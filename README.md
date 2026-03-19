@@ -18,14 +18,6 @@ A modern, fast, and responsive web interface for displaying player statistics, m
 * **Steam Integration:** Fetches player avatars and profile links directly from the Steam API.
 * **Performance:** Intelligent caching with 5-minute stats cache and 30-second server status cache for optimal performance.
 
-## Tech Stack
-
-* **Framework:** [Next.js](https://nextjs.org/) 16 (App Router) & [React](https://react.dev/) 19
-* **Styling:** [Tailwind CSS](https://tailwindcss.com/) 4 & [Lucide Icons](https://lucide.dev/)
-* **Database:** [MySQL2](https://github.com/sidorares/node-mysql2) (Connects directly to your existing ckSurf database)
-* **Server Query:** [GameDig](https://github.com/gamedig/node-gamedig) for real-time server status
-* **Deployment:** Docker & Docker Compose (Multi-stage Alpine builds for minimal footprint)
-
 ## Configuration
 
 The application is configured using environment variables. You can set these in a `.env` file for local development or in your `docker-compose.yml` for production.
@@ -80,3 +72,11 @@ If you prefer to run the application directly using Node.js:
    npm run dev
    ```
 4. Open `http://localhost:3000` in your browser.
+
+## Tech Stack
+
+* **Framework:** [Next.js](https://nextjs.org/) 16 (App Router) & [React](https://react.dev/) 19
+* **Styling:** [Tailwind CSS](https://tailwindcss.com/) 4 & [Lucide Icons](https://lucide.dev/)
+* **Database:** [MySQL2](https://github.com/sidorares/node-mysql2) (Connects directly to your existing ckSurf database)
+* **Server Query:** [GameDig](https://github.com/gamedig/node-gamedig) for real-time server status
+* **Deployment:** Docker & Docker Compose (Multi-stage Alpine builds for minimal footprint)

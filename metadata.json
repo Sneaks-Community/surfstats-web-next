@@ -1,5 +1,0 @@
-{
-  "name": "SurfStats",
-  "description": "A modern web application for displaying CS:GO surf statistics, player leaderboards, map records, and live server status.",
-  "requestFramePermissions": []
-}
