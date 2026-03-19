@@ -3,6 +3,9 @@ import { getServersCached } from '@/lib/cache';
 import ServerCard from './ServerCard';
 import logger from '@/lib/logger';
 
+// Force dynamic rendering to ensure fresh data on each request
+export const dynamic = 'force-dynamic';
+
 interface Player {
   name: string;
   raw?: any;

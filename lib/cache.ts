@@ -30,6 +30,216 @@ interface ServerStatus {
   playerList?: Player[];
 }
 
+// ============================================================
+// IN-MEMORY SERVER CACHE WITH BACKGROUND REFRESH
+// ============================================================
+// This cache is refreshed every 30 seconds in the background,
+// independent of user requests. Users always get instantly served
+// data that's at most 30 seconds old.
+//
+// IMPORTANT: We use globalThis to persist the cache across Next.js
+// hot reloads and serverless function invocations. Without this,
+// module-level variables would be reset on each page render.
+
+const SERVER_REFRESH_INTERVAL = 30 * 1000; // 30 seconds in milliseconds
+
+// Define the shape of our global cache
+interface GlobalServerCache {
+  data: ServerStatus[];
+  lastUpdated: number;
+  intervalId: NodeJS.Timeout | null;
+  initialized: boolean;
+  initialFetchPromise: Promise<void> | null;
+}
+
+// Get or create the global cache
+function getGlobalServerCache(): GlobalServerCache {
+  const global = globalThis as unknown as { serverCache?: GlobalServerCache };
+  if (!global.serverCache) {
+    global.serverCache = {
+      data: [],
+      lastUpdated: 0,
+      intervalId: null,
+      initialized: false,
+      initialFetchPromise: null,
+    };
+  }
+  return global.serverCache;
+}
+
+// Fetch servers from live game servers
+async function fetchServersFromGame(): Promise<ServerStatus[]> {
+  const startTime = Date.now();
+  
+  try {
+    logger.debug('[ServerCache] Fetching server statuses...');
+    let serversJson = process.env.SERVERS_JSON || '[]';
+    
+    // Remove surrounding single quotes if they exist
+    if (serversJson.startsWith("'") && serversJson.endsWith("'")) {
+      serversJson = serversJson.slice(1, -1);
+    }
+    
+    let configs: ServerConfig[];
+    try {
+      configs = JSON.parse(serversJson);
+    } catch (parseError: any) {
+      logger.error('[ServerCache] Failed to parse SERVERS_JSON environment variable');
+      logger.error(`[ServerCache] JSON parse error: ${parseError.message}`);
+      return [];
+    }
+    
+    if (!Array.isArray(configs)) {
+      logger.error('[ServerCache] SERVERS_JSON is not an array');
+      return [];
+    }
+    
+    logger.debug(`[ServerCache] Querying ${configs.length} servers...`);
+    
+    const statuses = await Promise.all(
+      configs.map(async (config) => {
+        const serverStart = Date.now();
+        try {
+          const state = await GameDig.query({
+            type: 'csgo',
+            host: config.ip,
+            port: config.port,
+            maxAttempts: 1,
+            socketTimeout: 2000,
+          });
+          
+          const duration = Date.now() - serverStart;
+          logger.debug(`[ServerCache] Server ${config.name} responded in ${duration}ms`);
+          
+          return {
+            config,
+            online: true,
+            name: state.name,
+            map: state.map,
+            players: state.players.length,
+            maxplayers: state.maxplayers,
+            ping: state.ping,
+            playerList: state.players.map((p: any) => ({
+              name: p.name || '',
+              time: p.time || p.raw?.time || 0,
+              score: p.score || 0
+            })),
+          };
+        } catch (error: any) {
+          const duration = Date.now() - serverStart;
+          const errorCode = error.code || 'UNKNOWN';
+          logger.debug(`[ServerCache] Server ${config.name} offline: ${errorCode}`);
+          return {
+            config,
+            online: false,
+          };
+        }
+      })
+    );
+    
+    const onlineCount = statuses.filter(s => s.online).length;
+    const duration = Date.now() - startTime;
+    logger.debug(`[ServerCache] Fetch complete: ${onlineCount}/${statuses.length} online (${duration}ms)`);
+    
+    return statuses;
+  } catch (error: any) {
+    logger.error(`[ServerCache] Unexpected error: ${error.message}`);
+    return [];
+  }
+}
+
+// Refresh the server cache
+async function refreshServerCache(): Promise<void> {
+  const cache = getGlobalServerCache();
+  const startTime = Date.now();
+  
+  try {
+    logger.debug('[ServerCache] Background refresh starting...');
+    cache.data = await fetchServersFromGame();
+    cache.lastUpdated = Date.now();
+    
+    const duration = Date.now() - startTime;
+    const age = Math.round((Date.now() - cache.lastUpdated) / 1000);
+    logger.debug(`[ServerCache] Background refresh complete (age: ${age}s, duration: ${duration}ms)`);
+  } catch (error: any) {
+    logger.error(`[ServerCache] Background refresh failed: ${error.message}`);
+  }
+}
+
+// Initialize the background refresh mechanism
+function initServerCache(): void {
+  if (typeof window !== 'undefined') {
+    // Skip in browser context
+    return;
+  }
+  
+  const cache = getGlobalServerCache();
+  
+  if (cache.initialized) {
+    return;
+  }
+  
+  cache.initialized = true;
+  logger.info('[ServerCache] Initializing background server cache (30s interval)...');
+  
+  // Initial fetch - store promise so callers can await it
+  cache.initialFetchPromise = refreshServerCache().catch(err => {
+    logger.error(`[ServerCache] Initial refresh failed: ${err.message}`);
+  });
+  
+  // Set up interval for background refresh
+  cache.intervalId = setInterval(() => {
+    refreshServerCache().catch(err => {
+      logger.error(`[ServerCache] Interval refresh failed: ${err.message}`);
+    });
+  }, SERVER_REFRESH_INTERVAL);
+  
+  logger.info('[ServerCache] Background refresh interval started');
+}
+
+// Stop the background refresh (for testing/cleanup)
+function stopServerCache(): void {
+  const cache = getGlobalServerCache();
+  if (cache.intervalId) {
+    clearInterval(cache.intervalId);
+    cache.intervalId = null;
+  }
+  cache.initialized = false;
+}
+
+// Public function to get servers from in-memory cache
+export async function getServersCached(): Promise<ServerStatus[]> {
+  // Initialize cache on first call (runs on server)
+  if (typeof window === 'undefined') {
+    initServerCache();
+  }
+  
+  const cache = getGlobalServerCache();
+  
+  // Wait for initial fetch to complete before returning
+  if (cache.initialFetchPromise) {
+    await cache.initialFetchPromise;
+  }
+  
+  // Return cached data
+  return cache.data;
+}
+
+// Get cache metadata for debugging/monitoring
+export function getServerCacheStats(): { lastUpdated: number; ageSeconds: number; initialized: boolean } {
+  const cache = getGlobalServerCache();
+  return {
+    lastUpdated: cache.lastUpdated,
+    ageSeconds: cache.lastUpdated ? Math.round((Date.now() - cache.lastUpdated) / 1000) : -1,
+    initialized: cache.initialized,
+  };
+}
+
+// ============================================================
+// UNSTABLE_CACHE: Used for stats and totals (database queries)
+// These don't need background refresh as database queries are fast
+// ============================================================
+
 // Fetch stats from database - throws on error so cache doesn't store bad data
 async function fetchStats() {
   const startTime = Date.now();
@@ -87,97 +297,6 @@ export const getStatsCached = unstable_cache(
   { revalidate: 300 }
 );
 
-// Fetch servers - with error handling
-async function fetchServers(): Promise<ServerStatus[]> {
-  const startTime = Date.now();
-  
-  try {
-    logger.debug('[Cache] Fetching server statuses...');
-    let serversJson = process.env.SERVERS_JSON || '[]';
-    
-    // Remove surrounding single quotes if they exist (e.g. from .env file or UI input)
-    if (serversJson.startsWith("'") && serversJson.endsWith("'")) {
-      serversJson = serversJson.slice(1, -1);
-    }
-    
-    let configs: ServerConfig[];
-    try {
-      configs = JSON.parse(serversJson);
-    } catch (parseError: any) {
-      logger.error('[Cache] Failed to parse SERVERS_JSON environment variable');
-      logger.error(`[Cache] JSON parse error: ${parseError.message}`);
-      logger.error('[Cache] Hint: Ensure SERVERS_JSON is valid JSON array format');
-      return [];
-    }
-    
-    if (!Array.isArray(configs)) {
-      logger.error('[Cache] SERVERS_JSON is not an array');
-      return [];
-    }
-    
-    logger.debug(`[Cache] Querying ${configs.length} servers...`);
-    
-    const statuses = await Promise.all(
-      configs.map(async (config) => {
-        const serverStart = Date.now();
-        try {
-          const state = await GameDig.query({
-            type: 'csgo',
-            host: config.ip,
-            port: config.port,
-            maxAttempts: 1,
-            socketTimeout: 2000,
-          });
-          
-          const duration = Date.now() - serverStart;
-          logger.debug(`[Cache] Server ${config.name} (${config.ip}:${config.port}) responded in ${duration}ms`);
-          
-          return {
-            config,
-            online: true,
-            name: state.name,
-            map: state.map,
-            players: state.players.length,
-            maxplayers: state.maxplayers,
-            ping: state.ping,
-            playerList: state.players.map((p: any) => ({
-              name: p.name || '',
-              time: p.time || p.raw?.time || 0,
-              score: p.score || 0
-            })),
-          };
-        } catch (error: any) {
-          const duration = Date.now() - serverStart;
-          const errorCode = error.code || 'UNKNOWN';
-          logger.warn(`[Cache] Server ${config.name} (${config.ip}:${config.port}) failed after ${duration}ms: ${errorCode} - ${error.message || 'No response'}`);
-          return {
-            config,
-            online: false,
-          };
-        }
-      })
-    );
-    
-    const onlineCount = statuses.filter(s => s.online).length;
-    const duration = Date.now() - startTime;
-    logger.debug(`[Cache] Server status fetch complete: ${onlineCount}/${statuses.length} online (${duration}ms)`);
-    
-    return statuses;
-  } catch (error: any) {
-    const duration = Date.now() - startTime;
-    logger.error(`[Cache] Unexpected error fetching servers after ${duration}ms`);
-    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
-    return [];
-  }
-}
-
-// Cache servers for 30 seconds
-export const getServersCached = unstable_cache(
-  fetchServers,
-  ['servers-status'],
-  { revalidate: 30 }
-);
-
 // Fetch totals (maps, bonuses, stages) - used for player progress bars
 async function fetchTotals() {
   const startTime = Date.now();
@@ -231,6 +350,16 @@ export async function prewarmCaches() {
     logger.info(`[Cache] Stats cache pre-warmed successfully (${Date.now() - startTime}ms)`);
   } catch (error: any) {
     logger.error('[Cache] Stats cache pre-warm failed');
+    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+  }
+  
+  // Pre-warm totals cache
+  try {
+    const startTime = Date.now();
+    await getTotalsCached();
+    logger.info(`[Cache] Totals cache pre-warmed successfully (${Date.now() - startTime}ms)`);
+  } catch (error: any) {
+    logger.error('[Cache] Totals cache pre-warm failed');
     logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
   }
   
