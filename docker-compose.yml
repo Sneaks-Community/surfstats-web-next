@@ -1,0 +1,32 @@
+services:
+  surfstats-web-next:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: surfstats-web-next:main
+    container_name: surfstats-web-next
+    restart: unless-stopped
+    # Security
+    security_opt:
+      - "apparmor=docker-default"
+      - "no-new-privileges=true"
+    # Drop all container capabilities
+    cap_drop:
+      - ALL
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - MYSQL_HOST=db
+      - MYSQL_PORT=3306
+      - MYSQL_USER=surfstats
+      - MYSQL_PASSWORD=surfstats_password
+      - MYSQL_DATABASE=cksurf
+      - STEAM_API_KEY=your_steam_api_key_here # https://steamcommunity.com/dev/apikey
+      - SERVERS_JSON=[{"name":"Main Server","ip":"127.0.0.1","port":27015}]
+      - MAP_IMAGES_URL=https://image.gametracker.com/images/maps/160x120/csgo/
+      - NEXT_PUBLIC_MAIN_SITE_URL=https://github.com/Sneaks-Community
+      - NEXT_PUBLIC_MAIN_SITE_NAME=Main Site
+      - NEXT_PUBLIC_FOOTER_LINK_URL=https://discord.com/invite/your_invite_code
+      - NEXT_PUBLIC_FOOTER_LINK_TEXT=Discord
+      - LOG_LEVEL=warn # trace, debug, info, warn, error, fatal, silent
