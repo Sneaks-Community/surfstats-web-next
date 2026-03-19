@@ -178,6 +178,48 @@ export const getServersCached = unstable_cache(
   { revalidate: 30 }
 );
 
+// Fetch totals (maps, bonuses, stages) - used for player progress bars
+async function fetchTotals() {
+  const startTime = Date.now();
+  
+  try {
+    logger.debug('[Cache] Fetching totals from database...');
+    
+    const [mapRows] = await pool.query<RowDataPacket[]>(`
+      SELECT COUNT(*) as total FROM ck_maptier m WHERE EXISTS (SELECT 1 FROM ck_playertimes pt WHERE pt.mapname = m.mapname)
+    `);
+    
+    const [bonusRows] = await pool.query<RowDataPacket[]>(`
+      SELECT COUNT(DISTINCT mapname, zonegroup) as total FROM ck_zones WHERE zonegroup > 0 AND EXISTS (SELECT 1 FROM ck_playertimes pt WHERE pt.mapname = ck_zones.mapname)
+    `);
+    
+    const [stageRows] = await pool.query<RowDataPacket[]>(`
+      SELECT COUNT(*) as total FROM ck_zones WHERE zonetype = 3 AND EXISTS (SELECT 1 FROM ck_playertimes pt WHERE pt.mapname = ck_zones.mapname)
+    `);
+    
+    const duration = Date.now() - startTime;
+    logger.debug(`[Cache] Totals fetched successfully in ${duration}ms: maps=${mapRows[0]?.total}, bonuses=${bonusRows[0]?.total}, stages=${stageRows[0]?.total}`);
+    
+    return {
+      totalMaps: mapRows[0]?.total ?? 0,
+      totalBonuses: bonusRows[0]?.total ?? 0,
+      totalStages: stageRows[0]?.total ?? 0,
+    };
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    logger.error(`[Cache] Failed to fetch totals after ${duration}ms`);
+    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+    throw error;
+  }
+}
+
+// Cache totals for 5 minutes (300 seconds)
+export const getTotalsCached = unstable_cache(
+  fetchTotals,
+  ['totals-data'],
+  { revalidate: 300 }
+);
+
 // Pre-warm all caches on startup
 export async function prewarmCaches() {
   logger.info('[Cache] Pre-warming caches...');

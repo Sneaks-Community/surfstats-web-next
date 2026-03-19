@@ -2,12 +2,14 @@ import pool from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 import Link from 'next/link';
 import { getSteamAvatars, getSteamProfileUrl } from '@/lib/steam';
-import { Trophy, Map as MapIcon, Clock, Activity, Target, Layers } from 'lucide-react';
+import { Trophy, Activity, Map as MapIcon, Target, Layers } from 'lucide-react';
 import Image from 'next/image';
 import { unstable_cache } from 'next/cache';
 import { formatTime, formatDate } from '@/lib/utils';
 import { sanitizeSteamId, sanitizePlayerName } from '@/lib/sanitize';
 import CountryBadge from '@/components/CountryBadge';
+import ProgressBar from '@/components/ProgressBar';
+import { getTotalsCached } from '@/lib/cache';
 import logger from '@/lib/logger';
 
 interface PlayerData extends RowDataPacket {
@@ -137,6 +139,7 @@ export default async function PlayerProfilePage({
   }
 
   const { player, maps, bonuses, stages } = data;
+  const totals = await getTotalsCached();
   const steamAvatars = await getSteamAvatars(decodedSteamId);
 
   return (
@@ -191,36 +194,40 @@ export default async function PlayerProfilePage({
             </div>
           </div>
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-800">
-              <div className="flex items-center gap-2 text-zinc-400 mb-1">
+          {/* Stats Row */}
+          <div className="flex flex-wrap gap-4 justify-center items-center">
+            <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-800 min-w-[140px] h-[72px] flex flex-col justify-center">
+              <div className="flex items-center justify-center gap-2 text-zinc-400 mb-1">
                 <Trophy className="h-4 w-4 text-yellow-500" />
                 <span className="text-sm font-medium uppercase tracking-wider">Rank</span>
               </div>
-              <div className="text-2xl font-bold text-white">#{player.rank}</div>
+              <div className="text-2xl font-bold text-white text-center">#{player.rank}</div>
             </div>
-            <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-800">
-              <div className="flex items-center gap-2 text-zinc-400 mb-1">
+            <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-800 min-w-[140px] h-[72px] flex flex-col justify-center">
+              <div className="flex items-center justify-center gap-2 text-zinc-400 mb-1">
                 <Activity className="h-4 w-4 text-emerald-500" />
                 <span className="text-sm font-medium uppercase tracking-wider">Points</span>
               </div>
-              <div className="text-2xl font-bold text-white">{player.points.toLocaleString()}</div>
+              <div className="text-2xl font-bold text-white text-center">{player.points.toLocaleString()}</div>
             </div>
-            <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-800">
-              <div className="flex items-center gap-2 text-zinc-400 mb-1">
-                <MapIcon className="h-4 w-4 text-blue-500" />
-                <span className="text-sm font-medium uppercase tracking-wider">Maps</span>
-              </div>
-              <div className="text-2xl font-bold text-white">{maps.length.toLocaleString()}</div>
-            </div>
-            <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-800">
-              <div className="flex items-center gap-2 text-zinc-400 mb-1">
-                <Target className="h-4 w-4 text-purple-500" />
-                <span className="text-sm font-medium uppercase tracking-wider">Bonuses</span>
-              </div>
-              <div className="text-2xl font-bold text-white">{bonuses.length.toLocaleString()}</div>
-            </div>
+            <ProgressBar
+              label="Maps"
+              current={maps.length}
+              total={totals.totalMaps}
+              color="blue"
+            />
+            <ProgressBar
+              label="Bonuses"
+              current={bonuses.length}
+              total={totals.totalBonuses}
+              color="purple"
+            />
+            <ProgressBar
+              label="Stages"
+              current={stages.length}
+              total={totals.totalStages}
+              color="orange"
+            />
           </div>
         </div>
       </div>
