@@ -19,15 +19,15 @@ export default function ProgressBar({ label, current, total, color }: ProgressBa
   return (
     <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-800 min-w-[260px] flex-1 max-w-[400px] h-[72px] flex flex-col justify-center">
       <div className="relative h-6 bg-zinc-700 rounded overflow-hidden">
-        <div 
-          className={`absolute inset-y-0 left-0 ${colorClasses[color]} rounded transition-all duration-1000 ease-out`}
-          style={{ width: `${percentage}%` }}
-        >
-          {/* Loading bar animation */}
-          <div className="absolute inset-0 overflow-hidden">
-            <div className="h-full w-full bg-gradient-to-r from-transparent via-white/40 to-transparent animate-loading-bar" />
-          </div>
-        </div>
+        <div
+          className={`absolute inset-y-0 left-0 ${colorClasses[color]} rounded transition-all duration-1000 ease-out animate-barber-pole`}
+          style={{
+            opacity: 0.85,
+            width: `${percentage}%`,
+            backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent)',
+            backgroundSize: '40px 40px',
+          }}
+        />
         <div className="absolute inset-0 flex items-center justify-between px-2">
           <span className="text-xs font-semibold text-white drop-shadow-md whitespace-nowrap">
             {label}
@@ -37,15 +37,6 @@ export default function ProgressBar({ label, current, total, color }: ProgressBa
           </span>
         </div>
       </div>
-      <style jsx>{`
-        @keyframes loading-bar {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(200%); }
-        }
-        .animate-loading-bar {
-          animation: loading-bar 1.5s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   );
 }
