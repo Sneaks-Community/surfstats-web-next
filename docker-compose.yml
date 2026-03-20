@@ -30,3 +30,9 @@ services:
       - NEXT_PUBLIC_FOOTER_LINK_URL=https://discord.com/invite/your_invite_code
       - NEXT_PUBLIC_FOOTER_LINK_TEXT=Discord
       - LOG_LEVEL=warn # trace, debug, info, warn, error, fatal, silent
+      # Optional, for Player Analytics integration. Review documentation for implementation and fork required.
+      - ANALYTICS_MYSQL_HOST=db
+      - ANALYTICS_MYSQL_PORT=3306
+      - ANALYTICS_MYSQL_USER=analytics
+      - ANALYTICS_MYSQL_PASSWORD=analytics_password
+      - ANALYTICS_MYSQL_DATABASE=player_analytics

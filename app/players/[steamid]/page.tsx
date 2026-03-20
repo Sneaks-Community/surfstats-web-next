@@ -2,14 +2,15 @@ import pool from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 import Link from 'next/link';
 import { getSteamAvatars, getSteamProfileUrl } from '@/lib/steam';
-import { Trophy, Activity, Map as MapIcon, Target, Layers } from 'lucide-react';
+import { Trophy, Activity, Map as MapIcon, Target, Layers, Clock } from 'lucide-react';
 import Image from 'next/image';
 import { unstable_cache } from 'next/cache';
-import { formatTime, formatDate } from '@/lib/utils';
+import { formatTime, formatDate, formatPlaytime } from '@/lib/utils';
 import { sanitizeSteamId, sanitizePlayerName } from '@/lib/sanitize';
 import CountryBadge from '@/components/CountryBadge';
 import ProgressBar from '@/components/ProgressBar';
 import { getTotalsCached } from '@/lib/cache';
+import { getPlayerTimeOnServer } from '@/lib/player-analytics';
 import logger from '@/lib/logger';
 
 interface PlayerData extends RowDataPacket {
@@ -141,6 +142,9 @@ export default async function PlayerProfilePage({
   const { player, maps, bonuses, stages } = data;
   const totals = await getTotalsCached();
   const steamAvatars = await getSteamAvatars(decodedSteamId);
+  
+  // Fetch playtime from analytics database (optional, box hidden if unavailable)
+  const playtimeData = await getPlayerTimeOnServer(validSteamId);
 
   return (
     <div className="space-y-8">
@@ -195,39 +199,77 @@ export default async function PlayerProfilePage({
           </div>
 
           {/* Stats Row */}
-          <div className="flex flex-wrap gap-4 justify-center items-center">
-            <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-800 min-w-[140px] h-[72px] flex flex-col justify-center">
-              <div className="flex items-center justify-center gap-2 text-zinc-400 mb-1">
-                <Trophy className="h-4 w-4 text-yellow-500" />
-                <span className="text-sm font-medium uppercase tracking-wider">Rank</span>
+          <div className="flex flex-wrap gap-3 justify-center items-center">
+            <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-800 min-w-[100px] h-[72px] flex flex-col justify-center">
+              <div className="flex items-center justify-center gap-1 text-zinc-400 mb-1">
+                <Trophy className="h-4 w-4 text-yellow-500 flex-shrink-0" />
+                <span className="text-xs font-medium uppercase tracking-wider">Rank</span>
               </div>
-              <div className="text-2xl font-bold text-white text-center">#{player.rank}</div>
+              <div className="text-xl font-bold text-white text-center">#{player.rank}</div>
             </div>
-            <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-800 min-w-[140px] h-[72px] flex flex-col justify-center">
-              <div className="flex items-center justify-center gap-2 text-zinc-400 mb-1">
-                <Activity className="h-4 w-4 text-emerald-500" />
-                <span className="text-sm font-medium uppercase tracking-wider">Points</span>
+            <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-800 min-w-[100px] h-[72px] flex flex-col justify-center">
+              <div className="flex items-center justify-center gap-1 text-zinc-400 mb-1">
+                <Activity className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                <span className="text-xs font-medium uppercase tracking-wider">Points</span>
               </div>
-              <div className="text-2xl font-bold text-white text-center">{player.points.toLocaleString()}</div>
+              <div className="text-xl font-bold text-white text-center">{player.points.toLocaleString()}</div>
             </div>
-            <ProgressBar
-              label="Maps"
-              current={maps.length}
-              total={totals.totalMaps}
-              color="blue"
-            />
-            <ProgressBar
-              label="Bonuses"
-              current={bonuses.length}
-              total={totals.totalBonuses}
-              color="purple"
-            />
-            <ProgressBar
-              label="Stages"
-              current={stages.length}
-              total={totals.totalStages}
-              color="orange"
-            />
+            {playtimeData && (
+              <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-800 min-w-[110px] h-[72px] flex flex-col justify-center">
+                <div className="flex items-center justify-center gap-1 text-zinc-400 mb-1">
+                  <Clock className="h-4 w-4 text-cyan-500 flex-shrink-0" />
+                  <span className="text-xs font-medium uppercase tracking-wider">Time Played</span>
+                </div>
+                <div className="text-xl font-bold text-white text-center">
+                  {formatPlaytime(playtimeData.totalSeconds)}
+                </div>
+              </div>
+            )}
+            {/* Progress bars stacked horizontally in a 72px tall container */}
+            <div className="bg-zinc-800/50 rounded-lg p-2 border border-zinc-800 h-[72px] flex flex-col justify-center gap-1.5 w-[240px]">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-medium text-blue-400 w-8 flex-shrink-0">Map</span>
+                <div className="flex-1 h-3 bg-zinc-700 rounded overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded animate-barber-pole"
+                    style={{
+                      width: `${totals.totalMaps > 0 ? Math.min(100, (maps.length / totals.totalMaps) * 100) : 0}%`,
+                      backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent)',
+                      backgroundSize: '20px 20px',
+                    }}
+                  />
+                </div>
+                <span className="text-[10px] text-zinc-300 w-12 text-right flex-shrink-0">{maps.length}/{totals.totalMaps}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-medium text-purple-400 w-8 flex-shrink-0">Bonus</span>
+                <div className="flex-1 h-3 bg-zinc-700 rounded overflow-hidden">
+                  <div
+                    className="h-full bg-purple-500 rounded animate-barber-pole"
+                    style={{
+                      width: `${totals.totalBonuses > 0 ? Math.min(100, (bonuses.length / totals.totalBonuses) * 100) : 0}%`,
+                      backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent)',
+                      backgroundSize: '20px 20px',
+                    }}
+                  />
+                </div>
+                <span className="text-[10px] text-zinc-300 w-12 text-right flex-shrink-0">{bonuses.length}/{totals.totalBonuses}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-medium text-orange-400 w-8 flex-shrink-0">Stage</span>
+                <div className="flex-1 h-3 bg-zinc-700 rounded overflow-hidden">
+                  <div
+                    className="h-full bg-orange-500 rounded animate-barber-pole"
+                    style={{
+                      width: `${totals.totalStages > 0 ? Math.min(100, (stages.length / totals.totalStages) * 100) : 0}%`,
+                      backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent)',
+                      backgroundSize: '20px 20px',
+                    }}
+                  />
+                </div>
+                <span className="text-[10px] text-zinc-300 w-12 text-right flex-shrink-0">{stages.length}/{totals.totalStages}</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

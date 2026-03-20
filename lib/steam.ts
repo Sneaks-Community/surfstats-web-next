@@ -183,6 +183,35 @@ export function convertSteamIdTo64(steamId: string): string | null {
 }
 
 /**
+ * Convert SteamID2 (STEAM_X:Y:Z) to SteamID3 numeric (Y component in [U:1:Y])
+ * SteamID3 numeric = Z * 2 + Y
+ * @param steamId - SteamID2 format (e.g., STEAM_1:0:95515509)
+ * @returns SteamID3 numeric value or null if invalid
+ */
+export function convertSteamId2ToSteamId3Numeric(steamId: string): number | null {
+  const match = steamId.match(/^STEAM_([0-5]):([0-1]):([0-9]+)$/);
+  if (!match) return null;
+
+  const z = parseInt(match[3], 10);
+  const y = parseInt(match[2], 10);
+
+  // SteamID3 numeric = Z * 2 + Y
+  return z * 2 + y;
+}
+
+/**
+ * Convert SteamID3 numeric (Y component in [U:1:Y]) to SteamID2 format
+ * @param steamId3Numeric - SteamID3 numeric value
+ * @returns SteamID2 format string (e.g., STEAM_1:0:95515509)
+ */
+export function convertSteamId3NumericToSteamId2(steamId3Numeric: number): string {
+  const z = Math.floor(steamId3Numeric / 2);
+  const y = steamId3Numeric % 2;
+
+  return `STEAM_1:${y}:${z}`;
+}
+
+/**
  * Generates a Steam community profile URL from a SteamID
  * @param steamId - Can be either STEAM_1:0:12345 format or already a SteamID64
  * @returns The Steam profile URL or null if the steamId is invalid

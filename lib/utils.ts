@@ -35,3 +35,16 @@ export function formatTime(seconds: number): string {
   const secs = (seconds % 60).toFixed(3);
   return `${mins}:${secs.padStart(6, '0')}`;
 }
+
+/**
+ * Format playtime duration in seconds to hours and minutes format
+ * Used for displaying total time on server from player analytics
+ * @param seconds - Total time in seconds
+ * @returns Formatted string in "Xh Ym" format (e.g., "125h 30m", "0h 15m")
+ */
+export function formatPlaytime(seconds: number): string {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  
+  return `${hours}h ${minutes}m`;
+}

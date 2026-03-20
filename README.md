@@ -17,6 +17,7 @@ A modern, fast, and responsive web interface for displaying player statistics, m
 * **Global Search:** Quickly find players by name or SteamID, search for specific maps.
 * **Steam Integration:** Fetches player avatars and profile links directly from the Steam API.
 * **Performance:** Intelligent caching with 5-minute stats cache and 30-second server status cache for optimal performance.
+* **Player Analytics:** Utilizes [a fork of Player Analytics](https://github.com/sneak-it/PlayerAnalytics) for **optional** play time display.
 
 ## Configuration
 
