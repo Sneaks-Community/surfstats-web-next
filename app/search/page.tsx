@@ -3,6 +3,7 @@ import { RowDataPacket } from 'mysql2';
 import Link from 'next/link';
 import { Search as SearchIcon, Map as MapIcon, Users, ChevronRight } from 'lucide-react';
 import MapImage from '@/components/MapImage';
+import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTierColor, getTierTextColor } from '@/lib/tierColors';
 import { sanitizeSearchQuery, sanitizePlayerName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
@@ -151,9 +152,8 @@ export default async function SearchPage({
             {maps.length > 0 ? (
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden divide-y divide-zinc-800">
                 {maps.map((map) => (
-                  <Link 
-                    key={map.mapname} 
-                    href={`/maps/${map.mapname}`}
+                  <div
+                    key={map.mapname}
                     className="flex items-center justify-between p-4 hover:bg-zinc-800/50 transition-colors group"
                   >
                     <div className="flex items-center gap-4">
@@ -167,14 +167,14 @@ export default async function SearchPage({
                         />
                       </div>
                       <div>
-                        <div className="font-medium text-emerald-400 group-hover:text-emerald-300 transition-colors">
+                        <MapLinkWithPreview mapname={map.mapname} className="font-medium text-emerald-400 group-hover:text-emerald-300 transition-colors">
                           {map.mapname}
-                        </div>
+                        </MapLinkWithPreview>
                         <div className={`text-xs mt-0.5 ${getTierTextColor(map.tier)}`}>Tier {map.tier}</div>
                       </div>
                     </div>
                     <ChevronRight className="h-5 w-5 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
-                  </Link>
+                  </div>
                 ))}
               </div>
             ) : (

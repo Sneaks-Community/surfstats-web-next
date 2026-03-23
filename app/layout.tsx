@@ -1,6 +1,7 @@
 import type {Metadata} from 'next';
 import './globals.css'; // Global styles
 import { Navigation } from '@/components/navigation';
+import { MapImagesUrlProvider } from '@/lib/MapImagesUrlContext';
 
 export const metadata: Metadata = {
   title: 'SurfStats - CS:GO Surf Community',
@@ -8,13 +9,16 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
+  const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
+  
   return (
     <html lang="en" className="dark">
       <body className="bg-zinc-900 text-zinc-100 min-h-screen flex flex-col antialiased" suppressHydrationWarning>
-        <Navigation />
-        <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {children}
-        </main>
+        <MapImagesUrlProvider url={mapImagesUrl}>
+          <Navigation />
+          <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {children}
+          </main>
         <footer className="bg-zinc-950 border-t border-zinc-800 mt-auto relative">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-zinc-400 text-sm">
             <a href={process.env.NEXT_PUBLIC_MAIN_SITE_URL || 'https://snksrv.com'} className="hover:text-emerald-400 transition-colors">{process.env.NEXT_PUBLIC_MAIN_SITE_NAME || 'Main Site'}</a>
@@ -31,6 +35,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
             </svg>
           </a>
         </footer>
+        </MapImagesUrlProvider>
       </body>
     </html>
   );

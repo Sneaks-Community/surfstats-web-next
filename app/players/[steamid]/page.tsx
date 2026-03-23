@@ -9,6 +9,7 @@ import { formatTime, formatDate, formatPlaytime } from '@/lib/utils';
 import { sanitizeSteamId, sanitizePlayerName } from '@/lib/sanitize';
 import CountryBadge from '@/components/CountryBadge';
 import ProgressBar from '@/components/ProgressBar';
+import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTotalsCached } from '@/lib/cache';
 import { getPlayerTimeOnServer } from '@/lib/player-analytics';
 import logger from '@/lib/logger';
@@ -290,9 +291,9 @@ export default async function PlayerProfilePage({
               {maps.map((record, i) => (
                 <div key={i} className="px-6 py-3 hover:bg-zinc-800/50 transition-colors flex justify-between items-center">
                   <div>
-                    <Link href={`/maps/${record.mapname}`} className="text-emerald-400 hover:underline font-medium">
+                    <MapLinkWithPreview mapname={record.mapname}>
                       {sanitizePlayerName(record.mapname)}
-                    </Link>
+                    </MapLinkWithPreview>
                     <div className="text-xs text-zinc-500 mt-0.5">{formatDate(record.date)}</div>
                   </div>
                   <div className="font-mono text-zinc-200">
@@ -321,9 +322,9 @@ export default async function PlayerProfilePage({
               {bonuses.map((record, i) => (
                 <div key={i} className="px-6 py-3 hover:bg-zinc-800/50 transition-colors flex justify-between items-center">
                   <div>
-                    <Link href={`/maps/${record.mapname}`} className="text-emerald-400 hover:underline font-medium">
+                    <MapLinkWithPreview mapname={record.mapname}>
                       {sanitizePlayerName(record.mapname)}
-                    </Link>
+                    </MapLinkWithPreview>
                     <span className="ml-2 text-xs bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded">B{record.zonegroup}</span>
                     <div className="text-xs text-zinc-500 mt-0.5">{formatDate(record.date)}</div>
                   </div>
@@ -353,9 +354,9 @@ export default async function PlayerProfilePage({
               {stages.map((record, i) => (
                 <div key={i} className="px-6 py-3 hover:bg-zinc-800/50 transition-colors flex justify-between items-center">
                   <div>
-                    <Link href={`/maps/${record.map}`} className="text-emerald-400 hover:underline font-medium">
+                    <MapLinkWithPreview mapname={record.map}>
                       {sanitizePlayerName(record.map)}
-                    </Link>
+                    </MapLinkWithPreview>
                     <span className="ml-2 text-xs bg-zinc-800 text-zinc-300 px-1.5 py-0.5 rounded">S{record.stage}</span>
                     <div className="text-xs text-zinc-500 mt-0.5">{formatDate(record.date)}</div>
                   </div>

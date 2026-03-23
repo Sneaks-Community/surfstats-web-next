@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Server, Users, Map as MapIcon, Activity, ChevronDown, Clock } from 'lucide-react';
 import Link from 'next/link';
 import MapImage from '@/components/MapImage';
+import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 
 function formatTime(seconds?: number) {
   if (typeof seconds !== 'number' || isNaN(seconds)) return 'Unknown';
@@ -54,9 +55,9 @@ export default function ServerCard({ server, mapImagesUrl }: { server: any; mapI
         {server.online ? (
           <div className="flex items-center gap-4 sm:gap-6">
             <div className="hidden sm:block text-right">
-              <Link href={`/maps/${server.map}`} className="text-sm font-medium text-emerald-400 hover:underline block" onClick={(e) => e.stopPropagation()}>
+              <MapLinkWithPreview mapname={server.map} className="text-sm font-medium text-emerald-400 hover:underline block" onClick={(e) => e.stopPropagation()}>
                 {server.map}
-              </Link>
+              </MapLinkWithPreview>
               <div className="text-[10px] uppercase tracking-wider text-zinc-500 mt-0.5">Map</div>
             </div>
             

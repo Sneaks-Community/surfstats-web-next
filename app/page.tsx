@@ -3,6 +3,7 @@ import { Users, Map as MapIcon, Trophy, Clock, Activity, Server } from 'lucide-r
 import { formatTime, formatDate } from '@/lib/utils';
 import { getStatsCached } from '@/lib/cache';
 import logger from '@/lib/logger';
+import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
@@ -89,9 +90,9 @@ export default async function Home() {
                         <MapIcon className="h-5 w-5 text-zinc-400" />
                       </div>
                       <div>
-                        <Link href={`/maps/${record.map}`} className="text-emerald-400 font-medium hover:underline">
+                        <MapLinkWithPreview mapname={record.map}>
                           {record.map}
-                        </Link>
+                        </MapLinkWithPreview>
                         <div className="text-sm text-zinc-400 flex items-center gap-2 mt-1">
                           <span>by</span>
                           <Link href={`/players/${record.steamid}`} className="text-zinc-300 hover:text-white transition-colors">
