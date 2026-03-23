@@ -185,13 +185,13 @@ export default async function MapsPage({
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-white">Maps</h1>
-            <p className="text-zinc-400">Browse {total.toLocaleString()} surf maps</p>
+            <h1 className="text-3xl font-bold text-text">Maps</h1>
+            <p className="text-text-muted">Browse {total.toLocaleString()} surf maps</p>
           </div>
         </div>
         
         {/* Filter Panel */}
-        <Suspense fallback={<div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 h-32 animate-pulse" />}>
+        <Suspense fallback={<div className="bg-surface border border-border rounded-xl p-4 h-32 animate-pulse" />}>
           <MapFilters tierOptions={filterOptions.tiers} />
         </Suspense>
       </div>
@@ -200,8 +200,8 @@ export default async function MapsPage({
         {maps.map((map) => {
           const tierColor = getTierColor(map.tier);
           return (
-            <Link href={`/maps/${map.mapname}`} key={map.mapname} className="group block bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden hover:border-emerald-500/50 transition-colors">
-              <div className="relative h-48 bg-zinc-800 w-full overflow-hidden">
+            <Link href={`/maps/${map.mapname}`} key={map.mapname} className="group block bg-surface border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-colors">
+              <div className="relative h-48 bg-surface-hover w-full overflow-hidden">
                 <MapImage
                   src={`${mapImagesUrl}${map.mapname}.jpg`}
                   alt={map.mapname}
@@ -209,14 +209,14 @@ export default async function MapsPage({
                   className="object-cover group-hover:scale-105 transition-transform duration-300"
                   referrerPolicy="no-referrer"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/60 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-surface/10 to-transparent" />
                 <div className="absolute bottom-2 left-3 right-3">
-                  <h3 className="text-lg font-bold text-white truncate">{map.mapname}</h3>
-                  <span className={`inline-block mt-1 px-2 py-0.5 bg-zinc-800/80 backdrop-blur-sm text-xs font-semibold rounded-md border border-zinc-700 ${tierColor.text}`}>
+                  <h3 className="text-lg font-bold text-white truncate drop-shadow-lg">{map.mapname}</h3>
+                  <span className={`inline-block mt-1 px-2 py-0.5 bg-black/50 backdrop-blur-sm text-xs font-semibold rounded-md ${tierColor.text}`}>
                     Tier {map.tier}
                   </span>
                 </div>
-              <div className="absolute top-2 right-2 flex items-center gap-3 px-2 py-1 bg-zinc-900/80 backdrop-blur-sm rounded-md text-xs text-zinc-300">
+              <div className="absolute top-2 right-2 flex items-center gap-3 px-2 py-1 bg-black/50 backdrop-blur-sm rounded-md text-xs text-white">
                 <span className="flex items-center gap-1">
                   <Users className="h-3 w-3" />
                   {map.completions.toLocaleString()}
@@ -237,10 +237,10 @@ export default async function MapsPage({
       </div>
       
       {maps.length === 0 && (
-        <div className="text-center py-12 bg-zinc-900 border border-zinc-800 rounded-xl">
-          <MapIcon className="h-12 w-12 text-zinc-600 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-white">No maps found</h3>
-          <p className="text-zinc-400 mt-1">Try adjusting your search or filters.</p>
+        <div className="text-center py-12 bg-surface border border-border rounded-xl">
+          <MapIcon className="h-12 w-12 text-text-placeholder mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-text">No maps found</h3>
+          <p className="text-text-muted mt-1">Try adjusting your search or filters.</p>
         </div>
       )}
 

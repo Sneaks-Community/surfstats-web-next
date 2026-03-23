@@ -132,10 +132,10 @@ export default async function MapProfilePage({
   const validMapname = sanitizeMapName(decodedMapname);
   if (!validMapname) {
     return (
-      <div className="text-center py-20 bg-zinc-900 border border-zinc-800 rounded-xl">
-        <h1 className="text-2xl font-bold text-white mb-2">Map Not Found</h1>
-        <p className="text-zinc-400">The map name contains invalid characters.</p>
-        <Link href="/maps" className="inline-block mt-6 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md transition-colors">
+      <div className="text-center py-20 bg-surface border border-border rounded-xl">
+        <h1 className="text-2xl font-bold text-text mb-2">Map Not Found</h1>
+        <p className="text-text-muted">The map name contains invalid characters.</p>
+        <Link href="/maps" className="inline-block mt-6 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-md transition-colors">
           Back to Maps
         </Link>
       </div>
@@ -152,10 +152,10 @@ export default async function MapProfilePage({
   
   if (!data) {
     return (
-      <div className="text-center py-20 bg-zinc-900 border border-zinc-800 rounded-xl">
-        <h1 className="text-2xl font-bold text-white mb-2">Map Not Found</h1>
-        <p className="text-zinc-400">The map {decodedMapname} could not be found.</p>
-        <Link href="/maps" className="inline-block mt-6 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-md transition-colors">
+      <div className="text-center py-20 bg-surface border border-border rounded-xl">
+        <h1 className="text-2xl font-bold text-text mb-2">Map Not Found</h1>
+        <p className="text-text-muted">The map {decodedMapname} could not be found.</p>
+        <Link href="/maps" className="inline-block mt-6 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-md transition-colors">
           Back to Maps
         </Link>
       </div>
@@ -168,7 +168,7 @@ export default async function MapProfilePage({
   return (
     <div className="space-y-8">
       {/* Map Header */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden relative">
+      <div className="bg-surface border border-border rounded-xl overflow-hidden relative">
         <div className="absolute inset-0 z-0 opacity-20">
           <MapImage
             src={`${mapImagesUrl}${map.mapname}.jpg`}
@@ -177,11 +177,11 @@ export default async function MapProfilePage({
             className="object-cover blur-sm"
             referrerPolicy="no-referrer"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-zinc-900/80 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/80 to-transparent" />
         </div>
         
         <div className="relative z-10 p-6 sm:p-10 flex flex-col md:flex-row gap-8 items-center md:items-end">
-          <div className="relative h-48 w-full md:w-72 rounded-xl overflow-hidden border-4 border-zinc-800 bg-zinc-800 flex-shrink-0 shadow-2xl">
+          <div className="relative h-48 w-full md:w-72 rounded-xl overflow-hidden border-4 border-border bg-surface-hover flex-shrink-0 shadow-2xl">
             <MapImage
               src={`${mapImagesUrl}${map.mapname}.jpg`}
               alt={map.mapname}
@@ -217,9 +217,9 @@ export default async function MapProfilePage({
               )}
             </div>
             
-            <h1 className="text-4xl sm:text-5xl font-bold text-white mb-2">{map.mapname}</h1>
-            <p className="text-zinc-400 text-lg flex items-center gap-2">
-              <span className="text-zinc-500">by</span>{' '}
+            <h1 className="text-4xl sm:text-5xl font-bold text-text mb-2">{map.mapname}</h1>
+            <p className="text-text-muted text-lg flex items-center gap-2">
+              <span className="text-text-placeholder">by</span>{' '}
               {(() => {
                 const profileUrl = map.mappersteam ? getSteamProfileUrl(map.mappersteam) : null;
                 return profileUrl ? (
@@ -227,7 +227,7 @@ export default async function MapProfilePage({
                     href={profileUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-emerald-400 hover:text-emerald-300 underline transition-colors"
+                    className="text-primary hover:text-primary transition-colors underline"
                   >
                     {sanitizePlayerName(map.mapper)}
                   </a>
@@ -238,77 +238,77 @@ export default async function MapProfilePage({
             </p>
           </div>
           
-          <div className="bg-zinc-800/80 backdrop-blur-md border border-zinc-700 rounded-xl p-4 text-center min-w-[120px]">
-            <Users className="h-6 w-6 text-emerald-400 mx-auto mb-1" />
-            <div className="text-2xl font-bold text-white">{total.toLocaleString()}</div>
-            <div className="text-xs text-zinc-400 uppercase tracking-wider font-semibold">Completions</div>
+          <div className="bg-surface-hover/80 backdrop-blur-md border border-border rounded-xl p-4 text-center min-w-[120px]">
+            <Users className="h-6 w-6 text-primary mx-auto mb-1" />
+            <div className="text-2xl font-bold text-text">{total.toLocaleString()}</div>
+            <div className="text-xs text-text-muted uppercase tracking-wider font-semibold">Completions</div>
           </div>
         </div>
       </div>
 
       {/* Leaderboard */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-zinc-800 bg-zinc-900/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+      <div className="bg-surface border border-border rounded-xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-border bg-surface/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <h2 className="text-xl font-semibold text-text flex items-center gap-2">
             <Trophy className="h-5 w-5 text-yellow-500" />
             Leaderboard
           </h2>
           
           <form className="relative w-full sm:w-72">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-zinc-400" />
+              <Search className="h-4 w-4 text-text-placeholder" />
             </div>
             <input
               type="text"
               name="q"
               defaultValue={q}
-              className="block w-full pl-10 pr-3 py-2 border border-zinc-700 rounded-md leading-5 bg-zinc-800 text-zinc-300 placeholder-zinc-400 focus:outline-none focus:bg-zinc-900 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 sm:text-sm transition-colors"
+              className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text placeholder-text-placeholder focus:outline-none focus:bg-surface focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
               placeholder="Search players..."
             />
           </form>
         </div>
         
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-zinc-800">
-            <thead className="bg-zinc-900/50">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-surface/50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider w-24">Rank</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Player</th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-zinc-400 uppercase tracking-wider">Time</th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-zinc-400 uppercase tracking-wider">Date</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider w-24">Rank</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Player</th>
+                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider">Time</th>
+                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider">Date</th>
               </tr>
             </thead>
-            <tbody className="bg-zinc-900 divide-y divide-zinc-800">
+            <tbody className="bg-surface divide-y divide-border">
               {records.map((record, i) => (
-                <tr key={`${record.steamid}-${i}`} className="hover:bg-zinc-800/50 transition-colors">
+                <tr key={`${record.steamid}-${i}`} className="hover:bg-surface-hover/50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center justify-center h-8 w-8 rounded-full font-bold text-sm ${
                       record.rank === 1 ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30' :
                       record.rank === 2 ? 'bg-zinc-300/20 text-zinc-300 border border-zinc-300/30' :
                       record.rank === 3 ? 'bg-amber-700/20 text-amber-600 border border-amber-700/30' :
-                      'text-zinc-500'
+                      'text-text-placeholder'
                     }`}>
                       {record.rank}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <Link href={`/players/${record.steamid}`} className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors text-base">
+                    <Link href={`/players/${record.steamid}`} className="text-primary hover:text-primary font-medium transition-colors text-base">
                       {sanitizePlayerName(record.name)}
                     </Link>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <span className="font-mono text-lg font-medium text-zinc-200">
+                    <span className="font-mono text-lg font-medium text-text">
                       {formatTime(record.runtimepro)}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-zinc-400">
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-text-muted">
                     {formatDate(record.date)}
                   </td>
                 </tr>
               ))}
               {records.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-zinc-400">
+                  <td colSpan={4} className="px-6 py-12 text-center text-text-muted">
                     {q ? 'No players found matching your search.' : 'No completions yet.'}
                   </td>
                 </tr>
@@ -319,7 +319,7 @@ export default async function MapProfilePage({
         
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-6 border-t border-zinc-800">
+          <div className="px-6 border-t border-border">
             <Pagination
               currentPage={page}
               totalPages={totalPages}

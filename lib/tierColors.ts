@@ -4,6 +4,9 @@ import 'server-only';
  * Utility functions for tier colorization
  * Tiers range from 1 (easiest) to 6+ (hardest)
  * Colors progress from green to red
+ * 
+ * Note: Tier colors are intentionally NOT theme-aware as they represent
+ * difficulty levels and should remain consistent across themes.
  */
 
 export interface TierColor {

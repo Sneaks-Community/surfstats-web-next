@@ -84,9 +84,9 @@ export default function Pagination({
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
       {/* Page info */}
-      <div className="text-sm text-zinc-400">
-        Page <span className="font-medium text-white">{currentPage}</span> of{' '}
-        <span className="font-medium text-white">{totalPages.toLocaleString()}</span>
+      <div className="text-sm text-text-muted">
+        Page <span className="font-medium text-text">{currentPage}</span> of{' '}
+        <span className="font-medium text-text">{totalPages.toLocaleString()}</span>
       </div>
 
       {/* Pagination controls */}
@@ -96,8 +96,8 @@ export default function Pagination({
           href={buildUrl(1)}
           className={`p-2 rounded-md border transition-colors ${
             currentPage === 1
-              ? 'border-zinc-800 text-zinc-600 cursor-not-allowed pointer-events-none'
-              : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:border-emerald-500/50'
+              ? 'border-border text-text-placeholder cursor-not-allowed pointer-events-none'
+              : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
           }`}
           aria-label="First page"
         >
@@ -109,8 +109,8 @@ export default function Pagination({
           href={currentPage > 1 ? buildUrl(currentPage - 1) : buildUrl(1)}
           className={`p-2 rounded-md border transition-colors ${
             currentPage === 1
-              ? 'border-zinc-800 text-zinc-600 cursor-not-allowed pointer-events-none'
-              : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:border-emerald-500/50'
+              ? 'border-border text-text-placeholder cursor-not-allowed pointer-events-none'
+              : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
           }`}
           aria-label="Previous page"
         >
@@ -122,14 +122,14 @@ export default function Pagination({
           {pageNumbers.map((page, index) => (
             <div key={index}>
               {page === '...' ? (
-                <span className="px-2 text-zinc-500">...</span>
+                <span className="px-2 text-text-placeholder">...</span>
               ) : (
                 <Link
                   href={buildUrl(page as number)}
                   className={`min-w-[2.5rem] h-9 px-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-center ${
                     currentPage === page
-                      ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400'
-                      : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:border-emerald-500/50'
+                      ? 'bg-primary/20 border-primary text-primary'
+                      : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
                   }`}
                 >
                   {page}
@@ -144,8 +144,8 @@ export default function Pagination({
           href={currentPage < totalPages ? buildUrl(currentPage + 1) : buildUrl(totalPages)}
           className={`p-2 rounded-md border transition-colors ${
             currentPage === totalPages
-              ? 'border-zinc-800 text-zinc-600 cursor-not-allowed pointer-events-none'
-              : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:border-emerald-500/50'
+              ? 'border-border text-text-placeholder cursor-not-allowed pointer-events-none'
+              : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
           }`}
           aria-label="Next page"
         >
@@ -157,8 +157,8 @@ export default function Pagination({
           href={buildUrl(totalPages)}
           className={`p-2 rounded-md border transition-colors ${
             currentPage === totalPages
-              ? 'border-zinc-800 text-zinc-600 cursor-not-allowed pointer-events-none'
-              : 'border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:border-emerald-500/50'
+              ? 'border-border text-text-placeholder cursor-not-allowed pointer-events-none'
+              : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
           }`}
           aria-label="Last page"
         >
@@ -167,7 +167,7 @@ export default function Pagination({
 
         {/* Jump to page */}
         <form onSubmit={handleJumpSubmit} className="flex items-center gap-2 ml-2">
-          <span className="text-sm text-zinc-400 hidden sm:inline">Go to</span>
+          <span className="text-sm text-text-muted hidden sm:inline">Go to</span>
           <input
             type="number"
             min={1}
@@ -176,11 +176,11 @@ export default function Pagination({
             onChange={(e) => setJumpPage(e.target.value)}
             placeholder="#"
             aria-label={`Jump to page (1-${totalPages})`}
-            className="w-16 h-9 px-2 text-center bg-zinc-900 border border-zinc-700 rounded-md text-sm text-zinc-300 placeholder-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+            className="w-16 h-9 px-2 text-center bg-background-secondary border border-border rounded-md text-sm text-text placeholder-text-placeholder focus:outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus"
           />
           <button
             type="submit"
-            className="h-9 px-3 bg-zinc-800 border border-zinc-700 rounded-md text-sm text-zinc-300 hover:bg-zinc-700 hover:border-emerald-500/50 transition-colors"
+            className="h-9 px-3 bg-surface border border-border rounded-md text-sm text-text-muted hover:bg-surface-hover hover:border-primary/50 transition-colors"
           >
             Go
           </button>

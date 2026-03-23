@@ -83,40 +83,40 @@ function MapFiltersForm({
   );
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-4">
+    <div className="bg-surface border border-border rounded-xl p-4 space-y-4">
       <div className="space-y-4">
         {/* Row 1: Search and Type */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-zinc-400" />
+              <Search className="h-4 w-4 text-text-placeholder" />
             </div>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-              className="block w-full pl-10 pr-3 py-2 border border-zinc-700 rounded-md leading-5 bg-zinc-800 text-zinc-300 placeholder-zinc-400 focus:outline-none focus:bg-zinc-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 sm:text-sm transition-colors"
+              className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text placeholder-text-placeholder focus:outline-none focus:bg-surface-hover focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
               placeholder="Search maps..."
             />
           </div>
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-zinc-400" />
+              <Search className="h-4 w-4 text-text-placeholder" />
             </div>
             <input
               type="text"
               value={mapper}
               onChange={(e) => setMapper(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-              className="block w-full pl-10 pr-3 py-2 border border-zinc-700 rounded-md leading-5 bg-zinc-800 text-zinc-300 placeholder-zinc-400 focus:outline-none focus:bg-zinc-700 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 sm:text-sm transition-colors"
+              className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text placeholder-text-placeholder focus:outline-none focus:bg-surface-hover focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
               placeholder="Search by mapper..."
             />
           </div>
           <select 
             value={type}
             onChange={(e) => setType(e.target.value)}
-            className="block w-full sm:w-32 pl-3 pr-10 py-2 border border-zinc-700 rounded-md leading-5 bg-zinc-800 text-zinc-300 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 sm:text-sm transition-colors"
+            className="block w-full sm:w-32 pl-3 pr-10 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text focus:outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
           >
             <option value="all">All Types</option>
             <option value="linear">Linear</option>
@@ -125,7 +125,7 @@ function MapFiltersForm({
           <select 
             value={bonuses}
             onChange={(e) => setBonuses(e.target.value)}
-            className="block w-full sm:w-32 pl-3 pr-10 py-2 border border-zinc-700 rounded-md leading-5 bg-zinc-800 text-zinc-300 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 sm:text-sm transition-colors"
+            className="block w-full sm:w-32 pl-3 pr-10 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text focus:outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
           >
             <option value="all">All Bonuses</option>
             <option value="0">0 Bonuses</option>
@@ -138,7 +138,7 @@ function MapFiltersForm({
         
         {/* Row 2: Tier Checkboxes */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-zinc-400 mr-2">Tiers:</span>
+          <span className="text-sm text-text-muted mr-2">Tiers:</span>
           {tierOptions.map((tier) => (
             <button
               key={tier.tier}
@@ -147,12 +147,12 @@ function MapFiltersForm({
               onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleTier(tier.tier)}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-md text-sm font-medium cursor-pointer transition-colors ${
                 selectedTiers.includes(tier.tier)
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/50'
-                  : 'bg-zinc-800 text-zinc-300 border border-zinc-700 hover:border-zinc-600'
+                  ? 'bg-primary/20 text-primary border border-primary/50'
+                  : 'bg-surface-hover text-text-muted border border-border hover:border-border-hover'
               }`}
             >
               <span>T{tier.tier}</span>
-              <span className="text-xs text-zinc-500">({tier.count})</span>
+              <span className="text-xs text-text-placeholder">({tier.count})</span>
             </button>
           ))}
         </div>
@@ -163,7 +163,7 @@ function MapFiltersForm({
             type="button"
             onClick={applyFilters}
             disabled={isPending}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-600/50 text-white text-sm font-medium rounded-md transition-colors"
+            className="px-4 py-2 bg-primary-600 hover:bg-primary-500 disabled:bg-primary-600/50 text-white text-sm font-medium rounded-md transition-colors"
           >
             {isPending ? 'Applying...' : 'Apply Filters'}
           </button>
@@ -172,7 +172,7 @@ function MapFiltersForm({
               type="button"
               onClick={clearFilters}
               disabled={isPending}
-              className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 disabled:bg-zinc-700/50 text-zinc-300 text-sm font-medium rounded-md transition-colors inline-flex items-center gap-2"
+              className="px-4 py-2 bg-surface-hover hover:bg-surface-active disabled:bg-surface-hover/50 text-text-muted text-sm font-medium rounded-md transition-colors inline-flex items-center gap-2"
             >
               <X className="h-4 w-4" />
               Clear Filters
@@ -198,11 +198,14 @@ export default function MapFilters({ tierOptions }: MapFiltersProps) {
   }), [searchParams]);
   
   // Create a stable key based on URL params - this forces re-mount when URL changes
-  const key = `${urlParams.q}|${urlParams.mapper}|${urlParams.type}|${urlParams.bonuses}|${urlParams.tiers.join(',')}`;
+  const formKey = useMemo(() => 
+    JSON.stringify(urlParams),
+    [urlParams]
+  );
   
   return (
     <MapFiltersForm
-      key={key}
+      key={formKey}
       tierOptions={tierOptions}
       initialQ={urlParams.q}
       initialMapper={urlParams.mapper}

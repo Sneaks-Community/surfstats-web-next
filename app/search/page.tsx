@@ -71,16 +71,16 @@ export default async function SearchPage({
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
       <div className="text-center space-y-4 py-8">
-        <h1 className="text-4xl font-bold text-white">Search</h1>
+        <h1 className="text-4xl font-bold text-text">Search</h1>
         <form className="relative max-w-2xl mx-auto">
           <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <SearchIcon className="h-6 w-6 text-zinc-400" />
+            <SearchIcon className="h-6 w-6 text-text-placeholder" />
           </div>
           <input
             type="text"
             name="q"
             defaultValue={query}
-            className="block w-full pl-12 pr-4 py-4 border border-zinc-700 rounded-xl leading-5 bg-zinc-900 text-lg text-zinc-100 placeholder-zinc-500 focus:outline-none focus:bg-zinc-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500 transition-all shadow-lg"
+            className="block w-full pl-12 pr-4 py-4 border border-border rounded-xl leading-5 bg-background-secondary text-lg text-text placeholder-text-placeholder focus:outline-none focus:bg-surface focus:border-border-focus focus:ring-2 focus:ring-border-focus transition-all shadow-lg"
             placeholder="Search for players (name, SteamID) or maps..."
             autoFocus
           />
@@ -88,7 +88,7 @@ export default async function SearchPage({
       </div>
 
       {query.length > 0 && query.length < 2 && (
-        <div className="text-center text-zinc-400 py-8">
+        <div className="text-center text-text-muted py-8">
           Please enter at least 2 characters to search.
         </div>
       )}
@@ -97,47 +97,47 @@ export default async function SearchPage({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Players Results */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
-                <Users className="h-5 w-5 text-emerald-500" />
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <h2 className="text-xl font-semibold text-text flex items-center gap-2">
+                <Users className="h-5 w-5 text-primary" />
                 Players
               </h2>
-              <span className="text-sm text-zinc-500">{players.length} results</span>
+              <span className="text-sm text-text-placeholder">{players.length} results</span>
             </div>
             
             {players.length > 0 ? (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden divide-y divide-zinc-800">
+              <div className="bg-surface border border-border rounded-xl overflow-hidden divide-y divide-border">
                 {players.map((player) => (
                   <Link 
                     key={player.steamid} 
                     href={`/players/${player.steamid}`}
-                    className="flex items-center justify-between p-4 hover:bg-zinc-800/50 transition-colors group"
+                    className="flex items-center justify-between p-4 hover:bg-surface-hover/50 transition-colors group"
                   >
                     <div>
-                      <div className="font-medium text-emerald-400 group-hover:text-emerald-300 transition-colors">
+                      <div className="font-medium text-primary group-hover:text-primary transition-colors">
                         {sanitizePlayerName(player.name)}
                       </div>
-                      <div className="text-xs text-zinc-500 mt-0.5">{player.steamid}</div>
+                      <div className="text-xs text-text-placeholder mt-0.5">{player.steamid}</div>
                     </div>
                     <div className="flex items-center gap-4">
-                      <div className="text-sm text-zinc-400 text-right">
-                        <div className="font-medium text-zinc-300">{player.points.toLocaleString()}</div>
+                      <div className="text-sm text-text-muted text-right">
+                        <div className="font-medium text-text">{player.points.toLocaleString()}</div>
                         <div className="text-[10px] uppercase tracking-wider">Points</div>
                       </div>
-                      <ChevronRight className="h-5 w-5 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                      <ChevronRight className="h-5 w-5 text-text-placeholder group-hover:text-text-muted transition-colors" />
                     </div>
                   </Link>
                 ))}
               </div>
             ) : (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center text-zinc-500">
+              <div className="bg-surface border border-border rounded-xl p-8 text-center text-text-placeholder">
                 No players found matching {'"'}{query}{'"'}
               </div>
             )}
             
             {players.length === 10 && (
               <div className="text-center">
-                <Link href={`/players?q=${encodeURIComponent(query)}`} className="text-sm text-emerald-500 hover:text-emerald-400 hover:underline">
+                <Link href={`/players?q=${encodeURIComponent(query)}`} className="text-sm text-primary hover:text-primary transition-colors underline">
                   View all player results &rarr;
                 </Link>
               </div>
@@ -146,23 +146,23 @@ export default async function SearchPage({
 
           {/* Maps Results */}
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-zinc-800 pb-2">
-              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+            <div className="flex items-center justify-between border-b border-border pb-2">
+              <h2 className="text-xl font-semibold text-text flex items-center gap-2">
                 <MapIcon className="h-5 w-5 text-blue-500" />
                 Maps
               </h2>
-              <span className="text-sm text-zinc-500">{maps.length} results</span>
+              <span className="text-sm text-text-placeholder">{maps.length} results</span>
             </div>
             
             {maps.length > 0 ? (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden divide-y divide-zinc-800">
+              <div className="bg-surface border border-border rounded-xl overflow-hidden divide-y divide-border">
                 {maps.map((map) => (
                   <div
                     key={map.mapname}
-                    className="flex items-center justify-between p-4 hover:bg-zinc-800/50 transition-colors group"
+                    className="flex items-center justify-between p-4 hover:bg-surface-hover/50 transition-colors group"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="relative h-12 w-16 rounded overflow-hidden bg-zinc-800 flex-shrink-0">
+                      <div className="relative h-12 w-16 rounded overflow-hidden bg-surface-hover flex-shrink-0">
                         <MapImage
                           src={`${mapImagesUrl}${map.mapname}.jpg`}
                           alt={map.mapname}
@@ -172,25 +172,25 @@ export default async function SearchPage({
                         />
                       </div>
                       <div>
-                        <MapLinkWithPreview mapname={map.mapname} className="font-medium text-emerald-400 group-hover:text-emerald-300 transition-colors">
+                        <MapLinkWithPreview mapname={map.mapname} className="font-medium text-primary group-hover:text-primary transition-colors">
                           {map.mapname}
                         </MapLinkWithPreview>
                         <div className={`text-xs mt-0.5 ${getTierTextColor(map.tier)}`}>Tier {map.tier}</div>
                       </div>
                     </div>
-                    <ChevronRight className="h-5 w-5 text-zinc-600 group-hover:text-zinc-400 transition-colors" />
+                    <ChevronRight className="h-5 w-5 text-text-placeholder group-hover:text-text-muted transition-colors" />
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center text-zinc-500">
+              <div className="bg-surface border border-border rounded-xl p-8 text-center text-text-placeholder">
                 No maps found matching {'"'}{query}{'"'}
               </div>
             )}
             
             {maps.length === 10 && (
               <div className="text-center">
-                <Link href={`/maps?q=${encodeURIComponent(query)}`} className="text-sm text-emerald-500 hover:text-emerald-400 hover:underline">
+                <Link href={`/maps?q=${encodeURIComponent(query)}`} className="text-sm text-primary hover:text-primary transition-colors underline">
                   View all map results &rarr;
                 </Link>
               </div>

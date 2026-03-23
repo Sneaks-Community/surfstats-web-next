@@ -99,43 +99,43 @@ export default async function PlayersPage({
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Players</h1>
-          <p className="text-zinc-400">Browse and search all {total.toLocaleString()} players</p>
+          <h1 className="text-3xl font-bold text-text">Players</h1>
+          <p className="text-text-muted">Browse and search all {total.toLocaleString()} players</p>
         </div>
         
         <form className="relative w-full sm:w-72">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-zinc-400" />
+            <Search className="h-4 w-4 text-text-placeholder" />
           </div>
           <input
             type="text"
             name="q"
             defaultValue={q}
             aria-label="Search players by name or SteamID"
-            className="block w-full pl-10 pr-3 py-2 border border-zinc-700 rounded-md leading-5 bg-zinc-900 text-zinc-300 placeholder-zinc-400 focus:outline-none focus:bg-zinc-800 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 sm:text-sm transition-colors"
+            className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text placeholder-text-placeholder focus:outline-none focus:bg-surface focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
             placeholder="Search by name or SteamID..."
           />
         </form>
       </div>
 
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="bg-surface border border-border rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-zinc-800">
-            <thead className="bg-zinc-900/50">
+          <table className="min-w-full divide-y divide-border">
+            <thead className="bg-surface/50">
               <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Rank</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Player</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Points</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Maps</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-zinc-400 uppercase tracking-wider">Last Seen</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Rank</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Player</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Points</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Maps</th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Last Seen</th>
               </tr>
             </thead>
-            <tbody className="bg-zinc-900 divide-y divide-zinc-800">
+            <tbody className="bg-surface divide-y divide-border">
               {players.map((player) => {
                 const avatar = avatarsWithData.get(player.steamid);
                 return (
-                  <tr key={player.steamid} className="hover:bg-zinc-800/50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-zinc-300">
+                  <tr key={player.steamid} className="hover:bg-surface-hover/50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-muted">
                       #{player.rank}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -149,18 +149,18 @@ export default async function PlayersPage({
                             className="rounded-full"
                           />
                         )}
-                        <Link href={`/players/${player.steamid}`} className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors">
+                        <Link href={`/players/${player.steamid}`} className="text-primary hover:text-primary font-medium transition-colors">
                           {player.name || 'Unknown'}
                         </Link>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
                       {player.points.toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-300">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
                       {player.finishedmaps.toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-zinc-400">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-text-muted">
                       {player.lastseen ? formatDate(player.lastseen) : 'Never'}
                     </td>
                   </tr>
@@ -168,7 +168,7 @@ export default async function PlayersPage({
               })}
               {players.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-zinc-400">
+                  <td colSpan={5} className="px-6 py-8 text-center text-text-muted">
                     No players found matching your search.
                   </td>
                 </tr>
@@ -179,7 +179,7 @@ export default async function PlayersPage({
         
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-6 border-t border-zinc-800">
+          <div className="px-6 border-t border-border">
             <Pagination
               currentPage={page}
               totalPages={totalPages}

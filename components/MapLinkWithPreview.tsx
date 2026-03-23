@@ -21,7 +21,7 @@ interface Position {
 export default function MapLinkWithPreview({
   mapname,
   children,
-  className = 'text-emerald-400 hover:underline font-medium',
+  className = 'text-primary hover:underline font-medium',
   onClick
 }: MapLinkWithPreviewProps) {
   const [isVisible, setIsVisible] = useState(false);
