@@ -4,18 +4,22 @@ import { Navigation } from '@/components/navigation';
 import { MapImagesUrlProvider } from '@/lib/MapImagesUrlContext';
 
 export const metadata: Metadata = {
-  title: 'SurfStats - CS:GO Surf Community',
-  description: 'Statistics, leaderboards, and server information for our CS:GO surf community.',
+  title: {
+    default: process.env.NEXT_PUBLIC_SITE_TITLE || 'SurfStats - CS:GO Surf Community',
+    template: `%s - ${process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats'}`,
+  },
+  description: process.env.NEXT_PUBLIC_SITE_DESCRIPTION || 'Statistics, leaderboards, and server information for our CS:GO surf community.',
 };
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
+  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats';
   
   return (
     <html lang="en" className="dark">
       <body className="bg-zinc-900 text-zinc-100 min-h-screen flex flex-col antialiased" suppressHydrationWarning>
         <MapImagesUrlProvider url={mapImagesUrl}>
-          <Navigation />
+          <Navigation siteName={siteName} />
           <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {children}
           </main>

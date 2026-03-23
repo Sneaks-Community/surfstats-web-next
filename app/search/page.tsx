@@ -7,6 +7,11 @@ import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTierColor, getTierTextColor } from '@/lib/tierColors';
 import { sanitizeSearchQuery, sanitizePlayerName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Search',
+};
 
 interface PlayerResult extends RowDataPacket {
   steamid: string;

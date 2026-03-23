@@ -10,6 +10,7 @@ import { getTierColor } from '@/lib/tierColors';
 import { formatTime, formatDate } from '@/lib/utils';
 import { sanitizeMapName, sanitizeSearchQuery, sanitizePlayerName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
+import type { Metadata } from 'next';
 
 interface MapData extends RowDataPacket {
   mapname: string;
@@ -96,6 +97,26 @@ const getMapData = unstable_cache(
   ['map-profile'],
   { revalidate: 60 }
 );
+
+export async function generateMetadata({ params }: { params: Promise<{ mapname: string }> }) {
+  const { mapname } = await params;
+  const decodedMapname = decodeURIComponent(mapname);
+  const validMapname = sanitizeMapName(decodedMapname);
+  
+  if (!validMapname) {
+    return { title: 'Map Not Found' };
+  }
+  
+  const data = await getMapData(validMapname, 1, '');
+  
+  if (!data) {
+    return { title: 'Map Not Found' };
+  }
+  
+  return {
+    title: data.map.mapname,
+  };
+}
 
 export default async function MapProfilePage({
   params,

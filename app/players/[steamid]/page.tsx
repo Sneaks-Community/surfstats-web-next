@@ -13,6 +13,7 @@ import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTotalsCached } from '@/lib/cache';
 import { getPlayerTimeOnServer } from '@/lib/player-analytics';
 import logger from '@/lib/logger';
+import type { Metadata } from 'next';
 
 interface PlayerData extends RowDataPacket {
   steamid: string;
@@ -103,6 +104,26 @@ const getPlayerData = unstable_cache(
   ['player-profile'],
   { revalidate: 60 }
 );
+
+export async function generateMetadata({ params }: { params: Promise<{ steamid: string }> }) {
+  const { steamid } = await params;
+  const decodedSteamId = decodeURIComponent(steamid);
+  const validSteamId = sanitizeSteamId(decodedSteamId);
+  
+  if (!validSteamId) {
+    return { title: 'Player Not Found' };
+  }
+  
+  const data = await getPlayerData(validSteamId);
+  
+  if (!data) {
+    return { title: 'Player Not Found' };
+  }
+  
+  return {
+    title: data.player.name,
+  };
+}
 
 export default async function PlayerProfilePage({
   params,

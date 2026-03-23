@@ -2,9 +2,14 @@ import { Server } from 'lucide-react';
 import { getServersCached } from '@/lib/cache';
 import ServerCard from './ServerCard';
 import logger from '@/lib/logger';
+import type { Metadata } from 'next';
 
 // Force dynamic rendering to ensure fresh data on each request
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  title: 'Servers',
+};
 
 interface Player {
   name: string;

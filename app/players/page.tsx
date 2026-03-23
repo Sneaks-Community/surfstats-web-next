@@ -9,6 +9,11 @@ import { getSteamProfiles } from '@/lib/steam';
 import Pagination from '@/components/Pagination';
 import { formatDate } from '@/lib/utils';
 import logger from '@/lib/logger';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Players',
+};
 
 // Cache Steam profile fetches within a request to avoid duplicate calls
 const getCachedSteamProfiles = cache(getSteamProfiles);

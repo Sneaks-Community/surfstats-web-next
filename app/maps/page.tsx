@@ -8,6 +8,11 @@ import MapImage from '@/components/MapImage';
 import MapFilters from '@/components/MapFilters';
 import { getTierColor } from '@/lib/tierColors';
 import Pagination from '@/components/Pagination';
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Maps',
+};
 
 interface MapData extends RowDataPacket {
   mapname: string;

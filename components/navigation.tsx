@@ -12,7 +12,7 @@ const navLinks = [
   { href: '/servers', label: 'Servers' },
 ];
 
-export function Navigation() {
+export function Navigation({ siteName }: { siteName: string }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
 
@@ -24,7 +24,7 @@ export function Navigation() {
           <div className="flex items-center">
             <Link href="/" className="flex-shrink-0 flex items-center gap-2">
               <Activity className="h-8 w-8 text-emerald-500" />
-              <span className="text-white font-bold text-xl tracking-tight">SurfStats</span>
+              <span className="text-white font-bold text-xl tracking-tight">{siteName}</span>
             </Link>
             <div className="hidden md:block ml-10">
               <div className="flex items-baseline space-x-4">

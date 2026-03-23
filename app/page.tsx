@@ -31,9 +31,9 @@ export default async function Home() {
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-8">
           <section>
-            <h1 className="text-4xl font-bold tracking-tight text-white mb-2">Welcome to SurfStats</h1>
+            <h1 className="text-4xl font-bold tracking-tight text-white mb-2">Welcome to {process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats'}</h1>
             <p className="text-zinc-400 text-lg">
-              The premier destination for CS:GO surf statistics, leaderboards, and community records.
+              {process.env.NEXT_PUBLIC_SITE_DESCRIPTION || 'Statistics, leaderboards, and server information for our CS:GO surf community.'}
             </p>
           </section>
 
