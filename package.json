@@ -34,10 +34,10 @@
     "eslint-config-next": "16.2.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^7.0.1",
-    "tailwindcss": "4.2.1",
+    "tailwindcss": "4.2.2",
     "typescript": "5.9.3"
   },
   "overrides": {
-    "fast-xml-parser": "^5.5.7"
+    "fast-xml-parser": "^5.5.8"
   }
 }
