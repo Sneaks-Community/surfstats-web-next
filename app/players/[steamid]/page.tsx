@@ -14,6 +14,7 @@ import { getTotalsCached } from '@/lib/cache';
 import { getPlayerTimeOnServer } from '@/lib/player-analytics';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
+import TierDistributionChart from './components/TierDistributionChart';
 
 interface PlayerData extends RowDataPacket {
   steamid: string;
@@ -44,6 +45,47 @@ interface StageRecord extends RowDataPacket {
   runtime: number;
   date: string;
 }
+
+interface TierDistribution extends RowDataPacket {
+  tier: number;
+  completed_maps: number;
+  total_maps: number;
+}
+
+const getTierDistribution = unstable_cache(
+  async (steamid: string): Promise<TierDistribution[]> => {
+    logger.debug(`[Player] Fetching tier distribution for: ${steamid}`);
+    
+    try {
+      // Get completed maps per tier with total maps per tier
+      const [rows] = await pool.query<TierDistribution[]>(`
+        SELECT
+          t.tier,
+          COUNT(DISTINCT pt.mapname) as completed_maps,
+          totals.total_maps
+        FROM ck_maptier t
+        CROSS JOIN (
+          SELECT tier, COUNT(DISTINCT mapname) as total_maps
+          FROM ck_maptier
+          GROUP BY tier
+        ) totals
+        LEFT JOIN ck_playertimes pt
+          ON t.mapname = pt.mapname
+          AND pt.steamid = ?
+        WHERE t.tier = totals.tier
+        GROUP BY t.tier, totals.total_maps
+        ORDER BY t.tier ASC
+      `, [steamid]);
+      
+      return rows;
+    } catch (error: any) {
+      logger.error(`[Player] Failed to fetch tier distribution: ${error.message}`);
+      return [];
+    }
+  },
+  ['player-tier-distribution'],
+  { revalidate: 60 }
+);
 
 const getPlayerData = unstable_cache(
   async (steamid: string) => {
@@ -167,6 +209,9 @@ export default async function PlayerProfilePage({
   
   // Fetch playtime from analytics database (optional, box hidden if unavailable)
   const playtimeData = await getPlayerTimeOnServer(validSteamId);
+  
+  // Fetch tier distribution for chart
+  const tierDistribution = await getTierDistribution(validSteamId);
 
   return (
     <div className="space-y-8">
@@ -292,6 +337,30 @@ export default async function PlayerProfilePage({
                 <span className="text-[10px] text-text w-12 text-right flex-shrink-0">{stages.length}/{totals.totalStages}</span>
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Charts Row - 4 columns */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 h-[280px]">
+        <TierDistributionChart data={tierDistribution} />
+        {/* Placeholder for additional charts */}
+        <div className="bg-surface border border-border rounded-xl p-4 flex flex-col">
+          <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
+          <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
+            Additional stats
+          </div>
+        </div>
+        <div className="bg-surface border border-border rounded-xl p-4 flex flex-col">
+          <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
+          <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
+            Additional stats
+          </div>
+        </div>
+        <div className="bg-surface border border-border rounded-xl p-4 flex flex-col">
+          <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
+          <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
+            Additional stats
           </div>
         </div>
       </div>
