@@ -122,10 +122,10 @@ function MapFiltersForm({
             <option value="linear">Linear</option>
             <option value="staged">Staged</option>
           </select>
-          <select 
+          <select
             value={bonuses}
             onChange={(e) => setBonuses(e.target.value)}
-            className="block w-full sm:w-32 pl-3 pr-10 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text focus:outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
+            className="block w-full sm:w-38 pl-3 pr-10 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text focus:outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
           >
             <option value="all">All Bonuses</option>
             <option value="0">0 Bonuses</option>
@@ -138,7 +138,7 @@ function MapFiltersForm({
         
         {/* Row 2: Tier Checkboxes */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm text-text-muted mr-2">Tiers:</span>
+          {/* <span className="text-sm text-text-muted mr-2">Tiers:</span> */}
           {tierOptions.map((tier) => (
             <button
               key={tier.tier}
