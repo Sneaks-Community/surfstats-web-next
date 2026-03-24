@@ -2,7 +2,7 @@ import pool from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 import { getSteamProfileUrl } from '@/lib/steam';
 import Link from 'next/link';
-import { Search, Map as MapIcon, Users, Trophy, Layers, Target } from 'lucide-react';
+import { Search, Map as MapIcon, Users, Trophy, Layers, Target, Download } from 'lucide-react';
 import MapImage from '@/components/MapImage';
 import Pagination from '@/components/Pagination';
 import { unstable_cache } from 'next/cache';
@@ -217,7 +217,20 @@ export default async function MapProfilePage({
               )}
             </div>
             
-            <h1 className="text-4xl sm:text-5xl font-bold text-text mb-2">{map.mapname}</h1>
+            <h1 className="text-4xl sm:text-5xl font-bold text-text mb-2 flex items-center gap-3">
+              {map.mapname}
+              {process.env.NEXT_PUBLIC_MAP_DOWNLOAD_URL_PREFIX && process.env.NEXT_PUBLIC_MAP_DOWNLOAD_URL_SUFFIX && (
+                <a
+                  href={`${process.env.NEXT_PUBLIC_MAP_DOWNLOAD_URL_PREFIX}${map.mapname}${process.env.NEXT_PUBLIC_MAP_DOWNLOAD_URL_SUFFIX}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:text-primary-hover transition-colors inline-flex items-center"
+                  title="Download map"
+                >
+                  <Download className="h-6 w-6" />
+                </a>
+              )}
+            </h1>
             <p className="text-text-muted text-lg flex items-center gap-2">
               <span className="text-text-placeholder">by</span>{' '}
               {(() => {
