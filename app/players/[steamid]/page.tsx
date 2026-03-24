@@ -30,6 +30,7 @@ interface MapRecord extends RowDataPacket {
   mapname: string;
   runtimepro: number;
   date: string;
+  wr_time: number | null;
 }
 
 interface BonusRecord extends RowDataPacket {
@@ -108,12 +109,22 @@ const getPlayerData = unstable_cache(
       const player = playerRows[0];
 
       // PARALLEL: Fetch maps, bonuses, and stages simultaneously
+      // Maps include WR time for comparison
       const [mapsResult, bonusesResult, stagesResult] = await Promise.all([
         pool.query<MapRecord[]>(`
-          SELECT mapname, runtimepro, date
-          FROM ck_playertimes
-          WHERE steamid = ?
-          ORDER BY date DESC
+          SELECT
+            pt.mapname,
+            pt.runtimepro,
+            pt.date,
+            wr.min_runtime as wr_time
+          FROM ck_playertimes pt
+          LEFT JOIN (
+            SELECT mapname, MIN(runtimepro) as min_runtime
+            FROM ck_playertimes
+            GROUP BY mapname
+          ) wr ON pt.mapname = wr.mapname
+          WHERE pt.steamid = ?
+          ORDER BY pt.date DESC
         `, [steamid]),
         pool.query<BonusRecord[]>(`
           SELECT mapname, zonegroup, runtime, date
@@ -378,19 +389,39 @@ export default async function PlayerProfilePage({
           </div>
           <div className="overflow-y-auto flex-1 p-0">
             <div className="divide-y divide-border">
-              {maps.map((record, i) => (
-                <div key={i} className="px-6 py-3 hover:bg-surface-hover/50 transition-colors flex justify-between items-center">
-                  <div>
-                    <MapLinkWithPreview mapname={record.mapname}>
-                      {sanitizePlayerName(record.mapname)}
-                    </MapLinkWithPreview>
-                    <div className="text-xs text-text-placeholder mt-0.5">{formatDate(record.date)}</div>
+              {maps.map((record, i) => {
+                // Calculate time difference from WR
+                const wrTimeDiff = record.wr_time ? record.runtimepro - record.wr_time : null;
+                // Calculate percentage for color scaling (0-100% maps to green-red)
+                const wrPercent = record.wr_time ? Math.min(100, ((record.runtimepro - record.wr_time) / record.wr_time * 100)) : null;
+                // Color: green (0%) -> yellow (25%) -> orange (50%) -> red (100%+)
+                const getDiffColor = (percent: number | null): string => {
+                  if (percent === null) return 'text-text-muted';
+                  if (percent < 5) return 'text-emerald-400';
+                  if (percent < 15) return 'text-lime-400';
+                  if (percent < 25) return 'text-yellow-400';
+                  if (percent < 50) return 'text-orange-400';
+                  return 'text-red-400';
+                };
+                return (
+                  <div key={i} className="px-6 py-3 hover:bg-surface-hover/50 transition-colors flex justify-between items-center">
+                    <div>
+                      <MapLinkWithPreview mapname={record.mapname}>
+                        {sanitizePlayerName(record.mapname)}
+                      </MapLinkWithPreview>
+                      <div className="text-xs text-text-placeholder mt-0.5">{formatDate(record.date)}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-mono text-text">{formatTime(record.runtimepro)}</div>
+                      {wrTimeDiff !== null && wrTimeDiff > 0 && (
+                        <div className={`text-xs font-mono ${getDiffColor(wrPercent)}`}>
+                          +{formatTime(wrTimeDiff)}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="font-mono text-text">
-                    {formatTime(record.runtimepro)}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
               {maps.length === 0 && (
                 <div className="p-6 text-center text-text-placeholder">No map records found.</div>
               )}
