@@ -368,26 +368,31 @@ export default async function PlayerProfilePage({
         </div>
       </div>
 
-      {/* Stats Charts Row - 4 columns */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 h-[280px]">
-        <TierDistributionChart data={tierDistribution} />
-        {/* Placeholder for additional charts */}
-        <div className="bg-surface border border-border rounded-xl p-4 flex flex-col">
-          <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
-          <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
-            Additional stats
-          </div>
+      {/* Stats Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:h-[280px]">
+        {/* Tier Distribution - full width on mobile, 1st column on desktop */}
+        <div className="lg:col-span-1 lg:row-span-1 h-[280px]">
+          <TierDistributionChart data={tierDistribution} />
         </div>
-        <div className="bg-surface border border-border rounded-xl p-4 flex flex-col">
-          <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
-          <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
-            Additional stats
+        {/* Placeholder for additional charts - stacked on mobile/tablet, 3 columns on desktop */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:col-span-3">
+          <div className="bg-surface border border-border rounded-xl p-4 flex flex-col h-[130px] lg:h-auto">
+            <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
+            <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
+              Additional stats
+            </div>
           </div>
-        </div>
-        <div className="bg-surface border border-border rounded-xl p-4 flex flex-col">
-          <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
-          <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
-            Additional stats
+          <div className="bg-surface border border-border rounded-xl p-4 flex flex-col h-[130px] lg:h-auto">
+            <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
+            <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
+              Additional stats
+            </div>
+          </div>
+          <div className="bg-surface border border-border rounded-xl p-4 flex flex-col h-[130px] lg:h-auto">
+            <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
+            <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
+              Additional stats
+            </div>
           </div>
         </div>
       </div>
