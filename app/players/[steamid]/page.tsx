@@ -2,19 +2,18 @@ import pool from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 import Link from 'next/link';
 import { getSteamAvatars, getSteamProfileUrl } from '@/lib/steam';
-import { Trophy, Activity, Map as MapIcon, Target, Layers, Clock } from 'lucide-react';
+import { Trophy, Activity, Clock } from 'lucide-react';
 import Image from 'next/image';
 import { unstable_cache } from 'next/cache';
-import { formatTime, formatDate, formatPlaytime } from '@/lib/utils';
+import { formatPlaytime, formatDate } from '@/lib/utils';
 import { sanitizeSteamId, sanitizePlayerName } from '@/lib/sanitize';
 import CountryBadge from '@/components/CountryBadge';
-import ProgressBar from '@/components/ProgressBar';
-import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTotalsCached } from '@/lib/cache';
 import { getPlayerTimeOnServer } from '@/lib/player-analytics';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
 import TierDistributionChart from './components/TierDistributionChart';
+import PlayerRecordsTabs from './components/PlayerRecordsTabs';
 
 interface PlayerData extends RowDataPacket {
   steamid: string;
@@ -31,6 +30,7 @@ interface MapRecord extends RowDataPacket {
   runtimepro: number;
   date: string;
   wr_time: number | null;
+  player_rank: number;
 }
 
 interface BonusRecord extends RowDataPacket {
@@ -38,6 +38,7 @@ interface BonusRecord extends RowDataPacket {
   zonegroup: number;
   runtime: number;
   date: string;
+  player_rank: number;
 }
 
 interface StageRecord extends RowDataPacket {
@@ -45,6 +46,7 @@ interface StageRecord extends RowDataPacket {
   stage: number;
   runtime: number;
   date: string;
+  player_rank: number;
 }
 
 interface TierDistribution extends RowDataPacket {
@@ -109,14 +111,16 @@ const getPlayerData = unstable_cache(
       const player = playerRows[0];
 
       // PARALLEL: Fetch maps, bonuses, and stages simultaneously
-      // Maps include WR time for comparison
+      // Maps include WR time for comparison and player rank (optimized with count-based rank)
       const [mapsResult, bonusesResult, stagesResult] = await Promise.all([
         pool.query<MapRecord[]>(`
           SELECT
             pt.mapname,
             pt.runtimepro,
             pt.date,
-            wr.min_runtime as wr_time
+            wr.min_runtime as wr_time,
+            (SELECT COUNT(*) + 1 FROM ck_playertimes pt2
+             WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as player_rank
           FROM ck_playertimes pt
           LEFT JOIN (
             SELECT mapname, MIN(runtimepro) as min_runtime
@@ -124,19 +128,31 @@ const getPlayerData = unstable_cache(
             GROUP BY mapname
           ) wr ON pt.mapname = wr.mapname
           WHERE pt.steamid = ?
-          ORDER BY pt.date DESC
+          ORDER BY pt.mapname ASC
         `, [steamid]),
         pool.query<BonusRecord[]>(`
-          SELECT mapname, zonegroup, runtime, date
-          FROM ck_bonus
-          WHERE steamid = ?
-          ORDER BY date DESC
+          SELECT
+            b.mapname,
+            b.zonegroup,
+            b.runtime,
+            b.date,
+            (SELECT COUNT(*) + 1 FROM ck_bonus b2
+             WHERE b2.mapname = b.mapname AND b2.zonegroup = b.zonegroup AND b2.runtime < b.runtime) as player_rank
+          FROM ck_bonus b
+          WHERE b.steamid = ?
+          ORDER BY b.mapname ASC, b.zonegroup ASC
         `, [steamid]),
         pool.query<StageRecord[]>(`
-          SELECT map, stage, runtime, date
-          FROM ck_stages
-          WHERE steamid = ?
-          ORDER BY date DESC
+          SELECT
+            s.map,
+            s.stage,
+            s.runtime,
+            s.date,
+            (SELECT COUNT(*) + 1 FROM ck_stages s2
+             WHERE s2.map = s.map AND s2.stage = s.stage AND s2.runtime < s.runtime) as player_rank
+          FROM ck_stages s
+          WHERE s.steamid = ?
+          ORDER BY s.map ASC, s.stage ASC
         `, [steamid])
       ]);
 
@@ -376,123 +392,13 @@ export default async function PlayerProfilePage({
         </div>
       </div>
 
-      {/* Records Sections */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Maps */}
-        <div className="bg-surface border border-border rounded-xl overflow-hidden flex flex-col h-[600px]" style={{ contentVisibility: 'auto', containIntrinsicSize: '0 600px' }}>
-          <div className="px-6 py-4 border-b border-border bg-surface/50 flex items-center justify-between sticky top-0">
-            <h2 className="text-lg font-semibold text-text flex items-center gap-2">
-              <MapIcon className="h-5 w-5 text-blue-500" />
-              Map Records
-            </h2>
-            <span className="bg-surface-hover text-text text-xs px-2 py-1 rounded-full">{maps.length}</span>
-          </div>
-          <div className="overflow-y-auto flex-1 p-0">
-            <div className="divide-y divide-border">
-              {maps.map((record, i) => {
-                // Calculate time difference from WR
-                const wrTimeDiff = record.wr_time ? record.runtimepro - record.wr_time : null;
-                // Calculate percentage for color scaling (0-100% maps to green-red)
-                const wrPercent = record.wr_time ? Math.min(100, ((record.runtimepro - record.wr_time) / record.wr_time * 100)) : null;
-                // Color: green (0%) -> yellow (25%) -> orange (50%) -> red (100%+)
-                const getDiffColor = (percent: number | null): string => {
-                  if (percent === null) return 'text-text-muted';
-                  if (percent < 5) return 'text-emerald-400';
-                  if (percent < 15) return 'text-lime-400';
-                  if (percent < 25) return 'text-yellow-400';
-                  if (percent < 50) return 'text-orange-400';
-                  return 'text-red-400';
-                };
-                return (
-                  <div key={i} className="px-6 py-3 hover:bg-surface-hover/50 transition-colors flex justify-between items-center">
-                    <div>
-                      <MapLinkWithPreview mapname={record.mapname}>
-                        {sanitizePlayerName(record.mapname)}
-                      </MapLinkWithPreview>
-                      <div className="text-xs text-text-placeholder mt-0.5">{formatDate(record.date)}</div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-mono text-text">{formatTime(record.runtimepro)}</div>
-                      {wrTimeDiff !== null && wrTimeDiff > 0 && (
-                        <div className={`text-xs font-mono ${getDiffColor(wrPercent)}`}>
-                          +{formatTime(wrTimeDiff)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-              {maps.length === 0 && (
-                <div className="p-6 text-center text-text-placeholder">No map records found.</div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Bonuses */}
-        <div className="bg-surface border border-border rounded-xl overflow-hidden flex flex-col h-[600px]" style={{ contentVisibility: 'auto', containIntrinsicSize: '0 600px' }}>
-          <div className="px-6 py-4 border-b border-border bg-surface/50 flex items-center justify-between sticky top-0">
-            <h2 className="text-lg font-semibold text-text flex items-center gap-2">
-              <Target className="h-5 w-5 text-purple-500" />
-              Bonus Records
-            </h2>
-            <span className="bg-surface-hover text-text text-xs px-2 py-1 rounded-full">{bonuses.length}</span>
-          </div>
-          <div className="overflow-y-auto flex-1 p-0">
-            <div className="divide-y divide-border">
-              {bonuses.map((record, i) => (
-                <div key={i} className="px-6 py-3 hover:bg-surface-hover/50 transition-colors flex justify-between items-center">
-                  <div>
-                    <MapLinkWithPreview mapname={record.mapname}>
-                      {sanitizePlayerName(record.mapname)}
-                    </MapLinkWithPreview>
-                    <span className="ml-2 text-xs bg-surface-hover text-text px-1.5 py-0.5 rounded">B{record.zonegroup}</span>
-                    <div className="text-xs text-text-placeholder mt-0.5">{formatDate(record.date)}</div>
-                  </div>
-                  <div className="font-mono text-text">
-                    {formatTime(record.runtime)}
-                  </div>
-                </div>
-              ))}
-              {bonuses.length === 0 && (
-                <div className="p-6 text-center text-text-placeholder">No bonus records found.</div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Stages */}
-        <div className="bg-surface border border-border rounded-xl overflow-hidden flex flex-col h-[600px]" style={{ contentVisibility: 'auto', containIntrinsicSize: '0 600px' }}>
-          <div className="px-6 py-4 border-b border-border bg-surface/50 flex items-center justify-between sticky top-0">
-            <h2 className="text-lg font-semibold text-text flex items-center gap-2">
-              <Layers className="h-5 w-5 text-orange-500" />
-              Stage Records
-            </h2>
-            <span className="bg-surface-hover text-text text-xs px-2 py-1 rounded-full">{stages.length}</span>
-          </div>
-          <div className="overflow-y-auto flex-1 p-0">
-            <div className="divide-y divide-border">
-              {stages.map((record, i) => (
-                <div key={i} className="px-6 py-3 hover:bg-surface-hover/50 transition-colors flex justify-between items-center">
-                  <div>
-                    <MapLinkWithPreview mapname={record.map}>
-                      {sanitizePlayerName(record.map)}
-                    </MapLinkWithPreview>
-                    <span className="ml-2 text-xs bg-surface-hover text-text px-1.5 py-0.5 rounded">S{record.stage}</span>
-                    <div className="text-xs text-text-placeholder mt-0.5">{formatDate(record.date)}</div>
-                  </div>
-                  <div className="font-mono text-text">
-                    {formatTime(record.runtime)}
-                  </div>
-                </div>
-              ))}
-              {stages.length === 0 && (
-                <div className="p-6 text-center text-text-placeholder">No stage records found.</div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Records Section - Tabbed Interface */}
+      <PlayerRecordsTabs
+        maps={maps}
+        bonuses={bonuses}
+        stages={stages}
+        steamid={validSteamId}
+      />
     </div>
   );
 }
