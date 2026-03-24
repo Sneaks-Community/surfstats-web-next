@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Search, X } from 'lucide-react';
+import { Search, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState, useTransition, useMemo } from 'react';
 
 interface TierOption {
@@ -20,14 +20,14 @@ const parseTiers = (tiersParam: string | null): number[] => {
 };
 
 // Inner component that receives parsed initial values
-function MapFiltersForm({ 
-  tierOptions, 
-  initialQ, 
-  initialMapper, 
-  initialType, 
-  initialBonuses, 
-  initialTiers 
-}: MapFiltersProps & { 
+function MapFiltersForm({
+  tierOptions,
+  initialQ,
+  initialMapper,
+  initialType,
+  initialBonuses,
+  initialTiers
+}: MapFiltersProps & {
   initialQ: string;
   initialMapper: string;
   initialType: string;
@@ -36,6 +36,7 @@ function MapFiltersForm({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [isExpanded, setIsExpanded] = useState(false);
   
   const [search, setSearch] = useState(initialQ);
   const [mapper, setMapper] = useState(initialMapper);
@@ -44,8 +45,8 @@ function MapFiltersForm({
   const [selectedTiers, setSelectedTiers] = useState<number[]>(initialTiers);
 
   const toggleTier = (tier: number) => {
-    setSelectedTiers(prev => 
-      prev.includes(tier) 
+    setSelectedTiers(prev =>
+      prev.includes(tier)
         ? prev.filter(t => t !== tier)
         : [...prev, tier]
     );
@@ -76,7 +77,20 @@ function MapFiltersForm({
     });
   };
 
-  // Memoize hasFilters to prevent unnecessary re-renders
+  // Count filters that are in the collapsible section (not default values)
+  const advancedFiltersCount = useMemo(
+    () => {
+      let count = 0;
+      if (mapper) count++;
+      if (type !== 'all') count++;
+      if (bonuses !== 'all') count++;
+      if (selectedTiers.length > 0) count++;
+      return count;
+    },
+    [mapper, type, bonuses, selectedTiers]
+  );
+
+  // Check if any filters are active (for showing clear button)
   const hasFilters = useMemo(
     () => search || mapper || type !== 'all' || bonuses !== 'all' || selectedTiers.length > 0,
     [search, mapper, type, bonuses, selectedTiers]
@@ -84,22 +98,57 @@ function MapFiltersForm({
 
   return (
     <div className="bg-surface border border-border rounded-xl p-4 space-y-4">
-      <div className="space-y-4">
-        {/* Row 1: Search and Type */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-text-placeholder" />
-            </div>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-              className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text placeholder-text-placeholder focus:outline-none focus:bg-surface-hover focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
-              placeholder="Search maps..."
-            />
+      {/* Always Visible Row: Search + More Filters Toggle + Apply Button */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-text-placeholder" />
           </div>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
+            className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text placeholder-text-placeholder focus:outline-none focus:bg-surface-hover focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
+            placeholder="Search maps..."
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="px-4 py-2 bg-surface-hover hover:bg-surface-active text-text-muted text-sm font-medium rounded-md transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+          aria-expanded={isExpanded}
+          aria-controls="advanced-filters"
+        >
+          <span>More Filters</span>
+          {advancedFiltersCount > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-semibold rounded-full bg-primary/20 text-primary">
+              {advancedFiltersCount}
+            </span>
+          )}
+          {isExpanded ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
+        </button>
+        <button
+          type="button"
+          onClick={applyFilters}
+          disabled={isPending}
+          className="px-4 py-2 bg-primary-600 hover:bg-primary-500 disabled:bg-primary-600/50 text-white text-sm font-medium rounded-md transition-colors whitespace-nowrap"
+        >
+          {isPending ? 'Applying...' : 'Apply Filters'}
+        </button>
+      </div>
+
+      {/* Collapsible Advanced Filters */}
+      <div
+        id="advanced-filters"
+        className={`space-y-4 overflow-hidden transition-all duration-200 ${isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
+      >
+        {/* Row: Mapper + Type + Bonuses */}
+        <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-4 w-4 text-text-placeholder" />
@@ -113,7 +162,7 @@ function MapFiltersForm({
               placeholder="Search by mapper..."
             />
           </div>
-          <select 
+          <select
             value={type}
             onChange={(e) => setType(e.target.value)}
             className="block w-full sm:w-32 pl-3 pr-10 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text focus:outline-none focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
@@ -136,10 +185,9 @@ function MapFiltersForm({
           </select>
         </div>
         
-        {/* Row 2: Tier Checkboxes */}
+        {/* Tier Checkboxes */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* <span className="text-sm text-text-muted mr-2">Tiers:</span> */}
-          {tierOptions.map((tier) => (
+          {tierOptions.filter(tier => tier.tier >= 1 && tier.tier <= 10).map((tier) => (
             <button
               key={tier.tier}
               type="button"
@@ -157,17 +205,9 @@ function MapFiltersForm({
           ))}
         </div>
         
-        {/* Row 3: Submit Button */}
-        <div className="flex gap-3">
-          <button 
-            type="button"
-            onClick={applyFilters}
-            disabled={isPending}
-            className="px-4 py-2 bg-primary-600 hover:bg-primary-500 disabled:bg-primary-600/50 text-white text-sm font-medium rounded-md transition-colors"
-          >
-            {isPending ? 'Applying...' : 'Apply Filters'}
-          </button>
-          {hasFilters && (
+        {/* Clear Filters Button */}
+        {hasFilters && (
+          <div className="flex gap-3">
             <button
               type="button"
               onClick={clearFilters}
@@ -177,8 +217,8 @@ function MapFiltersForm({
               <X className="h-4 w-4" />
               Clear Filters
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     </div>
   );
