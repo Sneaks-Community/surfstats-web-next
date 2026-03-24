@@ -315,7 +315,7 @@ export default function PlayerRecordsTabs({
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden">
       {/* Tab Bar */}
-      <div className="flex border-b border-border">
+      <div className="flex border-b border-border overflow-x-auto min-w-0">
         {tabs.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
@@ -323,15 +323,15 @@ export default function PlayerRecordsTabs({
             <button
               key={tab.id}
               onClick={() => handleTabChange(tab.id)}
-              className={`flex-1 px-4 py-3 flex items-center justify-center gap-2 transition-colors relative ${
+              className={`flex-1 min-w-0 px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-center gap-1 sm:gap-2 transition-colors relative ${
                 isActive
                   ? 'bg-surface-hover text-text'
                   : 'text-text-muted hover:text-text hover:bg-surface-hover/50'
               }`}
             >
-              <Icon className={`h-5 w-5 ${isActive ? tab.color : ''}`} />
-              <span className="font-medium">{tab.label}</span>
-              <span className="bg-surface-active text-text-muted text-xs px-2 py-0.5 rounded-full">
+              <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${isActive ? tab.color : ''}`} />
+              <span className="font-medium text-xs sm:text-sm">{tab.label}</span>
+              <span className="bg-surface-active text-text-muted text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full">
                 {tab.count}
               </span>
               {isActive && (
@@ -368,8 +368,8 @@ export default function PlayerRecordsTabs({
       <div className="min-h-[400px]">
         {paginatedRecords.length > 0 ? (
           <>
-            {/* Sortable Headers */}
-            <div className="px-6 py-2 bg-surface-hover/50 border-b border-border flex items-center gap-4 text-sm font-medium text-text-muted">
+            {/* Desktop Sortable Headers */}
+            <div className="hidden sm:flex px-6 py-2 bg-surface-hover/50 border-b border-border items-center gap-4 text-sm font-medium text-text-muted">
               <button
                 onClick={() => handleSort('map')}
                 className="flex-1 min-w-0 flex items-center gap-1 hover:text-text transition-colors"
@@ -410,6 +410,23 @@ export default function PlayerRecordsTabs({
               </button>
             </div>
 
+            {/* Mobile Compact Header */}
+            <div className="sm:hidden px-3 py-2 bg-surface-hover/50 border-b border-border flex items-center justify-between text-xs font-medium text-text-muted">
+              <button
+                onClick={() => handleSort('map')}
+                className="flex items-center gap-1 hover:text-text transition-colors"
+              >
+                Map
+                <SortIcon field="map" />
+              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => handleSort('rank')} className="flex items-center gap-1 hover:text-text transition-colors">Rk<SortIcon field="rank" /></button>
+                <button onClick={() => handleSort('time')} className="flex items-center gap-1 hover:text-text transition-colors">Time<SortIcon field="time" /></button>
+                {activeTab === 'maps' && <button onClick={() => handleSort('wrDiff')} className="flex items-center gap-1 hover:text-text transition-colors">WR<SortIcon field="wrDiff" /></button>}
+                <button onClick={() => handleSort('date')} className="flex items-center gap-1 hover:text-text transition-colors">Date<SortIcon field="date" /></button>
+              </div>
+            </div>
+
             <div className="divide-y divide-border">
               {activeTab === 'maps' &&
                 (paginatedRecords as MapRecord[]).map((record, i) => {
@@ -421,29 +438,32 @@ export default function PlayerRecordsTabs({
                   return (
                     <div
                       key={`${record.mapname}-${i}`}
-                      className="px-6 py-3 hover:bg-surface-hover/50 transition-colors flex items-center gap-4"
+                      className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
                     >
                       <div className="flex-1 min-w-0">
                         <MapLinkWithPreview mapname={record.mapname}>
                           {sanitizePlayerName(record.mapname)}
                         </MapLinkWithPreview>
                       </div>
-                      <div className="w-16 text-right">
-                        <span className="text-text-muted text-sm">#{record.player_rank}</span>
-                      </div>
-                      <div className="w-24 text-right font-mono text-text">
-                        {formatTime(record.runtimepro)}
-                      </div>
-                      {wrTimeDiff !== null && wrTimeDiff > 0 && (
-                        <div className="w-20 text-right">
-                          <span className={`text-xs font-mono ${getDiffColor(wrPercent)}`}>
-                            +{formatTime(wrTimeDiff)}
-                          </span>
+                      <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+                        <div className="sm:w-16 text-left sm:text-right">
+                          <span className="sm:hidden text-text-muted mr-1">Rk:</span>
+                          <span className="text-text-muted">#{record.player_rank}</span>
                         </div>
-                      )}
-                      {(!wrTimeDiff || wrTimeDiff <= 0) && <div className="w-20" />}
-                      <div className="w-24 text-right text-sm text-text-muted">
-                        {formatDate(record.date)}
+                        <div className="sm:w-24 text-left sm:text-right font-mono text-text">
+                          {formatTime(record.runtimepro)}
+                        </div>
+                        {wrTimeDiff !== null && wrTimeDiff > 0 && (
+                          <div className="sm:w-20 text-left sm:text-right">
+                            <span className={`font-mono ${getDiffColor(wrPercent)}`}>
+                              +{formatTime(wrTimeDiff)}
+                            </span>
+                          </div>
+                        )}
+                        {(!wrTimeDiff || wrTimeDiff <= 0) && <div className="sm:w-20 hidden sm:block" />}
+                        <div className="sm:w-24 text-left sm:text-right text-text-muted">
+                          {formatDate(record.date)}
+                        </div>
                       </div>
                     </div>
                   );
@@ -453,25 +473,28 @@ export default function PlayerRecordsTabs({
                 (paginatedRecords as BonusRecord[]).map((record, i) => (
                   <div
                     key={`${record.mapname}-${record.zonegroup}-${i}`}
-                    className="px-6 py-3 hover:bg-surface-hover/50 transition-colors flex items-center gap-4"
+                    className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
                   >
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.mapname}>
                         {sanitizePlayerName(record.mapname)}
                       </MapLinkWithPreview>
-                      <span className="ml-2 text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">
+                      <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">
                         B{record.zonegroup}
                       </span>
                     </div>
-                    <div className="w-16 text-right">
-                      <span className="text-text-muted text-sm">#{record.player_rank}</span>
-                    </div>
-                    <div className="w-24 text-right font-mono text-text">
-                      {formatTime(record.runtime)}
-                    </div>
-                    <div className="w-20" />
-                    <div className="w-24 text-right text-sm text-text-muted">
-                      {formatDate(record.date)}
+                    <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+                      <div className="sm:w-16 text-left sm:text-right">
+                        <span className="sm:hidden text-text-muted mr-1">Rk:</span>
+                        <span className="text-text-muted">#{record.player_rank}</span>
+                      </div>
+                      <div className="sm:w-24 text-left sm:text-right font-mono text-text">
+                        {formatTime(record.runtime)}
+                      </div>
+                      <div className="sm:w-20 hidden sm:block" />
+                      <div className="sm:w-24 text-left sm:text-right text-text-muted">
+                        {formatDate(record.date)}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -480,25 +503,28 @@ export default function PlayerRecordsTabs({
                 (paginatedRecords as StageRecord[]).map((record, i) => (
                   <div
                     key={`${record.map}-${record.stage}-${i}`}
-                    className="px-6 py-3 hover:bg-surface-hover/50 transition-colors flex items-center gap-4"
+                    className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
                   >
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.map}>
                         {sanitizePlayerName(record.map)}
                       </MapLinkWithPreview>
-                      <span className="ml-2 text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">
+                      <span className="text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">
                         S{record.stage}
                       </span>
                     </div>
-                    <div className="w-16 text-right">
-                      <span className="text-text-muted text-sm">#{record.player_rank}</span>
-                    </div>
-                    <div className="w-24 text-right font-mono text-text">
-                      {formatTime(record.runtime)}
-                    </div>
-                    <div className="w-20" />
-                    <div className="w-24 text-right text-sm text-text-muted">
-                      {formatDate(record.date)}
+                    <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+                      <div className="sm:w-16 text-left sm:text-right">
+                        <span className="sm:hidden text-text-muted mr-1">Rk:</span>
+                        <span className="text-text-muted">#{record.player_rank}</span>
+                      </div>
+                      <div className="sm:w-24 text-left sm:text-right font-mono text-text">
+                        {formatTime(record.runtime)}
+                      </div>
+                      <div className="sm:w-20 hidden sm:block" />
+                      <div className="sm:w-24 text-left sm:text-right text-text-muted">
+                        {formatDate(record.date)}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -518,7 +544,7 @@ export default function PlayerRecordsTabs({
 
       {/* Pagination */}
       {currentData.totalPages > 1 && (
-        <div className="px-6 py-4 border-t border-border">
+        <div className="px-3 sm:px-6 py-4 border-t border-border">
           <ClientPagination
             currentPage={currentData.page}
             totalPages={currentData.totalPages}
