@@ -7,3 +7,4 @@ coverage/
 !.env.example
 plans/
 sql/
+*.tsbuildinfo
