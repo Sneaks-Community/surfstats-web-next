@@ -1,0 +1,557 @@
+'use client';
+
+import { useState, useMemo, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Map as MapIcon, Target, Layers, Search, X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import MapLinkWithPreview from '@/components/MapLinkWithPreview';
+import ClientPagination from './ClientPagination';
+import { formatTime, formatDate, sanitizePlayerName } from '@/lib/client-utils';
+
+// Types for records
+interface MapRecord {
+  mapname: string;
+  runtimepro: number;
+  date: string;
+  wr_time: number | null;
+  player_rank: number;
+}
+
+interface BonusRecord {
+  mapname: string;
+  zonegroup: number;
+  runtime: number;
+  date: string;
+  player_rank: number;
+}
+
+interface StageRecord {
+  map: string;
+  stage: number;
+  runtime: number;
+  date: string;
+  player_rank: number;
+}
+
+interface PlayerRecordsTabsProps {
+  maps: MapRecord[];
+  bonuses: BonusRecord[];
+  stages: StageRecord[];
+  steamid: string;
+}
+
+type TabType = 'maps' | 'bonuses' | 'stages';
+type SortField = 'map' | 'rank' | 'time' | 'wrDiff' | 'date';
+type SortDirection = 'asc' | 'desc';
+
+const ITEMS_PER_PAGE = 20;
+
+// Debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
+
+export default function PlayerRecordsTabs({
+  maps,
+  bonuses,
+  stages,
+  steamid,
+}: PlayerRecordsTabsProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Get initial state from URL
+  const initialTab = (searchParams.get('tab') as TabType) || 'maps';
+  const initialMapPage = parseInt(searchParams.get('mapPage') || '1', 10);
+  const initialBonusPage = parseInt(searchParams.get('bonusPage') || '1', 10);
+  const initialStagePage = parseInt(searchParams.get('stagePage') || '1', 10);
+  const initialMapSearch = searchParams.get('mapSearch') || '';
+  const initialBonusSearch = searchParams.get('bonusSearch') || '';
+  const initialStageSearch = searchParams.get('stageSearch') || '';
+  const initialSortField = (searchParams.get('sort') as SortField) || 'map';
+  const initialSortDir = (searchParams.get('dir') as SortDirection) || 'asc';
+
+  // State
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+  const [pages, setPages] = useState({
+    maps: initialMapPage,
+    bonuses: initialBonusPage,
+    stages: initialStagePage,
+  });
+  const [searchQueries, setSearchQueries] = useState({
+    maps: initialMapSearch,
+    bonuses: initialBonusSearch,
+    stages: initialStageSearch,
+  });
+  const [sortField, setSortField] = useState<SortField>(initialSortField);
+  const [sortDirection, setSortDirection] = useState<SortDirection>(initialSortDir);
+
+  // Debounced search for URL updates
+  const debouncedSearch = useDebounce(searchQueries[activeTab], 300);
+
+  // Update URL when state changes
+  useEffect(() => {
+    const params = new URLSearchParams();
+    params.set('tab', activeTab);
+    params.set('mapPage', pages.maps.toString());
+    params.set('bonusPage', pages.bonuses.toString());
+    params.set('stagePage', pages.stages.toString());
+    if (searchQueries.maps) params.set('mapSearch', searchQueries.maps);
+    if (searchQueries.bonuses) params.set('bonusSearch', searchQueries.bonuses);
+    if (searchQueries.stages) params.set('stageSearch', searchQueries.stages);
+    if (sortField !== 'map') params.set('sort', sortField);
+    if (sortDirection !== 'asc') params.set('dir', sortDirection);
+
+    router.push(`?${params.toString()}`, { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, pages.maps, pages.bonuses, pages.stages, debouncedSearch, sortField, sortDirection, router]);
+
+  // Handle tab change
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    // Reset sort to default when changing tabs
+    setSortField('map');
+    setSortDirection('asc');
+  };
+
+  // Handle page change
+  const handlePageChange = (page: number) => {
+    setPages((prev) => ({ ...prev, [activeTab]: page }));
+  };
+
+  // Handle search change
+  const handleSearchChange = (value: string) => {
+    setSearchQueries((prev) => ({ ...prev, [activeTab]: value }));
+    // Reset to page 1 when search changes
+    setPages((prev) => ({ ...prev, [activeTab]: 1 }));
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchQueries((prev) => ({ ...prev, [activeTab]: '' }));
+    setPages((prev) => ({ ...prev, [activeTab]: 1 }));
+  };
+
+  // Handle sort
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+    // Reset to page 1 when sort changes
+    setPages((prev) => ({ ...prev, [activeTab]: 1 }));
+  };
+
+  // Sort icon component
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-text-muted opacity-50" />;
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp className="h-4 w-4 text-primary-500" />
+    ) : (
+      <ArrowDown className="h-4 w-4 text-primary-500" />
+    );
+  };
+
+  // Filter and sort records
+  const filteredMaps = useMemo(() => {
+    const query = searchQueries.maps.toLowerCase();
+    let filtered = maps;
+    if (query) {
+      filtered = maps.filter((record) => record.mapname.toLowerCase().includes(query));
+    }
+    
+    // Sort
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'map':
+          comparison = a.mapname.localeCompare(b.mapname);
+          break;
+        case 'rank':
+          comparison = a.player_rank - b.player_rank;
+          break;
+        case 'time':
+          comparison = a.runtimepro - b.runtimepro;
+          break;
+        case 'wrDiff':
+          const aDiff = a.wr_time ? a.runtimepro - a.wr_time : Infinity;
+          const bDiff = b.wr_time ? b.runtimepro - b.wr_time : Infinity;
+          comparison = aDiff - bDiff;
+          break;
+        case 'date':
+          comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+          break;
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [maps, searchQueries.maps, sortField, sortDirection]);
+
+  const filteredBonuses = useMemo(() => {
+    const query = searchQueries.bonuses.toLowerCase();
+    let filtered = bonuses;
+    if (query) {
+      filtered = bonuses.filter((record) => record.mapname.toLowerCase().includes(query));
+    }
+    
+    // Sort
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'map':
+          comparison = a.mapname.localeCompare(b.mapname) || a.zonegroup - b.zonegroup;
+          break;
+        case 'rank':
+          comparison = a.player_rank - b.player_rank;
+          break;
+        case 'time':
+          comparison = a.runtime - b.runtime;
+          break;
+        case 'date':
+          comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+          break;
+        default:
+          comparison = a.mapname.localeCompare(b.mapname);
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [bonuses, searchQueries.bonuses, sortField, sortDirection]);
+
+  const filteredStages = useMemo(() => {
+    const query = searchQueries.stages.toLowerCase();
+    let filtered = stages;
+    if (query) {
+      filtered = stages.filter((record) => record.map.toLowerCase().includes(query));
+    }
+    
+    // Sort
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+      switch (sortField) {
+        case 'map':
+          comparison = a.map.localeCompare(b.map) || a.stage - b.stage;
+          break;
+        case 'rank':
+          comparison = a.player_rank - b.player_rank;
+          break;
+        case 'time':
+          comparison = a.runtime - b.runtime;
+          break;
+        case 'date':
+          comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
+          break;
+        default:
+          comparison = a.map.localeCompare(b.map);
+      }
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+    return sorted;
+  }, [stages, searchQueries.stages, sortField, sortDirection]);
+
+  // Get current page data
+  const getCurrentData = () => {
+    switch (activeTab) {
+      case 'maps':
+        return {
+          records: filteredMaps,
+          page: pages.maps,
+          totalPages: Math.ceil(filteredMaps.length / ITEMS_PER_PAGE),
+        };
+      case 'bonuses':
+        return {
+          records: filteredBonuses,
+          page: pages.bonuses,
+          totalPages: Math.ceil(filteredBonuses.length / ITEMS_PER_PAGE),
+        };
+      case 'stages':
+        return {
+          records: filteredStages,
+          page: pages.stages,
+          totalPages: Math.ceil(filteredStages.length / ITEMS_PER_PAGE),
+        };
+    }
+  };
+
+  const currentData = getCurrentData();
+  const paginatedRecords = currentData.records.slice(
+    (currentData.page - 1) * ITEMS_PER_PAGE,
+    currentData.page * ITEMS_PER_PAGE
+  );
+
+  // Get color for WR diff percentage
+  const getDiffColor = (percent: number | null): string => {
+    if (percent === null) return 'text-text-muted';
+    if (percent < 5) return 'text-emerald-400';
+    if (percent < 15) return 'text-lime-400';
+    if (percent < 25) return 'text-yellow-400';
+    if (percent < 50) return 'text-orange-400';
+    return 'text-red-400';
+  };
+
+  const tabs = [
+    { id: 'maps' as TabType, label: 'Maps', count: maps.length, icon: MapIcon, color: 'text-blue-500' },
+    { id: 'bonuses' as TabType, label: 'Bonuses', count: bonuses.length, icon: Target, color: 'text-purple-500' },
+    { id: 'stages' as TabType, label: 'Stages', count: stages.length, icon: Layers, color: 'text-orange-500' },
+  ];
+
+  const currentSearchQuery = searchQueries[activeTab];
+
+  return (
+    <div className="bg-surface border border-border rounded-xl overflow-hidden">
+      {/* Tab Bar */}
+      <div className="flex border-b border-border overflow-x-auto min-w-0">
+        {tabs.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => handleTabChange(tab.id)}
+              className={`flex-1 min-w-0 px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-center gap-1 sm:gap-2 transition-colors relative ${
+                isActive
+                  ? 'bg-surface-hover text-text'
+                  : 'text-text-muted hover:text-text hover:bg-surface-hover/50'
+              }`}
+            >
+              <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${isActive ? tab.color : ''}`} />
+              <span className="font-medium text-xs sm:text-sm">{tab.label}</span>
+              <span className="bg-surface-active text-text-muted text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full">
+                {tab.count}
+              </span>
+              {isActive && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Search Bar */}
+      <div className="p-4 border-b border-border">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+          <input
+            type="text"
+            value={currentSearchQuery}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            placeholder={`Search ${activeTab}...`}
+            className="w-full pl-10 pr-10 py-2 bg-surface-hover border border-border rounded-lg text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          />
+          {currentSearchQuery && (
+            <button
+              onClick={clearSearch}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-surface-active transition-colors"
+            >
+              <X className="h-4 w-4 text-text-muted" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Records List */}
+      <div className="min-h-[400px]">
+        {paginatedRecords.length > 0 ? (
+          <>
+            {/* Desktop Sortable Headers */}
+            <div className="hidden sm:flex px-6 py-2 bg-surface-hover/50 border-b border-border items-center gap-4 text-sm font-medium text-text-muted">
+              <button
+                onClick={() => handleSort('map')}
+                className="flex-1 min-w-0 flex items-center gap-1 hover:text-text transition-colors"
+              >
+                Map
+                <SortIcon field="map" />
+              </button>
+              <button
+                onClick={() => handleSort('rank')}
+                className="w-16 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
+              >
+                Rank
+                <SortIcon field="rank" />
+              </button>
+              <button
+                onClick={() => handleSort('time')}
+                className="w-24 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
+              >
+                Time
+                <SortIcon field="time" />
+              </button>
+              {activeTab === 'maps' && (
+                <button
+                  onClick={() => handleSort('wrDiff')}
+                  className="w-20 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
+                >
+                  WR Diff
+                  <SortIcon field="wrDiff" />
+                </button>
+              )}
+              {activeTab !== 'maps' && <div className="w-20" />}
+              <button
+                onClick={() => handleSort('date')}
+                className="w-24 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
+              >
+                Date
+                <SortIcon field="date" />
+              </button>
+            </div>
+
+            {/* Mobile Compact Header */}
+            <div className="sm:hidden px-3 py-2 bg-surface-hover/50 border-b border-border flex items-center justify-between text-xs font-medium text-text-muted">
+              <button
+                onClick={() => handleSort('map')}
+                className="flex items-center gap-1 hover:text-text transition-colors"
+              >
+                Map
+                <SortIcon field="map" />
+              </button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => handleSort('rank')} className="flex items-center gap-1 hover:text-text transition-colors">Rk<SortIcon field="rank" /></button>
+                <button onClick={() => handleSort('time')} className="flex items-center gap-1 hover:text-text transition-colors">Time<SortIcon field="time" /></button>
+                {activeTab === 'maps' && <button onClick={() => handleSort('wrDiff')} className="flex items-center gap-1 hover:text-text transition-colors">WR<SortIcon field="wrDiff" /></button>}
+                <button onClick={() => handleSort('date')} className="flex items-center gap-1 hover:text-text transition-colors">Date<SortIcon field="date" /></button>
+              </div>
+            </div>
+
+            <div className="divide-y divide-border">
+              {activeTab === 'maps' &&
+                (paginatedRecords as MapRecord[]).map((record, i) => {
+                  const wrTimeDiff = record.wr_time ? record.runtimepro - record.wr_time : null;
+                  const wrPercent = record.wr_time
+                    ? Math.min(100, ((record.runtimepro - record.wr_time) / record.wr_time) * 100)
+                    : null;
+
+                  return (
+                    <div
+                      key={`${record.mapname}-${i}`}
+                      className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <MapLinkWithPreview mapname={record.mapname}>
+                          {sanitizePlayerName(record.mapname)}
+                        </MapLinkWithPreview>
+                      </div>
+                      <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+                        <div className="sm:w-16 text-left sm:text-right">
+                          <span className="sm:hidden text-text-muted mr-1">Rk:</span>
+                          <span className="text-text-muted">#{record.player_rank}</span>
+                        </div>
+                        <div className="sm:w-24 text-left sm:text-right font-mono text-text">
+                          {formatTime(record.runtimepro)}
+                        </div>
+                        {wrTimeDiff !== null && wrTimeDiff > 0 && (
+                          <div className="sm:w-20 text-left sm:text-right">
+                            <span className={`font-mono ${getDiffColor(wrPercent)}`}>
+                              +{formatTime(wrTimeDiff)}
+                            </span>
+                          </div>
+                        )}
+                        {(!wrTimeDiff || wrTimeDiff <= 0) && <div className="sm:w-20 hidden sm:block" />}
+                        <div className="sm:w-24 text-left sm:text-right text-text-muted">
+                          {formatDate(record.date)}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+              {activeTab === 'bonuses' &&
+                (paginatedRecords as BonusRecord[]).map((record, i) => (
+                  <div
+                    key={`${record.mapname}-${record.zonegroup}-${i}`}
+                    className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
+                  >
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                      <MapLinkWithPreview mapname={record.mapname}>
+                        {sanitizePlayerName(record.mapname)}
+                      </MapLinkWithPreview>
+                      <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">
+                        B{record.zonegroup}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+                      <div className="sm:w-16 text-left sm:text-right">
+                        <span className="sm:hidden text-text-muted mr-1">Rk:</span>
+                        <span className="text-text-muted">#{record.player_rank}</span>
+                      </div>
+                      <div className="sm:w-24 text-left sm:text-right font-mono text-text">
+                        {formatTime(record.runtime)}
+                      </div>
+                      <div className="sm:w-20 hidden sm:block" />
+                      <div className="sm:w-24 text-left sm:text-right text-text-muted">
+                        {formatDate(record.date)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+              {activeTab === 'stages' &&
+                (paginatedRecords as StageRecord[]).map((record, i) => (
+                  <div
+                    key={`${record.map}-${record.stage}-${i}`}
+                    className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
+                  >
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
+                      <MapLinkWithPreview mapname={record.map}>
+                        {sanitizePlayerName(record.map)}
+                      </MapLinkWithPreview>
+                      <span className="text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">
+                        S{record.stage}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+                      <div className="sm:w-16 text-left sm:text-right">
+                        <span className="sm:hidden text-text-muted mr-1">Rk:</span>
+                        <span className="text-text-muted">#{record.player_rank}</span>
+                      </div>
+                      <div className="sm:w-24 text-left sm:text-right font-mono text-text">
+                        {formatTime(record.runtime)}
+                      </div>
+                      <div className="sm:w-20 hidden sm:block" />
+                      <div className="sm:w-24 text-left sm:text-right text-text-muted">
+                        {formatDate(record.date)}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </>
+        ) : (
+          <div className="p-8 text-center text-text-muted">
+            <p>No {activeTab} found</p>
+            {currentSearchQuery && (
+              <p className="text-sm mt-1">
+                No {activeTab} matching &ldquo;{currentSearchQuery}&rdquo; for this player.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Pagination */}
+      {currentData.totalPages > 1 && (
+        <div className="px-3 sm:px-6 py-4 border-t border-border">
+          <ClientPagination
+            currentPage={currentData.page}
+            totalPages={currentData.totalPages}
+            onPageChange={handlePageChange}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
