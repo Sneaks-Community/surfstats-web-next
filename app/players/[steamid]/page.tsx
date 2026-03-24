@@ -323,7 +323,7 @@ export default async function PlayerProfilePage({
             <div className="bg-surface-hover/50 rounded-lg p-2 border border-border h-[72px] flex flex-col justify-center gap-1.5 w-[240px]">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-medium text-blue-400 w-8 flex-shrink-0">Map</span>
-                <div className="flex-1 h-3 bg-surface-active rounded overflow-hidden">
+                <div className="flex-1 h-3 bg-surface-active rounded overflow-hidden relative">
                   <div
                     className="h-full bg-blue-500 rounded animate-barber-pole"
                     style={{
@@ -332,12 +332,15 @@ export default async function PlayerProfilePage({
                       backgroundSize: '20px 20px',
                     }}
                   />
+                  <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white drop-shadow-md">
+                    {totals.totalMaps > 0 ? Math.min(100, Math.round((maps.length / totals.totalMaps) * 100)) : 0}%
+                  </span>
                 </div>
                 <span className="text-[10px] text-text w-12 text-right flex-shrink-0">{maps.length}/{totals.totalMaps}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-medium text-purple-400 w-8 flex-shrink-0">Bonus</span>
-                <div className="flex-1 h-3 bg-surface-active rounded overflow-hidden">
+                <div className="flex-1 h-3 bg-surface-active rounded overflow-hidden relative">
                   <div
                     className="h-full bg-purple-500 rounded animate-barber-pole"
                     style={{
@@ -346,12 +349,15 @@ export default async function PlayerProfilePage({
                       backgroundSize: '20px 20px',
                     }}
                   />
+                  <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white drop-shadow-md">
+                    {totals.totalBonuses > 0 ? Math.min(100, Math.round((bonuses.length / totals.totalBonuses) * 100)) : 0}%
+                  </span>
                 </div>
                 <span className="text-[10px] text-text w-12 text-right flex-shrink-0">{bonuses.length}/{totals.totalBonuses}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-medium text-orange-400 w-8 flex-shrink-0">Stage</span>
-                <div className="flex-1 h-3 bg-surface-active rounded overflow-hidden">
+                <div className="flex-1 h-3 bg-surface-active rounded overflow-hidden relative">
                   <div
                     className="h-full bg-orange-500 rounded animate-barber-pole"
                     style={{
@@ -360,6 +366,9 @@ export default async function PlayerProfilePage({
                       backgroundSize: '20px 20px',
                     }}
                   />
+                  <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white drop-shadow-md">
+                    {totals.totalStages > 0 ? Math.min(100, Math.round((stages.length / totals.totalStages) * 100)) : 0}%
+                  </span>
                 </div>
                 <span className="text-[10px] text-text w-12 text-right flex-shrink-0">{stages.length}/{totals.totalStages}</span>
               </div>
