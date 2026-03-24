@@ -39,10 +39,17 @@ export default function ServerCard({ server, mapImagesUrl }: { server: any; mapI
               <h2 className="text-base font-semibold text-text">{server.config.name}</h2>
               <span className="relative flex h-2 w-2">
                 {server.online ? (
-                  <>
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                  </>
+                  server.players < server.maxplayers ? (
+                    <>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-500 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
+                    </>
+                  )
                 ) : (
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
                 )}
