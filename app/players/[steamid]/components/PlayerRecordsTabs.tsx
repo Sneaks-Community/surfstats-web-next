@@ -6,6 +6,7 @@ import { Map as MapIcon, Target, Layers, Search, X, ArrowUpDown, ArrowUp, ArrowD
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import ClientPagination from './ClientPagination';
 import { formatTime, formatDate, sanitizePlayerName } from '@/lib/client-utils';
+import TierBadge from '@/components/TierBadge';
 
 // Types for records
 interface MapRecord {
@@ -14,6 +15,7 @@ interface MapRecord {
   date: string;
   wr_time: number | null;
   player_rank: number;
+  tier: number;
 }
 
 interface IncompleteMapRecord {
@@ -668,10 +670,11 @@ export default function PlayerRecordsTabs({
                       key={`${record.mapname}-${i}`}
                       className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
                     >
-                      <div className="flex-1 min-w-0">
+                      <div className="flex-1 min-w-0 flex items-center gap-2">
                         <MapLinkWithPreview mapname={record.mapname}>
                           {sanitizePlayerName(record.mapname)}
                         </MapLinkWithPreview>
+                        <TierBadge tier={record.tier} />
                       </div>
                       <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
                         <div className="sm:w-16 text-left sm:text-right">
@@ -764,19 +767,15 @@ export default function PlayerRecordsTabs({
                     key={`${record.mapname}-${i}`}
                     className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
                   >
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.mapname}>
                         {sanitizePlayerName(record.mapname)}
                       </MapLinkWithPreview>
+                      {record.tier !== null && (
+                        <TierBadge tier={record.tier} />
+                      )}
                     </div>
-                    {record.tier !== null && (
-                      <div className="sm:w-20 text-left sm:text-right">
-                        <span className="text-xs bg-surface-hover text-text-muted px-1.5 py-0.5 rounded">
-                          T{record.tier}
-                        </span>
-                      </div>
-                    )}
-                    {!record.tier && <div className="sm:w-20 hidden sm:block" />}
+                    <div className="sm:w-20 hidden sm:block" />
                     <div className="sm:w-16" />
                     <div className="sm:w-24" />
                     <div className="sm:w-20" />

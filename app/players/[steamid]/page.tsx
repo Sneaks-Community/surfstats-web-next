@@ -37,6 +37,7 @@ interface MapRecord extends RowDataPacket {
   date: string;
   wr_time: number | null;
   player_rank: number;
+  tier: number;
 }
 
 interface IncompleteMapRecord {
@@ -156,13 +157,15 @@ const getPlayerData = unstable_cache(
             pt.date,
             wr.min_runtime as wr_time,
             (SELECT COUNT(*) + 1 FROM ck_playertimes pt2
-             WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as player_rank
+             WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as player_rank,
+            COALESCE(mt.tier, 1) as tier
           FROM ck_playertimes pt
           LEFT JOIN (
             SELECT mapname, MIN(runtimepro) as min_runtime
             FROM ck_playertimes
             GROUP BY mapname
           ) wr ON pt.mapname = wr.mapname
+          LEFT JOIN ck_maptier mt ON pt.mapname = mt.mapname
           WHERE pt.steamid = ?
           ORDER BY pt.mapname ASC
         `, [steamid]),
