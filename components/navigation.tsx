@@ -24,6 +24,7 @@ const navLinks = [
 export function Navigation({ siteName }: { siteName: string }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [mobilePlayersExpanded, setMobilePlayersExpanded] = useState(false);
   const pathname = usePathname();
 
   // Check if a path is active (exact match)
@@ -153,25 +154,31 @@ export function Navigation({ siteName }: { siteName: string }) {
                 link.children ? (
                   // Mobile dropdown for items with children
                   <div key={link.href} className="space-y-1">
-                    <div className="text-text-muted px-3 py-2 text-base font-medium">
+                    <button
+                      onClick={() => setMobilePlayersExpanded(!mobilePlayersExpanded)}
+                      className="w-full flex items-center justify-between text-text-muted px-3 py-2 text-base font-medium hover:bg-surface-hover rounded-md transition-colors"
+                    >
                       {link.label}
-                    </div>
-                    <div className="flex flex-col space-y-1 pl-4">
-                      {link.children.map((child) => (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className={`px-3 py-2 rounded-md text-sm transition-colors ${
-                            isActive(child.href)
-                              ? 'text-primary bg-surface-hover'
-                              : 'text-text-muted hover:bg-surface-hover hover:text-text'
-                          }`}
-                        >
-                          {child.label}
-                        </Link>
-                      ))}
-                    </div>
+                      <ChevronDown className={`h-4 w-4 transition-transform ${mobilePlayersExpanded ? 'rotate-180' : ''}`} />
+                    </button>
+                    {mobilePlayersExpanded && (
+                      <div className="flex flex-col space-y-1 pl-4">
+                        {link.children.map((child) => (
+                          <Link
+                            key={child.href}
+                            href={child.href}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className={`px-3 py-2 rounded-md text-sm transition-colors ${
+                              isActive(child.href)
+                                ? 'text-primary bg-surface-hover'
+                                : 'text-text-muted hover:bg-surface-hover hover:text-text'
+                            }`}
+                          >
+                            {child.label}
+                          </Link>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   // Regular link for items without children
