@@ -4,6 +4,8 @@ import { RowDataPacket } from 'mysql2';
 import { GameDig } from 'gamedig';
 import { unstable_cache } from 'next/cache';
 import logger from '@/lib/logger';
+import { getAllMapMetadata, getTotals as getMapTotals } from './map-cache';
+import { getAllBonusGroups, getAllStages } from './registry-cache';
 
 // Types
 interface ServerConfig {
@@ -298,32 +300,20 @@ export const getStatsCached = unstable_cache(
 );
 
 // Fetch totals (maps, bonuses, stages) - used for player progress bars
+// Now uses the global map cache instead of database queries
 async function fetchTotals() {
   const startTime = Date.now();
   
   try {
-    logger.debug('[Cache] Fetching totals from database...');
+    logger.debug('[Cache] Fetching totals from global map cache...');
     
-    const [mapRows] = await pool.query<RowDataPacket[]>(`
-      SELECT COUNT(*) as total FROM ck_maptier m WHERE EXISTS (SELECT 1 FROM ck_playertimes pt WHERE pt.mapname = m.mapname)
-    `);
-    
-    const [bonusRows] = await pool.query<RowDataPacket[]>(`
-      SELECT COUNT(DISTINCT mapname, zonegroup) as total FROM ck_zones WHERE zonegroup > 0 AND EXISTS (SELECT 1 FROM ck_playertimes pt WHERE pt.mapname = ck_zones.mapname)
-    `);
-    
-    const [stageRows] = await pool.query<RowDataPacket[]>(`
-      SELECT COUNT(*) as total FROM ck_zones WHERE zonetype = 3 AND EXISTS (SELECT 1 FROM ck_playertimes pt WHERE pt.mapname = ck_zones.mapname)
-    `);
+    // Use the global map cache instead of database queries
+    const totals = await getMapTotals();
     
     const duration = Date.now() - startTime;
-    logger.debug(`[Cache] Totals fetched successfully in ${duration}ms: maps=${mapRows[0]?.total}, bonuses=${bonusRows[0]?.total}, stages=${stageRows[0]?.total}`);
+    logger.debug(`[Cache] Totals fetched successfully in ${duration}ms: maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}`);
     
-    return {
-      totalMaps: mapRows[0]?.total ?? 0,
-      totalBonuses: bonusRows[0]?.total ?? 0,
-      totalStages: stageRows[0]?.total ?? 0,
-    };
+    return totals;
   } catch (error: any) {
     const duration = Date.now() - startTime;
     logger.error(`[Cache] Failed to fetch totals after ${duration}ms`);
@@ -333,6 +323,7 @@ async function fetchTotals() {
 }
 
 // Cache totals for 5 minutes (300 seconds)
+// Note: The underlying map cache has a 1-hour TTL, so this provides an additional layer
 export const getTotalsCached = unstable_cache(
   fetchTotals,
   ['totals-data'],
@@ -353,7 +344,7 @@ export async function prewarmCaches() {
     logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
   }
   
-  // Pre-warm totals cache
+  // Pre-warm totals cache (now uses map cache internally)
   try {
     const startTime = Date.now();
     await getTotalsCached();
@@ -370,6 +361,26 @@ export async function prewarmCaches() {
     logger.info(`[Cache] Servers cache pre-warmed successfully (${Date.now() - startTime}ms)`);
   } catch (error: any) {
     logger.error('[Cache] Servers cache pre-warm failed');
+    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+  }
+  
+  // Pre-warm map metadata cache (1-hour TTL)
+  try {
+    const startTime = Date.now();
+    await getAllMapMetadata();
+    logger.info(`[Cache] Map metadata cache pre-warmed successfully (${Date.now() - startTime}ms)`);
+  } catch (error: any) {
+    logger.error('[Cache] Map metadata cache pre-warm failed');
+    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+  }
+  
+  // Pre-warm bonus/stage registry cache (1-hour TTL)
+  try {
+    const startTime = Date.now();
+    await Promise.all([getAllBonusGroups(), getAllStages()]);
+    logger.info(`[Cache] Registry cache pre-warmed successfully (${Date.now() - startTime}ms)`);
+  } catch (error: any) {
+    logger.error('[Cache] Registry cache pre-warm failed');
     logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
   }
 }

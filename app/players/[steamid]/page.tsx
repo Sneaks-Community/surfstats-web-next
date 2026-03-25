@@ -10,6 +10,12 @@ import { sanitizeSteamId, sanitizePlayerName } from '@/lib/sanitize';
 import CountryBadge from '@/components/CountryBadge';
 import { getTotalsCached } from '@/lib/cache';
 import { getPlayerTimeOnServer } from '@/lib/player-analytics';
+import { getAllMapMetadata, getTierDistribution as getCachedTierDistribution } from '@/lib/map-cache';
+import {
+  getIncompleteMapsForPlayer,
+  getIncompleteBonusesForPlayer,
+  getIncompleteStagesForPlayer
+} from '@/lib/registry-cache';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
 import TierDistributionChart from './components/TierDistributionChart';
@@ -64,7 +70,7 @@ interface IncompleteStageRecord {
   stage: number;
 }
 
-interface TierDistribution extends RowDataPacket {
+interface TierDistribution {
   tier: number;
   completed_maps: number;
   total_maps: number;
@@ -75,27 +81,42 @@ const getTierDistribution = unstable_cache(
     logger.debug(`[Player] Fetching tier distribution for: ${steamid}`);
     
     try {
-      // Get completed maps per tier with total maps per tier
-      const [rows] = await pool.query<TierDistribution[]>(`
-        SELECT
-          t.tier,
-          COUNT(DISTINCT pt.mapname) as completed_maps,
-          totals.total_maps
-        FROM ck_maptier t
-        CROSS JOIN (
-          SELECT tier, COUNT(DISTINCT mapname) as total_maps
-          FROM ck_maptier
-          GROUP BY tier
-        ) totals
-        LEFT JOIN ck_playertimes pt
-          ON t.mapname = pt.mapname
-          AND pt.steamid = ?
-        WHERE t.tier = totals.tier
-        GROUP BY t.tier, totals.total_maps
-        ORDER BY t.tier ASC
-      `, [steamid]);
+      // Get completed map names for this player
+      const [finishedMapsResult] = await pool.query<RowDataPacket[]>(
+        'SELECT DISTINCT mapname FROM ck_playertimes WHERE steamid = ?',
+        [steamid]
+      );
       
-      return rows;
+      const finishedMapnames = new Set(finishedMapsResult.map(r => r.mapname));
+      
+      // Use cached map metadata to calculate tier distribution
+      const allMapMetadata = await getAllMapMetadata();
+      
+      // Count maps per tier and completed maps per tier
+      const tierMapCounts = new Map<number, { total: number; completed: number }>();
+      
+      for (const [mapname, metadata] of allMapMetadata) {
+        const tier = metadata.tier;
+        const counts = tierMapCounts.get(tier) || { total: 0, completed: 0 };
+        counts.total++;
+        if (finishedMapnames.has(mapname)) {
+          counts.completed++;
+        }
+        tierMapCounts.set(tier, counts);
+      }
+      
+      // Convert to array and sort by tier
+      const result: TierDistribution[] = [];
+      for (const [tier, counts] of tierMapCounts) {
+        result.push({
+          tier,
+          completed_maps: counts.completed,
+          total_maps: counts.total,
+        });
+      }
+      result.sort((a, b) => a.tier - b.tier);
+      
+      return result;
     } catch (error: any) {
       logger.error(`[Player] Failed to fetch tier distribution: ${error.message}`);
       return [];
@@ -194,77 +215,65 @@ const getIncompleteRecords = unstable_cache(
     logger.debug(`[Player] Fetching incomplete records for: ${steamid}`);
     
     try {
-      // Get all maps that have tiers
-      const [allMapsResult] = await pool.query<RowDataPacket[]>(`
-        SELECT DISTINCT mapname FROM ck_maptier
-      `, []);
-      
-      const allMapnames = allMapsResult.map(r => r.mapname);
+      // Use cached map metadata and registry data instead of full table scans
+      // This is much more efficient than querying all maps/bonuses/stages from database
+      const [allMapMetadata, finishedMapsResult, finishedBonusesResult, finishedStagesResult] = await Promise.all([
+        getAllMapMetadata(),
+        pool.query<RowDataPacket[]>('SELECT DISTINCT mapname FROM ck_playertimes WHERE steamid = ?', [steamid]),
+        pool.query<RowDataPacket[]>('SELECT DISTINCT mapname, zonegroup FROM ck_bonus WHERE steamid = ?', [steamid]),
+        pool.query<RowDataPacket[]>('SELECT DISTINCT map, stage FROM ck_stages WHERE steamid = ?', [steamid]),
+      ]);
       
       // Get finished map names for this player
-      const [finishedMapsResult] = await pool.query<RowDataPacket[]>(`
-        SELECT DISTINCT mapname FROM ck_playertimes WHERE steamid = ?
-      `, [steamid]);
+      const finishedMapnames = new Set(finishedMapsResult[0].map(r => r.mapname));
       
-      const finishedMapnames = new Set(finishedMapsResult.map(r => r.mapname));
-      
-      // Get incomplete maps (in allMapnames but not in finishedMapnames)
-      const incompleteMapnames = allMapnames.filter(m => !finishedMapnames.has(m));
-      
-      // Get tier info for incomplete maps
-      const [incompleteMapsResult] = incompleteMapnames.length > 0
-        ? await pool.query<RowDataPacket[]>(`
-            SELECT DISTINCT mt.mapname, mt.tier
-            FROM ck_maptier mt
-            WHERE mt.mapname IN (${incompleteMapnames.map(() => '?').join(',')})
-            ORDER BY mt.tier ASC, mt.mapname ASC
-          `, incompleteMapnames)
-        : [[]];
-
-      // Get all bonus groups (mapname, zonegroup) that exist
-      const [allBonusesResult] = await pool.query<RowDataPacket[]>(`
-        SELECT DISTINCT mapname, zonegroup FROM ck_bonus
-      `, []);
+      // Build incomplete maps list from cached metadata
+      const incompleteMaps: IncompleteMapRecord[] = [];
+      for (const [mapname, metadata] of allMapMetadata) {
+        if (!finishedMapnames.has(mapname)) {
+          incompleteMaps.push({
+            mapname,
+            tier: metadata.tier,
+          });
+        }
+      }
+      // Sort by tier then name (handle null tiers)
+      incompleteMaps.sort((a, b) => {
+        const aTier = a.tier ?? 0;
+        const bTier = b.tier ?? 0;
+        if (aTier !== bTier) return aTier - bTier;
+        return a.mapname.localeCompare(b.mapname);
+      });
       
       // Get finished bonus groups for this player
-      const [finishedBonusesResult] = await pool.query<RowDataPacket[]>(`
-        SELECT DISTINCT mapname, zonegroup FROM ck_bonus WHERE steamid = ?
-      `, [steamid]);
-      
       const finishedBonusSet = new Set(
-        finishedBonusesResult.map(r => `${r.mapname}:${r.zonegroup}`)
+        finishedBonusesResult[0].map(r => `${r.mapname}:${r.zonegroup}`)
       );
       
-      // Get incomplete bonuses
-      const incompleteBonuses = allBonusesResult
-        .filter(r => !finishedBonusSet.has(`${r.mapname}:${r.zonegroup}`))
-        .map(r => ({ mapname: r.mapname, zonegroup: r.zonegroup }));
-
-      // Get all stages that exist
-      const [allStagesResult] = await pool.query<RowDataPacket[]>(`
-        SELECT DISTINCT map, stage FROM ck_stages
-      `, []);
+      // Get incomplete bonuses using cached registry
+      const incompleteBonusesList: IncompleteBonusRecord[] = [];
+      const allBonusGroups = await getIncompleteBonusesForPlayer(finishedBonusSet);
+      for (const bonus of allBonusGroups) {
+        incompleteBonusesList.push({
+          mapname: bonus.mapname,
+          zonegroup: bonus.zonegroup,
+        });
+      }
       
       // Get finished stages for this player
-      const [finishedStagesResult] = await pool.query<RowDataPacket[]>(`
-        SELECT DISTINCT map, stage FROM ck_stages WHERE steamid = ?
-      `, [steamid]);
-      
       const finishedStageSet = new Set(
-        finishedStagesResult.map(r => `${r.map}:${r.stage}`)
+        finishedStagesResult[0].map(r => `${r.map}:${r.stage}`)
       );
       
-      // Get incomplete stages
-      const incompleteStages = allStagesResult
-        .filter(r => !finishedStageSet.has(`${r.map}:${r.stage}`))
-        .map(r => ({ map: r.map, stage: r.stage }));
-
-      const incompleteMaps: IncompleteMapRecord[] = (incompleteMapsResult as RowDataPacket[]).map((r: RowDataPacket) => ({
-        mapname: r.mapname,
-        tier: r.tier
-      }));
-      const incompleteBonusesList: IncompleteBonusRecord[] = incompleteBonuses;
-      const incompleteStagesList: IncompleteStageRecord[] = incompleteStages;
+      // Get incomplete stages using cached registry
+      const incompleteStagesList: IncompleteStageRecord[] = [];
+      const allStages = await getIncompleteStagesForPlayer(finishedStageSet);
+      for (const stage of allStages) {
+        incompleteStagesList.push({
+          map: stage.map,
+          stage: stage.stage,
+        });
+      }
 
       logger.debug(`[Player] Incomplete records for ${steamid}: ${incompleteMaps.length} maps, ${incompleteBonusesList.length} bonuses, ${incompleteStagesList.length} stages`);
 

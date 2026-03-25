@@ -36,22 +36,41 @@ const getPlayers = unstable_cache(
       const limit = 20;
       const offset = (page - 1) * limit;
       
-      let query = `
-        SELECT
-          steamid, name, country, points, finishedmaps, lastseen,
-          (SELECT COUNT(*) + 1 FROM ck_playerrank pr2 WHERE pr2.points > pr1.points) as rank
-        FROM ck_playerrank pr1
-      `;
-      
+      // Use window function for rank calculation (much more efficient than correlated subquery)
+      // RANK() OVER (ORDER BY points DESC) calculates rank based on points
+      // This is O(n log n) instead of O(n²) for the correlated subquery
+      let query: string;
       const params: any[] = [];
       
       if (search) {
-        query += ` WHERE name LIKE ? OR steamid LIKE ?`;
-        params.push(`%${search}%`, `%${search}%`);
+        // For search, we need to use a subquery to filter first, then calculate rank
+        query = `
+          SELECT
+            ranked.steamid, ranked.name, ranked.country, ranked.points,
+            ranked.finishedmaps, ranked.lastseen, ranked.rank
+          FROM (
+            SELECT
+              steamid, name, country, points, finishedmaps, lastseen,
+              RANK() OVER (ORDER BY points DESC) as rank
+            FROM ck_playerrank
+            WHERE name LIKE ? OR steamid LIKE ?
+          ) ranked
+          ORDER BY ranked.points DESC
+          LIMIT ? OFFSET ?
+        `;
+        params.push(`%${search}%`, `%${search}%`, limit, offset);
+      } else {
+        // For non-search, use window function directly with pagination
+        query = `
+          SELECT
+            steamid, name, country, points, finishedmaps, lastseen,
+            RANK() OVER (ORDER BY points DESC) as rank
+          FROM ck_playerrank
+          ORDER BY points DESC
+          LIMIT ? OFFSET ?
+        `;
+        params.push(limit, offset);
       }
-      
-      query += ` ORDER BY points DESC LIMIT ? OFFSET ?`;
-      params.push(limit, offset);
       
       const [rows] = await pool.query<PlayerRank[]>(query, params);
       

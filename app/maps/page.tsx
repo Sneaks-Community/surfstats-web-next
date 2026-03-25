@@ -8,6 +8,7 @@ import MapImage from '@/components/MapImage';
 import MapFilters from '@/components/MapFilters';
 import { getTierColor } from '@/lib/tierColors';
 import Pagination from '@/components/Pagination';
+import { getTierDistribution } from '@/lib/map-cache';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -23,7 +24,7 @@ interface MapData extends RowDataPacket {
   stages: number;
 }
 
-interface FilterOptions extends RowDataPacket {
+interface FilterOptions {
   tier: number;
   count: number;
 }
@@ -120,15 +121,13 @@ const getMaps = unstable_cache(
 const getFilterOptions = unstable_cache(
   async () => {
     try {
-      // Get tier distribution
-      const tierQuery = `
-        SELECT m.tier, COUNT(*) as count
-        FROM ck_maptier m
-        WHERE EXISTS (SELECT 1 FROM ck_playertimes pt WHERE pt.mapname = m.mapname)
-        GROUP BY m.tier
-        ORDER BY m.tier ASC
-      `;
-      const [tierRows] = await pool.query<FilterOptions[]>(tierQuery);
+      // Use cached tier distribution instead of database query
+      const tierDistribution = await getTierDistribution();
+      
+      // Convert to FilterOptions format
+      const tierRows: FilterOptions[] = Array.from(tierDistribution.entries())
+        .map(([tier, count]) => ({ tier, count }))
+        .sort((a, b) => a.tier - b.tier);
       
       return { tiers: tierRows };
     } catch (error) {
