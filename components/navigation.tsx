@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Activity, Search, Menu, X, ChevronDown } from 'lucide-react';
 import { ThemeToggleCompact } from '@/components/ThemeToggle';
+import { SearchDropdown } from '@/components/SearchDropdown';
 
 const navLinks = [
   { href: '/', label: 'Dashboard' },
@@ -119,18 +120,7 @@ export function Navigation({ siteName }: { siteName: string }) {
 
           {/* Desktop search and theme toggle */}
           <div className="hidden md:flex items-center gap-4">
-            <form action="/search" method="GET" className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-text-placeholder" />
-              </div>
-              <input
-                type="text"
-                name="q"
-                aria-label="Search players or maps"
-                className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-surface text-text placeholder-text-placeholder focus:outline-none focus:bg-background-secondary focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
-                placeholder="Search players or maps..."
-              />
-            </form>
+            <SearchDropdown />
             <ThemeToggleCompact />
           </div>
 
