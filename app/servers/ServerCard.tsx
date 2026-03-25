@@ -76,9 +76,9 @@ export default function ServerCard({ server, mapImagesUrl }: { server: any; mapI
             </div>
             
             <div className="flex items-center gap-3">
-              <a 
+              <a
                 href={`steam://connect/${server.config.ip}:${server.config.port}`}
-                className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-md text-sm font-medium transition-colors"
+                className="hidden sm:inline-flex px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-md text-sm font-medium transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >
                 Connect
