@@ -138,7 +138,7 @@ export default function PlayerRecordsTabs({
     if (sortField !== 'map') params.set('sort', sortField);
     if (sortDirection !== 'asc') params.set('dir', sortDirection);
 
-    router.push(`?${params.toString()}`, { scroll: false });
+    router.replace(`?${params.toString()}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, statusFilter, pages.maps, pages.bonuses, pages.stages, debouncedSearch, sortField, sortDirection, router]);
 
