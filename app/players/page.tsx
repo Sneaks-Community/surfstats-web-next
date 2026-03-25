@@ -172,7 +172,7 @@ export default async function PlayersPage({
                             className="rounded-full"
                           />
                         )}
-                        <Link href={`/players/${player.steamid}`} className="text-primary hover:text-primary font-medium transition-colors">
+                        <Link href={`/players/${player.steamid}`} prefetch={false} className="text-primary hover:text-primary font-medium transition-colors">
                           {player.name || 'Unknown'}
                         </Link>
                       </div>
