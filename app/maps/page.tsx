@@ -115,7 +115,7 @@ const getMaps = unstable_cache(
     }
   },
   ['maps-list'],
-  { revalidate: 300 } // Cache for 5 minutes
+  { revalidate: 3600 } // Cache for 1 hour
 );
 
 const getFilterOptions = unstable_cache(
@@ -136,7 +136,7 @@ const getFilterOptions = unstable_cache(
     }
   },
   ['maps-filter-options'],
-  { revalidate: 300 }
+  { revalidate: 3600 } // Cache for 1 hour
 );
 
 export default async function MapsPage({

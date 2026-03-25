@@ -99,7 +99,7 @@ const getPlayers = unstable_cache(
     }
   },
   ['players-list'],
-  { revalidate: 60 } // Cache for 1 minute
+  { revalidate: 3600 } // Cache for 1 hour
 );
 
 export default async function PlayersPage({
