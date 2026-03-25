@@ -9,6 +9,7 @@ import { getSteamProfiles } from '@/lib/steam';
 import Pagination from '@/components/Pagination';
 import { formatDate } from '@/lib/utils';
 import logger from '@/lib/logger';
+import { getPlayerCount } from '@/lib/registry-cache';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -75,14 +76,17 @@ const getPlayers = unstable_cache(
       const [rows] = await pool.query<PlayerRank[]>(query, params);
       
       // Get total count for pagination
-      let countQuery = `SELECT COUNT(*) as total FROM ck_playerrank`;
-      const countParams: any[] = [];
+      let total: number;
       if (search) {
-        countQuery += ` WHERE name LIKE ? OR steamid LIKE ?`;
-        countParams.push(`%${search}%`, `%${search}%`);
+        // For search, we need to count matching records
+        const countQuery = `SELECT COUNT(*) as total FROM ck_playerrank WHERE name LIKE ? OR steamid LIKE ?`;
+        const countParams = [`%${search}%`, `%${search}%`];
+        const [countRows] = await pool.query<RowDataPacket[]>(countQuery, countParams);
+        total = countRows[0].total;
+      } else {
+        // Use cached player count for non-search queries
+        total = await getPlayerCount();
       }
-      const [countRows] = await pool.query<RowDataPacket[]>(countQuery, countParams);
-      const total = countRows[0].total;
       
       logger.debug(`[Players] Retrieved ${rows.length} players (page ${page} of ${Math.ceil(total / limit)}, ${total} total)`);
       

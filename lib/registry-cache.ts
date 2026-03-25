@@ -21,6 +21,7 @@ const REGISTRY_CACHE_TTL = 60 * 60 * 1000;
 interface GlobalRegistryCache {
   bonuses: BonusGroup[];
   stages: StageGroup[];
+  playerCount: number;
   lastUpdated: number;
   initialized: boolean;
   initialFetchPromise: Promise<void> | null;
@@ -33,6 +34,7 @@ function getGlobalRegistryCache(): GlobalRegistryCache {
     global.registryCache = {
       bonuses: [],
       stages: [],
+      playerCount: 0,
       lastUpdated: 0,
       initialized: false,
       initialFetchPromise: null,
@@ -42,26 +44,29 @@ function getGlobalRegistryCache(): GlobalRegistryCache {
 }
 
 /**
- * Fetch all bonus groups and stages from database in parallel
+ * Fetch all bonus groups, stages, and player count from database in parallel
  */
-async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stages: StageGroup[] }> {
+async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stages: StageGroup[]; playerCount: number }> {
   const startTime = Date.now();
   
   try {
-    logger.debug('[RegistryCache] Fetching bonus/stage registry from database...');
+    logger.debug('[RegistryCache] Fetching bonus/stage registry and player count from database...');
     
-    // Run both queries in parallel
-    const [bonusResult, stageResult] = await Promise.all([
+    // Run all three queries in parallel
+    const [bonusResult, stageResult, countResult] = await Promise.all([
       pool.query<RowDataPacket[]>(`
-        SELECT DISTINCT mapname, zonegroup 
-        FROM ck_zones 
+        SELECT DISTINCT mapname, zonegroup
+        FROM ck_zones
         WHERE zonegroup > 0
         ORDER BY mapname ASC, zonegroup ASC
       `),
       pool.query<RowDataPacket[]>(`
-        SELECT DISTINCT map, stage 
+        SELECT DISTINCT map, stage
         FROM ck_stages
         ORDER BY map ASC, stage ASC
+      `),
+      pool.query<RowDataPacket[]>(`
+        SELECT COUNT(*) as total FROM ck_playerrank
       `),
     ]);
     
@@ -75,10 +80,12 @@ async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stages: Sta
       stage: row.stage,
     }));
     
-    const duration = Date.now() - startTime;
-    logger.debug(`[RegistryCache] Fetched ${bonuses.length} bonus groups and ${stages.length} stages in ${duration}ms`);
+    const playerCount = (countResult[0] as RowDataPacket[])[0].total;
     
-    return { bonuses, stages };
+    const duration = Date.now() - startTime;
+    logger.debug(`[RegistryCache] Fetched ${bonuses.length} bonus groups, ${stages.length} stages, and ${playerCount} players in ${duration}ms`);
+    
+    return { bonuses, stages, playerCount };
   } catch (error: any) {
     const duration = Date.now() - startTime;
     logger.error(`[RegistryCache] Failed to fetch registry data after ${duration}ms`);
@@ -107,11 +114,12 @@ function initRegistryCache(): void {
   
   // Initial fetch - store promise so callers can await it
   cache.initialFetchPromise = fetchRegistryData()
-    .then(({ bonuses, stages }) => {
+    .then(({ bonuses, stages, playerCount }) => {
       cache.bonuses = bonuses;
       cache.stages = stages;
+      cache.playerCount = playerCount;
       cache.lastUpdated = Date.now();
-      logger.info(`[RegistryCache] Cache initialized with ${bonuses.length} bonuses and ${stages.length} stages`);
+      logger.info(`[RegistryCache] Cache initialized with ${bonuses.length} bonuses, ${stages.length} stages, and ${playerCount} players`);
     })
     .catch((err) => {
       logger.error(`[RegistryCache] Initial fetch failed: ${err.message}`);
@@ -144,9 +152,10 @@ export async function getAllBonusGroups(): Promise<BonusGroup[]> {
   
   // Cache expired or empty - fetch fresh data
   logger.debug('[RegistryCache] Cache expired, fetching fresh data...');
-  const { bonuses, stages } = await fetchRegistryData();
+  const { bonuses, stages, playerCount } = await fetchRegistryData();
   cache.bonuses = bonuses;
   cache.stages = stages;
+  cache.playerCount = playerCount;
   cache.lastUpdated = now;
   
   return cache.bonuses;
@@ -178,12 +187,48 @@ export async function getAllStages(): Promise<StageGroup[]> {
   
   // Cache expired or empty - fetch fresh data
   logger.debug('[RegistryCache] Cache expired, fetching fresh data...');
-  const { bonuses, stages } = await fetchRegistryData();
+  const { bonuses, stages, playerCount } = await fetchRegistryData();
   cache.bonuses = bonuses;
   cache.stages = stages;
+  cache.playerCount = playerCount;
   cache.lastUpdated = now;
   
   return cache.stages;
+}
+
+/**
+ * Get total player count from cache
+ */
+export async function getPlayerCount(): Promise<number> {
+  // Initialize cache on first call (runs on server)
+  if (typeof window === 'undefined') {
+    initRegistryCache();
+  }
+  
+  const cache = getGlobalRegistryCache();
+  
+  // Wait for initial fetch to complete before returning
+  if (cache.initialFetchPromise) {
+    await cache.initialFetchPromise;
+    cache.initialFetchPromise = null;
+  }
+  
+  // Check if cache is still valid
+  const now = Date.now();
+  if (now - cache.lastUpdated < REGISTRY_CACHE_TTL && cache.playerCount > 0) {
+    logger.debug(`[RegistryCache] Cache hit: player count ${cache.playerCount} (age: ${Math.round((now - cache.lastUpdated) / 1000)}s)`);
+    return cache.playerCount;
+  }
+  
+  // Cache expired or empty - fetch fresh data
+  logger.debug('[RegistryCache] Cache expired, fetching fresh data...');
+  const { bonuses, stages, playerCount } = await fetchRegistryData();
+  cache.bonuses = bonuses;
+  cache.stages = stages;
+  cache.playerCount = playerCount;
+  cache.lastUpdated = now;
+  
+  return cache.playerCount;
 }
 
 /**
@@ -261,6 +306,7 @@ export function getRegistryCacheStats(): {
   initialized: boolean;
   bonusCount: number;
   stageCount: number;
+  playerCount: number;
 } {
   const cache = getGlobalRegistryCache();
   return {
@@ -269,6 +315,7 @@ export function getRegistryCacheStats(): {
     initialized: cache.initialized,
     bonusCount: cache.bonuses.length,
     stageCount: cache.stages.length,
+    playerCount: cache.playerCount,
   };
 }
 
@@ -279,10 +326,11 @@ export async function refreshRegistryCache(): Promise<void> {
   const cache = getGlobalRegistryCache();
   logger.info('[RegistryCache] Force refreshing cache...');
   
-  const { bonuses, stages } = await fetchRegistryData();
+  const { bonuses, stages, playerCount } = await fetchRegistryData();
   cache.bonuses = bonuses;
   cache.stages = stages;
+  cache.playerCount = playerCount;
   cache.lastUpdated = Date.now();
   
-  logger.info(`[RegistryCache] Cache refreshed with ${bonuses.length} bonuses and ${stages.length} stages`);
+  logger.info(`[RegistryCache] Cache refreshed with ${bonuses.length} bonuses, ${stages.length} stages, and ${playerCount} players`);
 }
