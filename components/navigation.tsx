@@ -3,19 +3,44 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Activity, Search, Menu, X } from 'lucide-react';
+import { Activity, Search, Menu, X, ChevronDown } from 'lucide-react';
 import { ThemeToggleCompact } from '@/components/ThemeToggle';
 
 const navLinks = [
   { href: '/', label: 'Dashboard' },
-  { href: '/players', label: 'Players' },
+  { 
+    href: '/players', 
+    label: 'Players',
+    children: [
+      { href: '/players', label: 'All Players' },
+      { href: '/players/countries', label: 'Countries' },
+    ]
+  },
   { href: '/maps', label: 'Maps' },
   { href: '/servers', label: 'Servers' },
 ];
 
 export function Navigation({ siteName }: { siteName: string }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const pathname = usePathname();
+
+  // Check if a path is active (exact match)
+  const isActive = (href: string) => {
+    return pathname === href;
+  };
+
+  // Check if any child is active (for dropdown parent highlighting)
+  const hasActiveChild = (children: { href: string; label: string }[] | undefined) => {
+    if (!children) return false;
+    return children.some(child => pathname === child.href || pathname.startsWith(child.href + '/'));
+  };
+
+  // Check if we're on any page under this parent route (for dropdown parent highlighting)
+  const isParentActive = (href: string) => {
+    if (href === '/') return pathname === '/';
+    return pathname === href || pathname.startsWith(href + '/');
+  };
 
   return (
     <nav className="bg-background-secondary border-b border-border sticky top-0 z-50">
@@ -30,14 +55,63 @@ export function Navigation({ siteName }: { siteName: string }) {
             <div className="hidden md:block ml-10">
               <div className="flex items-baseline space-x-4">
                 {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    aria-current={pathname === link.href ? 'page' : undefined}
-                    className="text-text-muted hover:bg-surface-hover hover:text-text px-3 py-2 rounded-md text-sm font-medium transition-colors"
-                  >
-                    {link.label}
-                  </Link>
+                  link.children ? (
+                    // Dropdown menu for items with children
+                    <div
+                      key={link.href}
+                      className="relative"
+                      onMouseEnter={() => setOpenDropdown(link.href)}
+                      onMouseLeave={() => setOpenDropdown(null)}
+                    >
+                      <Link
+                        href={link.href}
+                        className={`inline-flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                          isParentActive(link.href)
+                            ? 'text-text bg-surface-hover'
+                            : 'text-text-muted hover:bg-surface-hover hover:text-text'
+                        }`}
+                      >
+                        {link.label}
+                        <ChevronDown className="h-4 w-4" />
+                      </Link>
+                      
+                      {/* Dropdown panel */}
+                      {openDropdown === link.href && (
+                        <div className="absolute left-0 mt-0 w-48 rounded-md shadow-lg bg-surface border border-border ring-1 ring-black ring-opacity-5">
+                          <div className="py-1" role="menu" aria-orientation="vertical">
+                            {link.children.map((child) => (
+                              <Link
+                                key={child.href}
+                                href={child.href}
+                                className={`block px-4 py-2 text-sm transition-colors ${
+                                  isActive(child.href)
+                                    ? 'text-primary bg-surface-hover'
+                                    : 'text-text-muted hover:bg-surface-hover hover:text-text'
+                                }`}
+                                role="menuitem"
+                              >
+                                {child.label}
+                              </Link>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // Regular link for items without children
+                    <Link
+                      key={link.href}
+                      href={link.href}
+                      aria-current={isActive(link.href) ? 'page' : undefined}
+                      className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        isActive(link.href)
+                          ? 'text-text bg-surface-hover'
+                          : 'text-text-muted hover:bg-surface-hover hover:text-text'
+                      }`}
+                    >
+                      {link.label}
+                    </Link>
+                  )
                 ))}
               </div>
             </div>
@@ -86,14 +160,44 @@ export function Navigation({ siteName }: { siteName: string }) {
             {/* Mobile nav links */}
             <div className="flex flex-col space-y-2">
               {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="text-text-muted hover:bg-surface-hover hover:text-text px-3 py-2 rounded-md text-base font-medium transition-colors"
-                >
-                  {link.label}
-                </Link>
+                link.children ? (
+                  // Mobile dropdown for items with children
+                  <div key={link.href} className="space-y-1">
+                    <div className="text-text-muted px-3 py-2 text-base font-medium">
+                      {link.label}
+                    </div>
+                    <div className="flex flex-col space-y-1 pl-4">
+                      {link.children.map((child) => (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={() => setMobileMenuOpen(false)}
+                          className={`px-3 py-2 rounded-md text-sm transition-colors ${
+                            isActive(child.href)
+                              ? 'text-primary bg-surface-hover'
+                              : 'text-text-muted hover:bg-surface-hover hover:text-text'
+                          }`}
+                        >
+                          {child.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  // Regular link for items without children
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`px-3 py-2 rounded-md text-base font-medium transition-colors ${
+                      isActive(link.href)
+                        ? 'text-text bg-surface-hover'
+                        : 'text-text-muted hover:bg-surface-hover hover:text-text'
+                    }`}
+                  >
+                    {link.label}
+                  </Link>
+                )
               ))}
             </div>
             {/* Mobile search */}
