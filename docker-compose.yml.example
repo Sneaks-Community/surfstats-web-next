@@ -1,0 +1,21 @@
+services:
+  surfstats-web-next:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: surfstats-web-next:main
+    container_name: surfstats-web-next
+    restart: unless-stopped
+    # Security
+    security_opt:
+      - "apparmor=docker-default"
+      - "no-new-privileges=true"
+    # Drop all container capabilities
+    cap_drop:
+      - ALL
+    ports:
+      - "3000:3000"
+    env_file:
+    - .env
+    environment:
+      - NODE_ENV=production

@@ -8,3 +8,4 @@ coverage/
 plans/
 sql/
 *.tsbuildinfo
+docker-compose.yml
