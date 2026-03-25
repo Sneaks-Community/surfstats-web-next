@@ -33,6 +33,11 @@ interface MapRecord extends RowDataPacket {
   player_rank: number;
 }
 
+interface IncompleteMapRecord {
+  mapname: string;
+  tier: number | null;
+}
+
 interface BonusRecord extends RowDataPacket {
   mapname: string;
   zonegroup: number;
@@ -41,12 +46,22 @@ interface BonusRecord extends RowDataPacket {
   player_rank: number;
 }
 
+interface IncompleteBonusRecord {
+  mapname: string;
+  zonegroup: number;
+}
+
 interface StageRecord extends RowDataPacket {
   map: string;
   stage: number;
   runtime: number;
   date: string;
   player_rank: number;
+}
+
+interface IncompleteStageRecord {
+  map: string;
+  stage: number;
 }
 
 interface TierDistribution extends RowDataPacket {
@@ -174,6 +189,97 @@ const getPlayerData = unstable_cache(
   { revalidate: 60 }
 );
 
+const getIncompleteRecords = unstable_cache(
+  async (steamid: string) => {
+    logger.debug(`[Player] Fetching incomplete records for: ${steamid}`);
+    
+    try {
+      // Get all maps that have tiers
+      const [allMapsResult] = await pool.query<RowDataPacket[]>(`
+        SELECT DISTINCT mapname FROM ck_maptier
+      `, []);
+      
+      const allMapnames = allMapsResult.map(r => r.mapname);
+      
+      // Get finished map names for this player
+      const [finishedMapsResult] = await pool.query<RowDataPacket[]>(`
+        SELECT DISTINCT mapname FROM ck_playertimes WHERE steamid = ?
+      `, [steamid]);
+      
+      const finishedMapnames = new Set(finishedMapsResult.map(r => r.mapname));
+      
+      // Get incomplete maps (in allMapnames but not in finishedMapnames)
+      const incompleteMapnames = allMapnames.filter(m => !finishedMapnames.has(m));
+      
+      // Get tier info for incomplete maps
+      const [incompleteMapsResult] = incompleteMapnames.length > 0
+        ? await pool.query<RowDataPacket[]>(`
+            SELECT DISTINCT mt.mapname, mt.tier
+            FROM ck_maptier mt
+            WHERE mt.mapname IN (${incompleteMapnames.map(() => '?').join(',')})
+            ORDER BY mt.tier ASC, mt.mapname ASC
+          `, incompleteMapnames)
+        : [[]];
+
+      // Get all bonus groups (mapname, zonegroup) that exist
+      const [allBonusesResult] = await pool.query<RowDataPacket[]>(`
+        SELECT DISTINCT mapname, zonegroup FROM ck_bonus
+      `, []);
+      
+      // Get finished bonus groups for this player
+      const [finishedBonusesResult] = await pool.query<RowDataPacket[]>(`
+        SELECT DISTINCT mapname, zonegroup FROM ck_bonus WHERE steamid = ?
+      `, [steamid]);
+      
+      const finishedBonusSet = new Set(
+        finishedBonusesResult.map(r => `${r.mapname}:${r.zonegroup}`)
+      );
+      
+      // Get incomplete bonuses
+      const incompleteBonuses = allBonusesResult
+        .filter(r => !finishedBonusSet.has(`${r.mapname}:${r.zonegroup}`))
+        .map(r => ({ mapname: r.mapname, zonegroup: r.zonegroup }));
+
+      // Get all stages that exist
+      const [allStagesResult] = await pool.query<RowDataPacket[]>(`
+        SELECT DISTINCT map, stage FROM ck_stages
+      `, []);
+      
+      // Get finished stages for this player
+      const [finishedStagesResult] = await pool.query<RowDataPacket[]>(`
+        SELECT DISTINCT map, stage FROM ck_stages WHERE steamid = ?
+      `, [steamid]);
+      
+      const finishedStageSet = new Set(
+        finishedStagesResult.map(r => `${r.map}:${r.stage}`)
+      );
+      
+      // Get incomplete stages
+      const incompleteStages = allStagesResult
+        .filter(r => !finishedStageSet.has(`${r.map}:${r.stage}`))
+        .map(r => ({ map: r.map, stage: r.stage }));
+
+      const incompleteMaps: IncompleteMapRecord[] = (incompleteMapsResult as RowDataPacket[]).map((r: RowDataPacket) => ({
+        mapname: r.mapname,
+        tier: r.tier
+      }));
+      const incompleteBonusesList: IncompleteBonusRecord[] = incompleteBonuses;
+      const incompleteStagesList: IncompleteStageRecord[] = incompleteStages;
+
+      logger.debug(`[Player] Incomplete records for ${steamid}: ${incompleteMaps.length} maps, ${incompleteBonusesList.length} bonuses, ${incompleteStagesList.length} stages`);
+
+      return { incompleteMaps, incompleteBonuses: incompleteBonusesList, incompleteStages: incompleteStagesList };
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      logger.error(`[Player] Failed to fetch incomplete records for ${steamid}: ${errorMessage}`);
+      logger.error(`[Player] Error code: ${error.code || 'N/A'}`);
+      return { incompleteMaps: [], incompleteBonuses: [], incompleteStages: [] };
+    }
+  },
+  ['player-incomplete-records'],
+  { revalidate: 60 }
+);
+
 export async function generateMetadata({ params }: { params: Promise<{ steamid: string }> }) {
   const { steamid } = await params;
   const decodedSteamId = decodeURIComponent(steamid);
@@ -231,6 +337,10 @@ export default async function PlayerProfilePage({
   }
 
   const { player, maps, bonuses, stages } = data;
+  
+  // Fetch incomplete records (maps, bonuses, stages not completed by this player)
+  const incompleteData = await getIncompleteRecords(validSteamId);
+  
   const totals = await getTotalsCached();
   const steamAvatars = await getSteamAvatars(decodedSteamId);
   
@@ -411,6 +521,9 @@ export default async function PlayerProfilePage({
         maps={maps}
         bonuses={bonuses}
         stages={stages}
+        incompleteMaps={incompleteData.incompleteMaps}
+        incompleteBonuses={incompleteData.incompleteBonuses}
+        incompleteStages={incompleteData.incompleteStages}
         steamid={validSteamId}
       />
     </div>
