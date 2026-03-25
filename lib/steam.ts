@@ -22,7 +22,7 @@ export async function getSteamAvatars(steamId: string): Promise<{ avatar: string
     
     const response = await fetch(
       `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${apiKey}&steamids=${steamId64}`,
-      { next: { revalidate: 3600 } } // Cache for 1 hour
+      { next: { revalidate: 86400 } } // Cache for 24 hours
     );
 
     if (!response.ok) {
@@ -121,7 +121,7 @@ export async function getSteamProfiles(steamIds: string[]): Promise<Map<string, 
       try {
         const response = await fetch(
           `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${apiKey}&steamids=${chunk.join(',')}`,
-          { next: { revalidate: 3600 } } // Cache for 1 hour
+          { next: { revalidate: 86400 } } // Cache for 24 hours
         );
 
         if (!response.ok) {

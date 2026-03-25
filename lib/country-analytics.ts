@@ -1,6 +1,7 @@
 import 'server-only';
 import pool from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
+import { unstable_cache } from 'next/cache';
 import logger from '@/lib/logger';
 import { getCountryNamesFromCode, countryNameToCode } from '@/lib/countries';
 
@@ -47,8 +48,9 @@ export type SortOrder = 'asc' | 'desc';
 /**
  * Get all unique country names from the database
  * Used to build a mapping of actual country values in the data
+ * Cached for 24 hours - country data changes very infrequently
  */
-async function getDistinctCountries(): Promise<string[]> {
+const getDistinctCountriesInternal = async (): Promise<string[]> => {
   try {
     const [rows] = await pool.query<RowDataPacket[]>(
       'SELECT DISTINCT country FROM ck_playerrank WHERE country IS NOT NULL AND country != ""'
@@ -59,7 +61,13 @@ async function getDistinctCountries(): Promise<string[]> {
     logger.error(`[CountryAnalytics] Failed to get distinct countries: ${errorMessage}`);
     return [];
   }
-}
+};
+
+const getDistinctCountries = unstable_cache(
+  getDistinctCountriesInternal,
+  ['distinct-countries'],
+  { revalidate: 86400 } // Cache for 24 hours
+);
 
 /**
  * Get countries ranking with aggregation
