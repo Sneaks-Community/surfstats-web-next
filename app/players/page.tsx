@@ -1,15 +1,11 @@
-import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Search } from 'lucide-react';
-import { unstable_cache } from 'next/cache';
 import { cache } from 'react';
 import { getSteamProfiles } from '@/lib/steam';
 import Pagination from '@/components/Pagination';
 import { formatDate } from '@/lib/utils';
-import logger from '@/lib/logger';
-import { getPlayerCount } from '@/lib/registry-cache';
+import { getPlayers, PlayerRank } from '@/lib/player-cache';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -18,89 +14,6 @@ export const metadata: Metadata = {
 
 // Cache Steam profile fetches within a request to avoid duplicate calls
 const getCachedSteamProfiles = cache(getSteamProfiles);
-
-interface PlayerRank extends RowDataPacket {
-  steamid: string;
-  name: string;
-  country: string;
-  points: number;
-  finishedmaps: number;
-  lastseen: string;
-  rank: number;
-}
-
-const getPlayers = unstable_cache(
-  async (page: number, search: string) => {
-    logger.debug(`[Players] Fetching players list (page: ${page}, search: "${search || 'none'}")`);
-    
-    try {
-      const limit = 20;
-      const offset = (page - 1) * limit;
-      
-      // Use window function for rank calculation (much more efficient than correlated subquery)
-      // RANK() OVER (ORDER BY points DESC) calculates rank based on points
-      // This is O(n log n) instead of O(n²) for the correlated subquery
-      let query: string;
-      const params: any[] = [];
-      
-      if (search) {
-        // For search, we need to use a subquery to filter first, then calculate rank
-        query = `
-          SELECT
-            ranked.steamid, ranked.name, ranked.country, ranked.points,
-            ranked.finishedmaps, ranked.lastseen, ranked.rank
-          FROM (
-            SELECT
-              steamid, name, country, points, finishedmaps, lastseen,
-              RANK() OVER (ORDER BY points DESC) as rank
-            FROM ck_playerrank
-            WHERE name LIKE ? OR steamid LIKE ?
-          ) ranked
-          ORDER BY ranked.points DESC
-          LIMIT ? OFFSET ?
-        `;
-        params.push(`%${search}%`, `%${search}%`, limit, offset);
-      } else {
-        // For non-search, use window function directly with pagination
-        query = `
-          SELECT
-            steamid, name, country, points, finishedmaps, lastseen,
-            RANK() OVER (ORDER BY points DESC) as rank
-          FROM ck_playerrank
-          ORDER BY points DESC
-          LIMIT ? OFFSET ?
-        `;
-        params.push(limit, offset);
-      }
-      
-      const [rows] = await pool.query<PlayerRank[]>(query, params);
-      
-      // Get total count for pagination
-      let total: number;
-      if (search) {
-        // For search, we need to count matching records
-        const countQuery = `SELECT COUNT(*) as total FROM ck_playerrank WHERE name LIKE ? OR steamid LIKE ?`;
-        const countParams = [`%${search}%`, `%${search}%`];
-        const [countRows] = await pool.query<RowDataPacket[]>(countQuery, countParams);
-        total = countRows[0].total;
-      } else {
-        // Use cached player count for non-search queries
-        total = await getPlayerCount();
-      }
-      
-      logger.debug(`[Players] Retrieved ${rows.length} players (page ${page} of ${Math.ceil(total / limit)}, ${total} total)`);
-      
-      return { players: rows, total, totalPages: Math.ceil(total / limit) };
-    } catch (error: any) {
-      const errorMessage = error.message || 'Unknown error';
-      logger.error(`[Players] Failed to fetch players: ${errorMessage}`);
-      logger.error(`[Players] Error code: ${error.code || 'N/A'}`);
-      return { players: [], total: 0, totalPages: 0 };
-    }
-  },
-  ['players-list'],
-  { revalidate: 3600 } // Cache for 1 hour
-);
 
 export default async function PlayersPage({
   searchParams,

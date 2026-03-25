@@ -1,11 +1,11 @@
-import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
 import Link from 'next/link';
 import { Search as SearchIcon, Map as MapIcon, Users, ChevronRight } from 'lucide-react';
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTierColor, getTierTextColor } from '@/lib/tierColors';
 import { sanitizeSearchQuery, sanitizePlayerName } from '@/lib/sanitize';
+import { getAllMapMetadata } from '@/lib/map-cache';
+import { searchPlayers, PlayerSearchResult } from '@/lib/player-cache';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
 
@@ -13,13 +13,7 @@ export const metadata: Metadata = {
   title: 'Search',
 };
 
-interface PlayerResult extends RowDataPacket {
-  steamid: string;
-  name: string;
-  points: number;
-}
-
-interface MapResult extends RowDataPacket {
+interface MapResult {
   mapname: string;
   tier: number;
 }
@@ -33,32 +27,24 @@ export default async function SearchPage({
   // Sanitize search query to prevent XSS and injection
   const query = sanitizeSearchQuery(q);
   
-  let players: PlayerResult[] = [];
+  let players: PlayerSearchResult[] = [];
   let maps: MapResult[] = [];
   
   if (query.length >= 2) {
     try {
-      // Search players
-      const [playerRows] = await pool.query<PlayerResult[]>(`
-        SELECT steamid, name, points
-        FROM ck_playerrank
-        WHERE name LIKE ? OR steamid LIKE ?
-        ORDER BY points DESC
-        LIMIT 10
-      `, [`%${query}%`, `%${query}%`]);
-      players = playerRows;
+      // Search players using cached function
+      players = await searchPlayers(query);
       
-      // Search maps
-      const [mapRows] = await pool.query<MapResult[]>(`
-        SELECT mapname, tier
-        FROM ck_maptier
-        WHERE mapname LIKE ?
-        ORDER BY mapname ASC
-        LIMIT 10
-      `, [`%${query}%`]);
-      maps = mapRows;
+      // Search maps using cached map metadata (no DB hit)
+      const allMaps = await getAllMapMetadata();
+      const queryLower = query.toLowerCase();
+      maps = Array.from(allMaps.values())
+        .filter(map => map.mapname.toLowerCase().includes(queryLower))
+        .map(map => ({ mapname: map.mapname, tier: map.tier }))
+        .sort((a, b) => a.mapname.localeCompare(b.mapname))
+        .slice(0, 10);
       
-      logger.debug(`[Search] Results for "${query}": ${players.length} players, ${maps.length} maps`);
+      logger.debug(`[Search] Results for "${query}": ${players.length} players, ${maps.length} maps (cached)`);
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       logger.error(`[Search] Query failed for "${query}": ${errorMessage}`);
