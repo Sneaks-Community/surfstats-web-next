@@ -1,6 +1,7 @@
 'use client';
 
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { usePagination } from '@/hooks/usePagination';
 
 interface ClientPaginationProps {
   currentPage: number;
@@ -13,44 +14,10 @@ export default function ClientPagination({
   totalPages,
   onPageChange,
 }: ClientPaginationProps) {
-  // Calculate which page numbers to show
-  const getPageNumbers = () => {
-    const pages: (number | string)[] = [];
-    const delta = 2; // Number of pages to show on each side of current page
-
-    if (totalPages <= 7) {
-      // Show all pages if 7 or fewer
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Always show first page
-      pages.push(1);
-
-      if (currentPage > delta + 2) {
-        pages.push('...');
-      }
-
-      // Calculate range around current page
-      const start = Math.max(2, currentPage - delta);
-      const end = Math.min(totalPages - 1, currentPage + delta);
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-
-      if (currentPage < totalPages - delta - 1) {
-        pages.push('...');
-      }
-
-      // Always show last page
-      pages.push(totalPages);
-    }
-
-    return pages;
-  };
-
-  const pageNumbers = getPageNumbers();
+  const { pageNumbers, hasPrevPage, hasNextPage, canGoToFirst, canGoToLast } = usePagination({
+    currentPage,
+    totalPages,
+  });
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
@@ -65,9 +32,9 @@ export default function ClientPagination({
         {/* First page */}
         <button
           onClick={() => onPageChange(1)}
-          disabled={currentPage === 1}
+          disabled={!canGoToFirst}
           className={`p-2 rounded-md border transition-colors ${
-            currentPage === 1
+            !canGoToFirst
               ? 'border-border text-text-placeholder cursor-not-allowed'
               : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
           }`}
@@ -79,9 +46,9 @@ export default function ClientPagination({
         {/* Previous page */}
         <button
           onClick={() => onPageChange(currentPage - 1)}
-          disabled={currentPage === 1}
+          disabled={!hasPrevPage}
           className={`p-2 rounded-md border transition-colors ${
-            currentPage === 1
+            !hasPrevPage
               ? 'border-border text-text-placeholder cursor-not-allowed'
               : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
           }`}
@@ -97,8 +64,8 @@ export default function ClientPagination({
             onClick={() => typeof page === 'number' && onPageChange(page)}
             disabled={page === '...'}
             className={`min-w-[2.5rem] h-10 px-3 rounded-md border transition-colors ${
-              page === currentPage
-                ? 'border-primary-500 bg-primary-500/10 text-primary-500 font-medium'
+              currentPage === page
+                ? 'border-primary bg-primary/10 text-primary font-medium'
                 : page === '...'
                 ? 'border-transparent text-text-muted cursor-default'
                 : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
@@ -111,9 +78,9 @@ export default function ClientPagination({
         {/* Next page */}
         <button
           onClick={() => onPageChange(currentPage + 1)}
-          disabled={currentPage === totalPages}
+          disabled={!hasNextPage}
           className={`p-2 rounded-md border transition-colors ${
-            currentPage === totalPages
+            !hasNextPage
               ? 'border-border text-text-placeholder cursor-not-allowed'
               : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
           }`}
@@ -125,9 +92,9 @@ export default function ClientPagination({
         {/* Last page */}
         <button
           onClick={() => onPageChange(totalPages)}
-          disabled={currentPage === totalPages}
+          disabled={!canGoToLast}
           className={`p-2 rounded-md border transition-colors ${
-            currentPage === totalPages
+            !canGoToLast
               ? 'border-border text-text-placeholder cursor-not-allowed'
               : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
           }`}

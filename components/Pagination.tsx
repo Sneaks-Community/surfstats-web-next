@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
+import { usePagination } from '@/hooks/usePagination';
 
 interface PaginationProps {
   currentPage: number;
@@ -18,6 +19,10 @@ export default function Pagination({
   queryParams = {},
 }: PaginationProps) {
   const [jumpPage, setJumpPage] = useState('');
+  const { pageNumbers, hasPrevPage, hasNextPage } = usePagination({
+    currentPage,
+    totalPages,
+  });
 
   // Build URL with all query parameters
   const buildUrl = (page: number) => {
@@ -34,43 +39,6 @@ export default function Pagination({
     return `${baseUrl}?${params.toString()}`;
   };
 
-  // Calculate which page numbers to show
-  const getPageNumbers = () => {
-    const pages: (number | string)[] = [];
-    const delta = 2; // Number of pages to show on each side of current page
-
-    if (totalPages <= 7) {
-      // Show all pages if 7 or fewer
-      for (let i = 1; i <= totalPages; i++) {
-        pages.push(i);
-      }
-    } else {
-      // Always show first page
-      pages.push(1);
-
-      if (currentPage > delta + 2) {
-        pages.push('...');
-      }
-
-      // Calculate range around current page
-      const start = Math.max(2, currentPage - delta);
-      const end = Math.min(totalPages - 1, currentPage + delta);
-
-      for (let i = start; i <= end; i++) {
-        pages.push(i);
-      }
-
-      if (currentPage < totalPages - delta - 1) {
-        pages.push('...');
-      }
-
-      // Always show last page
-      pages.push(totalPages);
-    }
-
-    return pages;
-  };
-
   const handleJumpSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const page = parseInt(jumpPage, 10);
@@ -78,8 +46,6 @@ export default function Pagination({
       window.location.href = buildUrl(page);
     }
   };
-
-  const pageNumbers = getPageNumbers();
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
@@ -95,7 +61,7 @@ export default function Pagination({
         <Link
           href={buildUrl(1)}
           className={`p-2 rounded-md border transition-colors ${
-            currentPage === 1
+            !hasPrevPage
               ? 'border-border text-text-placeholder cursor-not-allowed pointer-events-none'
               : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
           }`}
@@ -106,9 +72,9 @@ export default function Pagination({
 
         {/* Previous page */}
         <Link
-          href={currentPage > 1 ? buildUrl(currentPage - 1) : buildUrl(1)}
+          href={hasPrevPage ? buildUrl(currentPage - 1) : buildUrl(1)}
           className={`p-2 rounded-md border transition-colors ${
-            currentPage === 1
+            !hasPrevPage
               ? 'border-border text-text-placeholder cursor-not-allowed pointer-events-none'
               : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
           }`}
@@ -141,9 +107,9 @@ export default function Pagination({
 
         {/* Next page */}
         <Link
-          href={currentPage < totalPages ? buildUrl(currentPage + 1) : buildUrl(totalPages)}
+          href={hasNextPage ? buildUrl(currentPage + 1) : buildUrl(totalPages)}
           className={`p-2 rounded-md border transition-colors ${
-            currentPage === totalPages
+            !hasNextPage
               ? 'border-border text-text-placeholder cursor-not-allowed pointer-events-none'
               : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
           }`}
@@ -156,7 +122,7 @@ export default function Pagination({
         <Link
           href={buildUrl(totalPages)}
           className={`p-2 rounded-md border transition-colors ${
-            currentPage === totalPages
+            !hasNextPage
               ? 'border-border text-text-placeholder cursor-not-allowed pointer-events-none'
               : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
           }`}
