@@ -2,15 +2,14 @@ import pool from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 import { getSteamProfileUrl } from '@/lib/steam';
 import Link from 'next/link';
-import { Search, Map as MapIcon, Users, Trophy, Layers, Target, Download } from 'lucide-react';
+import { Map as MapIcon, Users, Layers, Target, Download } from 'lucide-react';
 import MapImage from '@/components/MapImage';
-import Pagination from '@/components/Pagination';
 import { unstable_cache } from 'next/cache';
 import { getTierColor } from '@/lib/tierColors';
-import { formatTime, formatDate } from '@/lib/utils';
-import { sanitizeMapName, sanitizeSearchQuery, sanitizePlayerName } from '@/lib/sanitize';
+import { sanitizeMapName, sanitizePlayerName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
+import MapRecordsTabs from './components/MapRecordsTabs';
 
 interface MapData extends RowDataPacket {
   mapname: string;
@@ -27,11 +26,35 @@ interface MapRecord extends RowDataPacket {
   runtimepro: number;
   date: string;
   rank: number;
+  wr_time: number | null;
+  startspeed: number;
+}
+
+interface BonusRecord extends RowDataPacket {
+  steamid: string;
+  name: string;
+  zonegroup: number;
+  runtime: number;
+  date: string;
+  rank: number;
+  wr_time: number | null;
+  startspeed: number;
+}
+
+interface StageRecord extends RowDataPacket {
+  steamid: string;
+  name: string;
+  stage: number;
+  runtime: number;
+  date: string;
+  rank: number;
+  wr_time: number | null;
+  startspeed: number;
 }
 
 const getMapData = unstable_cache(
-  async (mapname: string, page: number, search: string) => {
-    logger.debug(`[Map] Fetching data for: ${mapname} (page: ${page}, search: "${search || 'none'}")`);
+  async (mapname: string) => {
+    logger.debug(`[Map] Fetching map info for: ${mapname}`);
     
     try {
       // Get map info
@@ -48,53 +71,71 @@ const getMapData = unstable_cache(
         logger.warn(`[Map] No map found with name: ${mapname}`);
         return null;
       }
-      const map = mapRows[0];
-
-      // Get records with pagination and search
-      const limit = 25;
-      const offset = (page - 1) * limit;
       
-      let query = `
-        SELECT 
-          pt.steamid, pt.name, pt.runtimepro, pt.date,
-          (SELECT COUNT(*) + 1 FROM ck_playertimes pt2 WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as rank
-        FROM ck_playertimes pt
-        WHERE pt.mapname = ?
-      `;
-      
-      const params: any[] = [mapname];
-      
-      if (search) {
-        query += ` AND (pt.name LIKE ? OR pt.steamid LIKE ?)`;
-        params.push(`%${search}%`, `%${search}%`);
-      }
-      
-      query += ` ORDER BY pt.runtimepro ASC LIMIT ? OFFSET ?`;
-      params.push(limit, offset);
-      
-      const [records] = await pool.query<MapRecord[]>(query, params);
-      
-      // Get total count
-      let countQuery = `SELECT COUNT(*) as total FROM ck_playertimes WHERE mapname = ?`;
-      const countParams: any[] = [mapname];
-      if (search) {
-        countQuery += ` AND (name LIKE ? OR steamid LIKE ?)`;
-        countParams.push(`%${search}%`, `%${search}%`);
-      }
-      const [countRows] = await pool.query<RowDataPacket[]>(countQuery, countParams);
-      const total = countRows[0].total;
-
-      logger.debug(`[Map] ${mapname} loaded: tier ${map.tier}, ${records.length} records, ${total} total completions`);
-      
-      return { map, records, total, totalPages: Math.ceil(total / limit) };
+      return mapRows[0];
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
-      logger.error(`[Map] Failed to fetch ${mapname}: ${errorMessage}`);
+      logger.error(`[Map] Failed to fetch map info for ${mapname}: ${errorMessage}`);
       logger.error(`[Map] Error code: ${error.code || 'N/A'}`);
       return null;
     }
   },
-  ['map-profile'],
+  ['map-info'],
+  { revalidate: 60 }
+);
+
+const getMapRecords = unstable_cache(
+  async (mapname: string) => {
+    logger.debug(`[Map] Fetching all records for: ${mapname}`);
+    
+    try {
+      // Get all leaderboard records with WR time
+      const [leaderboardRows] = await pool.query<MapRecord[]>(`
+        SELECT
+          pt.steamid, pt.name, pt.runtimepro, pt.date, pt.startspeed,
+          (SELECT COUNT(*) + 1 FROM ck_playertimes pt2 WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as rank,
+          (SELECT MIN(runtimepro) FROM ck_playertimes WHERE mapname = pt.mapname) as wr_time
+        FROM ck_playertimes pt
+        WHERE pt.mapname = ?
+        ORDER BY pt.runtimepro ASC
+      `, [mapname]);
+
+      // Get all bonus records with WR time
+      const [bonusRows] = await pool.query<BonusRecord[]>(`
+        SELECT
+          b.steamid, b.name, b.zonegroup, b.runtime, b.date, b.startspeed,
+          (SELECT COUNT(*) + 1 FROM ck_bonus b2
+           WHERE b2.mapname = b.mapname AND b2.zonegroup = b.zonegroup AND b2.runtime < b.runtime) as rank,
+          (SELECT MIN(runtime) FROM ck_bonus WHERE mapname = b.mapname AND zonegroup = b.zonegroup) as wr_time
+        FROM ck_bonus b
+        WHERE b.mapname = ?
+        ORDER BY b.zonegroup ASC, b.runtime ASC
+      `, [mapname]);
+
+      // Get all stage records with WR time
+      const [stageRows] = await pool.query<StageRecord[]>(`
+        SELECT
+          s.steamid, pr.name, s.stage, s.runtime, s.date, s.startspeed,
+          (SELECT COUNT(*) + 1 FROM ck_stages s2
+           WHERE s2.map = s.map AND s2.stage = s.stage AND s2.runtime < s.runtime) as rank,
+          (SELECT MIN(runtime) FROM ck_stages WHERE map = s.map AND stage = s.stage) as wr_time
+        FROM ck_stages s
+        LEFT JOIN ck_playerrank pr ON s.steamid = pr.steamid
+        WHERE s.map = ?
+        ORDER BY s.stage ASC, s.runtime ASC
+      `, [mapname]);
+
+      logger.debug(`[Map] ${mapname} loaded: ${leaderboardRows.length} leaderboard records, ${bonusRows.length} bonus records, ${stageRows.length} stage records`);
+      
+      return { leaderboard: leaderboardRows, bonuses: bonusRows, stages: stageRows };
+    } catch (error: any) {
+      const errorMessage = error.message || 'Unknown error';
+      logger.error(`[Map] Failed to fetch records for ${mapname}: ${errorMessage}`);
+      logger.error(`[Map] Error code: ${error.code || 'N/A'}`);
+      return { leaderboard: [], bonuses: [], stages: [] };
+    }
+  },
+  ['map-records'],
   { revalidate: 60 }
 );
 
@@ -107,23 +148,21 @@ export async function generateMetadata({ params }: { params: Promise<{ mapname: 
     return { title: 'Map Not Found' };
   }
   
-  const data = await getMapData(validMapname, 1, '');
+  const map = await getMapData(validMapname);
   
-  if (!data) {
+  if (!map) {
     return { title: 'Map Not Found' };
   }
   
   return {
-    title: data.map.mapname,
+    title: map.mapname,
   };
 }
 
 export default async function MapProfilePage({
   params,
-  searchParams,
 }: {
   params: Promise<{ mapname: string }>;
-  searchParams: Promise<{ q?: string; page?: string }>;
 }) {
   const { mapname } = await params;
   const decodedMapname = decodeURIComponent(mapname);
@@ -142,15 +181,12 @@ export default async function MapProfilePage({
     );
   }
   
-  const sParams = await searchParams;
-  // Sanitize search query
-  const q = sanitizeSearchQuery(sParams.q);
-  // Sanitize page number
-  const page = Math.max(1, parseInt(sParams.page || '1', 10) || 1);
+  const [map, recordsData] = await Promise.all([
+    getMapData(validMapname),
+    getMapRecords(validMapname)
+  ]);
   
-  const data = await getMapData(validMapname, page, q);
-  
-  if (!data) {
+  if (!map) {
     return (
       <div className="text-center py-20 bg-surface border border-border rounded-xl">
         <h1 className="text-2xl font-bold text-text mb-2">Map Not Found</h1>
@@ -162,7 +198,8 @@ export default async function MapProfilePage({
     );
   }
 
-  const { map, records, total, totalPages } = data;
+  const { leaderboard, bonuses, stages } = recordsData;
+  const total = leaderboard.length;
   const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
 
   return (
@@ -197,8 +234,7 @@ export default async function MapProfilePage({
                 const tierColor = getTierColor(map.tier);
                 return (
                   <span className={`px-3 py-1 ${tierColor.bg} ${tierColor.text} ${tierColor.border} rounded-full text-sm font-bold tracking-wider uppercase`}>
-                    Tier {map.tier}
-                  </span>
+                    Tier {map.tier}</span>
                 );
               })()}
               {map.stages > 1 ? (
@@ -259,89 +295,16 @@ export default async function MapProfilePage({
         </div>
       </div>
 
-      {/* Leaderboard */}
-      <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-border bg-surface/50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <h2 className="text-xl font-semibold text-text flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-yellow-500" />
-            Leaderboard
-          </h2>
-          
-          <form className="relative w-full sm:w-72">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-4 w-4 text-text-placeholder" />
-            </div>
-            <input
-              type="text"
-              name="q"
-              defaultValue={q}
-              className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text placeholder-text-placeholder focus:outline-none focus:bg-surface focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
-              placeholder="Search players..."
-            />
-          </form>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-border">
-            <thead className="bg-surface/50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider w-24">Rank</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Player</th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider">Time</th>
-                <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider">Date</th>
-              </tr>
-            </thead>
-            <tbody className="bg-surface divide-y divide-border">
-              {records.map((record, i) => (
-                <tr key={`${record.steamid}-${i}`} className="hover:bg-surface-hover/50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center justify-center h-8 w-8 rounded-full font-bold text-sm ${
-                      record.rank === 1 ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30' :
-                      record.rank === 2 ? 'bg-zinc-300/20 text-zinc-300 border border-zinc-300/30' :
-                      record.rank === 3 ? 'bg-amber-700/20 text-amber-600 border border-amber-700/30' :
-                      'text-text-placeholder'
-                    }`}>
-                      {record.rank}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <Link href={`/players/${record.steamid}`} className="text-primary hover:text-primary font-medium transition-colors text-base">
-                      {sanitizePlayerName(record.name)}
-                    </Link>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <span className="font-mono text-lg font-medium text-text">
-                      {formatTime(record.runtimepro)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-text-muted">
-                    {formatDate(record.date)}
-                  </td>
-                </tr>
-              ))}
-              {records.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-6 py-12 text-center text-text-muted">
-                    {q ? 'No players found matching your search.' : 'No completions yet.'}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-6 border-t border-border">
-            <Pagination
-              currentPage={page}
-              totalPages={totalPages}
-              baseUrl={`/maps/${map.mapname}`}
-              queryParams={q ? { q } : {}}
-            />
-          </div>
-        )}
-      </div>
+      {/* Leaderboard with Tabs */}
+      <MapRecordsTabs
+        records={leaderboard}
+        totalRecords={total}
+        bonusRecords={bonuses}
+        stageRecords={stages}
+        mapname={map.mapname}
+        numBonuses={map.bonuses}
+        numStages={map.stages}
+      />
     </div>
   );
 }
