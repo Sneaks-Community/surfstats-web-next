@@ -378,9 +378,9 @@ export default async function PlayerProfilePage({
       </div>
 
       {/* Stats Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:h-[280px]">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
         {/* Tier Distribution - full width on mobile, 1st column on desktop */}
-        <div className="lg:col-span-1 lg:row-span-1 h-[280px]">
+        <div className="lg:col-span-1 lg:row-span-1 h-[280px] min-h-[280px]">
           <TierDistributionChart data={tierDistribution} />
         </div>
         {/* Placeholder for additional charts - stacked on mobile/tablet, 3 columns on desktop */}

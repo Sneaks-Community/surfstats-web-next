@@ -147,7 +147,7 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
     return (
       <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
         <h3 className="text-sm font-semibold text-text mb-2">Tier Distribution</h3>
-        <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
+        <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
           No completions
         </div>
       </div>
@@ -157,8 +157,8 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
   return (
     <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
       <h3 className="text-sm font-semibold text-text mb-2">Tier Distribution</h3>
-      <div className="flex-1 min-h-0">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="flex-1 min-h-[200px]">
+        <ResponsiveContainer width="100%" height={220}>
           <PieChart>
             <Pie
               data={chartData}
