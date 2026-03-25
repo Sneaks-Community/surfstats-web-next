@@ -43,6 +43,7 @@ interface MapRecord extends RowDataPacket {
 interface IncompleteMapRecord {
   mapname: string;
   tier: number | null;
+  wr_time: number | null;
 }
 
 interface BonusRecord extends RowDataPacket {
@@ -56,6 +57,7 @@ interface BonusRecord extends RowDataPacket {
 interface IncompleteBonusRecord {
   mapname: string;
   zonegroup: number;
+  wr_time: number | null;
 }
 
 interface StageRecord extends RowDataPacket {
@@ -237,6 +239,7 @@ const getIncompleteRecords = unstable_cache(
           incompleteMaps.push({
             mapname,
             tier: metadata.tier,
+            wr_time: metadata.wr_time,
           });
         }
       }
@@ -260,6 +263,7 @@ const getIncompleteRecords = unstable_cache(
         incompleteBonusesList.push({
           mapname: bonus.mapname,
           zonegroup: bonus.zonegroup,
+          wr_time: bonus.wr_time,
         });
       }
       

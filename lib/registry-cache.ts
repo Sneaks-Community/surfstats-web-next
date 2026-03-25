@@ -7,6 +7,7 @@ import logger from '@/lib/logger';
 export interface BonusGroup {
   mapname: string;
   zonegroup: number;
+  wr_time: number | null;
 }
 
 export interface StageGroup {
@@ -55,10 +56,12 @@ async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stages: Sta
     // Run all three queries in parallel
     const [bonusResult, stageResult, countResult] = await Promise.all([
       pool.query<RowDataPacket[]>(`
-        SELECT DISTINCT mapname, zonegroup
-        FROM ck_zones
-        WHERE zonegroup > 0
-        ORDER BY mapname ASC, zonegroup ASC
+        SELECT z.mapname, z.zonegroup, MIN(b.runtime) as wr_time
+        FROM ck_zones z
+        LEFT JOIN ck_bonus b ON z.mapname = b.mapname AND z.zonegroup = b.zonegroup
+        WHERE z.zonegroup > 0
+        GROUP BY z.mapname, z.zonegroup
+        ORDER BY z.mapname ASC, z.zonegroup ASC
       `),
       pool.query<RowDataPacket[]>(`
         SELECT DISTINCT map, stage
@@ -73,6 +76,7 @@ async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stages: Sta
     const bonuses: BonusGroup[] = (bonusResult[0] as RowDataPacket[]).map((row) => ({
       mapname: row.mapname,
       zonegroup: row.zonegroup,
+      wr_time: row.wr_time || null,
     }));
     
     const stages: StageGroup[] = (stageResult[0] as RowDataPacket[]).map((row) => ({
@@ -254,18 +258,19 @@ export async function getStagesForMap(mapname: string): Promise<StageGroup[]> {
 export async function getIncompleteMapsForPlayer(
   steamid: string,
   finishedMapNames: Set<string>
-): Promise<{ mapname: string; tier: number }[]> {
+): Promise<{ mapname: string; tier: number; wr_time: number | null }[]> {
   // Import here to avoid circular dependency
   const { getAllMapMetadata } = await import('./map-cache');
   
   const allMetadata = await getAllMapMetadata();
-  const incompleteMaps: { mapname: string; tier: number }[] = [];
+  const incompleteMaps: { mapname: string; tier: number; wr_time: number | null }[] = [];
   
   for (const [mapname, metadata] of allMetadata) {
     if (!finishedMapNames.has(mapname)) {
       incompleteMaps.push({
         mapname,
         tier: metadata.tier,
+        wr_time: metadata.wr_time,
       });
     }
   }
