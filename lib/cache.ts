@@ -243,27 +243,105 @@ export function getServerCacheStats(): { lastUpdated: number; ageSeconds: number
 // ============================================================
 
 // Fetch stats from database - throws on error so cache doesn't store bad data
-async function fetchStats() {
+// Note: This is a sync function returning a Promise (not async) for unstable_cache compatibility
+function fetchStatsInternal() {
   const startTime = Date.now();
   
-  try {
-    logger.debug('[Cache] Fetching stats from database...');
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT `key`, `value` FROM ck_stats');
-    
-    // If database returned empty (connection failed), throw to prevent caching
-    if (!rows || rows.length === 0) {
-      const error = new Error('Database returned empty stats');
-      logger.error('[Cache] Stats query returned empty result - database may be unavailable');
-      throw error;
-    }
-    
-    const statsMap = rows.reduce((acc, row) => {
-      acc[row.key] = row.value;
-      return acc;
-    }, {} as Record<string, number>);
+  return pool.query<RowDataPacket[]>('SELECT `key`, `value` FROM ck_stats')
+    .then(([rows]) => {
+      // If database returned empty (connection failed), throw to prevent caching
+      if (!rows || rows.length === 0) {
+        const error = new Error('Database returned empty stats');
+        logger.error('[Cache] Stats query returned empty result - database may be unavailable');
+        throw error;
+      }
+      
+      const statsMap = rows.reduce((acc, row) => {
+        acc[row.key] = row.value;
+        return acc;
+      }, {} as Record<string, number>);
 
-    // Fetch top 5 recent records
-    logger.debug('[Cache] Fetching recent records...');
+      // Fetch top 5 recent records
+      logger.debug('[Cache] Fetching recent records...');
+      return pool.query<RowDataPacket[]>(`
+        SELECT lr.steamid, lr.name, lr.runtime, lr.map, lr.date, pr.country
+        FROM ck_latestrecords lr
+        LEFT JOIN ck_playerrank pr ON lr.steamid = pr.steamid
+        ORDER BY lr.date DESC
+        LIMIT 5
+      `).then(([recentRecords]) => {
+        const duration = Date.now() - startTime;
+        logger.debug(`[Cache] Stats fetched successfully in ${duration}ms (${rows.length} stats, ${recentRecords.length} records)`);
+        
+        return {
+          playerCount: statsMap['player_count'] || 0,
+          mapCompletions: statsMap['map_completions'] || 0,
+          bonusCompletions: statsMap['bonus_completions'] || 0,
+          stageCompletions: statsMap['stage_completions'] || 0,
+          totalPoints: statsMap['total_points'] || 0,
+          playersMonth: statsMap['players_month'] || 0,
+          recentRecords,
+        };
+      });
+    })
+    .catch((error: any) => {
+      const duration = Date.now() - startTime;
+      logger.error(`[Cache] Failed to fetch stats after ${duration}ms`);
+      logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+      throw error;
+    });
+}
+
+// Cache stats for 5 minutes - only successful results get cached
+export const getStatsCached = unstable_cache(
+  fetchStatsInternal,
+  ['dashboard-stats'],
+  { revalidate: 300 }
+);
+
+// Fetch totals (maps, bonuses, stages) - used for player progress bars
+// Now uses the global map cache instead of database queries
+// Note: This is a sync function returning a Promise (not async) for unstable_cache compatibility
+function fetchTotalsInternal() {
+  const startTime = Date.now();
+  
+  logger.debug('[Cache] Fetching totals from global map cache...');
+  
+  // Use the global map cache instead of database queries
+  return getMapTotals().then(totals => {
+    const duration = Date.now() - startTime;
+    logger.debug(`[Cache] Totals fetched successfully in ${duration}ms: maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}`);
+    
+    return totals;
+  }).catch((error: any) => {
+    const duration = Date.now() - startTime;
+    logger.error(`[Cache] Failed to fetch totals after ${duration}ms`);
+    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+    throw error;
+  });
+}
+
+// Cache totals for 5 minutes (300 seconds)
+// Note: The underlying map cache has a 1-hour TTL, so this provides an additional layer
+export const getTotalsCached = unstable_cache(
+  fetchTotalsInternal,
+  ['totals-data'],
+  { revalidate: 300 }
+);
+
+// Pre-warm all caches on startup
+// Note: We use direct database calls instead of unstable_cache wrappers because
+// unstable_cache requires a React Server Component context which isn't available
+// during module initialization. The direct calls still trigger cache initialization
+// for the global in-memory caches (map-cache, player-cache, registry-cache).
+export async function prewarmCaches() {
+  logger.info('[Cache] Pre-warming caches...');
+  
+  // Pre-warm stats - use direct database query instead of unstable_cache
+  // This still triggers the global cache initialization for subsequent requests
+  try {
+    const startTime = Date.now();
+    const [rows] = await pool.query<RowDataPacket[]>('SELECT `key`, `value` FROM ck_stats');
     const [recentRecords] = await pool.query<RowDataPacket[]>(`
       SELECT lr.steamid, lr.name, lr.runtime, lr.map, lr.date, pr.country
       FROM ck_latestrecords lr
@@ -271,84 +349,20 @@ async function fetchStats() {
       ORDER BY lr.date DESC
       LIMIT 5
     `);
-
     const duration = Date.now() - startTime;
-    logger.debug(`[Cache] Stats fetched successfully in ${duration}ms (${rows.length} stats, ${recentRecords.length} records)`);
-    
-    return {
-      playerCount: statsMap['player_count'] || 0,
-      mapCompletions: statsMap['map_completions'] || 0,
-      bonusCompletions: statsMap['bonus_completions'] || 0,
-      stageCompletions: statsMap['stage_completions'] || 0,
-      totalPoints: statsMap['total_points'] || 0,
-      playersMonth: statsMap['players_month'] || 0,
-      recentRecords,
-    };
-  } catch (error: any) {
-    const duration = Date.now() - startTime;
-    logger.error(`[Cache] Failed to fetch stats after ${duration}ms`);
-    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
-    throw error;
-  }
-}
-
-// Cache stats for 5 minutes - only successful results get cached
-export const getStatsCached = unstable_cache(
-  fetchStats,
-  ['dashboard-stats'],
-  { revalidate: 300 }
-);
-
-// Fetch totals (maps, bonuses, stages) - used for player progress bars
-// Now uses the global map cache instead of database queries
-async function fetchTotals() {
-  const startTime = Date.now();
-  
-  try {
-    logger.debug('[Cache] Fetching totals from global map cache...');
-    
-    // Use the global map cache instead of database queries
-    const totals = await getMapTotals();
-    
-    const duration = Date.now() - startTime;
-    logger.debug(`[Cache] Totals fetched successfully in ${duration}ms: maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}`);
-    
-    return totals;
-  } catch (error: any) {
-    const duration = Date.now() - startTime;
-    logger.error(`[Cache] Failed to fetch totals after ${duration}ms`);
-    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
-    throw error;
-  }
-}
-
-// Cache totals for 5 minutes (300 seconds)
-// Note: The underlying map cache has a 1-hour TTL, so this provides an additional layer
-export const getTotalsCached = unstable_cache(
-  fetchTotals,
-  ['totals-data'],
-  { revalidate: 300 }
-);
-
-// Pre-warm all caches on startup
-export async function prewarmCaches() {
-  logger.info('[Cache] Pre-warming caches...');
-  
-  // Pre-warm stats cache
-  try {
-    const startTime = Date.now();
-    await getStatsCached();
-    logger.info(`[Cache] Stats cache pre-warmed successfully (${Date.now() - startTime}ms)`);
+    logger.info(`[Cache] Stats pre-warmed successfully (${rows.length} stats, ${recentRecords.length} records, ${duration}ms)`);
   } catch (error: any) {
     logger.error('[Cache] Stats cache pre-warm failed');
     logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
   }
   
-  // Pre-warm totals cache (now uses map cache internally)
+  // Pre-warm totals - use direct getMapTotals call instead of unstable_cache
+  // This triggers the global map cache initialization
   try {
     const startTime = Date.now();
-    await getTotalsCached();
-    logger.info(`[Cache] Totals cache pre-warmed successfully (${Date.now() - startTime}ms)`);
+    const totals = await getMapTotals();
+    const duration = Date.now() - startTime;
+    logger.info(`[Cache] Totals pre-warmed successfully (maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}, ${duration}ms)`);
   } catch (error: any) {
     logger.error('[Cache] Totals cache pre-warm failed');
     logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
