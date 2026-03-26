@@ -2,7 +2,7 @@
 
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, X, ChevronDown, ChevronUp } from 'lucide-react';
-import { useState, useTransition, useMemo } from 'react';
+import { useState, useTransition, useMemo, useEffect } from 'react';
 
 interface TierOption {
   tier: number;
@@ -39,10 +39,43 @@ function MapFiltersForm({
   const [isExpanded, setIsExpanded] = useState(false);
   
   const [search, setSearch] = useState(initialQ);
+  const [debouncedSearch, setDebouncedSearch] = useState(initialQ);
   const [mapper, setMapper] = useState(initialMapper);
+  const [debouncedMapper, setDebouncedMapper] = useState(initialMapper);
   const [type, setType] = useState(initialType);
   const [bonuses, setBonuses] = useState(initialBonuses);
   const [selectedTiers, setSelectedTiers] = useState<number[]>(initialTiers);
+
+  // Debounce search input (300ms delay)
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [search]);
+
+  // Debounce mapper input (300ms delay)
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setDebouncedMapper(mapper);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [mapper]);
+
+  // Apply filters when debounced values change (live search)
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (debouncedSearch) params.set('q', debouncedSearch);
+    if (debouncedMapper) params.set('mapper', debouncedMapper);
+    if (type !== 'all') params.set('type', type);
+    if (bonuses !== 'all') params.set('bonuses', bonuses);
+    if (selectedTiers.length > 0) params.set('tiers', selectedTiers.join(','));
+    
+    const queryString = params.toString();
+    startTransition(() => {
+      router.push(queryString ? `/maps?${queryString}` : '/maps');
+    });
+  }, [debouncedSearch, debouncedMapper, type, bonuses, selectedTiers, router]);
 
   const toggleTier = (tier: number) => {
     setSelectedTiers(prev =>
@@ -52,29 +85,12 @@ function MapFiltersForm({
     );
   };
 
-  const applyFilters = () => {
-    const params = new URLSearchParams();
-    if (search) params.set('q', search);
-    if (mapper) params.set('mapper', mapper);
-    if (type !== 'all') params.set('type', type);
-    if (bonuses !== 'all') params.set('bonuses', bonuses);
-    if (selectedTiers.length > 0) params.set('tiers', selectedTiers.join(','));
-    
-    const queryString = params.toString();
-    startTransition(() => {
-      router.push(queryString ? `/maps?${queryString}` : '/maps');
-    });
-  };
-
   const clearFilters = () => {
     setSearch('');
     setMapper('');
     setType('all');
     setBonuses('all');
     setSelectedTiers([]);
-    startTransition(() => {
-      router.push('/maps');
-    });
   };
 
   // Count filters that are in the collapsible section (not default values)
@@ -98,7 +114,7 @@ function MapFiltersForm({
 
   return (
     <div className="bg-surface border border-border rounded-xl p-4 space-y-4">
-      {/* Always Visible Row: Search + More Filters Toggle + Apply Button */}
+      {/* Always Visible Row: Search + More Filters Toggle */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -108,7 +124,6 @@ function MapFiltersForm({
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
             className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text placeholder-text-placeholder focus:outline-none focus:bg-surface-hover focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
             placeholder="Search maps..."
           />
@@ -132,14 +147,6 @@ function MapFiltersForm({
             <ChevronDown className="h-4 w-4" />
           )}
         </button>
-        <button
-          type="button"
-          onClick={applyFilters}
-          disabled={isPending}
-          className="px-4 py-2 bg-primary-600 hover:bg-primary-500 disabled:bg-primary-600/50 text-white text-sm font-medium rounded-md transition-colors whitespace-nowrap"
-        >
-          {isPending ? 'Applying...' : 'Apply Filters'}
-        </button>
       </div>
 
       {/* Collapsible Advanced Filters */}
@@ -157,7 +164,6 @@ function MapFiltersForm({
               type="text"
               value={mapper}
               onChange={(e) => setMapper(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
               className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text placeholder-text-placeholder focus:outline-none focus:bg-surface-hover focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
               placeholder="Search by mapper..."
             />
@@ -224,11 +230,11 @@ function MapFiltersForm({
   );
 }
 
-// Wrapper component that reads URL params and creates a key for re-initialization
+// Wrapper component that reads URL params and syncs them to local state
 export default function MapFilters({ tierOptions }: MapFiltersProps) {
   const searchParams = useSearchParams();
   
-  // Parse URL params once per render to create the key
+  // Parse URL params once per render
   const urlParams = useMemo(() => ({
     q: searchParams.get('q') || '',
     mapper: searchParams.get('mapper') || '',
@@ -237,15 +243,8 @@ export default function MapFilters({ tierOptions }: MapFiltersProps) {
     tiers: parseTiers(searchParams.get('tiers')),
   }), [searchParams]);
   
-  // Create a stable key based on URL params - this forces re-mount when URL changes
-  const formKey = useMemo(() => 
-    JSON.stringify(urlParams),
-    [urlParams]
-  );
-  
   return (
     <MapFiltersForm
-      key={formKey}
       tierOptions={tierOptions}
       initialQ={urlParams.q}
       initialMapper={urlParams.mapper}
