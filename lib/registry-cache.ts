@@ -13,6 +13,7 @@ export interface BonusGroup {
 export interface StageGroup {
   map: string;
   stage: number;
+  count: number; // Number of completions for this stage (aggregated)
 }
 
 // Cache TTL: 1 hour (in milliseconds)
@@ -64,8 +65,9 @@ async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stages: Sta
         ORDER BY z.mapname ASC, z.zonegroup ASC
       `),
       pool.query<RowDataPacket[]>(`
-        SELECT DISTINCT map, stage
+        SELECT map, stage, COUNT(*) as count
         FROM ck_stages
+        GROUP BY map, stage
         ORDER BY map ASC, stage ASC
       `),
       pool.query<RowDataPacket[]>(`
@@ -82,6 +84,7 @@ async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stages: Sta
     const stages: StageGroup[] = (stageResult[0] as RowDataPacket[]).map((row) => ({
       map: row.map,
       stage: row.stage,
+      count: row.count,
     }));
     
     const playerCount = (countResult[0] as RowDataPacket[])[0].total;
