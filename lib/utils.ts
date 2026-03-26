@@ -1,7 +1,6 @@
-import 'server-only';
-
 /**
  * Utility functions shared across the application
+ * These functions are safe to use in both client and server components
  */
 
 // Pre-created formatter for better performance (avoids creating new Intl.DateTimeFormat on each call)

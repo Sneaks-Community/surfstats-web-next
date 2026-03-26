@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Map as MapIcon, Target, Layers, Search, X, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle, Circle } from 'lucide-react';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import ClientPagination from './ClientPagination';
-import { formatTime, formatDate, sanitizePlayerName } from '@/lib/client-utils';
+import { formatTime, formatDate } from '@/lib/utils';
+import { sanitizePlayerName } from '@/lib/sanitize';
 import TierBadge from '@/components/TierBadge';
 
 // Types for records

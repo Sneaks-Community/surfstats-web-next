@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Trophy, Target, Layers, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
 import Link from 'next/link';
 import ClientPagination from '@/app/players/[steamid]/components/ClientPagination';
-import { formatTime, formatDate, sanitizePlayerName } from '@/lib/client-utils';
+import { formatTime, formatDate } from '@/lib/utils';
+import { sanitizePlayerName } from '@/lib/sanitize';
 
 interface MapRecord {
   steamid: string;

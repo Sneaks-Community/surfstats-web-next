@@ -1,7 +1,6 @@
-import 'server-only';
-
 /**
  * Input sanitization utilities for security
+ * These functions are safe to use in both client and server components
  */
 
 // Allowed characters for SteamID format: STEAM_1:0:12345 or numeric SteamID64

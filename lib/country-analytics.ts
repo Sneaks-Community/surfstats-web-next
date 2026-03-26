@@ -63,7 +63,7 @@ const getDistinctCountriesInternal = async (): Promise<string[]> => {
   }
 };
 
-const getDistinctCountries = unstable_cache(
+export const getDistinctCountries = unstable_cache(
   getDistinctCountriesInternal,
   ['distinct-countries'],
   { revalidate: 86400 } // Cache for 24 hours

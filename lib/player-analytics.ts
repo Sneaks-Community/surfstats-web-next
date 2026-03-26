@@ -5,6 +5,13 @@ import { unstable_cache } from 'next/cache';
 import { convertSteamId2ToSteamId3Numeric } from '@/lib/steam';
 import logger from '@/lib/logger';
 
+// Check if analytics database is configured (env vars are set)
+const isAnalyticsConfigured = !!(
+  process.env.ANALYTICS_MYSQL_HOST ||
+  process.env.ANALYTICS_MYSQL_DATABASE ||
+  (process.env.MYSQL_HOST && process.env.MYSQL_DATABASE)
+);
+
 interface PlayerTimeData extends RowDataPacket {
   total_duration: number | null;
   connection_count: number;
@@ -22,7 +29,7 @@ interface PlayerTimeResult {
  */
 async function getPlayerTimeOnServerInternal(steamId: string): Promise<PlayerTimeResult | null> {
   // Return null if analytics is not configured - box will be hidden
-  if (!isAnalyticsAvailable()) {
+  if (!isAnalyticsConfigured) {
     return null;
   }
 
