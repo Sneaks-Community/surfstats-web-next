@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Trophy, Target, Layers, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
 import Link from 'next/link';
@@ -47,6 +47,7 @@ interface MapRecordsTabsProps {
   mapname: string;
   numBonuses: number;
   numStages: number;
+  wr_time: number | null;
 }
 
 type TabType = 'map' | 'bonus' | 'stages';
@@ -89,9 +90,49 @@ export default function MapRecordsTabs({
   mapname,
   numBonuses,
   numStages,
+  wr_time,
 }: MapRecordsTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // State for loading additional records from API
+  const [allLeaderboardRecords, setAllLeaderboardRecords] = useState<MapRecord[]>(records);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadedPage, setLoadedPage] = useState(Math.ceil(records.length / ITEMS_PER_PAGE));
+  const [hasMoreToLoad, setHasMoreToLoad] = useState(totalRecords > records.length);
+  // Ref to track loaded pages as a Set (for arbitrary page navigation)
+  const loadedPagesRef = useRef<Set<number>>(new Set());
+
+  // State for stages loaded via API
+  const [allStageRecords, setAllStageRecords] = useState<StageRecord[]>([]);
+  const [stagesList, setStagesList] = useState<number[]>([]);
+  const [totalStageRecords, setTotalStageRecords] = useState(0);
+  const [isLoadingStages, setIsLoadingStages] = useState(false);
+
+  // State for bonuses loaded via API
+  const [allBonusRecords, setAllBonusRecords] = useState<BonusRecord[]>([]);
+  const [bonusGroupsList, setBonusGroupsList] = useState<number[]>([]);
+  const [totalBonusRecords, setTotalBonusRecords] = useState(0);
+  const [isLoadingBonuses, setIsLoadingBonuses] = useState(false);
+
+  // Reset state when map changes - only depends on mapname to avoid pagination issues
+  useEffect(() => {
+    setAllLeaderboardRecords(records);
+    const initialLoadedPage = Math.ceil(records.length / ITEMS_PER_PAGE);
+    setLoadedPage(initialLoadedPage);
+    // Initialize loadedPages Set with initial pages from server-rendered records
+    loadedPagesRef.current = new Set();
+    for (let i = 1; i <= initialLoadedPage; i++) {
+      loadedPagesRef.current.add(i);
+    }
+    setHasMoreToLoad(totalRecords > records.length);
+    setLeaderboardPage(1);
+    setAllStageRecords([]);
+    setAllBonusRecords([]);
+    setTotalStageRecords(0);
+    setTotalBonusRecords(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapname]);
 
   // Get initial state from URL
   const initialTab = (searchParams.get('tab') as TabType) || 'map';
@@ -124,10 +165,10 @@ export default function MapRecordsTabs({
   const debouncedBonusSearch = useDebounce(bonusSearchQuery, 300);
   const debouncedStageSearch = useDebounce(stageSearchQuery, 300);
 
-  // Group bonus records by zonegroup
+  // Group bonus records by zonegroup - uses API-loaded records
   const bonusGroups = useMemo(() => {
     const groups: { [zonegroup: number]: BonusRecord[] } = {};
-    for (const record of bonusRecords) {
+    for (const record of allBonusRecords) {
       if (!groups[record.zonegroup]) {
         groups[record.zonegroup] = [];
       }
@@ -138,12 +179,12 @@ export default function MapRecordsTabs({
       groups[parseInt(zonegroup)].sort((a, b) => a.rank - b.rank);
     }
     return groups;
-  }, [bonusRecords]);
+  }, [allBonusRecords]);
 
-  // Group stage records by stage
+  // Group stage records by stage - uses API-loaded records
   const stageGroups = useMemo(() => {
     const groups: { [stage: number]: StageRecord[] } = {};
-    for (const record of stageRecords) {
+    for (const record of allStageRecords) {
       if (!groups[record.stage]) {
         groups[record.stage] = [];
       }
@@ -154,7 +195,111 @@ export default function MapRecordsTabs({
       groups[parseInt(stage)].sort((a, b) => a.rank - b.rank);
     }
     return groups;
-  }, [stageRecords]);
+  }, [allStageRecords]);
+
+  // Function to load more records from API (sequential loading)
+  const loadMoreRecords = async () => {
+    if (isLoadingMore || !hasMoreToLoad) return;
+    
+    setIsLoadingMore(true);
+    try {
+      // Find the next page to load (first page not in loadedPages Set)
+      let nextPage = 1;
+      while (loadedPagesRef.current.has(nextPage)) {
+        nextPage++;
+      }
+      const response = await fetch(`/api/maps/${mapname}/records?page=${nextPage}&pageSize=${ITEMS_PER_PAGE}`);
+      const data = await response.json();
+      
+      if (data.records && data.records.length > 0) {
+        // Merge with existing records, ensuring we don't have duplicates
+        setAllLeaderboardRecords(prev => {
+          const existingIds = new Set(prev.map(r => r.steamid + r.date));
+          const newRecords = data.records.filter((r: MapRecord) =>
+            !existingIds.has(r.steamid + r.date)
+          );
+          return [...prev, ...newRecords];
+        });
+        loadedPagesRef.current.add(nextPage);
+        setLoadedPage(nextPage);
+        setHasMoreToLoad(data.pagination.page < data.pagination.totalPages);
+      } else {
+        setHasMoreToLoad(false);
+      }
+    } catch (error) {
+      console.error('Failed to load more records:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // Function to load stage records from API
+  const loadStageRecords = async (stage: number, page: number = 1) => {
+    if (isLoadingStages) return;
+
+    setIsLoadingStages(true);
+    try {
+      const response = await fetch(`/api/maps/${mapname}/stages?stage=${stage}&page=${page}&pageSize=${ITEMS_PER_PAGE}`);
+      const data = await response.json();
+
+      if (data.stages && data.stages.length > 0) {
+        setAllStageRecords(data.stages);
+        setTotalStageRecords(data.pagination.total);
+        if (data.stagesList && data.stagesList.length > 0) {
+          setStagesList(data.stagesList);
+        }
+      } else {
+        setAllStageRecords([]);
+        setTotalStageRecords(0);
+      }
+    } catch (error) {
+      console.error('Failed to load stage records:', error);
+    } finally {
+      setIsLoadingStages(false);
+    }
+  };
+
+  // Load stage records when selected stage changes
+  useEffect(() => {
+    if (activeTab === 'stages' && numStages > 1) {
+      loadStageRecords(selectedStage, stagePage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedStage, stagePage, numStages]);
+
+  // Function to load bonus records from API
+  const loadBonusRecords = async (bonus: number, page: number = 1) => {
+    if (isLoadingBonuses) return;
+
+    setIsLoadingBonuses(true);
+    try {
+      const response = await fetch(`/api/maps/${mapname}/bonuses?bonus=${bonus}&page=${page}&pageSize=${ITEMS_PER_PAGE}`);
+      const data = await response.json();
+
+      if (data.bonuses && data.bonuses.length > 0) {
+        setAllBonusRecords(data.bonuses);
+        setTotalBonusRecords(data.pagination.total);
+        if (data.bonusGroupsList && data.bonusGroupsList.length > 0) {
+          setBonusGroupsList(data.bonusGroupsList);
+        }
+      } else {
+        setAllBonusRecords([]);
+        setTotalBonusRecords(0);
+      }
+    } catch (error) {
+      console.error('Failed to load bonus records:', error);
+    } finally {
+      setIsLoadingBonuses(false);
+    }
+  };
+
+  // Load bonus records when selected bonus changes
+  useEffect(() => {
+    if (activeTab === 'bonus' && numBonuses > 0) {
+      loadBonusRecords(selectedBonus, bonusPage);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedBonus, bonusPage, numBonuses]);
 
   // Current bonus records based on selected bonus
   const currentBonusRecords = useMemo(() => {
@@ -193,9 +338,32 @@ export default function MapRecordsTabs({
     setSortDirection('asc');
   };
 
-  // Handle page change
-  const handlePageChange = (page: number) => {
+  // Handle page change - with auto-loading for map tab
+  const handlePageChange = async (page: number) => {
     if (activeTab === 'map') {
+      // Check if this page has already been loaded
+      if (!loadedPagesRef.current.has(page)) {
+        try {
+          const response = await fetch(`/api/maps/${mapname}/records?page=${page}&pageSize=${ITEMS_PER_PAGE}`);
+          const data = await response.json();
+          
+          if (data.records && data.records.length > 0) {
+            // Merge with existing records, ensuring we don't have duplicates
+            setAllLeaderboardRecords(prev => {
+              const existingIds = new Set(prev.map(r => r.steamid + r.date));
+              const newRecords = data.records.filter((r: MapRecord) =>
+                !existingIds.has(r.steamid + r.date)
+              );
+              return [...prev, ...newRecords];
+            });
+            loadedPagesRef.current.add(page);
+            setLoadedPage(page);
+            setHasMoreToLoad(data.pagination.page < data.pagination.totalPages);
+          }
+        } catch (error) {
+          console.error('Failed to load records:', error);
+        }
+      }
       setLeaderboardPage(page);
     } else if (activeTab === 'bonus') {
       setBonusPage(page);
@@ -263,16 +431,16 @@ export default function MapRecordsTabs({
     );
   };
 
-  // Filter records by search
+  // Filter records by search - use all loaded records (not just initial batch)
   const filteredRecords = useMemo(() => {
-    if (!debouncedSearch) return records;
+    if (!debouncedSearch) return allLeaderboardRecords;
     const query = debouncedSearch.toLowerCase();
-    return records.filter(
+    return allLeaderboardRecords.filter(
       (r) =>
         r.name.toLowerCase().includes(query) ||
         r.steamid.toLowerCase().includes(query)
     );
-  }, [records, debouncedSearch]);
+  }, [allLeaderboardRecords, debouncedSearch]);
 
   // Sort records
   const sortedRecords = useMemo(() => {
@@ -307,22 +475,27 @@ export default function MapRecordsTabs({
   }, [filteredRecords, sortField, sortDirection]);
 
   // Paginated records
-  const totalPages = Math.ceil(sortedRecords.length / ITEMS_PER_PAGE);
-  const paginatedRecords = sortedRecords.slice(
-    (leaderboardPage - 1) * ITEMS_PER_PAGE,
-    leaderboardPage * ITEMS_PER_PAGE
+  const totalPages = Math.ceil((searchQuery ? sortedRecords.length : totalRecords) / ITEMS_PER_PAGE);
+  
+  // Calculate rank range for the requested page (not array indices, since pages may be loaded non-sequentially)
+  const startRank = (leaderboardPage - 1) * ITEMS_PER_PAGE + 1;
+  const endRank = leaderboardPage * ITEMS_PER_PAGE;
+  
+  // Filter records by rank range instead of array slice
+  const paginatedRecords = sortedRecords.filter(
+    (r) => r.rank >= startRank && r.rank <= endRank
   );
 
   // Filter bonus records by search
   const filteredBonusRecords = useMemo(() => {
-    if (!debouncedBonusSearch) return currentBonusRecords;
+    if (!debouncedBonusSearch) return allBonusRecords;
     const query = debouncedBonusSearch.toLowerCase();
-    return currentBonusRecords.filter(
+    return allBonusRecords.filter(
       (r) =>
         r.name.toLowerCase().includes(query) ||
         r.steamid.toLowerCase().includes(query)
     );
-  }, [currentBonusRecords, debouncedBonusSearch]);
+  }, [allBonusRecords, debouncedBonusSearch]);
 
   // Sort bonus records
   const sortedBonusRecords = useMemo(() => {
@@ -356,23 +529,24 @@ export default function MapRecordsTabs({
     return sorted;
   }, [filteredBonusRecords, sortField, sortDirection]);
 
-  // Paginated bonus records
-  const totalBonusPages = Math.ceil(sortedBonusRecords.length / ITEMS_PER_PAGE);
-  const paginatedBonusRecords = sortedBonusRecords.slice(
-    (bonusPage - 1) * ITEMS_PER_PAGE,
-    bonusPage * ITEMS_PER_PAGE
+  // Paginated bonus records - use rank-based filtering for non-sequential page loading
+  const totalBonusPages = Math.ceil((bonusSearchQuery ? sortedBonusRecords.length : totalBonusRecords) / ITEMS_PER_PAGE);
+  const bonusStartRank = (bonusPage - 1) * ITEMS_PER_PAGE + 1;
+  const bonusEndRank = bonusPage * ITEMS_PER_PAGE;
+  const paginatedBonusRecords = sortedBonusRecords.filter(
+    (r) => r.rank >= bonusStartRank && r.rank <= bonusEndRank
   );
 
   // Filter stage records by search
   const filteredStageRecords = useMemo(() => {
-    if (!debouncedStageSearch) return currentStageRecords;
+    if (!debouncedStageSearch) return allStageRecords;
     const query = debouncedStageSearch.toLowerCase();
-    return currentStageRecords.filter(
+    return allStageRecords.filter(
       (r) =>
         r.name.toLowerCase().includes(query) ||
         r.steamid.toLowerCase().includes(query)
     );
-  }, [currentStageRecords, debouncedStageSearch]);
+  }, [allStageRecords, debouncedStageSearch]);
 
   // Sort stage records
   const sortedStageRecords = useMemo(() => {
@@ -406,11 +580,12 @@ export default function MapRecordsTabs({
     return sorted;
   }, [filteredStageRecords, sortField, sortDirection]);
 
-  // Paginated stage records
-  const totalStagePages = Math.ceil(sortedStageRecords.length / ITEMS_PER_PAGE);
-  const paginatedStageRecords = sortedStageRecords.slice(
-    (stagePage - 1) * ITEMS_PER_PAGE,
-    stagePage * ITEMS_PER_PAGE
+  // Paginated stage records - use rank-based filtering for non-sequential page loading
+  const totalStagePages = Math.ceil((stageSearchQuery ? sortedStageRecords.length : totalStageRecords) / ITEMS_PER_PAGE);
+  const stageStartRank = (stagePage - 1) * ITEMS_PER_PAGE + 1;
+  const stageEndRank = stagePage * ITEMS_PER_PAGE;
+  const paginatedStageRecords = sortedStageRecords.filter(
+    (r) => r.rank >= stageStartRank && r.rank <= stageEndRank
   );
 
   // Get the base URL for pagination

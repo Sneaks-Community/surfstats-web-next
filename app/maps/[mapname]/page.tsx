@@ -84,55 +84,84 @@ const getMapData = unstable_cache(
   { revalidate: 60 }
 );
 
+// Default page size - keeps cache entry under 2MB (each record ~200 bytes, 100 records ~20KB)
+const DEFAULT_PAGE_SIZE = 100;
+const MAX_PAGE_SIZE = 500;
+
+interface RecordCounts {
+  leaderboardTotal: number;
+  bonusesTotal: number;
+  stagesTotal: number;
+}
+
+interface MapRecordsResult {
+  leaderboard: MapRecord[];
+  bonuses: BonusRecord[];
+  stages: StageRecord[];
+  counts: RecordCounts;
+  wr_time: number | null;
+}
+
 const getMapRecords = unstable_cache(
-  async (mapname: string) => {
-    logger.debug(`[Map] Fetching all records for: ${mapname}`);
-    
+  async (mapname: string, page: number = 1, pageSize: number = DEFAULT_PAGE_SIZE): Promise<MapRecordsResult> => {
+    // Enforce limits to prevent cache bloat
+    const safePageSize = Math.min(Math.max(1, pageSize), MAX_PAGE_SIZE);
+    const safePage = Math.max(1, page);
+    const offset = (safePage - 1) * safePageSize;
+
+    logger.debug(`[Map] Fetching records for: ${mapname} (page ${safePage}, size ${safePageSize})`);
+
     try {
-      // Get all leaderboard records with WR time
+      // First, get the total counts for all record types in a single query
+      const [countsRows] = await pool.query<RowDataPacket[]>(`
+        SELECT
+          (SELECT COUNT(*) FROM ck_playertimes WHERE mapname = ?) as leaderboardTotal,
+          (SELECT COUNT(*) FROM ck_bonus WHERE mapname = ?) as bonusesTotal,
+          (SELECT COUNT(*) FROM ck_stages WHERE \`map\` = ?) as stagesTotal
+      `, [mapname, mapname, mapname]);
+
+      const counts: RecordCounts = {
+        leaderboardTotal: countsRows[0]?.leaderboardTotal || 0,
+        bonusesTotal: countsRows[0]?.bonusesTotal || 0,
+        stagesTotal: countsRows[0]?.stagesTotal || 0,
+      };
+
+      // Use window functions for efficient rank calculation - O(n) instead of O(n²)
+      // This query calculates ranks using ROW_NUMBER() which is much faster than correlated subqueries
+      
+      // Get WR time for the map (needed for all records)
+      const [wrTimeRows] = await pool.query<RowDataPacket[]>(`
+        SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?
+      `, [mapname]);
+      const wr_time = wrTimeRows[0]?.wr_time || null;
+
+      // Get leaderboard records with pagination and window function for rank
       const [leaderboardRows] = await pool.query<MapRecord[]>(`
         SELECT
-          pt.steamid, pt.name, pt.runtimepro, pt.date, pt.startspeed,
-          (SELECT COUNT(*) + 1 FROM ck_playertimes pt2 WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as rank,
-          (SELECT MIN(runtimepro) FROM ck_playertimes WHERE mapname = pt.mapname) as wr_time
-        FROM ck_playertimes pt
-        WHERE pt.mapname = ?
-        ORDER BY pt.runtimepro ASC
-      `, [mapname]);
+          steamid, name, runtimepro, date, startspeed,
+          ROW_NUMBER() OVER (ORDER BY runtimepro ASC) as rank,
+          ? as wr_time
+        FROM ck_playertimes
+        WHERE mapname = ?
+        ORDER BY runtimepro ASC
+        LIMIT ? OFFSET ?
+      `, [wr_time, mapname, safePageSize, offset]);
 
-      // Get all bonus records with WR time
-      const [bonusRows] = await pool.query<BonusRecord[]>(`
-        SELECT
-          b.steamid, b.name, b.zonegroup, b.runtime, b.date, b.startspeed,
-          (SELECT COUNT(*) + 1 FROM ck_bonus b2
-           WHERE b2.mapname = b.mapname AND b2.zonegroup = b.zonegroup AND b2.runtime < b.runtime) as rank,
-          (SELECT MIN(runtime) FROM ck_bonus WHERE mapname = b.mapname AND zonegroup = b.zonegroup) as wr_time
-        FROM ck_bonus b
-        WHERE b.mapname = ?
-        ORDER BY b.zonegroup ASC, b.runtime ASC
-      `, [mapname]);
+      // Bonuses are fetched client-side via API to keep server payload small
+      const bonusRows: BonusRecord[] = [];
 
-      // Get all stage records with WR time
-      const [stageRows] = await pool.query<StageRecord[]>(`
-        SELECT
-          s.steamid, pr.name, s.stage, s.runtime, s.date, s.startspeed,
-          (SELECT COUNT(*) + 1 FROM ck_stages s2
-           WHERE s2.map = s.map AND s2.stage = s.stage AND s2.runtime < s.runtime) as rank,
-          (SELECT MIN(runtime) FROM ck_stages WHERE map = s.map AND stage = s.stage) as wr_time
-        FROM ck_stages s
-        LEFT JOIN ck_playerrank pr ON s.steamid = pr.steamid
-        WHERE s.map = ?
-        ORDER BY s.stage ASC, s.runtime ASC
-      `, [mapname]);
+      // Stages are fetched client-side via API to avoid huge payloads
+      // (maps can have 300K+ stage records which exceeds 2MB cache limit)
+      const stageRows: StageRecord[] = [];
 
-      logger.debug(`[Map] ${mapname} loaded: ${leaderboardRows.length} leaderboard records, ${bonusRows.length} bonus records, ${stageRows.length} stage records`);
-      
-      return { leaderboard: leaderboardRows, bonuses: bonusRows, stages: stageRows };
+      logger.debug(`[Map] ${mapname} loaded: ${leaderboardRows.length}/${counts.leaderboardTotal} leaderboard records, ${bonusRows.length} bonus records, ${stageRows.length} stage records`);
+
+      return { leaderboard: leaderboardRows, bonuses: bonusRows, stages: stageRows, counts, wr_time };
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error';
       logger.error(`[Map] Failed to fetch records for ${mapname}: ${errorMessage}`);
       logger.error(`[Map] Error code: ${error.code || 'N/A'}`);
-      return { leaderboard: [], bonuses: [], stages: [] };
+      return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
     }
   },
   ['map-records'],
@@ -183,7 +212,7 @@ export default async function MapProfilePage({
   
   const [map, recordsData] = await Promise.all([
     getMapData(validMapname),
-    getMapRecords(validMapname)
+    getMapRecords(validMapname, 1, DEFAULT_PAGE_SIZE)
   ]);
   
   if (!map) {
@@ -198,8 +227,8 @@ export default async function MapProfilePage({
     );
   }
 
-  const { leaderboard, bonuses, stages } = recordsData;
-  const total = leaderboard.length;
+  const { leaderboard, bonuses, stages, counts, wr_time } = recordsData;
+  const total = counts.leaderboardTotal;
   const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
 
   return (
@@ -304,6 +333,7 @@ export default async function MapProfilePage({
         mapname={map.mapname}
         numBonuses={map.bonuses}
         numStages={map.stages}
+        wr_time={wr_time}
       />
     </div>
   );
