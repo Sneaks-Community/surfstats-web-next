@@ -8,6 +8,7 @@ import { unstable_cache } from 'next/cache';
 import { formatPlaytime, formatDate } from '@/lib/utils';
 import { sanitizeSteamId, sanitizePlayerName } from '@/lib/sanitize';
 import CountryBadge from '@/components/CountryBadge';
+import { countryNameToCode } from '@/lib/countries';
 import { getTotalsCached } from '@/lib/cache';
 import { getPlayerTimeOnServer, getPerformanceTrend } from '@/lib/player-analytics';
 import { getAllMapMetadata, getTierDistributionWithStages } from '@/lib/map-cache';
@@ -449,10 +450,19 @@ export default async function PlayerProfilePage({
               <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-text-muted">
                 <span className="font-mono bg-surface-hover px-2 py-1 rounded text-text">{player.steamid}</span>
                 {player.country && (
-                  <span className="flex items-center gap-2">
-                    <CountryBadge countryCode={player.country} showName={false} />
-                    <span>{player.country}</span>
-                  </span>
+                  (() => {
+                    const countryCode = countryNameToCode[player.country.toLowerCase()];
+                    if (!countryCode) return null;
+                    return (
+                      <Link
+                        href={`/players/countries/${countryCode}`}
+                        className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                      >
+                        <CountryBadge countryCode={player.country} showName={false} />
+                        <span>{player.country}</span>
+                      </Link>
+                    );
+                  })()
                 )}
                 <span>Last Seen: {player.lastseen ? formatDate(player.lastseen) : 'Unknown'}</span>
               </div>
