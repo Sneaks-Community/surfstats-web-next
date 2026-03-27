@@ -17,10 +17,11 @@ export default function ProgressBar({ label, current, total, color }: ProgressBa
   };
 
   return (
-    <div className="bg-zinc-800/50 rounded-lg p-4 border border-zinc-800 min-w-[260px] flex-1 max-w-[400px] h-[72px] flex flex-col justify-center">
-      <div className="relative h-6 bg-zinc-700 rounded overflow-hidden">
+    <div className="flex items-center gap-3">
+      <span className="text-sm font-medium text-text-muted w-10 flex-shrink-0">{label}</span>
+      <div className="flex-1 h-4 bg-surface-active rounded overflow-hidden relative">
         <div
-          className={`absolute inset-y-0 left-0 ${colorClasses[color]} rounded transition-all duration-1000 ease-out animate-barber-pole`}
+          className={`h-full ${colorClasses[color]} rounded animate-barber-pole`}
           style={{
             opacity: 0.85,
             width: `${percentage}%`,
@@ -28,15 +29,11 @@ export default function ProgressBar({ label, current, total, color }: ProgressBa
             backgroundSize: '40px 40px',
           }}
         />
-        <div className="absolute inset-0 flex items-center justify-between px-2">
-          <span className="text-xs font-semibold text-white drop-shadow-md whitespace-nowrap">
-            {label}
-          </span>
-          <span className="text-xs font-medium text-white drop-shadow-md whitespace-nowrap">
-            {current.toLocaleString()} / {total.toLocaleString()} ({percentage}%)
-          </span>
-        </div>
+        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white drop-shadow-md">
+          {percentage}%
+        </span>
       </div>
+      <span className="text-sm text-text-muted w-20 text-right flex-shrink-0">{current.toLocaleString()} / {total.toLocaleString()}</span>
     </div>
   );
 }

@@ -21,6 +21,7 @@ import type { Metadata } from 'next';
 import TierDistributionChart from './components/TierDistributionChart';
 import PerformanceTrendChart from './components/PerformanceTrendChart';
 import PlayerRecordsTabs from './components/PlayerRecordsTabs';
+import ProgressBar from '@/components/ProgressBar';
 
 interface PlayerData extends RowDataPacket {
   steamid: string;
@@ -399,24 +400,50 @@ export default async function PlayerProfilePage({
     <div className="space-y-8">
       {/* Profile Header */}
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <div className="h-32 bg-gradient-to-r from-primary-900 to-background-secondary"></div>
+        <div className="h-20 bg-gradient-to-r from-primary-900 to-background-secondary"></div>
         <div className="px-6 sm:px-10 pb-8 relative">
           <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end -mt-12 sm:-mt-16 mb-6">
-            <div className="relative h-24 w-24 sm:h-32 sm:w-32 rounded-xl overflow-hidden border-4 border-surface bg-surface-hover flex-shrink-0">
-              {steamAvatars?.avatarfull ? (
-                <Image
-                  src={steamAvatars.avatarfull}
-                  alt={player.name}
-                  fill
-                  className="object-cover"
-                  unoptimized
-                />
+            {(() => {
+              const profileUrl = getSteamProfileUrl(decodedSteamId);
+              return profileUrl ? (
+                <a
+                  href={profileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="relative h-16 w-16 sm:h-24 sm:w-24 rounded-xl overflow-hidden border-4 border-surface flex-shrink-0"
+                >
+                  {steamAvatars?.avatarfull ? (
+                    <Image
+                      src={steamAvatars.avatarfull}
+                      alt={player.name}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-surface-hover">
+                      <span className="text-4xl font-bold text-text-placeholder">{sanitizePlayerName(player.name).charAt(0).toUpperCase()}</span>
+                    </div>
+                  )}
+                </a>
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-surface-hover">
-                  <span className="text-4xl font-bold text-text-placeholder">{sanitizePlayerName(player.name).charAt(0).toUpperCase()}</span>
+                <div className="relative h-16 w-16 sm:h-24 sm:w-24 rounded-xl overflow-hidden border-4 border-surface bg-surface-hover flex-shrink-0">
+                  {steamAvatars?.avatarfull ? (
+                    <Image
+                      src={steamAvatars.avatarfull}
+                      alt={player.name}
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-surface-hover">
+                      <span className="text-4xl font-bold text-text-placeholder">{sanitizePlayerName(player.name).charAt(0).toUpperCase()}</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
+              );
+            })()}
             <div className="flex-1 pb-2">
               <h1 className="text-3xl font-bold text-text">{sanitizePlayerName(player.name)}</h1>
               <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-text-muted">
@@ -427,121 +454,40 @@ export default async function PlayerProfilePage({
                     <span>{player.country}</span>
                   </span>
                 )}
-                <span>Last seen: {player.lastseen ? formatDate(player.lastseen) : 'Unknown'}</span>
+                <span>Last Seen: {player.lastseen ? formatDate(player.lastseen) : 'Unknown'}</span>
               </div>
-            </div>
-            <div className="pb-2 flex gap-3">
-              {(() => {
-                const profileUrl = getSteamProfileUrl(decodedSteamId);
-                return profileUrl ? (
-                  <a
-                    href={profileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-4 py-2 bg-surface-hover hover:bg-surface-active text-text rounded-md font-medium transition-colors text-sm"
-                  >
-                    Steam Profile
-                  </a>
-                ) : null;
-              })()}
             </div>
           </div>
           
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_1fr_2fr] gap-3">
             <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center">
               <Trophy className="w-8 h-8 text-yellow-500 mb-2" />
-              <span className="text-2xl font-bold text-text">{player.rank}</span>
+              <span className="text-2xl font-bold text-text">#{player.rank}</span>
               <span className="text-xs text-text-muted">Global Rank</span>
             </div>
             <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center">
               <Activity className="w-8 h-8 text-blue-500 mb-2" />
-              <span className="text-2xl font-bold text-text">{player.finishedmaps}</span>
+              <span className="text-2xl font-bold text-text">{player.finishedmaps.toLocaleString()}</span>
               <span className="text-xs text-text-muted">Maps Completed</span>
             </div>
             <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center">
               <Clock className="w-8 h-8 text-green-500 mb-2" />
-              <span className="text-2xl font-bold text-text">{player.points}</span>
+              <span className="text-2xl font-bold text-text">{player.points.toLocaleString()}</span>
               <span className="text-xs text-text-muted">Points</span>
             </div>
             {playtimeData && playtimeData.totalSeconds > 0 ? (
-              <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center">
+              <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center md:col-start-4 md:col-span-1">
                 <Clock className="w-8 h-8 text-purple-500 mb-2" />
                 <span className="text-2xl font-bold text-text">{formatPlaytime(playtimeData.totalSeconds)}</span>
                 <span className="text-xs text-text-muted">Time on Server</span>
               </div>
             ) : null}
-          </div>
-          
-          {/* Progress Bars */}
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-surface border border-border rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-semibold text-text">Maps</span>
-                <span className="text-xs text-text-muted">{maps.length}/{totals.totalMaps}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-medium text-blue-400 w-8 flex-shrink-0">Map</span>
-                <div className="flex-1 h-3 bg-surface-active rounded overflow-hidden relative">
-                  <div
-                    className="h-full bg-blue-500 rounded animate-barber-pole"
-                    style={{
-                      width: `${totals.totalMaps > 0 ? Math.min(100, (maps.length / totals.totalMaps) * 100) : 0}%`,
-                      backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent)',
-                      backgroundSize: '20px 20px',
-                    }}
-                  />
-                  <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white drop-shadow-md">
-                    {totals.totalMaps > 0 ? Math.min(100, Math.round((maps.length / totals.totalMaps) * 100)) : 0}%
-                  </span>
-                </div>
-              </div>
-            </div>
-            <div className="bg-surface border border-border rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-semibold text-text">Bonuses</span>
-                <span className="text-xs text-text-muted">{bonuses.length}/{totals.totalBonuses}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-medium text-purple-400 w-8 flex-shrink-0">Bonus</span>
-                <div className="flex-1 h-3 bg-surface-active rounded overflow-hidden relative">
-                  <div
-                    className="h-full bg-purple-500 rounded animate-barber-pole"
-                    style={{
-                      width: `${totals.totalBonuses > 0 ? Math.min(100, (bonuses.length / totals.totalBonuses) * 100) : 0}%`,
-                      backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent)',
-                      backgroundSize: '20px 20px',
-                    }}
-                  />
-                  <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white drop-shadow-md">
-                    {totals.totalBonuses > 0 ? Math.min(100, Math.round((bonuses.length / totals.totalBonuses) * 100)) : 0}%
-                  </span>
-                </div>
-                <span className="text-[10px] text-text w-12 text-right flex-shrink-0">{bonuses.length}/{totals.totalBonuses}</span>
-              </div>
-            </div>
-            <div className="bg-surface border border-border rounded-xl p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-semibold text-text">Stages</span>
-                <span className="text-xs text-text-muted">{stages.length}/{totals.totalStages}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-medium text-orange-400 w-8 flex-shrink-0">Stage</span>
-                <div className="flex-1 h-3 bg-surface-active rounded overflow-hidden relative">
-                  <div
-                    className="h-full bg-orange-500 rounded animate-barber-pole"
-                    style={{
-                      width: `${totals.totalStages > 0 ? Math.min(100, (stages.length / totals.totalStages) * 100) : 0}%`,
-                      backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent)',
-                      backgroundSize: '20px 20px',
-                    }}
-                  />
-                  <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white drop-shadow-md">
-                    {totals.totalStages > 0 ? Math.min(100, Math.round((stages.length / totals.totalStages) * 100)) : 0}%
-                  </span>
-                </div>
-                <span className="text-[10px] text-text w-12 text-right flex-shrink-0">{stages.length}/{totals.totalStages}</span>
-              </div>
+            {/* Progress Bars - Stacked vertically in a single container to the right of Time on Server */}
+            <div className="bg-surface border border-border rounded-xl p-4 col-span-2 md:col-start-5 md:row-start-1 flex flex-col justify-center space-y-4">
+              <ProgressBar label="Map" current={maps.length} total={totals.totalMaps} color="blue" />
+              <ProgressBar label="Bonus" current={bonuses.length} total={totals.totalBonuses} color="purple" />
+              <ProgressBar label="Stage" current={stages.length} total={totals.totalStages} color="orange" />
             </div>
           </div>
         </div>
