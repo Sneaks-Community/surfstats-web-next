@@ -104,6 +104,14 @@ export default function MapRecordsTabs({
   // Ref to track loaded pages as a Set (for arbitrary page navigation)
   const loadedPagesRef = useRef<Set<number>>(new Set());
 
+  // Ref to track fetched stage-page combinations for client-side caching
+  // Key format: "${stage}-${page}"
+  const stageCacheRef = useRef<Map<string, StageRecord[]>>(new Map());
+
+  // Ref to track fetched bonus-page combinations for client-side caching
+  // Key format: "${bonus}-${page}"
+  const bonusCacheRef = useRef<Map<string, BonusRecord[]>>(new Map());
+
   // State for stages loaded via API
   const [allStageRecords, setAllStageRecords] = useState<StageRecord[]>([]);
   const [stagesList, setStagesList] = useState<number[]>([]);
@@ -128,6 +136,9 @@ export default function MapRecordsTabs({
     }
     setHasMoreToLoad(totalRecords > records.length);
     setLeaderboardPage(1);
+    // Clear stage and bonus caches when map changes
+    stageCacheRef.current = new Map();
+    bonusCacheRef.current = new Map();
     setAllStageRecords([]);
     setAllBonusRecords([]);
     setTotalStageRecords(0);
@@ -234,9 +245,20 @@ export default function MapRecordsTabs({
     }
   };
 
-  // Function to load stage records from API
+  // Function to load stage records from API with client-side caching
   const loadStageRecords = async (stage: number, page: number = 1) => {
     if (isLoadingStages) return;
+
+    // Check client-side cache first
+    const cacheKey = `${stage}-${page}`;
+    const cachedData = stageCacheRef.current.get(cacheKey);
+    
+    if (cachedData) {
+      // Cache hit - use cached data
+      setAllStageRecords(cachedData);
+      setIsLoadingStages(false);
+      return;
+    }
 
     setIsLoadingStages(true);
     try {
@@ -244,17 +266,23 @@ export default function MapRecordsTabs({
       const data = await response.json();
 
       if (data.stages && data.stages.length > 0) {
+        // Store in client-side cache
+        stageCacheRef.current.set(cacheKey, data.stages);
         setAllStageRecords(data.stages);
         setTotalStageRecords(data.pagination.total);
         if (data.stagesList && data.stagesList.length > 0) {
           setStagesList(data.stagesList);
         }
       } else {
+        stageCacheRef.current.set(cacheKey, []);
         setAllStageRecords([]);
         setTotalStageRecords(0);
       }
     } catch (error) {
       console.error('Failed to load stage records:', error);
+      stageCacheRef.current.set(cacheKey, []);
+      setAllStageRecords([]);
+      setTotalStageRecords(0);
     } finally {
       setIsLoadingStages(false);
     }
@@ -268,9 +296,20 @@ export default function MapRecordsTabs({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedStage, stagePage, numStages]);
 
-  // Function to load bonus records from API
+  // Function to load bonus records from API with client-side caching
   const loadBonusRecords = async (bonus: number, page: number = 1) => {
     if (isLoadingBonuses) return;
+
+    // Check client-side cache first
+    const cacheKey = `${bonus}-${page}`;
+    const cachedData = bonusCacheRef.current.get(cacheKey);
+    
+    if (cachedData) {
+      // Cache hit - use cached data
+      setAllBonusRecords(cachedData);
+      setIsLoadingBonuses(false);
+      return;
+    }
 
     setIsLoadingBonuses(true);
     try {
@@ -278,17 +317,23 @@ export default function MapRecordsTabs({
       const data = await response.json();
 
       if (data.bonuses && data.bonuses.length > 0) {
+        // Store in client-side cache
+        bonusCacheRef.current.set(cacheKey, data.bonuses);
         setAllBonusRecords(data.bonuses);
         setTotalBonusRecords(data.pagination.total);
         if (data.bonusGroupsList && data.bonusGroupsList.length > 0) {
           setBonusGroupsList(data.bonusGroupsList);
         }
       } else {
+        bonusCacheRef.current.set(cacheKey, []);
         setAllBonusRecords([]);
         setTotalBonusRecords(0);
       }
     } catch (error) {
       console.error('Failed to load bonus records:', error);
+      bonusCacheRef.current.set(cacheKey, []);
+      setAllBonusRecords([]);
+      setTotalBonusRecords(0);
     } finally {
       setIsLoadingBonuses(false);
     }
