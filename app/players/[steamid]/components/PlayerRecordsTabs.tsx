@@ -536,7 +536,7 @@ export default function PlayerRecordsTabs({
       </div>
 
       {/* Search Bar */}
-      <div className="p-4 border-b border-border">
+      <div className="p-2 border-b border-border">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
           <input
@@ -703,7 +703,7 @@ export default function PlayerRecordsTabs({
                   return (
                     <div
                       key={`${record.mapname}-${i}`}
-                      className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
+                      className="px-2 sm:px-4 py-2 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3"
                     >
                       <div className="flex-1 min-w-0">
                         <MapLinkWithPreview mapname={record.mapname}>
@@ -741,7 +741,7 @@ export default function PlayerRecordsTabs({
                 (paginatedRecords as BonusRecord[]).map((record, i) => (
                   <div
                     key={`${record.mapname}-${record.zonegroup}-${i}`}
-                    className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
+                    className="px-2 sm:px-4 py-2 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3"
                   >
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.mapname}>
@@ -771,7 +771,7 @@ export default function PlayerRecordsTabs({
                 (paginatedRecords as StageRecord[]).map((record, i) => (
                   <div
                     key={`${record.map}-${record.stage}-${i}`}
-                    className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
+                    className="px-2 sm:px-4 py-2 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3"
                   >
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.map}>
@@ -802,7 +802,7 @@ export default function PlayerRecordsTabs({
                 (paginatedRecords as IncompleteMapRecord[]).map((record, i) => (
                   <div
                     key={`${record.mapname}-${i}`}
-                    className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
+                    className="px-2 sm:px-4 py-2 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3"
                   >
                     <div className="flex-1 min-w-0">
                       <MapLinkWithPreview mapname={record.mapname}>
@@ -830,7 +830,7 @@ export default function PlayerRecordsTabs({
                 (paginatedRecords as IncompleteBonusRecord[]).map((record, i) => (
                   <div
                     key={`${record.mapname}-${record.zonegroup}-${i}`}
-                    className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
+                    className="px-2 sm:px-4 py-2 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3"
                   >
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.mapname}>
@@ -857,7 +857,7 @@ export default function PlayerRecordsTabs({
                 (paginatedRecords as IncompleteStageRecord[]).map((record, i) => (
                   <div
                     key={`${record.map}-${record.stage}-${i}`}
-                    className="px-3 sm:px-6 py-3 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4"
+                    className="px-2 sm:px-4 py-2 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3"
                   >
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.map}>

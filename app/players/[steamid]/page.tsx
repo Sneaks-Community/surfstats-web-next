@@ -398,12 +398,12 @@ export default async function PlayerProfilePage({
     performanceTrendRaw || [];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       {/* Profile Header */}
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
         <div className="h-20 bg-gradient-to-r from-primary-900 to-background-secondary"></div>
-        <div className="px-6 sm:px-10 pb-8 relative">
-          <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end -mt-12 sm:-mt-16 mb-6">
+        <div className="px-4 sm:px-6 pb-4 relative">
+          <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end -mt-8 sm:-mt-10 mb-4">
             {(() => {
               const profileUrl = getSteamProfileUrl(decodedSteamId);
               return profileUrl ? (
@@ -470,31 +470,31 @@ export default async function PlayerProfilePage({
           </div>
           
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_1fr_2fr] gap-3">
-            <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center">
+          <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_1fr_2fr] gap-2">
+            <div className="bg-surface border border-border rounded-xl p-3 flex flex-col items-center justify-center">
               <Trophy className="w-8 h-8 text-yellow-500 mb-2" />
               <span className="text-2xl font-bold text-text">#{player.rank}</span>
               <span className="text-xs text-text-muted">Global Rank</span>
             </div>
-            <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center">
+            <div className="bg-surface border border-border rounded-xl p-3 flex flex-col items-center justify-center">
               <Activity className="w-8 h-8 text-blue-500 mb-2" />
               <span className="text-2xl font-bold text-text">{player.finishedmaps.toLocaleString()}</span>
               <span className="text-xs text-text-muted">Maps Completed</span>
             </div>
-            <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center">
+            <div className="bg-surface border border-border rounded-xl p-3 flex flex-col items-center justify-center">
               <Clock className="w-8 h-8 text-green-500 mb-2" />
               <span className="text-2xl font-bold text-text">{player.points.toLocaleString()}</span>
               <span className="text-xs text-text-muted">Points</span>
             </div>
             {playtimeData && playtimeData.totalSeconds > 0 ? (
-              <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center md:col-start-4 md:col-span-1">
+              <div className="bg-surface border border-border rounded-xl p-3 flex flex-col items-center justify-center md:col-start-4 md:col-span-1">
                 <Clock className="w-8 h-8 text-purple-500 mb-2" />
                 <span className="text-2xl font-bold text-text">{formatPlaytime(playtimeData.totalSeconds)}</span>
                 <span className="text-xs text-text-muted">Time on Server</span>
               </div>
             ) : null}
             {/* Progress Bars - Stacked vertically in a single container to the right of Time on Server */}
-            <div className="bg-surface border border-border rounded-xl p-4 col-span-2 md:col-start-5 md:row-start-1 flex flex-col justify-center space-y-4">
+            <div className="bg-surface border border-border rounded-xl p-3 col-span-2 md:col-start-5 md:row-start-1 flex flex-col justify-center space-y-3">
               <ProgressBar label="Map" current={maps.length} total={totals.totalMaps} color="blue" />
               <ProgressBar label="Bonus" current={bonuses.length} total={totals.totalBonuses} color="purple" />
               <ProgressBar label="Stage" current={stages.length} total={totals.totalStages} color="orange" />
@@ -504,7 +504,7 @@ export default async function PlayerProfilePage({
       </div>
 
       {/* Stats Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
         {/* Tier Distribution Radar - full width on mobile, 1st column on desktop */}
         <div className="lg:col-span-1 lg:row-span-1 h-[280px] min-h-[280px]">
           {linearVsStagedPerTier && linearVsStagedPerTier.length > 0 ? (
