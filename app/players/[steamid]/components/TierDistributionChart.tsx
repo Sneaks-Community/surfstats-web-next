@@ -1,16 +1,35 @@
 'use client';
 
-import { Pie, PieChart, Cell, ResponsiveContainer, Tooltip, Legend, PieLabelRenderProps } from 'recharts';
+import { Radar } from 'react-chartjs-2';
+import type { ChartOptions } from 'chart.js';
+import {
+  Chart as ChartJS,
+  RadialLinearScale,
+  PointElement,
+  LineElement,
+  Filler,
+  Tooltip,
+  Legend,
+} from 'chart.js';
 import { useMemo } from 'react';
 
-interface TierData {
+ChartJS.register(
+  RadialLinearScale,
+  PointElement,
+  LineElement,
+  Filler,
+  Tooltip,
+  Legend
+);
+
+interface TierDistributionData {
   tier: number;
-  completed_maps: number;
-  total_maps: number;
+  linear: number;
+  staged: number;
 }
 
 interface TierDistributionChartProps {
-  data: TierData[];
+  data: TierDistributionData[];
 }
 
 // Tier colors matching the existing tierColors.ts theme
@@ -21,132 +40,132 @@ const TIER_COLORS: Record<number, string> = {
   4: '#f97316', // orange-500
   5: '#ea580c', // orange-600
   6: '#ef4444', // red-500
-  7: '#e11d48', // rose-600
-  8: '#db2777', // pink-600
-  9: '#a855f7', // purple-500
-  10: '#7c3aed', // violet-600
 };
 
-const DEFAULT_COLOR = '#ef4444'; // red-500 for tiers > 10
-
-// Custom tooltip component
-interface TooltipProps {
-  active?: boolean;
-  payload?: Array<{
-    payload: {
-      tier: number;
-      completed: number;
-      total: number;
-      percentage: number;
-      fill: string;
-    };
-  }>;
-}
-
-const CustomTooltip = ({ active, payload }: TooltipProps) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="bg-surface border border-border rounded-lg p-3 shadow-lg">
-        <p className="font-semibold text-text">Tier {data.tier}</p>
-        <p className="text-sm text-text-muted">
-          <span className="text-text">{data.completed}</span> of <span className="text-text">{data.total}</span> maps
-        </p>
-        <p className="text-sm text-text-muted">
-          <span className="font-medium" style={{ color: data.fill }}>
-            {data.percentage.toFixed(1)}%
-          </span>
-          {' '}completion
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
-// Custom legend component
-interface LegendProps {
-  payload?: Array<{
-    value: string;
-    type: string;
-    color: string;
-  }>;
-}
-
-const CustomLegend = ({ payload }: LegendProps) => {
-  if (!payload) return null;
-  
-  return (
-    <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 mt-1">
-      {payload.map((entry, index) => (
-        <div key={`legend-${index}`} className="flex items-center gap-1 text-xs">
-          <div
-            className="w-2 h-2 rounded-sm flex-shrink-0"
-            style={{ backgroundColor: entry.color }}
-          />
-          <span className="text-text-muted">{entry.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-};
-
-// Label renderer for pie slices
-const renderLabel = (props: PieLabelRenderProps) => {
-  const { cx, cy, midAngle, innerRadius, outerRadius, percent, name } = props;
-  
-  // Type guard to ensure we have valid numbers
-  if (
-    typeof cx !== 'number' ||
-    typeof cy !== 'number' ||
-    typeof midAngle !== 'number' ||
-    typeof innerRadius !== 'number' ||
-    typeof outerRadius !== 'number' ||
-    typeof percent !== 'number'
-  ) {
-    return null;
-  }
-  
-  if (percent < 0.05) return null; // Don't show labels for slices < 5%
-  
-  const RADIAN = Math.PI / 180;
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
-  
-  return (
-    <text
-      x={x}
-      y={y}
-      fill="white"
-      textAnchor="middle"
-      dominantBaseline="central"
-      className="text-xs font-medium"
-    >
-      T{name}
-    </text>
-  );
-};
+const DEFAULT_COLOR = '#a855f7'; // red-500 for tiers > 6
 
 export default function TierDistributionChart({ data }: TierDistributionChartProps) {
-  // Transform data for the chart
+  // Ensure data is an array and handle edge cases
+  const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
+
+  // Transform data for the radar chart
   const chartData = useMemo(() => {
-    return data
-      .filter(d => d.completed_maps > 0) // Only show tiers with completions
-      .map(d => ({
-        tier: d.tier,
-        completed: d.completed_maps,
-        total: d.total_maps,
-        percentage: d.total_maps > 0 ? (d.completed_maps / d.total_maps) * 100 : 0,
-        fill: TIER_COLORS[d.tier] || DEFAULT_COLOR,
-      }));
-  }, [data]);
+    // Get all tiers 1-6
+    const tiers = Array.from({ length: 6 }, (_, i) => i + 1);
+
+    // Calculate linear and staged completions per tier from array data
+    const linearPerTier = tiers.map(tier => {
+      const tierData = safeData.find(d => d.tier === tier);
+      return tierData?.linear ?? 0;
+    });
+    
+    const stagedPerTier = tiers.map(tier => {
+      const tierData = safeData.find(d => d.tier === tier);
+      return tierData?.staged ?? 0;
+    });
+
+    return {
+      labels: tiers.map(t => `Tier ${t}`),
+      datasets: [
+        {
+          label: 'Linear Maps',
+          data: linearPerTier,
+          borderColor: '#eab308', // yellow-500
+          backgroundColor: 'rgba(234, 179, 8, 0.2)',
+          pointBackgroundColor: '#eab308', // yellow-500
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: '#eab308', // yellow-500
+        },
+        {
+          label: 'Staged Maps',
+          data: stagedPerTier,
+          borderColor: '#a855f7', // purple-500
+          backgroundColor: 'rgba(168, 85, 247, 0.2)',
+          pointBackgroundColor: '#a855f7', // purple-500
+          pointBorderColor: '#fff',
+          pointHoverBackgroundColor: '#fff',
+          pointHoverBorderColor: '#a855f7', // purple-500
+        },
+      ],
+    };
+  }, [safeData]);
+
+  const options: ChartOptions<'radar'> = useMemo(() => ({
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom' as const,
+        labels: {
+          usePointStyle: true,
+          boxWidth: 8,
+          boxHeight: 8,
+          font: {
+            size: 12,
+          },
+          padding: 10,
+        },
+      },
+      tooltip: {
+        backgroundColor: 'rgba(30, 41, 59, 0.95)',
+        titleColor: '#f8fafc',
+        bodyColor: '#e2e8f0',
+        borderColor: 'rgba(148, 163, 184, 0.5)',
+        borderWidth: 1,
+        cornerRadius: 8,
+        padding: 12,
+        displayColors: true,
+        titleFont: {
+          size: 14,
+          weight: 'bold' as const,
+        },
+        bodyFont: {
+          size: 13,
+        },
+        callbacks: {
+          title: (tooltipItems) => {
+            return tooltipItems[0].label || '';
+          },
+          label: (context) => {
+            const count = context.parsed.r as number;
+            const datasetLabel = context.dataset.label;
+            return `${datasetLabel}: ${count} maps`;
+          },
+        },
+      },
+    },
+    scales: {
+      r: {
+        angleLines: {
+          color: 'rgba(148, 163, 184, 0.2)',
+        },
+        grid: {
+          color: 'rgba(148, 163, 184, 0.2)',
+        },
+        pointLabels: {
+          color: '#94a3b8',
+          font: {
+            size: 12,
+          },
+        },
+        ticks: {
+          display: false, // Hide value labels (50, 100, 200, etc.)
+        },
+        suggestedMin: 0,
+        // Auto-scale the radial axis based on data
+        max: Math.max(
+          ...safeData.map(d => d.linear),
+          ...safeData.map(d => d.staged)
+        ) * 1.1, // Add 10% padding for visual clarity
+      },
+    },
+  }), [safeData]);
 
   // If no data, show empty state
-  if (chartData.length === 0) {
+  if (chartData.labels.length === 0) {
     return (
-      <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-        <h3 className="text-sm font-semibold text-text mb-2">Tier Distribution</h3>
+      <div className="bg-surface border border-border rounded-xl p-2 h-full flex flex-col">
         <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
           No completions
         </div>
@@ -155,36 +174,9 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
   }
 
   return (
-    <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-      <h3 className="text-sm font-semibold text-text mb-2">Tier Distribution</h3>
+    <div className="bg-surface border border-border rounded-xl p-2 h-full flex flex-col">
       <div className="flex-1 min-h-[200px]">
-        <ResponsiveContainer width="100%" height={220}>
-          <PieChart>
-            <Pie
-              data={chartData}
-              cx="50%"
-              cy="50%"
-              innerRadius="35%"
-              outerRadius="70%"
-              paddingAngle={2}
-              dataKey="completed"
-              nameKey="tier"
-              labelLine={false}
-              label={renderLabel}
-            >
-              {chartData.map((entry, index) => (
-                <Cell
-                  key={`cell-${index}`}
-                  fill={entry.fill}
-                  stroke="var(--color-surface)"
-                  strokeWidth={2}
-                />
-              ))}
-            </Pie>
-            <Tooltip content={<CustomTooltip />} />
-            <Legend content={<CustomLegend />} />
-          </PieChart>
-        </ResponsiveContainer>
+        <Radar data={chartData} options={options} />
       </div>
     </div>
   );

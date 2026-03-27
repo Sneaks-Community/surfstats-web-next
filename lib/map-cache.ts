@@ -293,6 +293,39 @@ export async function getTierDistribution(): Promise<Map<number, number>> {
 }
 
 /**
+ * Get tier distribution with linear vs staged map counts per tier
+ * Linear maps: maps with 0 stages (bonuses only or no bonus/stage)
+ * Staged maps: maps with >0 stages
+ */
+export async function getTierDistributionWithStages(): Promise<Map<number, { linear: number; staged: number }>> {
+  const allMetadata = await getAllMapMetadata();
+  const distribution = new Map<number, { linear: number; staged: number }>();
+  
+  // Initialize all tiers 1-10
+  for (let tier = 1; tier <= 10; tier++) {
+    distribution.set(tier, { linear: 0, staged: 0 });
+  }
+  
+  for (const map of allMetadata.values()) {
+    const tier = map.tier;
+    const stages = map.stages || 0;
+    const counts = distribution.get(tier) || { linear: 0, staged: 0 };
+    
+    if (stages === 0) {
+      // Linear map (no stages)
+      counts.linear++;
+    } else {
+      // Staged map (has stages)
+      counts.staged++;
+    }
+    
+    distribution.set(tier, counts);
+  }
+  
+  return distribution;
+}
+
+/**
  * Get cache stats for debugging/monitoring
  */
 export function getMapCacheStats(): {

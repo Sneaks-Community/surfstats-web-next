@@ -10,7 +10,7 @@ import { sanitizeSteamId, sanitizePlayerName } from '@/lib/sanitize';
 import CountryBadge from '@/components/CountryBadge';
 import { getTotalsCached } from '@/lib/cache';
 import { getPlayerTimeOnServer, getPerformanceTrend } from '@/lib/player-analytics';
-import { getAllMapMetadata, getTierDistribution as getCachedTierDistribution } from '@/lib/map-cache';
+import { getAllMapMetadata, getTierDistributionWithStages } from '@/lib/map-cache';
 import {
   getIncompleteMapsForPlayer,
   getIncompleteBonusesForPlayer,
@@ -74,15 +74,12 @@ interface IncompleteStageRecord {
   stage: number;
 }
 
-interface TierDistribution {
-  tier: number;
-  completed_maps: number;
-  total_maps: number;
-}
-
-const getTierDistribution = unstable_cache(
-  async (steamid: string): Promise<TierDistribution[]> => {
-    logger.debug(`[Player] Fetching tier distribution for: ${steamid}`);
+/**
+ * Get linear vs staged map completions per tier for the player
+ */
+const getLinearVsStagedPerTier = unstable_cache(
+  async (steamid: string): Promise<{ tier: number; linear: number; staged: number }[]> => {
+    logger.debug(`[Player] Fetching linear vs staged per tier for: ${steamid}`);
     
     try {
       // Get completed map names for this player
@@ -93,40 +90,50 @@ const getTierDistribution = unstable_cache(
       
       const finishedMapnames = new Set(finishedMapsResult.map(r => r.mapname));
       
-      // Use cached map metadata to calculate tier distribution
+      // Get all map metadata to determine which maps have stages
       const allMapMetadata = await getAllMapMetadata();
       
-      // Count maps per tier and completed maps per tier
-      const tierMapCounts = new Map<number, { total: number; completed: number }>();
+      // Initialize all tiers 1-10 as array (not Map, for JSON serialization)
+      const distribution: { tier: number; linear: number; staged: number }[] = [];
+      for (let tier = 1; tier <= 10; tier++) {
+        distribution.push({ tier, linear: 0, staged: 0 });
+      }
       
+      // Count player's completed maps per tier, split by linear vs staged
       for (const [mapname, metadata] of allMapMetadata) {
         const tier = metadata.tier;
-        const counts = tierMapCounts.get(tier) || { total: 0, completed: 0 };
-        counts.total++;
-        if (finishedMapnames.has(mapname)) {
-          counts.completed++;
+        const stages = metadata.stages || 0;
+        
+        if (!finishedMapnames.has(mapname)) {
+          // Player hasn't completed this map
+          continue;
         }
-        tierMapCounts.set(tier, counts);
+        
+        // Find the tier entry in the array
+        const tierEntry = distribution.find(d => d.tier === tier);
+        if (tierEntry) {
+          if (stages === 0) {
+            // Linear map (no stages)
+            tierEntry.linear++;
+          } else {
+            // Staged map (has stages)
+            tierEntry.staged++;
+          }
+        }
       }
       
-      // Convert to array and sort by tier
-      const result: TierDistribution[] = [];
-      for (const [tier, counts] of tierMapCounts) {
-        result.push({
-          tier,
-          completed_maps: counts.completed,
-          total_maps: counts.total,
-        });
-      }
-      result.sort((a, b) => a.tier - b.tier);
-      
-      return result;
+      return distribution;
     } catch (error: any) {
-      logger.error(`[Player] Failed to fetch tier distribution: ${error.message}`);
-      return [];
+      logger.error(`[Player] Failed to fetch linear vs staged per tier: ${error.message}`);
+      // Return empty array with all tiers at 0
+      const emptyArray: { tier: number; linear: number; staged: number }[] = [];
+      for (let tier = 1; tier <= 10; tier++) {
+        emptyArray.push({ tier, linear: 0, staged: 0 });
+      }
+      return emptyArray;
     }
   },
-  ['player-tier-distribution'],
+  ['player-linear-vs-staged-per-tier'],
   { revalidate: 60 }
 );
 
@@ -303,18 +310,33 @@ export async function generateMetadata({ params }: { params: Promise<{ steamid: 
   const validSteamId = sanitizeSteamId(decodedSteamId);
   
   if (!validSteamId) {
-    return { title: 'Player Not Found' };
+    return {
+      title: 'Invalid SteamID',
+    };
   }
-  
-  const data = await getPlayerData(validSteamId);
-  
-  if (!data) {
-    return { title: 'Player Not Found' };
+
+  try {
+    const [playerRows] = await pool.query<PlayerData[]>(
+      'SELECT name FROM ck_playerrank WHERE steamid = ?',
+      [validSteamId]
+    );
+
+    if (playerRows.length === 0) {
+      return {
+        title: 'Player Not Found',
+      };
+    }
+
+    const player = playerRows[0];
+    return {
+      title: `${sanitizePlayerName(player.name)} - Player Profile`,
+    };
+  } catch (error: any) {
+    logger.error(`[Player] Failed to generate metadata for ${validSteamId}: ${error.message}`);
+    return {
+      title: 'Player Profile',
+    };
   }
-  
-  return {
-    title: data.player.name,
-  };
 }
 
 export default async function PlayerProfilePage({
@@ -364,11 +386,14 @@ export default async function PlayerProfilePage({
   // Fetch playtime from analytics database (optional, box hidden if unavailable)
   const playtimeData = await getPlayerTimeOnServer(validSteamId);
   
-  // Fetch tier distribution for chart
-  const tierDistribution = await getTierDistribution(validSteamId);
+  // Fetch linear vs staged per tier for radar chart (returns array directly)
+  const linearVsStagedPerTier = await getLinearVsStagedPerTier(validSteamId);
   
   // Fetch performance trend data
-  const performanceTrend = await getPerformanceTrend(validSteamId);
+  const performanceTrendRaw = await getPerformanceTrend(validSteamId);
+  // Ensure performanceTrend is always an array for client-side serialization
+  const performanceTrend: { date: string; avgTime: number; mapCount: number; tier: number }[] = 
+    performanceTrendRaw || [];
 
   return (
     <div className="space-y-8">
@@ -421,36 +446,40 @@ export default async function PlayerProfilePage({
               })()}
             </div>
           </div>
-
-          {/* Stats Row */}
-          <div className="flex flex-wrap gap-3 justify-center items-center">
-            <div className="bg-surface-hover/50 rounded-lg p-3 border border-border min-w-[100px] h-[72px] flex flex-col justify-center">
-              <div className="flex items-center justify-center gap-1 text-text-muted mb-1">
-                <Trophy className="h-4 w-4 text-yellow-500 flex-shrink-0" />
-                <span className="text-xs font-medium uppercase tracking-wider">Rank</span>
-              </div>
-              <div className="text-xl font-bold text-text text-center">#{player.rank}</div>
+          
+          {/* Stats Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center">
+              <Trophy className="w-8 h-8 text-yellow-500 mb-2" />
+              <span className="text-2xl font-bold text-text">{player.rank}</span>
+              <span className="text-xs text-text-muted">Global Rank</span>
             </div>
-            <div className="bg-surface-hover/50 rounded-lg p-3 border border-border min-w-[100px] h-[72px] flex flex-col justify-center">
-              <div className="flex items-center justify-center gap-1 text-text-muted mb-1">
-                <Activity className="h-4 w-4 text-primary flex-shrink-0" />
-                <span className="text-xs font-medium uppercase tracking-wider">Points</span>
-              </div>
-              <div className="text-xl font-bold text-text text-center">{player.points.toLocaleString()}</div>
+            <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center">
+              <Activity className="w-8 h-8 text-blue-500 mb-2" />
+              <span className="text-2xl font-bold text-text">{player.finishedmaps}</span>
+              <span className="text-xs text-text-muted">Maps Completed</span>
             </div>
-            {playtimeData && (
-              <div className="bg-surface-hover/50 rounded-lg p-3 border border-border min-w-[110px] h-[72px] flex flex-col justify-center">
-                <div className="flex items-center justify-center gap-1 text-text-muted mb-1">
-                  <Clock className="h-4 w-4 text-cyan-500 flex-shrink-0" />
-                  <span className="text-xs font-medium uppercase tracking-wider">Time Played</span>
-                </div>
-                <div className="text-xl font-bold text-text text-center">
-                  {formatPlaytime(playtimeData.totalSeconds)}
-                </div>
+            <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center">
+              <Clock className="w-8 h-8 text-green-500 mb-2" />
+              <span className="text-2xl font-bold text-text">{player.points}</span>
+              <span className="text-xs text-text-muted">Points</span>
+            </div>
+            {playtimeData && playtimeData.totalSeconds > 0 ? (
+              <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center justify-center">
+                <Clock className="w-8 h-8 text-purple-500 mb-2" />
+                <span className="text-2xl font-bold text-text">{formatPlaytime(playtimeData.totalSeconds)}</span>
+                <span className="text-xs text-text-muted">Time on Server</span>
               </div>
-            )}
-            {/* Progress bars stacked horizontally in a 72px tall container */}
-            <div className="bg-surface-hover/50 rounded-lg p-2 border border-border h-[72px] flex flex-col justify-center gap-1.5 w-[240px]">
+            ) : null}
+          </div>
+          
+          {/* Progress Bars */}
+          <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-surface border border-border rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-text">Maps</span>
+                <span className="text-xs text-text-muted">{maps.length}/{totals.totalMaps}</span>
+              </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-medium text-blue-400 w-8 flex-shrink-0">Map</span>
                 <div className="flex-1 h-3 bg-surface-active rounded overflow-hidden relative">
@@ -466,7 +495,12 @@ export default async function PlayerProfilePage({
                     {totals.totalMaps > 0 ? Math.min(100, Math.round((maps.length / totals.totalMaps) * 100)) : 0}%
                   </span>
                 </div>
-                <span className="text-[10px] text-text w-12 text-right flex-shrink-0">{maps.length}/{totals.totalMaps}</span>
+              </div>
+            </div>
+            <div className="bg-surface border border-border rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-text">Bonuses</span>
+                <span className="text-xs text-text-muted">{bonuses.length}/{totals.totalBonuses}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-medium text-purple-400 w-8 flex-shrink-0">Bonus</span>
@@ -484,6 +518,12 @@ export default async function PlayerProfilePage({
                   </span>
                 </div>
                 <span className="text-[10px] text-text w-12 text-right flex-shrink-0">{bonuses.length}/{totals.totalBonuses}</span>
+              </div>
+            </div>
+            <div className="bg-surface border border-border rounded-xl p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-semibold text-text">Stages</span>
+                <span className="text-xs text-text-muted">{stages.length}/{totals.totalStages}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-medium text-orange-400 w-8 flex-shrink-0">Stage</span>
@@ -509,9 +549,18 @@ export default async function PlayerProfilePage({
 
       {/* Stats Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {/* Tier Distribution - full width on mobile, 1st column on desktop */}
+        {/* Tier Distribution Radar - full width on mobile, 1st column on desktop */}
         <div className="lg:col-span-1 lg:row-span-1 h-[280px] min-h-[280px]">
-          <TierDistributionChart data={tierDistribution} />
+          {linearVsStagedPerTier && linearVsStagedPerTier.length > 0 ? (
+            <TierDistributionChart data={linearVsStagedPerTier} />
+          ) : (
+            <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
+              <h3 className="text-sm font-semibold text-text mb-2">Tier Distribution</h3>
+              <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
+                No data available
+              </div>
+            </div>
+          )}
         </div>
         {/* Performance Trend - stacked on mobile/tablet, 3 columns on desktop */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:col-span-3">
