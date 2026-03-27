@@ -9,7 +9,7 @@ import { formatPlaytime, formatDate } from '@/lib/utils';
 import { sanitizeSteamId, sanitizePlayerName } from '@/lib/sanitize';
 import CountryBadge from '@/components/CountryBadge';
 import { getTotalsCached } from '@/lib/cache';
-import { getPlayerTimeOnServer } from '@/lib/player-analytics';
+import { getPlayerTimeOnServer, getPerformanceTrend } from '@/lib/player-analytics';
 import { getAllMapMetadata, getTierDistribution as getCachedTierDistribution } from '@/lib/map-cache';
 import {
   getIncompleteMapsForPlayer,
@@ -19,6 +19,7 @@ import {
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
 import TierDistributionChart from './components/TierDistributionChart';
+import PerformanceTrendChart from './components/PerformanceTrendChart';
 import PlayerRecordsTabs from './components/PlayerRecordsTabs';
 
 interface PlayerData extends RowDataPacket {
@@ -365,6 +366,9 @@ export default async function PlayerProfilePage({
   
   // Fetch tier distribution for chart
   const tierDistribution = await getTierDistribution(validSteamId);
+  
+  // Fetch performance trend data
+  const performanceTrend = await getPerformanceTrend(validSteamId);
 
   return (
     <div className="space-y-8">
@@ -509,14 +513,21 @@ export default async function PlayerProfilePage({
         <div className="lg:col-span-1 lg:row-span-1 h-[280px] min-h-[280px]">
           <TierDistributionChart data={tierDistribution} />
         </div>
-        {/* Placeholder for additional charts - stacked on mobile/tablet, 3 columns on desktop */}
+        {/* Performance Trend - stacked on mobile/tablet, 3 columns on desktop */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:col-span-3">
-          <div className="bg-surface border border-border rounded-xl p-4 flex flex-col h-[130px] lg:h-auto">
-            <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
-            <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
-              Additional stats
-            </div>
+          <div className="lg:col-span-1 h-[280px] min-h-[280px]">
+            {performanceTrend && performanceTrend.length > 0 ? (
+              <PerformanceTrendChart data={performanceTrend} />
+            ) : (
+              <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
+                <h3 className="text-sm font-semibold text-text mb-2">Performance Trend</h3>
+                <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
+                  No completion history
+                </div>
+              </div>
+            )}
           </div>
+          {/* Placeholder for additional charts */}
           <div className="bg-surface border border-border rounded-xl p-4 flex flex-col h-[130px] lg:h-auto">
             <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
             <div className="flex-1 flex items-center justify-center text-text-muted text-sm">

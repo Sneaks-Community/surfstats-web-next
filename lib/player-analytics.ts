@@ -1,5 +1,6 @@
 import 'server-only';
 import analyticsPool, { isAnalyticsAvailable } from '@/lib/db-analytics';
+import pool from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 import { unstable_cache } from 'next/cache';
 import { convertSteamId2ToSteamId3Numeric } from '@/lib/steam';
@@ -156,3 +157,109 @@ export async function getPlayersTimeOnServer(steamIds: string[]): Promise<Map<st
 
   return result;
 }
+
+// Performance Trend Data Interface
+interface PerformanceTrendData extends RowDataPacket {
+  mapname: string;
+  runtimepro: number;
+  date: string;
+  tier: number;
+}
+
+interface PerformanceTrendResult {
+  date: string;
+  avgTime: number;
+  mapCount: number;
+  tier: number;
+}
+
+/**
+ * Fetch performance trend data for a player
+ * Returns completion times grouped by date and tier for visualization
+ * @param steamId - SteamID2 format (e.g., STEAM_1:0:95515509)
+ * @returns Array of performance data points, or null if unavailable
+ */
+async function getPerformanceTrendInternal(steamId: string): Promise<PerformanceTrendResult[] | null> {
+  try {
+    logger.debug(`[Analytics] Fetching performance trend for ${steamId}`);
+    
+    const [rows] = await pool.query<PerformanceTrendData[]>(`
+      SELECT
+        pt.mapname,
+        pt.runtimepro,
+        pt.date,
+        COALESCE(mt.tier, 1) as tier
+      FROM ck_playertimes pt
+      LEFT JOIN ck_maptier mt ON pt.mapname = mt.mapname
+      WHERE pt.steamid = ?
+      ORDER BY pt.date DESC
+    `, [steamId]);
+
+    logger.debug(`[Analytics] Found ${rows.length} records for ${steamId}`);
+
+    if (rows.length === 0) {
+      logger.debug(`[Analytics] No records found for ${steamId}`);
+      return [];
+    }
+
+    // Aggregate by date and tier
+    const aggregated = new Map<string, Map<number, { total: number; count: number }>>();
+
+    for (const row of rows) {
+      // Handle both string and Date objects from MySQL
+      let dateStr: string;
+      if (typeof row.date === 'string') {
+        dateStr = row.date.split('T')[0]; // Extract date part only
+      } else if (row.date && typeof (row.date as any).toISOString === 'function') {
+        dateStr = (row.date as Date).toISOString().split('T')[0];
+      } else {
+        continue; // Skip invalid date values
+      }
+      const tier = row.tier;
+      
+      if (!aggregated.has(dateStr)) {
+        aggregated.set(dateStr, new Map());
+      }
+      
+      const tierData = aggregated.get(dateStr)!;
+      const current = tierData.get(tier) || { total: 0, count: 0 };
+      current.total += row.runtimepro;
+      current.count += 1;
+      tierData.set(tier, current);
+    }
+
+    // Convert to result format
+    const result: PerformanceTrendResult[] = [];
+    for (const [date, tiers] of aggregated) {
+      for (const [tier, { total, count }] of tiers) {
+        if (count > 0) {
+          result.push({
+            date,
+            avgTime: total / count,
+            mapCount: count,
+            tier,
+          });
+        }
+      }
+    }
+
+    // Sort by date ascending
+    result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    return result;
+  } catch (error: any) {
+    const errorMessage = error.message || 'Unknown error';
+    logger.error(`[Analytics] Failed to fetch performance trend for ${steamId}: ${errorMessage}`);
+    return null;
+  }
+}
+
+/**
+ * Cached version of getPerformanceTrend for use in server components
+ * Cache for 5 minutes (300 seconds) to reduce database load on high-traffic pages
+ */
+export const getPerformanceTrend = unstable_cache(
+  getPerformanceTrendInternal,
+  ['player-performance-trend'],
+  { revalidate: 300 }
+);
