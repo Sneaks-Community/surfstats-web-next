@@ -8,6 +8,7 @@ import Pagination from '@/components/Pagination';
 import { formatTime, formatDate } from '@/lib/utils';
 import { sanitizePlayerName } from '@/lib/sanitize';
 import TierBadge from '@/components/TierBadge';
+import { useDebounce } from '@/hooks/useDebounce';
 
 // Types for records
 interface MapRecord {
@@ -68,23 +69,6 @@ type SortField = 'map' | 'rank' | 'time' | 'wrDiff' | 'date' | 'tier' | 'wrTime'
 type SortDirection = 'asc' | 'desc';
 
 const ITEMS_PER_PAGE = 20;
-
-// Debounce hook
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
 
 export default function PlayerRecordsTabs({
   maps,

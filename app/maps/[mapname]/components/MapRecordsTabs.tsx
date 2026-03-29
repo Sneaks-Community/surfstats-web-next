@@ -7,6 +7,7 @@ import Link from 'next/link';
 import Pagination from '@/components/Pagination';
 import { formatTime, formatDate } from '@/lib/utils';
 import { sanitizePlayerName } from '@/lib/sanitize';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface MapRecord {
   steamid: string;
@@ -58,23 +59,6 @@ const ITEMS_PER_PAGE = 20;
 // Sort types
 type SortField = 'rank' | 'player' | 'time' | 'speed' | 'wrDiff' | 'date';
 type SortDirection = 'asc' | 'desc';
-
-// Debounce hook
-function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = useState<T>(value);
-
-  useEffect(() => {
-    const handler = setTimeout(() => {
-      setDebouncedValue(value);
-    }, delay);
-
-    return () => {
-      clearTimeout(handler);
-    };
-  }, [value, delay]);
-
-  return debouncedValue;
-}
 
 // Format time difference from WR
 function formatTimeDiff(time: number, wrTime: number | null): string {

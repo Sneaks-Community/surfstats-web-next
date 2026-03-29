@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Search, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState, useTransition, useMemo, useEffect } from 'react';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface TierOption {
   tier: number;
@@ -39,28 +40,12 @@ function MapFiltersForm({
   const [isExpanded, setIsExpanded] = useState(false);
   
   const [search, setSearch] = useState(initialQ);
-  const [debouncedSearch, setDebouncedSearch] = useState(initialQ);
+  const debouncedSearch = useDebounce(search, 300);
   const [mapper, setMapper] = useState(initialMapper);
-  const [debouncedMapper, setDebouncedMapper] = useState(initialMapper);
+  const debouncedMapper = useDebounce(mapper, 300);
   const [type, setType] = useState(initialType);
   const [bonuses, setBonuses] = useState(initialBonuses);
   const [selectedTiers, setSelectedTiers] = useState<number[]>(initialTiers);
-
-  // Debounce search input (300ms delay)
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, [search]);
-
-  // Debounce mapper input (300ms delay)
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      setDebouncedMapper(mapper);
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, [mapper]);
 
   // Apply filters when debounced values change (live search)
   useEffect(() => {
