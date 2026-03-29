@@ -3,7 +3,7 @@ import pool from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 import { unstable_cache } from 'next/cache';
 import logger from '@/lib/logger';
-import { getCountryNamesFromCode, countryNameToCode } from '@/lib/countries';
+import { getCountryNamesFromCode, countryNameToCode, getCountryCodeFromName } from '@/lib/countries';
 
 /**
  * Country ranking data from database (raw query result)
@@ -326,14 +326,6 @@ export async function getCountriesStats(): Promise<{ totalCountries: number; tot
     logger.error(`[CountryAnalytics] Failed to fetch countries stats: ${errorMessage}`);
     return { totalCountries: 0, totalPlayers: 0 };
   }
-}
-
-/**
- * Helper: Convert country name to ISO code
- */
-function getCountryCodeFromName(name: string): string {
-  const normalizedName = name.toLowerCase().trim();
-  return countryNameToCode[normalizedName] || name.toUpperCase().substring(0, 2);
 }
 
 /**

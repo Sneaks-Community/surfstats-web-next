@@ -393,3 +393,21 @@ export function getPrimaryCountryName(code: string): string | undefined {
 export function isValidCountryCode(code: string): boolean {
   return code.toUpperCase() in codeToCountryName;
 }
+
+/**
+ * Convert a country name to its ISO 3166-1 alpha-2 code
+ * Normalizes the input (lowercase, trim) before lookup
+ * Falls back to first two uppercase characters if not found in mapping
+ *
+ * @param name - Country name to convert (e.g., "United States", "thailand", "THAILAND")
+ * @returns ISO 3166-1 alpha-2 code (e.g., "US", "TH"), or fallback code
+ *
+ * @example
+ * getCountryCodeFromName("United States") // returns "US"
+ * getCountryCodeFromName("thailand") // returns "TH"
+ * getCountryCodeFromName("Unknown Country") // returns "UN"
+ */
+export function getCountryCodeFromName(name: string): string {
+  const normalizedName = name.toLowerCase().trim();
+  return countryNameToCode[normalizedName] || name.toUpperCase().substring(0, 2);
+}
