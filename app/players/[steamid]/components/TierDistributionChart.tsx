@@ -12,7 +12,6 @@ import {
   Legend,
 } from 'chart.js';
 import { useMemo } from 'react';
-import { TIER_COLORS, DEFAULT_COLOR } from '@/lib/tierColors';
 
 ChartJS.register(
   RadialLinearScale,
