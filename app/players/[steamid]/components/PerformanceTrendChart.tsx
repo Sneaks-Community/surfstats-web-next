@@ -14,6 +14,7 @@ import {
   Filler,
 } from 'chart.js';
 import { useMemo } from 'react';
+import { TIER_COLORS, DEFAULT_COLOR } from '@/lib/tierColors';
 
 ChartJS.register(
   CategoryScale,
@@ -37,17 +38,6 @@ interface PerformanceTrendChartProps {
   data: PerformanceData[];
 }
 
-// Tier colors matching the existing tierColors.ts theme
-const TIER_COLORS: Record<number, string> = {
-  1: '#10b981', // emerald-500
-  2: '#84cc16', // lime-500
-  3: '#eab308', // yellow-500
-  4: '#f97316', // orange-500
-  5: '#ea580c', // orange-600
-  6: '#ef4444', // red-500
-};
-
-const DEFAULT_COLOR = '#a855f7'; // red-500 for tiers > 10
 
 export default function PerformanceTrendChart({ data }: PerformanceTrendChartProps) {
   // Ensure data is an array and handle edge cases
