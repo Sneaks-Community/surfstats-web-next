@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Trophy, Target, Layers, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
 import Link from 'next/link';
-import ClientPagination from '@/app/players/[steamid]/components/ClientPagination';
+import Pagination from '@/components/Pagination';
 import { formatTime, formatDate } from '@/lib/utils';
 import { sanitizePlayerName } from '@/lib/sanitize';
 
@@ -1014,10 +1014,10 @@ export default function MapRecordsTabs({
           {/* Pagination */}
           {totalPages > 1 && (
             <div className="px-6 border-t border-border">
-              <ClientPagination
+              <Pagination
                 currentPage={leaderboardPage}
                 totalPages={totalPages}
-                onPageChange={(page) => handlePageChange(page)}
+                onPageChange={handlePageChange}
               />
             </div>
           )}
@@ -1114,10 +1114,10 @@ export default function MapRecordsTabs({
           {/* Pagination */}
           {totalBonusPages > 1 && (
             <div className="px-6 border-t border-border">
-              <ClientPagination
+              <Pagination
                 currentPage={bonusPage}
                 totalPages={totalBonusPages}
-                onPageChange={(page) => handlePageChange(page)}
+                onPageChange={handlePageChange}
               />
             </div>
           )}
@@ -1214,10 +1214,10 @@ export default function MapRecordsTabs({
           {/* Pagination */}
           {totalStagePages > 1 && (
             <div className="px-6 border-t border-border">
-              <ClientPagination
+              <Pagination
                 currentPage={stagePage}
                 totalPages={totalStagePages}
-                onPageChange={(page) => handlePageChange(page)}
+                onPageChange={handlePageChange}
               />
             </div>
           )}

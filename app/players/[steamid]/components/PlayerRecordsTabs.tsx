@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Map as MapIcon, Target, Layers, Search, X, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle, Circle } from 'lucide-react';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
-import ClientPagination from './ClientPagination';
+import Pagination from '@/components/Pagination';
 import { formatTime, formatDate } from '@/lib/utils';
 import { sanitizePlayerName } from '@/lib/sanitize';
 import TierBadge from '@/components/TierBadge';
@@ -896,7 +896,7 @@ export default function PlayerRecordsTabs({
       {/* Pagination */}
       {currentData.totalPages > 1 && (
         <div className="px-3 sm:px-6 py-4 border-t border-border">
-          <ClientPagination
+          <Pagination
             currentPage={currentData.page}
             totalPages={currentData.totalPages}
             onPageChange={handlePageChange}
