@@ -9,7 +9,7 @@ const pool = mysql.createPool({
   database: process.env.MYSQL_DATABASE || 'cksurf',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0,
+  queueLimit: 100,
 });
 
 // Log pool connection events (debug mode only)
