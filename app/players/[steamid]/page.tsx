@@ -29,7 +29,6 @@ interface PlayerData extends RowDataPacket {
   name: string;
   country: string;
   points: number;
-  finishedmaps: number;
   lastseen: string;
   rank: number;
 }
@@ -147,7 +146,7 @@ const getPlayerData = unstable_cache(
       // Get basic player info and rank
       const [playerRows] = await pool.query<PlayerData[]>(`
         SELECT
-          steamid, name, country, points, finishedmaps, lastseen,
+          steamid, name, country, points, lastseen,
           (SELECT COUNT(*) + 1 FROM ck_playerrank pr2 WHERE pr2.points > pr1.points) as rank
         FROM ck_playerrank pr1
         WHERE steamid = ?
@@ -478,7 +477,7 @@ export default async function PlayerProfilePage({
             </div>
             <div className="bg-surface border border-border rounded-xl p-3 flex flex-col items-center justify-center">
               <Activity className="w-8 h-8 text-blue-500 mb-2" />
-              <span className="text-2xl font-bold text-text">{player.finishedmaps.toLocaleString()}</span>
+              <span className="text-2xl font-bold text-text">{maps.length.toLocaleString()}</span>
               <span className="text-xs text-text-muted">Maps Completed</span>
             </div>
             <div className="bg-surface border border-border rounded-xl p-3 flex flex-col items-center justify-center">
