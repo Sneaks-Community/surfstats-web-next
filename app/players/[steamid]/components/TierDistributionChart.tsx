@@ -42,16 +42,15 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
     // Get all tiers 1-6
     const tiers = Array.from({ length: 6 }, (_, i) => i + 1);
 
-    // Calculate linear and staged completions per tier from array data
-    const linearPerTier = tiers.map(tier => {
-      const tierData = safeData.find(d => d.tier === tier);
-      return tierData?.linear ?? 0;
-    });
-    
-    const stagedPerTier = tiers.map(tier => {
-      const tierData = safeData.find(d => d.tier === tier);
-      return tierData?.staged ?? 0;
-    });
+    // Build Map for O(1) lookups - computed directly within outer useMemo
+    const dataMap = new Map<number, { linear: number; staged: number }>();
+    for (const d of safeData) {
+      dataMap.set(d.tier, { linear: d.linear, staged: d.staged });
+    }
+
+    // O(1) lookups instead of O(n) find() calls
+    const linearPerTier = tiers.map(tier => dataMap.get(tier)?.linear ?? 0);
+    const stagedPerTier = tiers.map(tier => dataMap.get(tier)?.staged ?? 0);
 
     return {
       labels: tiers.map(t => `Tier ${t}`),
