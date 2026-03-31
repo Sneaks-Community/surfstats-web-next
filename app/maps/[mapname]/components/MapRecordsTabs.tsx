@@ -636,7 +636,7 @@ export default function MapRecordsTabs({
       key={record.steamid}
       className="hover:bg-surface-hover/50 transition-colors"
     >
-      <td className="px-6 py-4 whitespace-nowrap">
+      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
         <span
           className={`inline-flex items-center justify-center h-8 w-8 rounded-full font-bold text-sm ${
             record.rank === 1
@@ -651,7 +651,7 @@ export default function MapRecordsTabs({
           {record.rank}
         </span>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap">
+      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
         <Link
           href={`/players/${record.steamid}`}
           className="text-primary hover:text-primary font-medium transition-colors text-base"
@@ -660,19 +660,19 @@ export default function MapRecordsTabs({
           {sanitizePlayerName(record.name)}
         </Link>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right">
+      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
         <span className="font-mono text-lg font-medium text-text">
           {formatTime(record.runtimepro)}
         </span>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right">
+      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
         <span className={`font-mono text-lg font-medium ${
           record.rank === 1 ? 'text-green-400' : 'text-yellow-400'
         }`}>
           {formatTimeDiff(record.runtimepro, record.wr_time)}
         </span>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right">
+      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
         {record.startspeed !== -1 ? (
           <span className="font-mono text-lg font-medium text-text">
             {record.startspeed.toFixed(1)}
@@ -681,7 +681,7 @@ export default function MapRecordsTabs({
           <span className="text-text-muted">-</span>
         )}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-text-muted">
+      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right text-sm text-text-muted">
         {formatDate(record.date)}
       </td>
     </tr>
@@ -693,7 +693,7 @@ export default function MapRecordsTabs({
       key={`${record.steamid}-${'zonegroup' in record ? record.zonegroup : record.stage}`}
       className="hover:bg-surface-hover/50 transition-colors"
     >
-      <td className="px-6 py-4 whitespace-nowrap">
+      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
         <span
           className={`inline-flex items-center justify-center h-8 w-8 rounded-full font-bold text-sm ${
             record.rank === 1
@@ -708,7 +708,7 @@ export default function MapRecordsTabs({
           {record.rank}
         </span>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap">
+      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
         <Link
           href={`/players/${record.steamid}`}
           className="text-primary hover:text-primary font-medium transition-colors text-base"
@@ -717,19 +717,19 @@ export default function MapRecordsTabs({
           {sanitizePlayerName(record.name)}
         </Link>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right">
+      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
         <span className="font-mono text-lg font-medium text-text">
           {formatTime(record.runtime)}
         </span>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right">
+      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
         <span className={`font-mono text-lg font-medium ${
           record.rank === 1 ? 'text-green-400' : 'text-yellow-400'
         }`}>
           {formatTimeDiff(record.runtime, record.wr_time)}
         </span>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right">
+      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
         {record.startspeed !== -1 ? (
           <span className="font-mono text-lg font-medium text-text">
             {record.startspeed.toFixed(1)}
@@ -738,7 +738,7 @@ export default function MapRecordsTabs({
           <span className="text-text-muted">-</span>
         )}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-text-muted">
+      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right text-sm text-text-muted">
         {formatDate(record.date)}
       </td>
     </tr>
@@ -747,13 +747,13 @@ export default function MapRecordsTabs({
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden">
       {/* Tabs */}
-      <div className="px-6 py-4 border-b border-border bg-surface/50">
-        <div className="flex flex-wrap items-center gap-4">
+      <div className="px-3 sm:px-6 py-3 border-b border-border bg-surface/50">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-4">
           {/* Tab buttons */}
           <div className="flex gap-1">
             <button
               onClick={() => handleTabChange('map')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+              className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                 activeTab === 'map'
                   ? 'bg-primary-600 text-white'
                   : 'bg-surface-hover text-text-muted hover:bg-surface-hover/70 hover:text-text'
@@ -765,7 +765,7 @@ export default function MapRecordsTabs({
             {numBonuses > 0 && (
               <button
                 onClick={() => handleTabChange('bonus')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                   activeTab === 'bonus'
                     ? 'bg-primary-600 text-white'
                     : 'bg-surface-hover text-text-muted hover:bg-surface-hover/70 hover:text-text'
@@ -778,7 +778,7 @@ export default function MapRecordsTabs({
             {numStages > 1 && (
               <button
                 onClick={() => handleTabChange('stages')}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-2 ${
                   activeTab === 'stages'
                     ? 'bg-primary-600 text-white'
                     : 'bg-surface-hover text-text-muted hover:bg-surface-hover/70 hover:text-text'
@@ -793,8 +793,8 @@ export default function MapRecordsTabs({
           {/* Search for Map tab */}
           {activeTab === 'map' && (
             <div className="relative flex-1 max-w-xs">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-text-placeholder" />
+              <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                <Search className="h-3.5 w-3.5 text-text-placeholder" />
               </div>
               <input
                 type="text"
@@ -817,8 +817,8 @@ export default function MapRecordsTabs({
           {/* Search for Bonus tab */}
           {activeTab === 'bonus' && (
             <div className="relative flex-1 max-w-xs">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-text-placeholder" />
+              <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                <Search className="h-3.5 w-3.5 text-text-placeholder" />
               </div>
               <input
                 type="text"
@@ -841,8 +841,8 @@ export default function MapRecordsTabs({
           {/* Search for Stages tab */}
           {activeTab === 'stages' && (
             <div className="relative flex-1 max-w-xs">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-4 w-4 text-text-placeholder" />
+              <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                <Search className="h-3.5 w-3.5 text-text-placeholder" />
               </div>
               <input
                 type="text"
@@ -917,7 +917,7 @@ export default function MapRecordsTabs({
                 <tr>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider w-24 cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider w-24 cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('rank')}
                   >
                     <div className="flex items-center gap-2">
@@ -927,7 +927,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('player')}
                   >
                     <div className="flex items-center gap-2">
@@ -937,7 +937,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('time')}
                   >
                     <div className="flex items-center gap-2 justify-end">
@@ -947,7 +947,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('wrDiff')}
                   >
                     <div className="flex items-center gap-2 justify-end">
@@ -957,7 +957,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('speed')}
                   >
                     <div className="flex items-center gap-2 justify-end">
@@ -967,7 +967,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('date')}
                   >
                     <div className="flex items-center gap-2 justify-end">
@@ -983,7 +983,7 @@ export default function MapRecordsTabs({
                   <tr>
                     <td
                       colSpan={6}
-                      className="px-6 py-12 text-center text-text-muted"
+                      className="px-2 sm:px-4 py-8 text-center text-text-muted"
                     >
                       {debouncedSearch
                         ? 'No players found matching your search.'
@@ -997,7 +997,7 @@ export default function MapRecordsTabs({
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="px-6 border-t border-border">
+            <div className="px-3 sm:px-6 border-t border-border">
               <Pagination
                 currentPage={leaderboardPage}
                 totalPages={totalPages}
@@ -1017,7 +1017,7 @@ export default function MapRecordsTabs({
                 <tr>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider w-24 cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider w-24 cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('rank')}
                   >
                     <div className="flex items-center gap-2">
@@ -1027,7 +1027,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('player')}
                   >
                     <div className="flex items-center gap-2">
@@ -1037,7 +1037,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('time')}
                   >
                     <div className="flex items-center gap-2 justify-end">
@@ -1047,7 +1047,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('wrDiff')}
                   >
                     <div className="flex items-center gap-2 justify-end">
@@ -1057,7 +1057,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('speed')}
                   >
                     <div className="flex items-center gap-2 justify-end">
@@ -1067,7 +1067,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('date')}
                   >
                     <div className="flex items-center gap-2 justify-end">
@@ -1083,7 +1083,7 @@ export default function MapRecordsTabs({
                   <tr>
                     <td
                       colSpan={6}
-                      className="px-6 py-12 text-center text-text-muted"
+                      className="px-2 sm:px-4 py-8 text-center text-text-muted"
                     >
                       {debouncedBonusSearch
                         ? 'No players found matching your search.'
@@ -1097,7 +1097,7 @@ export default function MapRecordsTabs({
 
           {/* Pagination */}
           {totalBonusPages > 1 && (
-            <div className="px-6 border-t border-border">
+            <div className="px-3 sm:px-6 border-t border-border">
               <Pagination
                 currentPage={bonusPage}
                 totalPages={totalBonusPages}
@@ -1117,7 +1117,7 @@ export default function MapRecordsTabs({
                 <tr>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider w-24 cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider w-24 cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('rank')}
                   >
                     <div className="flex items-center gap-2">
@@ -1127,7 +1127,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('player')}
                   >
                     <div className="flex items-center gap-2">
@@ -1137,7 +1137,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('time')}
                   >
                     <div className="flex items-center gap-2 justify-end">
@@ -1147,7 +1147,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('wrDiff')}
                   >
                     <div className="flex items-center gap-2 justify-end">
@@ -1157,7 +1157,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('speed')}
                   >
                     <div className="flex items-center gap-2 justify-end">
@@ -1167,7 +1167,7 @@ export default function MapRecordsTabs({
                   </th>
                   <th
                     scope="col"
-                    className="px-6 py-3 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
+                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
                     onClick={() => handleSort('date')}
                   >
                     <div className="flex items-center gap-2 justify-end">
@@ -1183,7 +1183,7 @@ export default function MapRecordsTabs({
                   <tr>
                     <td
                       colSpan={5}
-                      className="px-6 py-12 text-center text-text-muted"
+                      className="px-2 sm:px-4 py-8 text-center text-text-muted"
                     >
                       {debouncedStageSearch
                         ? 'No players found matching your search.'
@@ -1197,7 +1197,7 @@ export default function MapRecordsTabs({
 
           {/* Pagination */}
           {totalStagePages > 1 && (
-            <div className="px-6 border-t border-border">
+            <div className="px-3 sm:px-6 border-t border-border">
               <Pagination
                 currentPage={stagePage}
                 totalPages={totalStagePages}

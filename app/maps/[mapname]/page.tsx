@@ -233,7 +233,7 @@ export default async function MapProfilePage({
   const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       {/* Map Header */}
       <div className="bg-surface border border-border rounded-xl overflow-hidden relative">
         <div className="absolute inset-0 z-0 opacity-20">
@@ -247,7 +247,7 @@ export default async function MapProfilePage({
           <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/80 to-transparent" />
         </div>
         
-        <div className="relative z-10 p-6 sm:p-10 flex flex-col md:flex-row gap-8 items-center md:items-end">
+        <div className="relative z-10 p-4 sm:p-6 flex flex-col md:flex-row gap-3 items-center md:items-end">
           <div className="relative h-48 w-full md:w-72 rounded-xl overflow-hidden border-4 border-border bg-surface-hover flex-shrink-0 shadow-2xl">
             <MapImage
               src={`${mapImagesUrl}${map.mapname}.jpg`}
