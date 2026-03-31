@@ -236,7 +236,7 @@ export default async function MapProfilePage({
     <div className="space-y-4">
       {/* Map Header */}
       <div className="bg-surface border border-border rounded-xl overflow-hidden relative">
-        <div className="absolute inset-0 z-0 opacity-20">
+        <div className="absolute inset-0 z-0 opacity-60">
           <MapImage
             src={`${mapImagesUrl}${map.mapname}.jpg`}
             alt={map.mapname}
