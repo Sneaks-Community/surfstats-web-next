@@ -346,10 +346,10 @@ export default async function PlayerProfilePage({
   params: Promise<{ steamid: string }>;
 }) {
   const { steamid } = await params;
-  const decodedSteamId = decodeURIComponent(steamid);
+  const decodedSteamId: string = decodeURIComponent(steamid);
   
   // Validate and sanitize SteamID input
-  const validSteamId = sanitizeSteamId(decodedSteamId);
+  const validSteamId = sanitizeSteamId(decodedSteamId) ?? decodedSteamId;
   if (!validSteamId) {
     return (
       <div className="text-center py-20 bg-surface border border-border rounded-xl">
@@ -447,7 +447,26 @@ export default async function PlayerProfilePage({
             <div className="flex-1 pb-2">
               <h1 className="text-3xl font-bold text-text">{sanitizePlayerName(player.name)}</h1>
               <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-text-muted">
-                <span className="font-mono bg-surface-hover px-2 py-1 rounded text-text">{player.steamid}</span>
+                {(() => {
+                  const profileUrl = getSteamProfileUrl(decodedSteamId);
+                  if (!profileUrl) {
+                    return (
+                      <span className="font-mono bg-surface-hover px-2 py-1 rounded text-text">
+                        {player.steamid}
+                      </span>
+                    );
+                  }
+                  return (
+                    <a
+                      href={profileUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono bg-surface-hover px-2 py-1 rounded text-text hover:opacity-80 transition-opacity"
+                    >
+                      {player.steamid}
+                    </a>
+                  );
+                })()}
                 {player.country && (
                   (() => {
                     const countryCode = countryNameToCode[player.country.toLowerCase()];
