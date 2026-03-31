@@ -36,12 +36,30 @@ export function formatTime(seconds: number): string {
 }
 
 /**
- * Format playtime duration in seconds to hours and minutes format
+ * Format playtime duration in seconds to days, hours, and minutes format
  * Used for displaying total time on server from player analytics
  * @param seconds - Total time in seconds
- * @returns Formatted string in "Xh Ym" format (e.g., "125h 30m", "0h 15m")
+ * @returns Formatted string in "Xd Yh Zm" format (e.g., "5d 3h 20m", "1d 12h 0m")
  */
 export function formatPlaytime(seconds: number): string {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days.toLocaleString()}d`);
+  parts.push(`${hours.toLocaleString()}h`);
+  parts.push(`${minutes}m`);
+  
+  return parts.join(' ');
+}
+
+/**
+ * Format seconds into hours and minutes for toggle display
+ * @param seconds - Total time in seconds
+ * @returns Formatted string in "Xh Ym" format (e.g., "125h 30m")
+ */
+export function formatPlaytimeToggle(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   

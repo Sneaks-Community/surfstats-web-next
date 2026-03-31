@@ -5,7 +5,7 @@ import { getSteamAvatars, getSteamProfileUrl } from '@/lib/steam';
 import { Trophy, Activity, Clock } from 'lucide-react';
 import Image from 'next/image';
 import { unstable_cache } from 'next/cache';
-import { formatPlaytime, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import { sanitizeSteamId, sanitizePlayerName } from '@/lib/sanitize';
 import CountryBadge from '@/components/CountryBadge';
 import { countryNameToCode } from '@/lib/countries';
@@ -23,6 +23,7 @@ import TierDistributionChart from './components/TierDistributionChart';
 import PerformanceTrendChart from './components/PerformanceTrendChart';
 import PlayerRecordsTabs from './components/PlayerRecordsTabs';
 import ProgressBar from '@/components/ProgressBar';
+import PlayerTimeDisplay from './components/PlayerTimeDisplay';
 
 interface PlayerData extends RowDataPacket {
   steamid: string;
@@ -505,13 +506,9 @@ export default async function PlayerProfilePage({
               <span className="text-xs text-text-muted">Points</span>
             </div>
             {playtimeData && playtimeData.totalSeconds > 0 ? (
-              <div className="bg-surface border border-border rounded-xl p-3 flex flex-col items-center justify-center md:col-start-4 md:col-span-1">
-                <Clock className="w-8 h-8 text-purple-500 mb-2" />
-                <span className="text-2xl font-bold text-text">{formatPlaytime(playtimeData.totalSeconds)}</span>
-                <span className="text-xs text-text-muted">Time on Server</span>
-              </div>
+              <PlayerTimeDisplay totalSeconds={playtimeData.totalSeconds} />
             ) : null}
-            {/* Progress Bars - Stacked vertically in a single container to the right of Time on Server */}
+            {/* Progress Bars - Stacked vertically in a single container to the right of Time Played */}
             <div className="bg-surface border border-border rounded-xl p-3 col-span-2 md:col-start-5 md:row-start-1 flex flex-col justify-center space-y-3">
               <ProgressBar label="Map" current={maps.length} total={totals.totalMaps} color="blue" />
               <ProgressBar label="Bonus" current={bonuses.length} total={totals.totalBonuses} color="purple" />
