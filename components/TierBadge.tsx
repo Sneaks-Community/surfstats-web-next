@@ -1,4 +1,5 @@
 import { getTierColor } from '@/lib/tierColors';
+import { Mountain } from 'lucide-react';
 
 interface TierBadgeProps {
   tier: number;
@@ -17,8 +18,9 @@ export default function TierBadge({ tier, className = '', variant = 'compact' }:
   
   return (
     <span
-      className={`text-xs px-1.5 py-0.5 rounded font-medium ${colors.bg} ${colors.text} ${colors.border} border ${className}`}
+      className={`text-sm px-3 py-1 rounded font-bold tracking-wider uppercase flex items-center gap-1 ${colors.bg} ${colors.text} ${colors.border} border ${className}`}
     >
+      <Mountain className="h-3 w-3" />
       {variant === 'full' ? `Tier ${tier}` : `T${tier}`}
     </span>
   );

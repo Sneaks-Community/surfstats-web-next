@@ -260,7 +260,7 @@ export default async function MapProfilePage({
           
           <div className="flex-1 w-full">
             <div className="flex flex-wrap items-center gap-3 mb-3">
-              <TierBadge tier={map.tier} variant="full" className="text-sm px-3 py-1 rounded-full font-bold tracking-wider uppercase" />
+              <TierBadge tier={map.tier} variant="full" className="rounded-full" />
               {map.stages > 1 ? (
                 <span className="px-3 py-1 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full text-sm font-bold tracking-wider uppercase flex items-center gap-1">
                   <Layers className="h-3 w-3" /> {map.stages} Stages
