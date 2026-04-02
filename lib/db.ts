@@ -1,6 +1,7 @@
 import 'server-only';
 import mysql from 'mysql2/promise';
 import logger from '@/lib/logger';
+import { wrapPoolQuery } from '@/lib/db-query-logger';
 
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST || 'localhost',
@@ -29,70 +30,8 @@ pool.on('enqueue', () => {
   logger.warn('[DB] Queue limit reached, waiting for available connection');
 });
 
-// Wrapper to handle connection errors gracefully with detailed logging
-const originalQuery = pool.query.bind(pool) as any;
-pool.query = async (...args: any[]) => {
-  const queryPreview = typeof args[0] === 'string' 
-    ? args[0].substring(0, 100) + (args[0].length > 100 ? '...' : '')
-    : 'prepared statement';
-  
-  try {
-    const startTime = Date.now();
-    const result = await originalQuery(...args);
-    const duration = Date.now() - startTime;
-    
-    // Log slow queries (> 1 second)
-    if (duration > 1000) {
-      logger.warn(`[DB] Slow query detected (${duration}ms): ${queryPreview}`);
-    } else {
-      logger.debug(`[DB] Query executed in ${duration}ms: ${queryPreview}`);
-    }
-    
-    return result;
-  } catch (error: any) {
-    const errorCode = error.code || 'UNKNOWN';
-    const errorMessage = error.message || 'Unknown error';
-    
-    // Connection-related errors
-    if (error.code === 'ECONNREFUSED') {
-      logger.error(`[DB] Connection refused - database server unavailable at ${process.env.MYSQL_HOST || 'localhost'}`);
-      logger.error(`[DB] Error details: ${errorMessage}`);
-      return [[], []] as any;
-    }
-    
-    if (error.code === 'ENOTFOUND') {
-      logger.error(`[DB] Host not found - unable to resolve ${process.env.MYSQL_HOST || 'localhost'}`);
-      logger.error(`[DB] Error details: ${errorMessage}`);
-      return [[], []] as any;
-    }
-    
-    if (error.code === 'ETIMEDOUT' || error.code === 'PROTOCOL_CONNECTION_LOST') {
-      logger.error(`[DB] Connection timeout or lost - database may be overloaded`);
-      logger.error(`[DB] Error details: ${errorMessage}`);
-      return [[], []] as any;
-    }
-    
-    if (error.code === 'ER_ACCESS_DENIED_ERROR') {
-      logger.error(`[DB] Access denied - check MYSQL_USER and MYSQL_PASSWORD credentials`);
-      logger.error(`[DB] Error details: ${errorMessage}`);
-      return [[], []] as any;
-    }
-    
-    if (error.code === 'ER_BAD_DB_ERROR') {
-      logger.error(`[DB] Database not found - check MYSQL_DATABASE: ${process.env.MYSQL_DATABASE || 'cksurf'}`);
-      logger.error(`[DB] Error details: ${errorMessage}`);
-      return [[], []] as any;
-    }
-    
-    // Query errors - log and rethrow
-    logger.error(`[DB] Query error (${errorCode}): ${errorMessage}`);
-    logger.error(`[DB] Query: ${queryPreview}`);
-    if (args[1]) {
-      logger.debug('[DB] Parameters:', args[1]);
-    }
-    throw error;
-  }
-};
+// Wrap the pool with slow query logging
+wrapPoolQuery(pool, { prefix: 'DB' });
 
 // Initialize database connection and pre-warm caches at server startup
 async function initializeDatabase() {

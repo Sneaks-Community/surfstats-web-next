@@ -1,143 +1,21 @@
-import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
 import Link from 'next/link';
-import { Map as MapIcon, Layers, Target, Users } from 'lucide-react';
-import { unstable_cache } from 'next/cache';
+import { Map as MapIcon, Layers, Target, Users, Flag } from 'lucide-react';
 import { Suspense } from 'react';
 import MapImage from '@/components/MapImage';
 import MapFilters from '@/components/MapFilters';
 import { getTierColor } from '@/lib/tierColors';
 import Pagination from '@/components/Pagination';
-import { getTierDistribution } from '@/lib/map-cache';
+import { getTierDistribution, getAllMapMetadata, type MapMetadata } from '@/lib/map-cache';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Maps',
 };
 
-interface MapData extends RowDataPacket {
-  mapname: string;
-  tier: number;
-  mapper: string;
-  completions: number;
-  bonuses: number;
-  stages: number;
-}
-
 interface FilterOptions {
   tier: number;
   count: number;
 }
-
-const getMaps = unstable_cache(
-  async (
-    page: number,
-    search: string,
-    type: string,
-    tiers: number[],
-    mapper: string,
-    bonuses: string
-  ) => {
-    try {
-      const limit = 20;
-      const offset = (page - 1) * limit;
-      
-      let query = `
-        SELECT
-          m.mapname, m.tier, m.mapper,
-          (SELECT COUNT(*) FROM ck_playertimes pt WHERE pt.mapname = m.mapname) as completions,
-          (SELECT COUNT(DISTINCT zonegroup) FROM ck_zones z WHERE z.mapname = m.mapname AND z.zonegroup > 0) as bonuses,
-          (SELECT COUNT(*) + 1 FROM ck_zones z WHERE z.mapname = m.mapname AND z.zonetype = 3) as stages
-        FROM ck_maptier m
-      `;
-      
-      const params: any[] = [];
-      const conditions: string[] = [];
-      
-      // Filter to only show maps that have player times
-      conditions.push(`EXISTS (SELECT 1 FROM ck_playertimes pt WHERE pt.mapname = m.mapname)`);
-      
-      if (search) {
-        conditions.push(`m.mapname LIKE ?`);
-        params.push(`%${search}%`);
-      }
-      
-      if (type === 'linear') {
-        conditions.push(`(SELECT COUNT(*) FROM ck_zones z WHERE z.mapname = m.mapname AND z.zonetype = 3) = 0`);
-      } else if (type === 'staged') {
-        conditions.push(`(SELECT COUNT(*) FROM ck_zones z WHERE z.mapname = m.mapname AND z.zonetype = 3) > 0`);
-      }
-      
-      if (tiers.length > 0) {
-        const placeholders = tiers.map(() => '?').join(', ');
-        conditions.push(`m.tier IN (${placeholders})`);
-        params.push(...tiers);
-      }
-      
-      if (mapper) {
-        conditions.push(`m.mapper LIKE ?`);
-        params.push(`%${mapper}%`);
-      }
-      
-      if (bonuses !== 'all') {
-        if (bonuses === '0') {
-          conditions.push(`(SELECT COUNT(DISTINCT zonegroup) FROM ck_zones z WHERE z.mapname = m.mapname AND z.zonegroup > 0) = 0`);
-        } else if (bonuses === '4+') {
-          conditions.push(`(SELECT COUNT(DISTINCT zonegroup) FROM ck_zones z WHERE z.mapname = m.mapname AND z.zonegroup > 0) >= 4`);
-        } else {
-          conditions.push(`(SELECT COUNT(DISTINCT zonegroup) FROM ck_zones z WHERE z.mapname = m.mapname AND z.zonegroup > 0) = ?`);
-          params.push(parseInt(bonuses));
-        }
-      }
-      
-      if (conditions.length > 0) {
-        query += ` WHERE ` + conditions.join(' AND ');
-      }
-      
-      query += ` ORDER BY m.mapname ASC LIMIT ? OFFSET ?`;
-      params.push(limit, offset);
-      
-      const [rows] = await pool.query<MapData[]>(query, params);
-      
-      // Get total count for pagination
-      let countQuery = `SELECT COUNT(*) as total FROM ck_maptier m WHERE EXISTS (SELECT 1 FROM ck_playertimes pt WHERE pt.mapname = m.mapname)`;
-      const countConditions = conditions.slice(1); // Remove the EXISTS condition for count query
-      if (countConditions.length > 0) {
-        countQuery += ` AND ` + countConditions.join(' AND ');
-      }
-      const [countRows] = await pool.query<RowDataPacket[]>(countQuery, params.slice(0, -2));
-      const total = countRows[0].total;
-      
-      return { maps: rows, total, totalPages: Math.ceil(total / limit) };
-    } catch (error) {
-      console.error('Error fetching maps:', error);
-      return { maps: [], total: 0, totalPages: 0 };
-    }
-  },
-  ['maps-list'],
-  { revalidate: 3600 } // Cache for 1 hour
-);
-
-const getFilterOptions = unstable_cache(
-  async () => {
-    try {
-      // Use cached tier distribution instead of database query
-      const tierDistribution = await getTierDistribution();
-      
-      // Convert to FilterOptions format
-      const tierRows: FilterOptions[] = Array.from(tierDistribution.entries())
-        .map(([tier, count]) => ({ tier, count }))
-        .sort((a, b) => a.tier - b.tier);
-      
-      return { tiers: tierRows };
-    } catch (error) {
-      console.error('Error fetching filter options:', error);
-      return { tiers: [] };
-    }
-  },
-  ['maps-filter-options'],
-  { revalidate: 3600 } // Cache for 1 hour
-);
 
 export default async function MapsPage({
   searchParams,
@@ -173,11 +51,55 @@ export default async function MapsPage({
   const tiers = tiersParams.flatMap(t => t.split(',').map(tier => parseInt(tier.trim())).filter(tier => !isNaN(tier)));
   const mapper = getParam(params.mapper);
   const bonuses = getParam(params.bonuses, 'all');
-  
-  const { maps, total, totalPages } = await getMaps(page, q, type, tiers, mapper, bonuses);
-  const filterOptions = await getFilterOptions();
-  const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
 
+  // Fetch all map metadata from shared cache
+  const allMetadata = await getAllMapMetadata();
+  
+  // Apply filters to cached data
+  const filteredMaps: MapMetadata[] = [];
+  for (const metadata of allMetadata.values()) {
+    // Apply search filter
+    if (q && !metadata.mapname.toLowerCase().includes(q.toLowerCase())) continue;
+    
+    // Apply type filter (linear vs staged)
+    if (type === 'linear' && metadata.stages > 0) continue;
+    if (type === 'staged' && metadata.stages === 0) continue;
+    
+    // Apply tier filter
+    if (tiers.length > 0 && !tiers.includes(metadata.tier)) continue;
+    
+    // Apply mapper filter
+    if (mapper && !metadata.mapper.toLowerCase().includes(mapper.toLowerCase())) continue;
+    
+    // Apply bonuses filter
+    if (bonuses !== 'all') {
+      if (bonuses === '0' && metadata.bonuses !== 0) continue;
+      if (bonuses === '4+' && metadata.bonuses < 4) continue;
+      if (!['0', '4+'].includes(bonuses) && parseInt(bonuses) !== metadata.bonuses) continue;
+    }
+    
+    filteredMaps.push(metadata);
+  }
+  
+  // Sort by mapname
+  filteredMaps.sort((a, b) => a.mapname.localeCompare(b.mapname));
+  
+  // Apply pagination
+  const limit = 20;
+  const offset = (page - 1) * limit;
+  const total = filteredMaps.length;
+  const paginatedMaps = filteredMaps.slice(offset, offset + limit);
+  const totalPages = Math.ceil(total / limit);
+  
+  // Get filter options from cache
+  const tierDistribution = await getTierDistribution();
+  const filterOptions = {
+    tiers: Array.from(tierDistribution.entries())
+      .map(([tier, count]) => ({ tier, count }))
+      .sort((a, b) => a.tier - b.tier),
+  };
+  
+  const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
 
   return (
     <div className="space-y-6">
@@ -196,7 +118,7 @@ export default async function MapsPage({
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {maps.map((map) => {
+        {paginatedMaps.map((map) => {
           const tierColor = getTierColor(map.tier);
           return (
             <Link href={`/maps/${map.mapname}`} key={map.mapname} className="group block bg-surface border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-colors">
@@ -225,8 +147,19 @@ export default async function MapsPage({
                   {map.bonuses || 0}
                 </span>
                 <span className="flex items-center gap-1">
-                  <Layers className="h-3 w-3" />
-                  {map.stages > 1 ? map.stages : 'Linear'}
+                  {map.stages > 1 ? (
+                    <>
+                      <Layers className="h-3 w-3" />
+                      {map.stages}
+                    </>
+                  ) : map.checkpoints > 0 ? (
+                    <>
+                      <Flag className="h-3 w-3" />
+                      {map.checkpoints}
+                    </>
+                  ) : (
+                    'Linear'
+                  )}
                 </span>
               </div>
               </div>
@@ -235,7 +168,7 @@ export default async function MapsPage({
         })}
       </div>
       
-      {maps.length === 0 && (
+      {paginatedMaps.length === 0 && (
         <div className="text-center py-12 bg-surface border border-border rounded-xl">
           <MapIcon className="h-12 w-12 text-text-placeholder mx-auto mb-4" />
           <h3 className="text-lg font-medium text-text">No maps found</h3>

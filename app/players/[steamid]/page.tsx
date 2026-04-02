@@ -10,7 +10,7 @@ import { sanitizeSteamId, sanitizePlayerName } from '@/lib/sanitize';
 import CountryBadge from '@/components/CountryBadge';
 import { countryNameToCode } from '@/lib/countries';
 import { getTotalsCached } from '@/lib/cache';
-import { getPlayerTimeOnServer, getPerformanceTrend } from '@/lib/player-analytics';
+import { getPlayerTimeOnServer } from '@/lib/player-analytics';
 import { getAllMapMetadata, getTierDistributionWithStages } from '@/lib/map-cache';
 import {
   getIncompleteMapsForPlayer,
@@ -20,7 +20,6 @@ import {
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
 import TierDistributionChart from './components/TierDistributionChart';
-import PerformanceTrendChart from './components/PerformanceTrendChart';
 import PlayerRecordsTabs from './components/PlayerRecordsTabs';
 import ProgressBar from '@/components/ProgressBar';
 import PlayerTimeDisplay from './components/PlayerTimeDisplay';
@@ -390,12 +389,6 @@ export default async function PlayerProfilePage({
   
   // Fetch linear vs staged per tier for radar chart (returns array directly)
   const linearVsStagedPerTier = await getLinearVsStagedPerTier(validSteamId);
-  
-  // Fetch performance trend data
-  const performanceTrendRaw = await getPerformanceTrend(validSteamId);
-  // Ensure performanceTrend is always an array for client-side serialization
-  const performanceTrend: { date: string; avgTime: number; mapCount: number; tier: number }[] = 
-    performanceTrendRaw || [];
 
   return (
     <div className="space-y-4">
@@ -533,21 +526,8 @@ export default async function PlayerProfilePage({
             </div>
           )}
         </div>
-        {/* Performance Trend - stacked on mobile/tablet, 3 columns on desktop */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:col-span-3">
-          <div className="lg:col-span-1 h-[280px] min-h-[280px]">
-            {performanceTrend && performanceTrend.length > 0 ? (
-              <PerformanceTrendChart data={performanceTrend} />
-            ) : (
-              <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-                <h3 className="text-sm font-semibold text-text mb-2">Performance Trend</h3>
-                <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-                  No completion history
-                </div>
-              </div>
-            )}
-          </div>
-          {/* Placeholder for additional charts */}
+        {/* Placeholder for additional charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:col-span-3">
           <div className="bg-surface border border-border rounded-xl p-4 flex flex-col h-[130px] lg:h-auto">
             <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
             <div className="flex-1 flex items-center justify-center text-text-muted text-sm">

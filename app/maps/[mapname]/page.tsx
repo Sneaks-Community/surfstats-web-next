@@ -4,24 +4,20 @@ import { getSteamProfileUrl } from '@/lib/steam';
 import Link from 'next/link';
 import { Map as MapIcon, Users, Layers, Target, Download } from 'lucide-react';
 import MapImage from '@/components/MapImage';
-import { unstable_cache } from 'next/cache';
 import { getTierColor } from '@/lib/tierColors';
 import { sanitizeMapName, sanitizePlayerName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
 import MapRecordsTabs from './components/MapRecordsTabs';
 import TierBadge from '@/components/TierBadge';
+import MapChartGrid from './components/charts/MapChartGrid';
+import { getMapMetadata, type MapMetadata } from '@/lib/map-cache';
 
-interface MapData extends RowDataPacket {
-  mapname: string;
-  tier: number;
-  mapper: string;
-  mappersteam: string;
-  bonuses: number;
-  stages: number;
-}
+// Default page size - keeps cache entry under 2MB (each record ~200 bytes, 100 records ~20KB)
+const DEFAULT_PAGE_SIZE = 100;
+const MAX_PAGE_SIZE = 500;
 
-interface MapRecord extends RowDataPacket {
+interface MapRecord {
   steamid: string;
   name: string;
   runtimepro: number;
@@ -31,7 +27,7 @@ interface MapRecord extends RowDataPacket {
   startspeed: number;
 }
 
-interface BonusRecord extends RowDataPacket {
+interface BonusRecord {
   steamid: string;
   name: string;
   zonegroup: number;
@@ -42,7 +38,7 @@ interface BonusRecord extends RowDataPacket {
   startspeed: number;
 }
 
-interface StageRecord extends RowDataPacket {
+interface StageRecord {
   steamid: string;
   name: string;
   stage: number;
@@ -52,42 +48,6 @@ interface StageRecord extends RowDataPacket {
   wr_time: number | null;
   startspeed: number;
 }
-
-const getMapData = unstable_cache(
-  async (mapname: string) => {
-    logger.debug(`[Map] Fetching map info for: ${mapname}`);
-    
-    try {
-      // Get map info
-      const [mapRows] = await pool.query<MapData[]>(`
-        SELECT
-          m.mapname, m.tier, m.mapper, m.mappersteam,
-          (SELECT COUNT(DISTINCT zonegroup) FROM ck_zones z WHERE z.mapname = m.mapname AND z.zonegroup > 0) as bonuses,
-          (SELECT COUNT(*) + 1 FROM ck_zones z WHERE z.mapname = m.mapname AND z.zonetype = 3) as stages
-        FROM ck_maptier m
-        WHERE m.mapname = ?
-      `, [mapname]);
-
-      if (mapRows.length === 0) {
-        logger.warn(`[Map] No map found with name: ${mapname}`);
-        return null;
-      }
-      
-      return mapRows[0];
-    } catch (error: any) {
-      const errorMessage = error.message || 'Unknown error';
-      logger.error(`[Map] Failed to fetch map info for ${mapname}: ${errorMessage}`);
-      logger.error(`[Map] Error code: ${error.code || 'N/A'}`);
-      return null;
-    }
-  },
-  ['map-info'],
-  { revalidate: 60 }
-);
-
-// Default page size - keeps cache entry under 2MB (each record ~200 bytes, 100 records ~20KB)
-const DEFAULT_PAGE_SIZE = 100;
-const MAX_PAGE_SIZE = 500;
 
 interface RecordCounts {
   leaderboardTotal: number;
@@ -103,71 +63,67 @@ interface MapRecordsResult {
   wr_time: number | null;
 }
 
-const getMapRecords = unstable_cache(
-  async (mapname: string, page: number = 1, pageSize: number = DEFAULT_PAGE_SIZE): Promise<MapRecordsResult> => {
-    // Enforce limits to prevent cache bloat
-    const safePageSize = Math.min(Math.max(1, pageSize), MAX_PAGE_SIZE);
-    const safePage = Math.max(1, page);
-    const offset = (safePage - 1) * safePageSize;
+const getMapRecords = async (mapname: string, page: number = 1, pageSize: number = DEFAULT_PAGE_SIZE): Promise<MapRecordsResult> => {
+  // Enforce limits to prevent cache bloat
+  const safePageSize = Math.min(Math.max(1, pageSize), MAX_PAGE_SIZE);
+  const safePage = Math.max(1, page);
+  const offset = (safePage - 1) * safePageSize;
 
-    logger.debug(`[Map] Fetching records for: ${mapname} (page ${safePage}, size ${safePageSize})`);
+  logger.debug(`[Map] Fetching records for: ${mapname} (page ${safePage}, size ${safePageSize})`);
 
-    try {
-      // First, get the total counts for all record types in a single query
-      const [countsRows] = await pool.query<RowDataPacket[]>(`
-        SELECT
-          (SELECT COUNT(*) FROM ck_playertimes WHERE mapname = ?) as leaderboardTotal,
-          (SELECT COUNT(*) FROM ck_bonus WHERE mapname = ?) as bonusesTotal,
-          (SELECT COUNT(*) FROM ck_stages WHERE \`map\` = ?) as stagesTotal
-      `, [mapname, mapname, mapname]);
+  try {
+    // First, get the total counts for all record types in a single query
+    const [countsRows] = await pool.query<RowDataPacket[]>(`
+      SELECT
+        (SELECT COUNT(*) FROM ck_playertimes WHERE mapname = ?) as leaderboardTotal,
+        (SELECT COUNT(*) FROM ck_bonus WHERE mapname = ?) as bonusesTotal,
+        (SELECT COUNT(*) FROM ck_stages WHERE \`map\` = ?) as stagesTotal
+    `, [mapname, mapname, mapname]);
 
-      const counts: RecordCounts = {
-        leaderboardTotal: countsRows[0]?.leaderboardTotal || 0,
-        bonusesTotal: countsRows[0]?.bonusesTotal || 0,
-        stagesTotal: countsRows[0]?.stagesTotal || 0,
-      };
+    const counts: RecordCounts = {
+      leaderboardTotal: countsRows[0]?.leaderboardTotal || 0,
+      bonusesTotal: countsRows[0]?.bonusesTotal || 0,
+      stagesTotal: countsRows[0]?.stagesTotal || 0,
+    };
 
-      // Use window functions for efficient rank calculation - O(n) instead of O(n²)
-      // This query calculates ranks using ROW_NUMBER() which is much faster than correlated subqueries
-      
-      // Get WR time for the map (needed for all records)
-      const [wrTimeRows] = await pool.query<RowDataPacket[]>(`
-        SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?
-      `, [mapname]);
-      const wr_time = wrTimeRows[0]?.wr_time || null;
+    // Use window functions for efficient rank calculation - O(n) instead of O(n²)
+    // This query calculates ranks using ROW_NUMBER() which is much faster than correlated subqueries
+    
+    // Get WR time for the map (needed for all records)
+    const [wrTimeRows] = await pool.query<RowDataPacket[]>(`
+      SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?
+    `, [mapname]);
+    const wr_time = wrTimeRows[0]?.wr_time || null;
 
-      // Get leaderboard records with pagination and window function for rank
-      const [leaderboardRows] = await pool.query<MapRecord[]>(`
-        SELECT
-          steamid, name, runtimepro, date, startspeed,
-          ROW_NUMBER() OVER (ORDER BY runtimepro ASC) as rank,
-          ? as wr_time
-        FROM ck_playertimes
-        WHERE mapname = ?
-        ORDER BY runtimepro ASC
-        LIMIT ? OFFSET ?
-      `, [wr_time, mapname, safePageSize, offset]);
+    // Get leaderboard records with pagination and window function for rank
+    const [leaderboardRows] = await pool.query<RowDataPacket[] & MapRecord[]>(`
+      SELECT
+        steamid, name, runtimepro, date, startspeed,
+        ROW_NUMBER() OVER (ORDER BY runtimepro ASC) as rank,
+        ? as wr_time
+      FROM ck_playertimes
+      WHERE mapname = ?
+      ORDER BY runtimepro ASC
+      LIMIT ? OFFSET ?
+    `, [wr_time, mapname, safePageSize, offset]);
 
-      // Bonuses are fetched client-side via API to keep server payload small
-      const bonusRows: BonusRecord[] = [];
+    // Bonuses are fetched client-side via API to keep server payload small
+    const bonusRows: BonusRecord[] = [];
 
-      // Stages are fetched client-side via API to avoid huge payloads
-      // (maps can have 300K+ stage records which exceeds 2MB cache limit)
-      const stageRows: StageRecord[] = [];
+    // Stages are fetched client-side via API to avoid huge payloads
+    // (maps can have 300K+ stage records which exceeds 2MB cache limit)
+    const stageRows: StageRecord[] = [];
 
-      logger.debug(`[Map] ${mapname} loaded: ${leaderboardRows.length}/${counts.leaderboardTotal} leaderboard records, ${bonusRows.length} bonus records, ${stageRows.length} stage records`);
+    logger.debug(`[Map] ${mapname} loaded: ${leaderboardRows.length}/${counts.leaderboardTotal} leaderboard records, ${bonusRows.length} bonus records, ${stageRows.length} stage records`);
 
-      return { leaderboard: leaderboardRows, bonuses: bonusRows, stages: stageRows, counts, wr_time };
-    } catch (error: any) {
-      const errorMessage = error.message || 'Unknown error';
-      logger.error(`[Map] Failed to fetch records for ${mapname}: ${errorMessage}`);
-      logger.error(`[Map] Error code: ${error.code || 'N/A'}`);
-      return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
-    }
-  },
-  ['map-records'],
-  { revalidate: 60 }
-);
+    return { leaderboard: leaderboardRows, bonuses: bonusRows, stages: stageRows, counts, wr_time };
+  } catch (error: any) {
+    const errorMessage = error.message || 'Unknown error';
+    logger.error(`[Map] Failed to fetch records for ${mapname}: ${errorMessage}`);
+    logger.error(`[Map] Error code: ${error.code || 'N/A'}`);
+    return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
+  }
+};
 
 export async function generateMetadata({ params }: { params: Promise<{ mapname: string }> }) {
   const { mapname } = await params;
@@ -178,7 +134,7 @@ export async function generateMetadata({ params }: { params: Promise<{ mapname: 
     return { title: 'Map Not Found' };
   }
   
-  const map = await getMapData(validMapname);
+  const map = await getMapMetadata(validMapname);
   
   if (!map) {
     return { title: 'Map Not Found' };
@@ -212,9 +168,11 @@ export default async function MapProfilePage({
   }
   
   const [map, recordsData] = await Promise.all([
-    getMapData(validMapname),
+    getMapMetadata(validMapname),
     getMapRecords(validMapname, 1, DEFAULT_PAGE_SIZE)
   ]);
+  
+  logger.debug(`[Map Page] Map data for ${validMapname}: stages=${map?.stages}, checkpoints=${map?.checkpoints}`);
   
   if (!map) {
     return (
@@ -264,6 +222,10 @@ export default async function MapProfilePage({
               {map.stages > 1 ? (
                 <span className="px-3 py-1 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full text-sm font-bold tracking-wider uppercase flex items-center gap-1">
                   <Layers className="h-3 w-3" /> {map.stages} Stages
+                </span>
+              ) : map.checkpoints > 0 ? (
+                <span className="px-3 py-1 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-full text-sm font-bold tracking-wider uppercase flex items-center gap-1">
+                  <MapIcon className="h-3 w-3" /> {map.checkpoints} Checkpoints
                 </span>
               ) : (
                 <span className="px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded-full text-sm font-bold tracking-wider uppercase flex items-center gap-1">
@@ -318,6 +280,9 @@ export default async function MapProfilePage({
           </div>
         </div>
       </div>
+
+      {/* Chart Grid */}
+      <MapChartGrid mapname={validMapname} />
 
       {/* Leaderboard with Tabs */}
       <MapRecordsTabs

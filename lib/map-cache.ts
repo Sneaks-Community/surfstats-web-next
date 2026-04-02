@@ -11,6 +11,7 @@ export interface MapMetadata {
   mappersteam: string | null;
   bonuses: number;
   stages: number;
+  checkpoints: number;
   completions: number;
   wr_time: number | null;
   wr_holder: string | null;
@@ -54,42 +55,49 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
     
     // Single query with JOINs - much more efficient than multiple queries or correlated subqueries
     const [rows] = await pool.query<RowDataPacket[]>(`
-      SELECT 
-        m.mapname, 
-        m.tier, 
-        m.mapper, 
+      SELECT
+        m.mapname,
+        m.tier,
+        m.mapper,
         m.mappersteam,
         COALESCE(pt_cnt.completions, 0) as completions,
         COALESCE(b_cnt.bonus_count, 0) as bonuses,
         COALESCE(s_cnt.stage_count, 0) as stages,
+        COALESCE(c_cnt.checkpoint_count, 0) as checkpoints,
         wr.min_runtime as wr_time,
         wr_holder.name as wr_holder,
         wr_holder.steamid as wr_holder_steamid
       FROM ck_maptier m
       LEFT JOIN (
-        SELECT mapname, COUNT(*) as completions 
-        FROM ck_playertimes 
+        SELECT mapname, COUNT(*) as completions
+        FROM ck_playertimes
         GROUP BY mapname
       ) pt_cnt ON m.mapname = pt_cnt.mapname
       LEFT JOIN (
-        SELECT mapname, COUNT(DISTINCT zonegroup) as bonus_count 
-        FROM ck_zones 
-        WHERE zonegroup > 0 
+        SELECT mapname, COUNT(DISTINCT zonegroup) as bonus_count
+        FROM ck_zones
+        WHERE zonegroup > 0
         GROUP BY mapname
       ) b_cnt ON m.mapname = b_cnt.mapname
       LEFT JOIN (
-        SELECT mapname, COUNT(*) as stage_count 
-        FROM ck_zones 
-        WHERE zonetype = 3 
+        SELECT mapname, COUNT(*) + 1 as stage_count
+        FROM ck_zones
+        WHERE zonetype = 3
         GROUP BY mapname
       ) s_cnt ON m.mapname = s_cnt.mapname
       LEFT JOIN (
-        SELECT mapname, MIN(runtimepro) as min_runtime 
-        FROM ck_playertimes 
+        SELECT mapname, COUNT(*) as checkpoint_count
+        FROM ck_zones
+        WHERE zonetype = 4
+        GROUP BY mapname
+      ) c_cnt ON m.mapname = c_cnt.mapname
+      LEFT JOIN (
+        SELECT mapname, MIN(runtimepro) as min_runtime
+        FROM ck_playertimes
         GROUP BY mapname
       ) wr ON m.mapname = wr.mapname
-      LEFT JOIN ck_playertimes wr_holder 
-        ON wr.mapname = wr_holder.mapname 
+      LEFT JOIN ck_playertimes wr_holder
+        ON wr.mapname = wr_holder.mapname
         AND wr.min_runtime = wr_holder.runtimepro
       WHERE pt_cnt.completions > 0
       ORDER BY m.mapname ASC
@@ -105,6 +113,7 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
         mappersteam: row.mappersteam,
         bonuses: row.bonuses || 0,
         stages: row.stages || 0,
+        checkpoints: row.checkpoints || 0,
         completions: row.completions || 0,
         wr_time: row.wr_time,
         wr_holder: row.wr_holder,
@@ -114,6 +123,12 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
     
     const duration = Date.now() - startTime;
     logger.debug(`[MapCache] Fetched ${metadataMap.size} maps in ${duration}ms`);
+    
+    // Debug: Log first map's checkpoints value
+    const firstMap = metadataMap.values().next().value;
+    if (firstMap) {
+      logger.debug(`[MapCache] Sample map: ${firstMap.mapname} - stages: ${firstMap.stages}, checkpoints: ${firstMap.checkpoints}`);
+    }
     
     return metadataMap;
   } catch (error: any) {
