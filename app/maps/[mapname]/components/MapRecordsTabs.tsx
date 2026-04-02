@@ -331,16 +331,6 @@ export default function MapRecordsTabs({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedBonus, bonusPage, numBonuses]);
 
-  // Current bonus records based on selected bonus
-  const currentBonusRecords = useMemo(() => {
-    return bonusGroups[selectedBonus] || [];
-  }, [bonusGroups, selectedBonus]);
-
-  // Current stage records based on selected stage
-  const currentStageRecords = useMemo(() => {
-    return stageGroups[selectedStage] || [];
-  }, [stageGroups, selectedStage]);
-
   // Update URL when state changes
   useEffect(() => {
     const params = new URLSearchParams();
@@ -617,18 +607,6 @@ export default function MapRecordsTabs({
   const paginatedStageRecords = sortedStageRecords.filter(
     (r) => r.rank >= stageStartRank && r.rank <= stageEndRank
   );
-
-  // Get the base URL for pagination
-  const getBaseUrl = () => {
-    const params = new URLSearchParams();
-    params.set('tab', activeTab);
-    if (searchQuery && activeTab === 'map') params.set('q', searchQuery);
-    if (bonusSearchQuery && activeTab === 'bonus') params.set('bq', bonusSearchQuery);
-    if (stageSearchQuery && activeTab === 'stages') params.set('sq', stageSearchQuery);
-    if (selectedBonus > 1 && activeTab === 'bonus') params.set('bonus', selectedBonus.toString());
-    if (selectedStage > 1 && activeTab === 'stages') params.set('stage', selectedStage.toString());
-    return `/maps/${mapname}?${params.toString()}`;
-  };
 
   // Render record row for Map tab
   const renderRecordRow = (record: MapRecord) => (
