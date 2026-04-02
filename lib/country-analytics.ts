@@ -70,7 +70,7 @@ export const getDistinctCountries = unstable_cache(
 );
 
 /**
- * Get countries ranking with aggregation
+ * Internal function for getting countries ranking with aggregation
  *
  * Query optimization notes:
  * - Fetches all country data and aggregates in JavaScript for proper normalization
@@ -81,12 +81,12 @@ export const getDistinctCountries = unstable_cache(
  * IMPORTANT: Country names in the database may have variations (e.g., "Thailand", "thailand", "THAILAND").
  * We normalize them to ISO codes BEFORE grouping to avoid duplicate entries.
  */
-export async function getCountriesRanking(
+const getCountriesRankingInternal = async (
   sort: CountrySortKey = 'points',
   order: SortOrder = 'desc',
   page: number = 1,
   limit: number = 50
-): Promise<{ countries: CountryRank[]; total: number; totalPages: number }> {
+): Promise<{ countries: CountryRank[]; total: number; totalPages: number }> => {
   logger.debug(`[CountryAnalytics] Fetching countries ranking (sort: ${sort}, order: ${order}, page: ${page})`);
   
   try {
@@ -185,7 +185,26 @@ export async function getCountriesRanking(
     logger.error(`[CountryAnalytics] Failed to fetch countries ranking: ${errorMessage}`);
     return { countries: [], total: 0, totalPages: 0 };
   }
-}
+};
+
+/**
+ * Get countries ranking with aggregation
+ *
+ * Query optimization notes:
+ * - Fetches all country data and aggregates in JavaScript for proper normalization
+ * - Country names are normalized to ISO codes BEFORE grouping to avoid duplicates
+ * - Supports sorting by rank, country name, points, or player count
+ * - Pagination applied after sorting
+ *
+ * IMPORTANT: Country names in the database may have variations (e.g., "Thailand", "thailand", "THAILAND").
+ * We normalize them to ISO codes BEFORE grouping to avoid duplicate entries.
+ * Cached for 24 hours - country rankings change relatively infrequently
+ */
+export const getCountriesRanking = unstable_cache(
+  getCountriesRankingInternal,
+  ['countries-ranking'],
+  { revalidate: 86400 } // Cache for 24 hours
+);
 
 /**
  * Sort keys for country players
@@ -305,10 +324,10 @@ function getPlayerOrderByClause(sort: PlayerSortKey, order: SortOrder): string {
 }
 
 /**
- * Get country statistics summary
+ * Internal function for getting country statistics summary
  * Used for displaying total countries count
  */
-export async function getCountriesStats(): Promise<{ totalCountries: number; totalPlayers: number }> {
+const getCountriesStatsInternal = async (): Promise<{ totalCountries: number; totalPlayers: number }> => {
   try {
     const query = `
       SELECT
@@ -326,7 +345,18 @@ export async function getCountriesStats(): Promise<{ totalCountries: number; tot
     logger.error(`[CountryAnalytics] Failed to fetch countries stats: ${errorMessage}`);
     return { totalCountries: 0, totalPlayers: 0 };
   }
-}
+};
+
+/**
+ * Get country statistics summary
+ * Used for displaying total countries count
+ * Cached for 24 hours - country statistics change very infrequently
+ */
+export const getCountriesStats = unstable_cache(
+  getCountriesStatsInternal,
+  ['countries-stats'],
+  { revalidate: 86400 } // Cache for 24 hours
+);
 
 /**
  * Helper: Build ORDER BY clause for country rankings

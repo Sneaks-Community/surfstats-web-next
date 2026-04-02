@@ -31,7 +31,7 @@ export default async function CountriesPage({
   const validatedOrder: SortOrder = order === 'asc' ? 'asc' : 'desc';
   
   // Fetch countries ranking
-  const { countries, total, totalPages } = await getCountriesRanking(validatedSort, validatedOrder, page, 50);
+  const { countries, total, totalPages } = await getCountriesRanking(validatedSort, validatedOrder, page, 25);
   const stats = await getCountriesStats();
   
   // Build query params for pagination
