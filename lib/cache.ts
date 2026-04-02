@@ -299,6 +299,76 @@ export const getStatsCached = unstable_cache(
   { revalidate: 300 }
 );
 
+// Fetch latest completions (map + bonus) - combined and sorted by date
+// Note: This is a sync function returning a Promise (not async) for unstable_cache compatibility
+function fetchLatestCompletionsInternal() {
+  const startTime = Date.now();
+  
+  // Fetch top N from each table separately using indexes, then combine and sort in application code.
+  return Promise.all([
+    pool.query<RowDataPacket[]>(`
+      SELECT
+        pt.steamid,
+        pt.name,
+        pt.mapname,
+        pt.runtimepro as runtime,
+        pt.date,
+        'map' as type,
+        NULL as bonus
+      FROM ck_playertimes pt
+      ORDER BY pt.date DESC
+      LIMIT 25
+    `),
+    pool.query<RowDataPacket[]>(`
+      SELECT
+        b.steamid,
+        b.name,
+        b.mapname,
+        b.runtime,
+        b.date,
+        'bonus' as type,
+        b.zonegroup as bonus
+      FROM ck_bonus b
+      ORDER BY b.date DESC
+      LIMIT 25
+    `)
+  ]).then(([mapRows, bonusRows]) => {
+    const duration = Date.now() - startTime;
+    
+    // Combine and sort in application code
+    const combined = [...mapRows[0], ...bonusRows[0]];
+    combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    const result = combined.slice(0, 10).map(row => ({
+      steamid: row.steamid,
+      name: row.name,
+      map: row.mapname,
+      runtime: row.runtime,
+      date: row.date,
+      type: row.type,
+      bonus: row.bonus,
+    }));
+    
+    const mapCount = result.filter(r => r.type === 'map').length;
+    const bonusCount = result.filter(r => r.type === 'bonus').length;
+    logger.debug(`[Cache] Latest completions fetched successfully in ${duration}ms (${result.length} records: ${mapCount} map, ${bonusCount} bonus)`);
+    
+    return result;
+  }).catch((error: any) => {
+    const duration = Date.now() - startTime;
+    logger.error(`[Cache] Failed to fetch latest completions after ${duration}ms`);
+    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+    throw error;
+  });
+}
+
+// Cache latest completions for 5 minutes (300 seconds)
+export const getLatestCompletionsCached = unstable_cache(
+  fetchLatestCompletionsInternal,
+  ['dashboard-completions'],
+  { revalidate: 300 }
+);
+
 // Fetch totals (maps, bonuses, stages) - used for player progress bars
 // Now uses the global map cache instead of database queries
 // Note: This is a sync function returning a Promise (not async) for unstable_cache compatibility
