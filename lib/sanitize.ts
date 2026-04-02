@@ -104,7 +104,7 @@ export function sanitizePlayerName(name: string | null | undefined): string {
   // Remove HTML/script tags and special characters that could be used for XSS
   return name
     .replace(/[<>]/g, '')
-    .replace(/javascript:/gi, '')
+    .replace(/\b(?:javascript|data|vbscript):/gi, '')
     .replace(/on\w+=/gi, '')
     .slice(0, 64) // Limit length
     .trim() || 'Unknown';
