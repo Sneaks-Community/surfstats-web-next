@@ -118,9 +118,9 @@ function createThemeConfig() {
   const primary = (process.env.THEME_PRIMARY as ColorFamily) || 'emerald';
   const secondary = (process.env.THEME_SECONDARY as ColorFamily) || 'cyan';
   
-  // Log theme config once at server start
-  console.log('[Theme Config] Initialized with THEME_PRIMARY:', process.env.THEME_PRIMARY || '(not set)', '-> using:', primary);
-  console.log('[Theme Config] Initialized with THEME_SECONDARY:', process.env.THEME_SECONDARY || '(not set)', '-> using:', secondary);
+  // Debug log - theme config once at server start
+  // console.log('[Theme Config] Initialized with THEME_PRIMARY:', process.env.THEME_PRIMARY || '(not set)', '-> using:', primary);
+  // console.log('[Theme Config] Initialized with THEME_SECONDARY:', process.env.THEME_SECONDARY || '(not set)', '-> using:', secondary);
   
   return {
     light: {
