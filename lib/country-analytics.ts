@@ -357,15 +357,3 @@ export const getCountriesStats = unstable_cache(
   ['countries-stats'],
   { revalidate: 86400 } // Cache for 24 hours
 );
-  
-  const column = columnMap[sort];
-  const direction = order.toUpperCase();
-  
-  // For rank, we need to order by the window function result
-  // For other columns, we can use the alias
-  if (sort === 'rank') {
-    return `rank ${direction}`;
-  }
-  
-  return `${column} ${direction}`;
-}

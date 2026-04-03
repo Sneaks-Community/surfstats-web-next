@@ -1,4 +1,3 @@
-import { unstable_cache } from 'next/cache';
 import Link from 'next/link';
 import { getCountriesRanking, getCountriesStats, CountrySortKey, SortOrder } from '@/lib/country-analytics';
 import CountryBadge from '@/components/CountryBadge';

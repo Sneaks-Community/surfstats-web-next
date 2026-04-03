@@ -11,14 +11,12 @@ import CountryBadge from '@/components/CountryBadge';
 import { countryNameToCode } from '@/lib/countries';
 import { getTotalsCached } from '@/lib/cache';
 import { getPlayerTimeOnServer } from '@/lib/player-analytics';
-import { getAllMapMetadata, getTierDistributionWithStages } from '@/lib/map-cache';
+import { getAllMapMetadata } from '@/lib/map-cache';
 import {
-  getIncompleteMapsForPlayer,
   getIncompleteBonusesForPlayer,
   getIncompleteStagesForPlayer
 } from '@/lib/registry-cache';
 import logger from '@/lib/logger';
-import type { Metadata } from 'next';
 import TierDistributionChart from './components/TierDistributionChart';
 import PlayerRecordsTabs from './components/PlayerRecordsTabs';
 import ProgressBar from '@/components/ProgressBar';

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Users, Map as MapIcon, Trophy, Clock, Activity, Server } from 'lucide-react';
+import { Users, Map as MapIcon, Trophy, Clock, Activity } from 'lucide-react';
 import { formatTime, formatDate } from '@/lib/utils';
 import { getStatsCached, getLatestCompletionsCached } from '@/lib/cache';
 import logger from '@/lib/logger';

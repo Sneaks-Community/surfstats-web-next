@@ -5,7 +5,7 @@ import { cache } from 'react';
 import { getSteamProfiles } from '@/lib/steam';
 import Pagination from '@/components/Pagination';
 import { formatDate } from '@/lib/utils';
-import { getPlayers, PlayerRank } from '@/lib/player-cache';
+import { getPlayers } from '@/lib/player-cache';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {

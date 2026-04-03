@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Server, Users, Map as MapIcon, Activity, ChevronDown, Clock } from 'lucide-react';
+import { Server, Users, ChevronDown, Clock } from 'lucide-react';
 import Link from 'next/link';
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';

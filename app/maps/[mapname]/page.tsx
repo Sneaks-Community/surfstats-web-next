@@ -4,14 +4,12 @@ import { getSteamProfileUrl } from '@/lib/steam';
 import Link from 'next/link';
 import { Map as MapIcon, Users, Layers, Target, Download } from 'lucide-react';
 import MapImage from '@/components/MapImage';
-import { getTierColor } from '@/lib/tierColors';
 import { sanitizeMapName, sanitizePlayerName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
-import type { Metadata } from 'next';
 import MapRecordsTabs from './components/MapRecordsTabs';
 import TierBadge from '@/components/TierBadge';
 import MapChartGrid from './components/charts/MapChartGrid';
-import { getMapMetadata, type MapMetadata } from '@/lib/map-cache';
+import { getMapMetadata } from '@/lib/map-cache';
 
 // Default page size - keeps cache entry under 2MB (each record ~200 bytes, 100 records ~20KB)
 const DEFAULT_PAGE_SIZE = 100;

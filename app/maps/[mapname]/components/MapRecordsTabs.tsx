@@ -161,22 +161,6 @@ export default function MapRecordsTabs({
   const debouncedBonusSearch = useDebounce(bonusSearchQuery, 300);
   const debouncedStageSearch = useDebounce(stageSearchQuery, 300);
 
-  // Group stage records by stage - uses API-loaded records
-  const stageGroups = useMemo(() => {
-    const groups: { [stage: number]: StageRecord[] } = {};
-    for (const record of allStageRecords) {
-      if (!groups[record.stage]) {
-        groups[record.stage] = [];
-      }
-      groups[record.stage].push(record);
-    }
-    // Sort records within each group by rank
-    for (const stage in groups) {
-      groups[parseInt(stage)].sort((a, b) => a.rank - b.rank);
-    }
-    return groups;
-  }, [allStageRecords]);
-
   // Function to load stage records from API with client-side caching
   const loadStageRecords = async (stage: number, page: number = 1) => {
     if (isLoadingStages) return;

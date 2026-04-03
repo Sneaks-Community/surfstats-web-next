@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { Search as SearchIcon, Map as MapIcon, Users, ChevronRight } from 'lucide-react';
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
-import { getTierColor, getTierTextColor } from '@/lib/tierColors';
+import { getTierTextColor } from '@/lib/tierColors';
 import { sanitizeSearchQuery, sanitizePlayerName } from '@/lib/sanitize';
 import { getAllMapMetadata } from '@/lib/map-cache';
 import { searchPlayers, PlayerSearchResult } from '@/lib/player-cache';
