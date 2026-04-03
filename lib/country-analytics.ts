@@ -357,17 +357,6 @@ export const getCountriesStats = unstable_cache(
   ['countries-stats'],
   { revalidate: 86400 } // Cache for 24 hours
 );
-
-/**
- * Helper: Build ORDER BY clause for country rankings
- */
-function getOrderByClause(sort: CountrySortKey, order: SortOrder): string {
-  const columnMap: Record<CountrySortKey, string> = {
-    rank: 'rank',
-    country: 'country',
-    points: 'total_points',
-    players: 'player_count',
-  };
   
   const column = columnMap[sort];
   const direction = order.toUpperCase();

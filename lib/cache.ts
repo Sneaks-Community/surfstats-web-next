@@ -199,16 +199,6 @@ function initServerCache(): void {
   logger.info('[ServerCache] Background refresh interval started');
 }
 
-// Stop the background refresh (for testing/cleanup)
-function stopServerCache(): void {
-  const cache = getGlobalServerCache();
-  if (cache.intervalId) {
-    clearInterval(cache.intervalId);
-    cache.intervalId = null;
-  }
-  cache.initialized = false;
-}
-
 // Public function to get servers from in-memory cache
 export async function getServersCached(): Promise<ServerStatus[]> {
   // Initialize cache on first call (runs on server)

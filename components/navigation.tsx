@@ -32,12 +32,6 @@ export function Navigation({ siteName }: { siteName: string }) {
     return pathname === href;
   };
 
-  // Check if any child is active (for dropdown parent highlighting)
-  const hasActiveChild = (children: { href: string; label: string }[] | undefined) => {
-    if (!children) return false;
-    return children.some(child => pathname === child.href || pathname.startsWith(child.href + '/'));
-  };
-
   // Check if we're on any page under this parent route (for dropdown parent highlighting)
   const isParentActive = (href: string) => {
     if (href === '/') return pathname === '/';

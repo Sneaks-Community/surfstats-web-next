@@ -161,22 +161,6 @@ export default function MapRecordsTabs({
   const debouncedBonusSearch = useDebounce(bonusSearchQuery, 300);
   const debouncedStageSearch = useDebounce(stageSearchQuery, 300);
 
-  // Group bonus records by zonegroup - uses API-loaded records
-  const bonusGroups = useMemo(() => {
-    const groups: { [zonegroup: number]: BonusRecord[] } = {};
-    for (const record of allBonusRecords) {
-      if (!groups[record.zonegroup]) {
-        groups[record.zonegroup] = [];
-      }
-      groups[record.zonegroup].push(record);
-    }
-    // Sort records within each group by rank
-    for (const zonegroup in groups) {
-      groups[parseInt(zonegroup)].sort((a, b) => a.rank - b.rank);
-    }
-    return groups;
-  }, [allBonusRecords]);
-
   // Group stage records by stage - uses API-loaded records
   const stageGroups = useMemo(() => {
     const groups: { [stage: number]: StageRecord[] } = {};
@@ -192,42 +176,6 @@ export default function MapRecordsTabs({
     }
     return groups;
   }, [allStageRecords]);
-
-  // Function to load more records from API (sequential loading)
-  const loadMoreRecords = async () => {
-    if (isLoadingMore || !hasMoreToLoad) return;
-    
-    setIsLoadingMore(true);
-    try {
-      // Find the next page to load (first page not in loadedPages Set)
-      let nextPage = 1;
-      while (loadedPagesRef.current.has(nextPage)) {
-        nextPage++;
-      }
-      const response = await fetch(`/api/maps/${mapname}/records?page=${nextPage}&pageSize=${ITEMS_PER_PAGE}`);
-      const data = await response.json();
-      
-      if (data.records && data.records.length > 0) {
-        // Merge with existing records, ensuring we don't have duplicates
-        setAllLeaderboardRecords(prev => {
-          const existingIds = new Set(prev.map(r => r.steamid + r.date));
-          const newRecords = data.records.filter((r: MapRecord) =>
-            !existingIds.has(r.steamid + r.date)
-          );
-          return [...prev, ...newRecords];
-        });
-        loadedPagesRef.current.add(nextPage);
-        setLoadedPage(nextPage);
-        setHasMoreToLoad(data.pagination.page < data.pagination.totalPages);
-      } else {
-        setHasMoreToLoad(false);
-      }
-    } catch (error) {
-      console.error('Failed to load more records:', error);
-    } finally {
-      setIsLoadingMore(false);
-    }
-  };
 
   // Function to load stage records from API with client-side caching
   const loadStageRecords = async (stage: number, page: number = 1) => {
