@@ -109,7 +109,6 @@ const backgroundPalettes: Record<BackgroundFamily, Record<string, string>> = {
 
 // Cached theme config - initialized once at server start
 let cachedThemeConfig: ReturnType<typeof createThemeConfig> | null = null;
-let cachedThemeStyles: string | null = null;
 
 /**
  * Create theme configuration from environment variables

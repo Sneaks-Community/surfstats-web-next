@@ -41,9 +41,6 @@ export default async function Home() {
   const stats = await getStats();
   const latestCompletions = await getLatestCompletions();
 
-  // Separate map and bonus completions
-  const mapCompletions = latestCompletions.filter(c => c.type === 'map');
-  const bonusCompletions = latestCompletions.filter(c => c.type === 'bonus');
 
   const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
 

@@ -3,7 +3,7 @@ import pool from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 import { unstable_cache } from 'next/cache';
 import logger from '@/lib/logger';
-import { getCountryNamesFromCode, countryNameToCode, getCountryCodeFromName } from '@/lib/countries';
+import { getCountryNamesFromCode, getCountryCodeFromName } from '@/lib/countries';
 
 /**
  * Country ranking data from database (raw query result)

@@ -186,7 +186,6 @@ export default function CompletionsOverTimeChart({ data }: CompletionsOverTimeCh
             const parts = date.split('-');
             if (parts.length !== 3) return date;
             const year = parseInt(parts[0], 10);
-            const month = parseInt(parts[1], 10);
             
             // Calculate total months in the dataset
             const totalMonths = labels.length;
