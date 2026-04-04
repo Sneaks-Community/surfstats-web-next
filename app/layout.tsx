@@ -47,11 +47,11 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
           }}
         />
       </head>
-      <body className="bg-background text-text min-h-screen flex flex-col antialiased" suppressHydrationWarning>
+      <body className="bg-gradient-radial grid-pattern bg-background text-text min-h-screen flex flex-col antialiased" suppressHydrationWarning>
         <ThemeProvider>
           <MapImagesUrlProvider url={mapImagesUrl}>
             <Navigation siteName={siteName} />
-            <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 glow-effect">
               {children}
             </main>
           <footer className="bg-background-secondary border-t border-border mt-auto relative">
