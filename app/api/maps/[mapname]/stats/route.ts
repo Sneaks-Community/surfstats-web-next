@@ -31,6 +31,7 @@ interface StatsResponse {
   checkpointAvgTimes: Array<{ checkpoint: number; avgTime: number; sampleSize: number }>;
   wrCheckpointTimes?: Array<{ checkpoint: number; time: number }>;
   bonusCompletionRates: Array<{ bonus: number; completionRate: number; completions: number }>;
+  isStageMap: boolean; // true if map has stages (zonetype 3), false for linear maps (zonetype 4)
 }
 
 /**
@@ -77,6 +78,7 @@ function processCheckpointData(
 
 /**
  * Fetch WR holder's checkpoint times for a map
+ * For staged maps, this fetches stage completion times from ck_checkpoints table
  */
 async function getWRCheckpointTimes(mapname: string, maxCheckpoint: number): Promise<Array<{ checkpoint: number; time: number }> | undefined> {
   if (maxCheckpoint === 0) {
@@ -136,19 +138,26 @@ async function getWRCheckpointTimes(mapname: string, maxCheckpoint: number): Pro
 
 /**
  * Cached function to fetch checkpoint statistics for a map
+ * For linear maps: uses mapMetadata.checkpoints (zonetype=4)
+ * For staged maps: uses mapMetadata.stages (zonetype=3) since stages are stored in ck_checkpoints table
  */
 const getCheckpointStats = unstable_cache(
   async (mapname: string) => {
     // Get checkpoint count from cached map metadata
     const mapMetadata = await getMapMetadata(mapname);
     const checkpoints = mapMetadata?.checkpoints || 0;
+    const stages = mapMetadata?.stages || 0;
 
-    if (checkpoints === 0) {
+    // For staged maps, use stage count as the max checkpoint column to fetch
+    // Staged maps store stage times in ck_checkpoints table (cp1, cp2, etc.)
+    const maxCheckpoint = checkpoints > 0 ? checkpoints : stages;
+
+    if (maxCheckpoint === 0) {
       return { checkpointAvgTimes: [], wrCheckpointTimes: [] };
     }
 
-    // Build dynamic column list based on checkpoint count
-    const checkpointColumns = Array.from({ length: checkpoints }, (_, i) => `cp${i + 1}`);
+    // Build dynamic column list based on max checkpoint count
+    const checkpointColumns = Array.from({ length: maxCheckpoint }, (_, i) => `cp${i + 1}`);
 
     // Fetch only existing checkpoint columns
     const [checkpointRows] = await pool.query<RowDataPacket[]>(`
@@ -157,7 +166,7 @@ const getCheckpointStats = unstable_cache(
       WHERE mapname = ?
     `, [mapname]);
 
-    return processCheckpointData(checkpointRows, checkpoints);
+    return processCheckpointData(checkpointRows, maxCheckpoint);
   },
   ['checkpoint-stats'],
   { revalidate: 3600 } // 1 hour cache
@@ -187,17 +196,23 @@ export async function GET(
 
     if (totalCompletions === 0) {
       // No data available for this map
+      const mapMetadata = await getMapMetadata(validMapname);
       return NextResponse.json({
         completionsOverTime: [],
         timeOnMapData: [],
         checkpointAvgTimes: [],
         bonusCompletionRates: [],
+        isStageMap: (mapMetadata?.stages || 0) > 0,
       } as StatsResponse);
     }
 
-    // Get map metadata to know how many checkpoints exist
+    // Get map metadata to know how many checkpoints exist and if map has stages
     const mapMetadata = await getMapMetadata(validMapname);
-    const maxCheckpoint = mapMetadata?.checkpoints || 0;
+    const checkpoints = mapMetadata?.checkpoints || 0;
+    const stages = mapMetadata?.stages || 0;
+    // For staged maps, use stage count as maxCheckpoint since stages are stored in ck_checkpoints table
+    const maxCheckpoint = checkpoints > 0 ? checkpoints : stages;
+    const isStageMap = stages > 0;
 
     // Query 1: Completions Over Time (grouped by month, all available data)
     const [completionsRows] = await pool.query<CompletionsOverTimeData[]>(`
@@ -279,6 +294,7 @@ export async function GET(
       checkpointAvgTimes,
       wrCheckpointTimes,
       bonusCompletionRates,
+      isStageMap,
     } as StatsResponse);
   } catch (error: any) {
     logger.error(`[API Stats] Failed to fetch stats for ${validMapname}: ${error.message}`);

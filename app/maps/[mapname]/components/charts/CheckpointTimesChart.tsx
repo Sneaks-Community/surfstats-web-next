@@ -42,9 +42,10 @@ interface WRCheckpointTimeData {
 interface CheckpointTimesChartProps {
   data: CheckpointTimeData[];
   wrData?: WRCheckpointTimeData[];
+  isStageMap?: boolean; // true if map has stages (zonetype 3), false for linear maps (zonetype 4)
 }
 
-export default function CheckpointTimesChart({ data, wrData }: CheckpointTimesChartProps) {
+export default function CheckpointTimesChart({ data, wrData, isStageMap = false }: CheckpointTimesChartProps) {
   const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
   const safeWRData = useMemo(() => Array.isArray(wrData) ? wrData : [], [wrData]);
 
@@ -53,7 +54,12 @@ export default function CheckpointTimesChart({ data, wrData }: CheckpointTimesCh
   };
 
   const chartData = useMemo(() => {
-    const labels = safeData.map(d => `CP${d.checkpoint}`);
+    const labels = safeData.map(d => {
+      if (isStageMap) {
+        return `S${d.checkpoint}`;
+      }
+      return `CP${d.checkpoint}`;
+    });
     const avgTimes = safeData.map(d => d.avgTime);
 
     // Create a map of checkpoint -> WR time for easy lookup
@@ -94,7 +100,7 @@ export default function CheckpointTimesChart({ data, wrData }: CheckpointTimesCh
         }] : []),
       ],
     };
-  }, [safeData, safeWRData, wrData]);
+  }, [safeData, safeWRData, wrData, isStageMap]);
 
   const options: ChartOptions<'line'> = useMemo(() => ({
     responsive: true,
@@ -133,7 +139,14 @@ export default function CheckpointTimesChart({ data, wrData }: CheckpointTimesCh
         callbacks: {
           title: (tooltipItems) => {
             const label = tooltipItems[0].label as string;
-            return `CP ${label.replace('CP', '')}`;
+            // Extract number from either 'CP1' or 'S1' format
+            const match = label.match(/(CP|S)(\d+)/);
+            if (match) {
+              const type = match[1];
+              const num = match[2];
+              return `${type} ${num}`;
+            }
+            return label;
           },
           label: (context) => {
             const datasetIndex = context.datasetIndex;
@@ -191,7 +204,7 @@ export default function CheckpointTimesChart({ data, wrData }: CheckpointTimesCh
       <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
         <h3 className="text-sm font-semibold text-text mb-2">Checkpoint Times</h3>
         <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-          No checkpoint time data available
+          {isStageMap ? 'No stage time data available' : 'No checkpoint time data available'}
         </div>
       </div>
     );

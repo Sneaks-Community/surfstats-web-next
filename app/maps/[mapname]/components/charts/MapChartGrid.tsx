@@ -12,6 +12,7 @@ interface ChartData {
   checkpointAvgTimes: Array<{ checkpoint: number; avgTime: number; sampleSize: number }>;
   wrCheckpointTimes?: Array<{ checkpoint: number; time: number }>;
   bonusCompletionRates: Array<{ bonus: number; completionRate: number; completions: number }>;
+  isStageMap: boolean; // true if map has stages (zonetype 3), false for linear maps (zonetype 4)
 }
 
 interface MapChartGridProps {
@@ -79,7 +80,11 @@ export default function MapChartGrid({ mapname }: MapChartGridProps) {
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       <CompletionsOverTimeChart data={data.completionsOverTime} />
       <TimeOnMapChart data={data.timeOnMapData} />
-      <CheckpointTimesChart data={data.checkpointAvgTimes} wrData={data.wrCheckpointTimes} />
+      <CheckpointTimesChart
+        data={data.checkpointAvgTimes}
+        wrData={data.wrCheckpointTimes}
+        isStageMap={data.isStageMap}
+      />
       <BonusCompletionChart data={data.bonusCompletionRates} />
     </div>
   );
