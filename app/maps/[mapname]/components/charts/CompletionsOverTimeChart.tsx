@@ -119,7 +119,14 @@ export default function CompletionsOverTimeChart({ data }: CompletionsOverTimeCh
       scales: {
         x: {
           grid: {
-            color: 'rgba(148, 163, 184, 0.2)',
+            // Only show grid lines at year boundaries (every 12 months)
+            color: (context: any) => {
+              // Only draw grid line at year boundaries (index divisible by 12)
+              if (context.tick && context.tick.index % 12 === 0) {
+                return 'rgba(148, 163, 184, 0.2)';
+              }
+              return 'transparent';
+            },
           },
           ticks: {
             color: '#94a3b8',
@@ -128,7 +135,7 @@ export default function CompletionsOverTimeChart({ data }: CompletionsOverTimeCh
             },
             maxRotation: 45,
             minRotation: 45,
-            autoSkip: true,
+            autoSkip: false,
             callback: (value, index) => {
               // Chart.js passes the numeric index to the tick callback
               const date = chartData.labels[index as number];
