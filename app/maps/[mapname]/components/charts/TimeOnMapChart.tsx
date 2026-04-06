@@ -35,22 +35,37 @@ interface TimeOnMapChartProps {
   data: TimeOnMapData[];
 }
 
+const formatHours = (hours: number): string => {
+  const totalDays = Math.round(hours / 24);
+  if (totalDays >= 1) {
+    return `${totalDays}d`;
+  }
+  const totalHours = Math.round(hours);
+  return `${totalHours}h`;
+};
+
+const formatHoursDetailed = (hours: number): string => {
+  const totalHours = Math.round(hours);
+  const days = Math.floor(totalHours / 24);
+  const remainingHours = totalHours % 24;
+  
+  if (days > 0) {
+    return `${days}d ${remainingHours}h`;
+  }
+  return `${totalHours}h`;
+};
+
+const formatDate = (date: string): string => {
+  // Input: "2017-10-01" → Output: "10/2017"
+  const [year, month] = date.split('-');
+  return `${month}/${year}`;
+};
+
 export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
   const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
 
-  const formatHours = (hours: number): string => {
-    const totalHours = Math.round(hours);
-    const days = Math.floor(totalHours / 24);
-    const remainingHours = totalHours % 24;
-    
-    if (days > 0) {
-      return `${days}d ${remainingHours}h`;
-    }
-    return `${totalHours}h`;
-  };
-
   const chartData = useMemo(() => {
-    const labels = safeData.map(d => d.date);
+    const labels = safeData.map(d => formatDate(d.date));
     const durations = safeData.map(d => d.totalDuration);
 
     return {
@@ -103,7 +118,7 @@ export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
           },
           label: (context) => {
             const value = context.parsed.y ?? 0;
-            return `Total hours: ${formatHours(value)}`;
+            return `Total hours: ${formatHoursDetailed(value)}`;
           },
         },
       },
