@@ -49,16 +49,7 @@ export default function CheckpointTimesChart({ data, wrData }: CheckpointTimesCh
   const safeWRData = useMemo(() => Array.isArray(wrData) ? wrData : [], [wrData]);
 
   const formatTime = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.round(seconds % 60);
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${secs}s`;
-    }
-    if (minutes > 0) {
-      return `${minutes}m ${secs}s`;
-    }
-    return `${secs}s`;
+    return `${seconds.toFixed(1)}s`;
   };
 
   const chartData = useMemo(() => {
@@ -117,8 +108,10 @@ export default function CheckpointTimesChart({ data, wrData }: CheckpointTimesCh
           font: {
             size: 12,
           },
-          usePointStyle: true,
-          pointStyle: 'line',
+          usePointStyle: false,
+          pointStyle: 'rect',
+          boxWidth: 8,
+          boxHeight: 8,
         },
       },
       tooltip: {
@@ -140,7 +133,7 @@ export default function CheckpointTimesChart({ data, wrData }: CheckpointTimesCh
         callbacks: {
           title: (tooltipItems) => {
             const label = tooltipItems[0].label as string;
-            return `Checkpoint ${label.replace('CP', '')}`;
+            return `CP ${label.replace('CP', '')}`;
           },
           label: (context) => {
             const datasetIndex = context.datasetIndex;
@@ -148,8 +141,7 @@ export default function CheckpointTimesChart({ data, wrData }: CheckpointTimesCh
             
             if (datasetIndex === 0) {
               // Average Time dataset
-              const sampleSize = safeData[context.dataIndex]?.sampleSize ?? 0;
-              return `Avg: ${formatTime(value)} (${sampleSize} samples)`;
+              return `Avg: ${formatTime(value)}`;
             } else if (datasetIndex === 1 && wrData && wrData.length > 0) {
               // WR Time dataset
               const checkpoint = safeData[context.dataIndex]?.checkpoint;
