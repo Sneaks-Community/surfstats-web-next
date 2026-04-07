@@ -118,7 +118,7 @@ export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
           },
           label: (context) => {
             const value = context.parsed.y ?? 0;
-            return `Total hours: ${formatHoursDetailed(value)}`;
+            return `Total Time: ${formatHoursDetailed(value)}`;
           },
         },
       },
