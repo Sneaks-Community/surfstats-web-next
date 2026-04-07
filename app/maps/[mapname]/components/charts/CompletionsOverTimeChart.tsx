@@ -109,7 +109,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
       borderColor: '#3b82f6', // blue-500
       backgroundColor: 'rgba(59, 130, 246, 0.1)',
       fill: false,
-      tension: 0.4,
+      tension: 0.1,
       pointRadius: 0,
       pointHoverRadius: 4,
     });
@@ -135,7 +135,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
         borderColor: bonusColors[index],
         backgroundColor: bonusColors[index].replace(')', ', 0.1)').replace('hsl', 'hsl'),
         fill: false,
-        tension: 0.4,
+        tension: 0.1,
         pointRadius: 0,
         pointHoverRadius: 4,
       });

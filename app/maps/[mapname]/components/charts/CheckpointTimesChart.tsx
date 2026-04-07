@@ -77,7 +77,7 @@ export default function CheckpointTimesChart({ data, wrData, isStageMap = false 
           borderColor: '#8b5cf6', // violet-500
           backgroundColor: 'rgba(139, 92, 246, 0.3)',
           fill: true,
-          tension: 0.4,
+          tension: 0,
           pointRadius: 4,
           pointHoverRadius: 6,
           pointBackgroundColor: '#8b5cf6',
@@ -90,7 +90,7 @@ export default function CheckpointTimesChart({ data, wrData, isStageMap = false 
           borderColor: '#10b981', // emerald-500
           backgroundColor: 'rgba(16, 185, 129, 0.3)',
           fill: false,
-          tension: 0.4,
+          tension: 0,
           pointRadius: 5,
           pointHoverRadius: 7,
           pointBackgroundColor: '#10b981',

@@ -77,7 +77,7 @@ export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
           borderColor: '#fdba74', // peach-400
           backgroundColor: 'rgba(251, 146, 60, 0.3)',
           fill: true,
-          tension: 0.4,
+          tension: 0.1,
           pointRadius: 0,
           pointHoverRadius: 4,
           pointBackgroundColor: '#3b82f6',
