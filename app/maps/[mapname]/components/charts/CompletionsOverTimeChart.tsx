@@ -35,12 +35,33 @@ interface CompletionsOverTimeData {
   count: number;
 }
 
-interface CompletionsOverTimeChartProps {
-  data: CompletionsOverTimeData[];
+interface BonusTimeSeriesData {
+  [bonus: number]: Array<{ date: string; count: number }>;
 }
 
-export default function CompletionsOverTimeChart({ data }: CompletionsOverTimeChartProps) {
+interface CompletionsOverTimeChartProps {
+  data: CompletionsOverTimeData[];
+  bonusData: BonusTimeSeriesData;
+}
+
+// Generate distinct colors for each bonus series
+const generateBonusColors = (bonusCount: number) => {
+  const baseHues = [280, 320, 160, 45, 200, 30, 220, 10, 180, 260];
+  const colors: string[] = [];
+  
+  for (let i = 0; i < bonusCount; i++) {
+    const hue = baseHues[i % baseHues.length];
+    const saturation = 70 + (i % 3) * 5; // 70-85%
+    const lightness = 55 + (i % 2) * 5; // 55-60%
+    colors.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
+  }
+  
+  return colors;
+};
+
+export default function CompletionsOverTimeChart({ data, bonusData }: CompletionsOverTimeChartProps) {
   const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
+  const safeBonusData = useMemo(() => bonusData || {}, [bonusData]);
 
   const formatDate = (dateStr: string): string => {
     // MySQL returns dates as 'YYYY-MM-01', parse manually to avoid timezone issues
@@ -55,27 +76,76 @@ export default function CompletionsOverTimeChart({ data }: CompletionsOverTimeCh
   const labels = useMemo(() => safeData.map(d => d.date), [safeData]);
   const counts = useMemo(() => safeData.map(d => d.count), [safeData]);
 
-  // Calculate max count for Y-axis upper bound
+  // Calculate max count for Y-axis upper bound (considering both total and bonuses)
   const maxCount = useMemo(() => {
-    if (counts.length === 0) return 1;
-    return Math.max(...counts);
-  }, [counts]);
+    const allCounts = [...counts];
+    
+    // Add bonus counts to find the true maximum
+    Object.values(safeBonusData).forEach((bonusSeries: Array<{ date: string; count: number }>) => {
+      bonusSeries.forEach((d) => allCounts.push(d.count));
+    });
+    
+    if (allCounts.length === 0) return 1;
+    return Math.max(...allCounts);
+  }, [counts, safeBonusData]);
 
-  const chartData = useMemo(() => ({
-    labels,
-    datasets: [
-      {
-        label: 'Completions',
-        data: counts,
-        borderColor: '#3b82f6', // blue-500
-        backgroundColor: 'rgba(59, 130, 246, 0.3)',
-        fill: true,
+  // Generate datasets for total completions and each bonus
+  const chartData = useMemo(() => {
+    const datasets: Array<{
+      label: string;
+      data: (number | null)[];
+      borderColor: string;
+      backgroundColor: string;
+      fill: boolean;
+      tension: number;
+      pointRadius: number;
+      pointHoverRadius: number;
+    }> = [];
+
+    // Total completions line (blue, solid)
+    datasets.push({
+      label: 'Map',
+      data: counts,
+      borderColor: '#3b82f6', // blue-500
+      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      fill: false,
+      tension: 0.4,
+      pointRadius: 0,
+      pointHoverRadius: 4,
+    });
+
+    // Bonus lines (one per bonus)
+    const bonusNumbers = Object.keys(safeBonusData)
+      .map(Number)
+      .sort((a, b) => a - b);
+    
+    const bonusColors = generateBonusColors(bonusNumbers.length);
+    
+    bonusNumbers.forEach((bonus, index) => {
+      const bonusSeries = safeBonusData[bonus] || [];
+      // Create an array aligned with labels, using null for missing dates
+      const alignedData = labels.map(date => {
+        const entry = bonusSeries.find(d => d.date === date);
+        return entry ? entry.count : null;
+      });
+
+      datasets.push({
+        label: `Bonus ${bonus}`,
+        data: alignedData,
+        borderColor: bonusColors[index],
+        backgroundColor: bonusColors[index].replace(')', ', 0.1)').replace('hsl', 'hsl'),
+        fill: false,
         tension: 0.4,
-        pointRadius: 3,
-        pointHoverRadius: 6,
-      },
-    ],
-  }), [labels, counts]);
+        pointRadius: 0,
+        pointHoverRadius: 4,
+      });
+    });
+
+    return {
+      labels,
+      datasets,
+    };
+  }, [labels, counts, safeBonusData]);
 
   const options: ChartOptions<'line'> = useMemo(() => {
     // Calculate the upper bound for Y-axis (next power of 10 above maxCount)
@@ -86,7 +156,16 @@ export default function CompletionsOverTimeChart({ data }: CompletionsOverTimeCh
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          display: false,
+          display: true,
+          position: 'top' as const,
+          labels: {
+            color: '#94a3b8',
+            font: {
+              size: 12,
+            },
+            padding: 12,
+            usePointStyle: true,
+          },
         },
         tooltip: {
           backgroundColor: 'rgba(30, 41, 59, 0.95)',
@@ -96,7 +175,7 @@ export default function CompletionsOverTimeChart({ data }: CompletionsOverTimeCh
           borderWidth: 1,
           cornerRadius: 8,
           padding: 12,
-          displayColors: false,
+          displayColors: true,
           titleFont: {
             size: 14,
             weight: 'bold',
@@ -110,8 +189,16 @@ export default function CompletionsOverTimeChart({ data }: CompletionsOverTimeCh
               return formatDate(date);
             },
             label: (context) => {
+              const label = context.dataset.label || '';
               const count = context.parsed.y ?? 0;
-              return `${count} completion${count !== 1 ? 's' : ''}`;
+              
+              if (label === 'Map') {
+                return `Map: ${count.toLocaleString()}`;
+              } else if (label.startsWith('Bonus ')) {
+                const bonusNum = label.replace('Bonus ', '');
+                return `B ${bonusNum}: ${count.toLocaleString()}`;
+              }
+              return `${label}: ${count.toLocaleString()}`;
             },
           },
         },
@@ -202,7 +289,7 @@ export default function CompletionsOverTimeChart({ data }: CompletionsOverTimeCh
   if (safeData.length === 0) {
     return (
       <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-        <h3 className="text-sm font-semibold text-text mb-2">Completions Over Time (log scale)</h3>
+        <h3 className="text-sm font-semibold text-text mb-2">Completions Over Time</h3>
         <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
           No completion data available
         </div>

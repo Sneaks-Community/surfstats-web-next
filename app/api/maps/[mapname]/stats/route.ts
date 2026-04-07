@@ -20,6 +20,12 @@ interface BonusData extends RowDataPacket {
   total: number;
 }
 
+interface BonusTimeSeriesData extends RowDataPacket {
+  date: string;
+  bonus: number;
+  count: number;
+}
+
 interface TimeOnMapData extends RowDataPacket {
   date: string;
   total_duration: number;
@@ -31,6 +37,7 @@ interface StatsResponse {
   checkpointAvgTimes: Array<{ checkpoint: number; avgTime: number; sampleSize: number }>;
   wrCheckpointTimes?: Array<{ checkpoint: number; time: number }>;
   bonusCompletionRates: Array<{ bonus: number; completionRate: number; completions: number }>;
+  bonusCompletionsOverTime: { [bonus: number]: Array<{ date: string; count: number }> };
   isStageMap: boolean; // true if map has stages (zonetype 3), false for linear maps (zonetype 4)
 }
 
@@ -172,6 +179,42 @@ const getCheckpointStats = unstable_cache(
   { revalidate: 3600 } // 1 hour cache
 );
 
+/**
+ * Cached function to fetch bonus completions over time for a map
+ * Groups bonus completions by month and zonegroup
+ */
+const getBonusCompletionsOverTime = unstable_cache(
+  async (mapname: string) => {
+    const [bonusRows] = await pool.query<BonusTimeSeriesData[]>(`
+      SELECT
+        DATE_FORMAT(date, '%Y-%m-01') as date,
+        zonegroup as bonus,
+        COUNT(*) as count
+      FROM ck_bonus
+      WHERE mapname = ?
+      GROUP BY DATE_FORMAT(date, '%Y-%m'), zonegroup
+      ORDER BY date ASC, zonegroup ASC
+    `, [mapname]);
+
+    // Group by bonus number
+    const bonusData: { [bonus: number]: Array<{ date: string; count: number }> } = {};
+    
+    for (const row of bonusRows) {
+      if (!bonusData[row.bonus]) {
+        bonusData[row.bonus] = [];
+      }
+      bonusData[row.bonus].push({
+        date: row.date,
+        count: row.count,
+      });
+    }
+
+    return bonusData;
+  },
+  ['bonus-completions-over-time'],
+  { revalidate: 300 } // 5 minute cache
+);
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ mapname: string }> }
@@ -202,6 +245,7 @@ export async function GET(
         timeOnMapData: [],
         checkpointAvgTimes: [],
         bonusCompletionRates: [],
+        bonusCompletionsOverTime: {},
         isStageMap: (mapMetadata?.stages || 0) > 0,
       } as StatsResponse);
     }
@@ -270,7 +314,7 @@ export async function GET(
 
     // Query 5: Bonus Completion Rates
     const [bonusRows] = await pool.query<BonusData[]>(`
-      SELECT 
+      SELECT
         zonegroup as bonus,
         COUNT(*) as completions,
         ? as total
@@ -286,7 +330,10 @@ export async function GET(
       completions: row.completions,
     }));
 
-    logger.debug(`[API Stats] Fetched stats for ${validMapname}: ${completionsOverTime.length} time points, ${checkpointAvgTimes.length} checkpoints, ${bonusCompletionRates.length} bonuses, ${wrCheckpointTimes ? wrCheckpointTimes.length : 0} WR checkpoint times`);
+    // Query 6: Bonus Completions Over Time (cached)
+    const bonusCompletionsOverTime = await getBonusCompletionsOverTime(validMapname);
+
+    logger.debug(`[API Stats] Fetched stats for ${validMapname}: ${completionsOverTime.length} time points, ${checkpointAvgTimes.length} checkpoints, ${bonusCompletionRates.length} bonuses, ${Object.keys(bonusCompletionsOverTime).length} bonus time series, ${wrCheckpointTimes ? wrCheckpointTimes.length : 0} WR checkpoint times`);
 
     return NextResponse.json({
       completionsOverTime,
@@ -294,6 +341,7 @@ export async function GET(
       checkpointAvgTimes,
       wrCheckpointTimes,
       bonusCompletionRates,
+      bonusCompletionsOverTime,
       isStageMap,
     } as StatsResponse);
   } catch (error: any) {
