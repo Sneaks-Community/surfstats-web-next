@@ -87,7 +87,7 @@ const getBonusRecords = unstable_cache(
       throw error;
     }
   },
-  ['bonus-records'],
+  [],
   { revalidate: 300 } // Revalidate cache every 5 minutes
 );
 

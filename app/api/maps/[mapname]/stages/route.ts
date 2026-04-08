@@ -137,7 +137,7 @@ const getStageRecords = unstable_cache(
       throw error;
     }
   },
-  ['stage-records'],
+  [],
   { revalidate: 300 } // Revalidate cache every 5 minutes
 );
 
