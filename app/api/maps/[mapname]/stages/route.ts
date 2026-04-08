@@ -5,8 +5,8 @@ import { sanitizeMapName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import { unstable_cache } from 'next/cache';
 
-const DEFAULT_PAGE_SIZE = 100;
-const MAX_PAGE_SIZE = 500;
+const TOP_RECORDS_LIMIT = 100;
+const MAX_STAGE_RECORDS = 100;
 
 interface StageRecord extends RowDataPacket {
   steamid: string;
@@ -33,16 +33,16 @@ interface StagesResponse {
 }
 
 // Server-side cache for stage records
-// Cache key includes mapname, stage, page, and pageSize to create unique entries
+// Cache key includes mapname, stage, sortField, sortOrder, pageSize, and offset
 const getStageRecords = unstable_cache(
   async (
     mapname: string,
     stage: number,
-    page: number,
-    pageSize: number
+    sortField: string,
+    sortOrder: string,
+    pageSize: number,
+    offset: number
   ): Promise<StagesResponse> => {
-    const offset = (page - 1) * pageSize;
-
     try {
       // Get list of all stages
       const [stagesListRows] = await pool.query<RowDataPacket[]>(`
@@ -56,31 +56,80 @@ const getStageRecords = unstable_cache(
       `, [mapname, stage]);
       const totalRecords = countRows[0]?.total || 0;
 
-      // Get stage records with pagination using window function
-      const [stageRows] = await pool.query<StageRecord[]>(`
-        SELECT 
-          s.steamid, pr.name, s.stage, s.runtime, s.date, s.startspeed,
-          ROW_NUMBER() OVER (ORDER BY s.runtime ASC) as rank,
-          (SELECT MIN(runtime) FROM ck_stages WHERE map = s.map AND stage = s.stage) as wr_time
-        FROM ck_stages s
-        LEFT JOIN ck_playerrank pr ON s.steamid = pr.steamid
-        WHERE s.map = ? AND s.stage = ?
-        ORDER BY s.runtime ASC
-        LIMIT ? OFFSET ?
-      `, [mapname, stage, pageSize, offset]);
+      // Get WR time once
+      const [wrResult] = await pool.query<RowDataPacket[]>(`
+        SELECT MIN(runtime) as wr_time FROM ck_stages WHERE map = ? AND stage = ?
+      `, [mapname, stage]);
+      const wrTime = wrResult[0]?.wr_time || null;
 
-      logger.debug(`[API] Fetched ${stageRows.length} stage records for ${mapname} stage ${stage}`);
+      // Build ORDER BY clause based on sort field
+      // NOTE: For stages, we always fetch top 100 by rank (runtime ASC) first
+      // Client-side sorting handles other sort fields
+      const orderDirection = sortOrder === 'desc' ? 'DESC' : 'ASC';
+      let orderByClause = 'runtime ASC'; // Default to runtime
+      if (sortField === 'rank') {
+        orderByClause = 'runtime ASC';
+      } else if (sortField === 'player') {
+        orderByClause = `name ${orderDirection}, runtime ASC`;
+      } else if (sortField === 'time') {
+        orderByClause = `runtime ${orderDirection}`;
+      } else if (sortField === 'speed') {
+        orderByClause = `startspeed ${orderDirection}, runtime ASC`;
+      } else if (sortField === 'date') {
+        orderByClause = `date ${orderDirection}, runtime ASC`;
+      }
+
+      // Get total count with rank calculation (always by runtime, date as tiebreaker)
+      const [rankCountRows] = await pool.query<RowDataPacket[]>(`
+        SELECT COUNT(DISTINCT rank) as total FROM (
+          SELECT
+            s.steamid,
+            DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) as rank
+          FROM ck_stages s
+          WHERE s.map = ? AND s.stage = ?
+        ) AS ranked
+      `, [mapname, stage]);
+      const totalWithRank = rankCountRows[0]?.total || 0;
+
+      // Get stage records with rank calculation
+      // Return all top 100 records sorted by rank for UI to handle pagination and sorting
+      const [stageRows] = await pool.query<StageRecord[]>(`
+        SELECT
+          steamid, name, stage, runtime, date, startspeed, rank, wr_time
+        FROM (
+          SELECT
+            s.steamid,
+            pr.name,
+            s.stage,
+            s.runtime,
+            s.date,
+            s.startspeed,
+            DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) as rank,
+            ? as wr_time
+          FROM ck_stages s
+          LEFT JOIN ck_playerrank pr ON s.steamid = pr.steamid
+          WHERE s.map = ? AND s.stage = ?
+        ) AS ranked_data
+        WHERE rank <= ?
+        ORDER BY rank ASC, date ASC
+      `, [wrTime, mapname, stage, MAX_STAGE_RECORDS]);
+
+      logger.debug(`[API] Fetched ${stageRows.length} stage records for ${mapname} stage ${stage} (sort: ${sortField} ${sortOrder}, page: ${Math.floor(offset / pageSize) + 1})`);
+
+      // Cap total records at MAX_STAGE_RECORDS (100)
+      const cappedTotal = Math.min(totalWithRank, MAX_STAGE_RECORDS);
+      const cappedTotalPages = Math.ceil(cappedTotal / pageSize);
 
       return {
         stages: stageRows,
         stagesList,
         pagination: {
           stage,
-          page,
+          page: Math.floor(offset / pageSize) + 1,
           pageSize,
           offset,
-          total: totalRecords,
-          totalPages: Math.ceil(totalRecords / pageSize),
+          total: cappedTotal,
+          totalPages: cappedTotalPages,
         },
       };
     } catch (error: any) {
@@ -106,17 +155,17 @@ export async function GET(
 
   const searchParams = request.nextUrl.searchParams;
   const stage = parseInt(searchParams.get('stage') || '1', 10);
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-  const pageSize = Math.min(
-    MAX_PAGE_SIZE,
-    Math.max(1, parseInt(searchParams.get('pageSize') || String(DEFAULT_PAGE_SIZE), 10))
-  );
+  const sortField = searchParams.get('sort') || 'rank';
+  const sortOrder = searchParams.get('order') || 'asc';
+  const page = parseInt(searchParams.get('page') || '1', 10);
+  const pageSize = parseInt(searchParams.get('pageSize') || TOP_RECORDS_LIMIT.toString(), 10);
+  const offset = (page - 1) * pageSize;
 
   try {
-    const data = await getStageRecords(validMapname, stage, page, pageSize);
+    const data = await getStageRecords(validMapname, stage, sortField, sortOrder, pageSize, offset);
     return NextResponse.json(data);
   } catch (error: any) {
-    logger.error(`[API] Failed to fetch stage records for ${validMapname}: ${error.message}`);
+    logger.error(`[API] Failed to fetch top stage records for ${validMapname}: ${error.message}`);
     return NextResponse.json(
       { error: 'Failed to fetch stage records' },
       { status: 500 }

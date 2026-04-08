@@ -55,6 +55,7 @@ interface MapRecordsTabsProps {
 type TabType = 'map' | 'bonus' | 'stages';
 
 const ITEMS_PER_PAGE = 20;
+const MAX_STAGE_RECORDS = 100;
 
 // Sort types
 type SortField = 'rank' | 'player' | 'time' | 'speed' | 'wrDiff' | 'date';
@@ -88,10 +89,6 @@ export default function MapRecordsTabs({
   // Ref to track loaded pages as a Set (for arbitrary page navigation)
   const loadedPagesRef = useRef<Set<number>>(new Set());
 
-  // Ref to track fetched stage-page combinations for client-side caching
-  // Key format: "${stage}-${page}"
-  const stageCacheRef = useRef<Map<string, StageRecord[]>>(new Map());
-
   // Ref to track fetched bonus-page combinations for client-side caching
   // Key format: "${bonus}-${page}"
   const bonusCacheRef = useRef<Map<string, BonusRecord[]>>(new Map());
@@ -120,8 +117,7 @@ export default function MapRecordsTabs({
     }
     setHasMoreToLoad(totalRecords > records.length);
     setLeaderboardPage(1);
-    // Clear stage and bonus caches when map changes
-    stageCacheRef.current = new Map();
+    // Clear bonus cache when map changes
     bonusCacheRef.current = new Map();
     setAllStageRecords([]);
     setAllBonusRecords([]);
@@ -143,7 +139,7 @@ export default function MapRecordsTabs({
   const initialSortField = (searchParams.get('sort') as SortField) || 'rank';
   const initialSortDir = (searchParams.get('dir') as SortDirection) || 'asc';
 
-  // State
+  // State - Map tab uses client-side sorting, Stages tab uses server-side sorting
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [leaderboardPage, setLeaderboardPage] = useState(initialPage);
   const [selectedBonus, setSelectedBonus] = useState(initialBonus);
@@ -161,42 +157,33 @@ export default function MapRecordsTabs({
   const debouncedBonusSearch = useDebounce(bonusSearchQuery, 300);
   const debouncedStageSearch = useDebounce(stageSearchQuery, 300);
 
-  // Function to load stage records from API with client-side caching
-  const loadStageRecords = async (stage: number, page: number = 1) => {
-    if (isLoadingStages) return;
+  // Function to load stage records from API - returns all 100 records for client-side pagination
+  const MAX_STAGE_PAGES = Math.ceil(MAX_STAGE_RECORDS / ITEMS_PER_PAGE);
 
-    // Check client-side cache first
-    const cacheKey = `${stage}-${page}`;
-    const cachedData = stageCacheRef.current.get(cacheKey);
-    
-    if (cachedData) {
-      // Cache hit - use cached data
-      setAllStageRecords(cachedData);
-      setIsLoadingStages(false);
-      return;
-    }
+  const loadStageRecords = async (stage: number) => {
+    if (isLoadingStages) return;
 
     setIsLoadingStages(true);
     try {
-      const response = await fetch(`/api/maps/${mapname}/stages?stage=${stage}&page=${page}&pageSize=${ITEMS_PER_PAGE}`);
+      // Build query - API returns all 100 records sorted by rank
+      const params = new URLSearchParams();
+      params.set('stage', stage.toString());
+
+      const response = await fetch(`/api/maps/${mapname}/stages?${params.toString()}`);
       const data = await response.json();
 
       if (data.stages && data.stages.length > 0) {
-        // Store in client-side cache
-        stageCacheRef.current.set(cacheKey, data.stages);
         setAllStageRecords(data.stages);
         setTotalStageRecords(data.pagination.total);
         if (data.stagesList && data.stagesList.length > 0) {
           setStagesList(data.stagesList);
         }
       } else {
-        stageCacheRef.current.set(cacheKey, []);
         setAllStageRecords([]);
         setTotalStageRecords(0);
       }
     } catch (error) {
       console.error('Failed to load stage records:', error);
-      stageCacheRef.current.set(cacheKey, []);
       setAllStageRecords([]);
       setTotalStageRecords(0);
     } finally {
@@ -204,13 +191,13 @@ export default function MapRecordsTabs({
     }
   };
 
-  // Load stage records when selected stage changes
+  // Load stage records when selected stage changes (sort is handled client-side)
   useEffect(() => {
     if (activeTab === 'stages' && numStages > 1) {
-      loadStageRecords(selectedStage, stagePage);
+      loadStageRecords(selectedStage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, selectedStage, stagePage, numStages]);
+  }, [activeTab, selectedStage, numStages]);
 
   // Function to load bonus records from API with client-side caching
   const loadBonusRecords = async (bonus: number, page: number = 1) => {
@@ -275,8 +262,15 @@ export default function MapRecordsTabs({
     if (searchQuery) params.set('q', searchQuery);
     if (bonusSearchQuery) params.set('bq', bonusSearchQuery);
     if (stageSearchQuery) params.set('sq', stageSearchQuery);
-    if (sortField !== 'rank') params.set('sort', sortField);
-    if (sortDirection !== 'asc') params.set('dir', sortDirection);
+    // Stages tab: sorting is done server-side
+    if (activeTab === 'stages') {
+      if (sortField !== 'rank') params.set('sort', sortField);
+      if (sortDirection !== 'asc') params.set('order', sortDirection);
+    } else {
+      // Map tab uses client-side sorting
+      if (sortField !== 'rank') params.set('sort', sortField);
+      if (sortDirection !== 'asc') params.set('dir', sortDirection);
+    }
 
     router.replace(`?${params.toString()}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -360,7 +354,7 @@ export default function MapRecordsTabs({
     setStagePage(1);
   };
 
-  // Handle sort
+  // Handle sort for map tab (client-side sorting)
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -371,8 +365,31 @@ export default function MapRecordsTabs({
     setLeaderboardPage(1);
   };
 
-  // Sort icon component
+  // Handle sort for stages tab (server-side sorting)
+  const handleStageSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+    setStagePage(1);
+  };
+
+  // Sort icon component for map tab (client-side sorting)
   const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="h-4 w-4 text-text-muted opacity-50" />;
+    }
+    return sortDirection === 'asc' ? (
+      <ArrowUp className="h-4 w-4 text-primary-500" />
+    ) : (
+      <ArrowDown className="h-4 w-4 text-primary-500" />
+    );
+  };
+
+  // Sort icon component for stages tab (server-side sorting)
+  const StageSortIcon = ({ field }: { field: SortField }) => {
     if (sortField !== field) {
       return <ArrowUpDown className="h-4 w-4 text-text-muted opacity-50" />;
     }
@@ -489,56 +506,59 @@ export default function MapRecordsTabs({
     (r) => r.rank >= bonusStartRank && r.rank <= bonusEndRank
   );
 
-  // Filter stage records by search
-  const filteredStageRecords = useMemo(() => {
-    if (!debouncedStageSearch) return allStageRecords;
-    const query = debouncedStageSearch.toLowerCase();
-    return allStageRecords.filter(
-      (r) =>
-        r.name.toLowerCase().includes(query) ||
-        r.steamid.toLowerCase().includes(query)
-    );
-  }, [allStageRecords, debouncedStageSearch]);
-
-  // Sort stage records
+  // Stage records are sorted by rank (runtime ASC) from the server
+  // We sort client-side based on the selected sort field
   const sortedStageRecords = useMemo(() => {
-    const sorted = [...filteredStageRecords];
+    const sorted = [...allStageRecords];
     sorted.sort((a, b) => {
       let comparison = 0;
       switch (sortField) {
         case 'rank':
-          comparison = a.rank - b.rank;
+        case 'time':
+          comparison = a.runtime - b.runtime;
           break;
         case 'player':
           comparison = a.name.localeCompare(b.name);
           break;
-        case 'time':
-          comparison = a.runtime - b.runtime;
-          break;
         case 'speed':
           comparison = a.startspeed - b.startspeed;
           break;
-        case 'wrDiff':
-          const aDiff = a.wr_time ? a.runtime - a.wr_time : Infinity;
-          const bDiff = b.wr_time ? b.runtime - b.wr_time : Infinity;
-          comparison = aDiff - bDiff;
-          break;
         case 'date':
-          comparison = new Date(b.date).getTime() - new Date(a.date).getTime();
+          comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
           break;
+        default:
+          comparison = a.rank - b.rank;
       }
       return sortDirection === 'asc' ? comparison : -comparison;
     });
     return sorted;
-  }, [filteredStageRecords, sortField, sortDirection]);
+  }, [allStageRecords, sortField, sortDirection]);
 
-  // Paginated stage records - use rank-based filtering for non-sequential page loading
-  const totalStagePages = Math.ceil((stageSearchQuery ? sortedStageRecords.length : totalStageRecords) / ITEMS_PER_PAGE);
-  const stageStartRank = (stagePage - 1) * ITEMS_PER_PAGE + 1;
-  const stageEndRank = stagePage * ITEMS_PER_PAGE;
-  const paginatedStageRecords = sortedStageRecords.filter(
-    (r) => r.rank >= stageStartRank && r.rank <= stageEndRank
+  // Paginated stage records - use row-based filtering for non-sequential page loading
+  // With DENSE_RANK, multiple players can have the same rank, so we use ROW_NUMBER for pagination
+  // Cap total pages at MAX_STAGE_PAGES (5) to respect 100 record limit
+  const totalStagePages = Math.min(
+    Math.ceil((stageSearchQuery ? sortedStageRecords.length : totalStageRecords) / ITEMS_PER_PAGE),
+    MAX_STAGE_PAGES
   );
+  
+  // Calculate row-based pagination (not rank-based)
+  const stageStartRow = (stagePage - 1) * ITEMS_PER_PAGE;
+  const stageEndRow = stagePage * ITEMS_PER_PAGE;
+  
+  let paginatedStageRecords: StageRecord[];
+  if (stageSearchQuery) {
+    // When searching, filter and paginate the sorted results
+    const filtered = sortedStageRecords.filter(
+      (r) =>
+        r.name.toLowerCase().includes(stageSearchQuery.toLowerCase()) ||
+        r.steamid.toLowerCase().includes(stageSearchQuery.toLowerCase())
+    );
+    paginatedStageRecords = filtered.slice(stageStartRow, stageEndRow);
+  } else {
+    // When not searching, use row-based filtering
+    paginatedStageRecords = sortedStageRecords.slice(stageStartRow, stageEndRow);
+  }
 
   // Render record row for Map tab
   const renderRecordRow = (record: MapRecord) => (
@@ -797,7 +817,10 @@ export default function MapRecordsTabs({
 
         {/* Stage sub-tabs */}
         {activeTab === 'stages' && numStages > 1 && (
-          <div className="flex gap-2 mt-4 flex-wrap">
+          <div className="flex gap-2 mt-4 flex-wrap items-center">
+            <span className="text-xs text-text-muted font-medium px-2">
+              Top 100 times:
+            </span>
             {Array.from({ length: numStages }, (_, i) => i + 1).map((stageNum) => (
               <button
                 key={stageNum}
@@ -1028,61 +1051,61 @@ export default function MapRecordsTabs({
                   <th
                     scope="col"
                     className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider w-24 cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('rank')}
+                    onClick={() => handleStageSort('rank')}
                   >
                     <div className="flex items-center gap-2">
                       Rank
-                      <SortIcon field="rank" />
+                      <StageSortIcon field="rank" />
                     </div>
                   </th>
                   <th
                     scope="col"
                     className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('player')}
+                    onClick={() => handleStageSort('player')}
                   >
                     <div className="flex items-center gap-2">
                       Player
-                      <SortIcon field="player" />
+                      <StageSortIcon field="player" />
                     </div>
                   </th>
                   <th
                     scope="col"
                     className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('time')}
+                    onClick={() => handleStageSort('time')}
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Time
-                      <SortIcon field="time" />
+                      <StageSortIcon field="time" />
                     </div>
                   </th>
                   <th
                     scope="col"
                     className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('wrDiff')}
+                    onClick={() => handleStageSort('wrDiff')}
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Diff
-                      <SortIcon field="wrDiff" />
+                      <StageSortIcon field="wrDiff" />
                     </div>
                   </th>
                   <th
                     scope="col"
                     className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('speed')}
+                    onClick={() => handleStageSort('speed')}
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Start Speed
-                      <SortIcon field="speed" />
+                      <StageSortIcon field="speed" />
                     </div>
                   </th>
                   <th
                     scope="col"
                     className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('date')}
+                    onClick={() => handleStageSort('date')}
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Date
-                      <SortIcon field="date" />
+                      <StageSortIcon field="date" />
                     </div>
                   </th>
                 </tr>
