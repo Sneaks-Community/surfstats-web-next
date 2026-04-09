@@ -84,64 +84,87 @@ function processCheckpointData(
 }
 
 /**
- * Fetch WR holder's checkpoint times for a map
+ * Cached function to fetch WR holder's checkpoint times for a map
  * For staged maps, this fetches stage completion times from ck_checkpoints table
  */
-async function getWRCheckpointTimes(mapname: string, maxCheckpoint: number): Promise<Array<{ checkpoint: number; time: number }> | undefined> {
-  if (maxCheckpoint === 0) {
-    return undefined;
-  }
+const getWRCheckpointTimes = unstable_cache(
+  async (mapname: string, maxCheckpoint: number) => {
+    if (maxCheckpoint === 0) {
+      return undefined;
+    }
 
-  try {
-    // Get the WR holder's steamid
-    const [wrHolderRows] = await pool.query<RowDataPacket[]>(`
-      SELECT steamid
-      FROM ck_playertimes
-      WHERE mapname = ?
-      ORDER BY runtimepro ASC
-      LIMIT 1
-    `, [mapname]);
-    
-    if (wrHolderRows.length === 0) {
-      return undefined;
-    }
-    
-    const wrSteamid = wrHolderRows[0].steamid;
-    
-    // Build dynamic column list based on max checkpoint
-    const checkpointColumns = Array.from({ length: maxCheckpoint }, (_, i) => `cp${i + 1}`);
-    
-    // Get WR holder's checkpoint times - fetch only existing cp columns
-    const [wrCheckpointRows] = await pool.query<RowDataPacket[]>(`
-      SELECT ${checkpointColumns.join(', ')}
-      FROM ck_checkpoints
-      WHERE mapname = ? AND steamid = ?
-    `, [mapname, wrSteamid]);
-    
-    if (wrCheckpointRows.length === 0) {
-      return undefined;
-    }
-    
-    const row = wrCheckpointRows[0];
-    const checkpointData: Array<{ checkpoint: number; time: number }> = [];
-    
-    // Extract non-null checkpoint times
-    for (let i = 1; i <= maxCheckpoint; i++) {
-      const colName = `cp${i}` as keyof typeof row;
-      if (row[colName] !== null && row[colName] !== undefined) {
-        checkpointData.push({
-          checkpoint: i,
-          time: row[colName] as number,
-        });
+    try {
+      // Get WR holder's steamid from cached map metadata
+      const mapMetadata = await getMapMetadata(mapname);
+      const wrSteamid = mapMetadata?.wr_holder_steamid || null;
+      
+      if (!wrSteamid) {
+        return undefined;
       }
+      
+      // Build dynamic column list based on max checkpoint
+      const checkpointColumns = Array.from({ length: maxCheckpoint }, (_, i) => `cp${i + 1}`);
+      
+      // Get WR holder's checkpoint times - fetch only existing cp columns
+      const [wrCheckpointRows] = await pool.query<RowDataPacket[]>(`
+        SELECT ${checkpointColumns.join(', ')}
+        FROM ck_checkpoints
+        WHERE mapname = ? AND steamid = ?
+      `, [mapname, wrSteamid]);
+      
+      if (wrCheckpointRows.length === 0) {
+        return undefined;
+      }
+      
+      const row = wrCheckpointRows[0];
+      const checkpointData: Array<{ checkpoint: number; time: number }> = [];
+      
+      // Extract non-null checkpoint times
+      for (let i = 1; i <= maxCheckpoint; i++) {
+        const colName = `cp${i}` as keyof typeof row;
+        if (row[colName] !== null && row[colName] !== undefined) {
+          checkpointData.push({
+            checkpoint: i,
+            time: row[colName] as number,
+          });
+        }
+      }
+      
+      return checkpointData;
+    } catch (error: any) {
+      logger.warn(`[getWRCheckpointTimes] Failed to fetch WR checkpoint times for ${mapname}: ${error.message}`);
+      return undefined;
     }
-    
-    return checkpointData;
-  } catch (error: any) {
-    logger.warn(`[API Stats] Failed to fetch WR checkpoint times for ${mapname}: ${error.message}`);
-    return undefined;
-  }
-}
+  },
+  ['wr-checkpoint-times'],
+  { revalidate: 3600 } // 1 hour cache
+);
+
+/**
+ * Cached function to fetch bonus completion rates for a map
+ */
+const getBonusCompletionRates = unstable_cache(
+  async (mapname: string, totalCompletions: number) => {
+    const [bonusRows] = await pool.query<BonusData[]>(`
+      SELECT
+        zonegroup as bonus,
+        COUNT(*) as completions,
+        ? as total
+      FROM ck_bonus
+      WHERE mapname = ?
+      GROUP BY zonegroup
+      ORDER BY zonegroup ASC
+    `, [totalCompletions, mapname]);
+
+    return bonusRows.map(row => ({
+      bonus: row.bonus,
+      completionRate: row.completions / row.total,
+      completions: row.completions,
+    }));
+  },
+  ['bonus-completion-rates'],
+  { revalidate: 3600 } // 1 hour cache
+);
 
 /**
  * Cached function to fetch checkpoint statistics for a map
@@ -212,7 +235,72 @@ const getBonusCompletionsOverTime = unstable_cache(
     return bonusData;
   },
   ['bonus-completions-over-time'],
-  { revalidate: 300 } // 5 minute cache
+  { revalidate: 3600 } // 1 hour cache
+);
+
+/**
+ * Cached function to fetch completions over time for a map
+ * Groups completions by month from ck_playertimes table
+ */
+const getCompletionsOverTime = unstable_cache(
+  async (mapname: string) => {
+    const [completionsRows] = await pool.query<CompletionsOverTimeData[]>(`
+      SELECT
+        DATE_FORMAT(date, '%Y-%m-01') as date,
+        COUNT(*) as count
+      FROM ck_playertimes
+      WHERE mapname = ?
+      GROUP BY DATE_FORMAT(date, '%Y-%m')
+      ORDER BY date ASC
+    `, [mapname]);
+
+    return completionsRows.map(row => ({
+      date: row.date,
+      count: row.count,
+    }));
+  },
+  ['completions-over-time'],
+  { revalidate: 3600 } // 1 hour cache
+);
+
+/**
+ * Cached function to fetch time on map data for a map
+ * Groups cumulative playtime by month from player_analytics table
+ */
+const getTimeOnMapData = unstable_cache(
+  async (mapname: string) => {
+    let timeOnMapData: Array<{ date: string; totalDuration: number }> = [];
+    
+    try {
+      const [timeOnMapRows] = await analyticsPool.query<TimeOnMapData[]>(`
+        SELECT
+          DATE_FORMAT(connect_date, '%Y-%m-01') as date,
+          SUM(duration) as total_duration
+        FROM player_analytics
+        WHERE map = ?
+          AND duration IS NOT NULL
+        GROUP BY DATE_FORMAT(connect_date, '%Y-%m-01')
+        ORDER BY date ASC
+      `, [mapname]);
+
+      // Calculate cumulative total (convert seconds to hours)
+      let cumulativeTotalHours = 0;
+      timeOnMapData = timeOnMapRows.map(row => {
+        const hours = (row.total_duration || 0) / 3600;
+        cumulativeTotalHours += hours;
+        return {
+          date: row.date,
+          totalDuration: cumulativeTotalHours,
+        };
+      });
+    } catch (error: any) {
+      logger.warn(`[getTimeOnMapData] Failed to fetch time on map data for ${mapname}: ${error.message}`);
+    }
+    
+    return timeOnMapData;
+  },
+  ['time-on-map-data'],
+  { revalidate: 3600 } // 1 hour cache
 );
 
 export async function GET(
@@ -231,104 +319,42 @@ export async function GET(
   const days = Math.min(365, Math.max(1, parseInt(searchParams.get('days') || String(DEFAULT_DAYS), 10)));
 
   try {
-    // Get total completions for the map (used as denominator for rates)
-    const [totalRows] = await pool.query<RowDataPacket[]>(`
-      SELECT COUNT(*) as total FROM ck_playertimes WHERE mapname = ?
-    `, [validMapname]);
-    const totalCompletions = totalRows[0]?.total || 0;
-
-    if (totalCompletions === 0) {
-      // No data available for this map
-      const mapMetadata = await getMapMetadata(validMapname);
-      return NextResponse.json({
-        completionsOverTime: [],
-        timeOnMapData: [],
-        checkpointAvgTimes: [],
-        bonusCompletionRates: [],
-        bonusCompletionsOverTime: {},
-        isStageMap: (mapMetadata?.stages || 0) > 0,
-      } as StatsResponse);
-    }
-
-    // Get map metadata to know how many checkpoints exist and if map has stages
+    // Get map metadata (already cached with 1 hour TTL in lib/map-cache.ts)
+    // This includes completions count and wr_holder_steamid
     const mapMetadata = await getMapMetadata(validMapname);
+    const totalCompletions = mapMetadata?.completions || 0;
     const checkpoints = mapMetadata?.checkpoints || 0;
     const stages = mapMetadata?.stages || 0;
     // For staged maps, use stage count as maxCheckpoint since stages are stored in ck_checkpoints table
     const maxCheckpoint = checkpoints > 0 ? checkpoints : stages;
     const isStageMap = stages > 0;
 
-    // Query 1: Completions Over Time (grouped by month, all available data)
-    const [completionsRows] = await pool.query<CompletionsOverTimeData[]>(`
-      SELECT
-        DATE_FORMAT(date, '%Y-%m-01') as date,
-        COUNT(*) as count
-      FROM ck_playertimes
-      WHERE mapname = ?
-      GROUP BY DATE_FORMAT(date, '%Y-%m')
-      ORDER BY date ASC
-    `, [validMapname]);
-
-    const completionsOverTime = completionsRows.map(row => ({
-      date: row.date,
-      count: row.count,
-    }));
-
-    // Query 2: Time on Map Data (from player_analytics table) - grouped by month, cumulative in hours
-    // Filter to past year for performance optimization
-    // Uses connect_date column with composite index (idx_connect_date_map_duration) for fast lookups
-    let timeOnMapData: Array<{ date: string; totalDuration: number }> = [];
-    
-    try {
-      const [timeOnMapRows] = await analyticsPool.query<TimeOnMapData[]>(`
-        SELECT
-          DATE_FORMAT(connect_date, '%Y-%m-01') as date,
-          SUM(duration) as total_duration
-        FROM player_analytics
-        WHERE map = ?
-          AND duration IS NOT NULL
-        GROUP BY DATE_FORMAT(connect_date, '%Y-%m-01')
-        ORDER BY date ASC
-      `, [validMapname]);
-
-      // Calculate cumulative total (convert seconds to hours)
-      let cumulativeTotalHours = 0;
-      timeOnMapData = timeOnMapRows.map(row => {
-        const hours = (row.total_duration || 0) / 3600;
-        cumulativeTotalHours += hours;
-        return {
-          date: row.date,
-          totalDuration: cumulativeTotalHours,
-        };
-      });
-    } catch (error: any) {
-      logger.warn(`[API Stats] Failed to fetch time on map data for ${validMapname}: ${error.message}`);
-      // Continue without time on map data - not critical
+    if (totalCompletions === 0) {
+      // No data available for this map
+      return NextResponse.json({
+        completionsOverTime: [],
+        timeOnMapData: [],
+        checkpointAvgTimes: [],
+        bonusCompletionRates: [],
+        bonusCompletionsOverTime: {},
+        isStageMap,
+      } as StatsResponse);
     }
+
+    // Query 1: Completions Over Time (cached)
+    const completionsOverTime = await getCompletionsOverTime(validMapname);
+
+    // Query 2: Time on Map Data (cached)
+    const timeOnMapData = await getTimeOnMapData(validMapname);
 
     // Query 3: Checkpoint Data (Average Times) - use cached checkpoint count
     const { checkpointAvgTimes } = await getCheckpointStats(validMapname);
 
-    // Query 4: WR Checkpoint Times - fetch WR holder's checkpoint times
+    // Query 4: WR Checkpoint Times (cached)
     const wrCheckpointTimes = await getWRCheckpointTimes(validMapname, maxCheckpoint);
 
-    // Query 5: Bonus Completion Rates
-    const [bonusRows] = await pool.query<BonusData[]>(`
-      SELECT
-        zonegroup as bonus,
-        COUNT(*) as completions,
-        ? as total
-      FROM ck_bonus
-      WHERE mapname = ?
-      GROUP BY zonegroup
-      ORDER BY zonegroup ASC
-    `, [totalCompletions, validMapname]);
-
-    const bonusCompletionRates = bonusRows.map(row => ({
-      bonus: row.bonus,
-      completionRate: row.completions / row.total,
-      completions: row.completions,
-    }));
+    // Query 5: Bonus Completion Rates (cached)
+    const bonusCompletionRates = await getBonusCompletionRates(validMapname, totalCompletions);
 
     // Query 6: Bonus Completions Over Time (cached)
     const bonusCompletionsOverTime = await getBonusCompletionsOverTime(validMapname);
