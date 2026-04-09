@@ -28,6 +28,13 @@ export interface PlayerSearchResult {
 }
 
 /**
+ * Player name result (minimal data for metadata)
+ */
+export interface PlayerNameResult {
+  name: string;
+}
+
+/**
  * Result of getPlayers paginated query
  */
 export interface PlayersResult {
@@ -156,4 +163,40 @@ export const searchPlayers = unstable_cache(
   searchPlayersInternal,
   ['players-search'],
   { revalidate: 3600 } // Cache for 1 hour
+);
+
+/**
+ * Internal function to fetch player name
+ */
+async function getPlayerNameInternal(steamid: string): Promise<PlayerNameResult> {
+  logger.debug(`[PlayerCache] Fetching player name for: ${steamid}`);
+  
+  try {
+    const [rows] = await pool.query<RowDataPacket[]>(
+      'SELECT name FROM ck_playerrank WHERE steamid = ?',
+      [steamid]
+    );
+    
+    if (rows.length === 0) {
+      logger.warn(`[PlayerCache] No player found with SteamID: ${steamid}`);
+      return { name: '' };
+    }
+    
+    return { name: rows[0].name };
+  } catch (error: any) {
+    const errorMessage = error.message || 'Unknown error';
+    logger.error(`[PlayerCache] Failed to fetch player name for ${steamid}: ${errorMessage}`);
+    logger.error(`[PlayerCache] Error code: ${error.code || 'N/A'}`);
+    return { name: '' };
+  }
+}
+
+/**
+ * Get player name with 24 hour cache
+ * Used by generateMetadata and getPlayerData to avoid duplicate queries
+ */
+export const getPlayerName = unstable_cache(
+  getPlayerNameInternal,
+  ['player-name'],
+  { revalidate: 86400 } // Cache for 24 hours
 );

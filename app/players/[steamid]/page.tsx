@@ -16,6 +16,7 @@ import {
   getIncompleteBonusesForPlayer,
   getIncompleteStagesForPlayer
 } from '@/lib/registry-cache';
+import { getPlayerName } from '@/lib/player-cache';
 import logger from '@/lib/logger';
 import TierDistributionChart from './components/TierDistributionChart';
 import PlayerRecordsTabs from './components/PlayerRecordsTabs';
@@ -141,7 +142,15 @@ const getPlayerData = unstable_cache(
     logger.debug(`[Player] Fetching profile data for: ${steamid}`);
     
     try {
-      // Get basic player info and rank
+      // Get player name from cached function (Next.js will deduplicate with generateMetadata)
+      const { name } = await getPlayerName(steamid);
+      
+      if (!name) {
+        logger.warn(`[Player] No player found with SteamID: ${steamid}`);
+        return null;
+      }
+
+      // Get basic player info and rank (excluding name since we already have it)
       const [playerRows] = await pool.query<PlayerData[]>(`
         SELECT
           steamid, name, country, points, lastseen,
@@ -315,20 +324,16 @@ export async function generateMetadata({ params }: { params: Promise<{ steamid: 
   }
 
   try {
-    const [playerRows] = await pool.query<PlayerData[]>(
-      'SELECT name FROM ck_playerrank WHERE steamid = ?',
-      [validSteamId]
-    );
+    const { name } = await getPlayerName(validSteamId);
 
-    if (playerRows.length === 0) {
+    if (!name) {
       return {
         title: 'Player Not Found',
       };
     }
 
-    const player = playerRows[0];
     return {
-      title: `${sanitizePlayerName(player.name)} - Player Profile`,
+      title: `${sanitizePlayerName(name)} - Player Profile`,
     };
   } catch (error: any) {
     logger.error(`[Player] Failed to generate metadata for ${validSteamId}: ${error.message}`);
