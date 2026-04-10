@@ -50,10 +50,17 @@ async function initializeDatabase() {
     await pool.query('SELECT `key`, `value` FROM ck_stats');
     logger.debug(`[DB] Stats pre-fetched successfully (${Date.now() - statsStart}ms)`);
     
-    // Pre-warm all caches (stats, servers)
+    // Pre-warm all caches (stats, servers, map metadata)
     logger.debug('[DB] Pre-warming application caches...');
     const { prewarmCaches } = await import('./cache');
     await prewarmCaches();
+    
+    // Pre-warm map metadata cache to prevent initial page load timeout
+    logger.debug('[DB] Pre-fetching map metadata...');
+    const { getAllMapMetadata } = await import('./map-cache');
+    await getAllMapMetadata();
+    logger.debug('[DB] Map metadata pre-fetched successfully');
+    
     logger.info('[DB] Initialization complete');
   } catch (error: any) {
     const errorCode = error.code || 'UNKNOWN';

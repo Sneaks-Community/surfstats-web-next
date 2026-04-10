@@ -18,15 +18,17 @@ export interface MapMetadata {
   wr_holder_steamid: string | null;
 }
 
-// Cache TTL: 1 hour (in milliseconds)
-const MAP_CACHE_TTL = 60 * 60 * 1000;
+// Configuration constants
+const QUERY_TIMEOUT_MS = 30000; // 30 seconds - prevents indefinite query hanging
+const CACHE_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes - background refresh interval
 
-// Global cache structure
+// Global cache structure with background refresh support
 interface GlobalMapCache {
   data: Map<string, MapMetadata>;
   lastUpdated: number;
   initialized: boolean;
   initialFetchPromise: Promise<void> | null;
+  refreshIntervalId: NodeJS.Timeout | null;
 }
 
 // Get or create the global cache using globalThis for persistence across hot reloads
@@ -38,6 +40,7 @@ function getGlobalMapCache(): GlobalMapCache {
       lastUpdated: 0,
       initialized: false,
       initialFetchPromise: null,
+      refreshIntervalId: null,
     };
   }
   return global.mapMetadataCache;
@@ -46,6 +49,7 @@ function getGlobalMapCache(): GlobalMapCache {
 /**
  * Fetch all map metadata from database in a single optimized query
  * Uses JOINs instead of correlated subqueries for better performance
+ * Includes timeout protection to prevent indefinite query hanging
  */
 async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
   const startTime = Date.now();
@@ -53,55 +57,63 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
   try {
     logger.debug('[MapCache] Fetching all map metadata from database...');
     
+    // Create timeout promise to prevent indefinite query hanging
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Query timeout exceeded')), QUERY_TIMEOUT_MS);
+    });
+    
     // Single query with JOINs - much more efficient than multiple queries or correlated subqueries
-    const [rows] = await pool.query<RowDataPacket[]>(`
-      SELECT
-        m.mapname,
-        m.tier,
-        m.mapper,
-        m.mappersteam,
-        COALESCE(pt_cnt.completions, 0) as completions,
-        COALESCE(b_cnt.bonus_count, 0) as bonuses,
-        COALESCE(s_cnt.stage_count, 0) as stages,
-        COALESCE(c_cnt.checkpoint_count, 0) as checkpoints,
-        wr.min_runtime as wr_time,
-        wr_holder.name as wr_holder,
-        wr_holder.steamid as wr_holder_steamid
-      FROM ck_maptier m
-      LEFT JOIN (
-        SELECT mapname, COUNT(*) as completions
-        FROM ck_playertimes
-        GROUP BY mapname
-      ) pt_cnt ON m.mapname = pt_cnt.mapname
-      LEFT JOIN (
-        SELECT mapname, COUNT(DISTINCT zonegroup) as bonus_count
-        FROM ck_zones
-        WHERE zonegroup > 0
-        GROUP BY mapname
-      ) b_cnt ON m.mapname = b_cnt.mapname
-      LEFT JOIN (
-        SELECT mapname, COUNT(*) + 1 as stage_count
-        FROM ck_zones
-        WHERE zonetype = 3
-        GROUP BY mapname
-      ) s_cnt ON m.mapname = s_cnt.mapname
-      LEFT JOIN (
-        SELECT mapname, COUNT(*) as checkpoint_count
-        FROM ck_zones
-        WHERE zonetype = 4
-        GROUP BY mapname
-      ) c_cnt ON m.mapname = c_cnt.mapname
-      LEFT JOIN (
-        SELECT mapname, MIN(runtimepro) as min_runtime
-        FROM ck_playertimes
-        GROUP BY mapname
-      ) wr ON m.mapname = wr.mapname
-      LEFT JOIN ck_playertimes wr_holder
-        ON wr.mapname = wr_holder.mapname
-        AND wr.min_runtime = wr_holder.runtimepro
-      WHERE pt_cnt.completions > 0
-      ORDER BY m.mapname ASC
-    `);
+    const [rows] = await Promise.race([
+      pool.query<RowDataPacket[]>(`
+        SELECT
+          m.mapname,
+          m.tier,
+          m.mapper,
+          m.mappersteam,
+          COALESCE(pt_cnt.completions, 0) as completions,
+          COALESCE(b_cnt.bonus_count, 0) as bonuses,
+          COALESCE(s_cnt.stage_count, 0) as stages,
+          COALESCE(c_cnt.checkpoint_count, 0) as checkpoints,
+          wr.min_runtime as wr_time,
+          wr_holder.name as wr_holder,
+          wr_holder.steamid as wr_holder_steamid
+        FROM ck_maptier m
+        LEFT JOIN (
+          SELECT mapname, COUNT(*) as completions
+          FROM ck_playertimes
+          GROUP BY mapname
+        ) pt_cnt ON m.mapname = pt_cnt.mapname
+        LEFT JOIN (
+          SELECT mapname, COUNT(DISTINCT zonegroup) as bonus_count
+          FROM ck_zones
+          WHERE zonegroup > 0
+          GROUP BY mapname
+        ) b_cnt ON m.mapname = b_cnt.mapname
+        LEFT JOIN (
+          SELECT mapname, COUNT(*) + 1 as stage_count
+          FROM ck_zones
+          WHERE zonetype = 3
+          GROUP BY mapname
+        ) s_cnt ON m.mapname = s_cnt.mapname
+        LEFT JOIN (
+          SELECT mapname, COUNT(*) as checkpoint_count
+          FROM ck_zones
+          WHERE zonetype = 4
+          GROUP BY mapname
+        ) c_cnt ON m.mapname = c_cnt.mapname
+        LEFT JOIN (
+          SELECT mapname, MIN(runtimepro) as min_runtime
+          FROM ck_playertimes
+          GROUP BY mapname
+        ) wr ON m.mapname = wr.mapname
+        LEFT JOIN ck_playertimes wr_holder
+          ON wr.mapname = wr_holder.mapname
+          AND wr.min_runtime = wr_holder.runtimepro
+        WHERE pt_cnt.completions > 0
+        ORDER BY m.mapname ASC
+      `),
+      timeoutPromise
+    ]);
     
     const metadataMap = new Map<string, MapMetadata>();
     
@@ -133,6 +145,13 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
     return metadataMap;
   } catch (error: any) {
     const duration = Date.now() - startTime;
+    
+    // Handle timeout specifically
+    if (error.message === 'Query timeout exceeded') {
+      logger.error(`[MapCache] Query timeout after ${duration}ms`);
+      throw new Error(`Map metadata query exceeded ${QUERY_TIMEOUT_MS / 1000} second timeout`);
+    }
+    
     logger.error(`[MapCache] Failed to fetch map metadata after ${duration}ms`);
     logger.error(`[MapCache] Error: ${error.message || 'Unknown error'}`);
     throw error;
@@ -140,7 +159,27 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
 }
 
 /**
- * Initialize the map cache - called automatically on first access
+ * Refresh the map cache in the background
+ * Returns a promise that resolves when the refresh completes
+ */
+async function refreshMapCacheBackground(): Promise<void> {
+  const cache = getGlobalMapCache();
+  
+  try {
+    logger.debug('[MapCache] Background refresh started...');
+    const freshData = await fetchAllMapMetadata();
+    cache.data = freshData;
+    cache.lastUpdated = Date.now();
+    logger.info(`[MapCache] Background refresh complete: ${freshData.size} maps`);
+  } catch (error: any) {
+    logger.error(`[MapCache] Background refresh failed: ${error.message}`);
+    // Don't throw - background refresh failures shouldn't block user requests
+  }
+}
+
+/**
+ * Initialize the map cache with background refresh
+ * Called automatically on first access
  */
 function initMapCache(): void {
   if (typeof window !== 'undefined') {
@@ -155,23 +194,24 @@ function initMapCache(): void {
   }
   
   cache.initialized = true;
-  logger.info('[MapCache] Initializing map metadata cache (1 hour TTL)...');
+  logger.info('[MapCache] Initializing map metadata cache with background refresh...');
   
   // Initial fetch - store promise so callers can await it
-  cache.initialFetchPromise = fetchAllMapMetadata()
-    .then((data) => {
-      cache.data = data;
-      cache.lastUpdated = Date.now();
-      logger.info(`[MapCache] Cache initialized with ${data.size} maps`);
-    })
-    .catch((err) => {
-      logger.error(`[MapCache] Initial fetch failed: ${err.message}`);
+  cache.initialFetchPromise = refreshMapCacheBackground();
+  
+  // Start background refresh interval
+  cache.refreshIntervalId = setInterval(() => {
+    refreshMapCacheBackground().catch((err) => {
+      logger.error(`[MapCache] Background refresh error: ${err.message}`);
     });
+  }, CACHE_REFRESH_INTERVAL);
+  
+  logger.info(`[MapCache] Background refresh scheduled every ${CACHE_REFRESH_INTERVAL / 1000} seconds`);
 }
 
 /**
- * Get all map metadata from cache (with automatic refresh)
- * Returns cached data if valid, otherwise fetches fresh data
+ * Get all map metadata from cache
+ * Returns cached data immediately - background refresh handles updates
  */
 export async function getAllMapMetadata(): Promise<Map<string, MapMetadata>> {
   // Initialize cache on first call (runs on server)
@@ -184,22 +224,10 @@ export async function getAllMapMetadata(): Promise<Map<string, MapMetadata>> {
   // Wait for initial fetch to complete before returning
   if (cache.initialFetchPromise) {
     await cache.initialFetchPromise;
-    cache.initialFetchPromise = null;
   }
   
-  // Check if cache is still valid
-  const now = Date.now();
-  if (now - cache.lastUpdated < MAP_CACHE_TTL && cache.data.size > 0) {
-    logger.debug(`[MapCache] Cache hit: ${cache.data.size} maps (age: ${Math.round((now - cache.lastUpdated) / 1000)}s)`);
-    return cache.data;
-  }
-  
-  // Cache expired or empty - fetch fresh data
-  logger.debug('[MapCache] Cache expired, fetching fresh data...');
-  const freshData = await fetchAllMapMetadata();
-  cache.data = freshData;
-  cache.lastUpdated = now;
-  
+  // Always return cached data - background refresh handles updates
+  // This prevents blocking user requests on slow queries
   return cache.data;
 }
 
@@ -360,6 +388,7 @@ export function getMapCacheStats(): {
 
 /**
  * Force refresh the cache (useful for admin operations)
+ * This performs a synchronous refresh and returns a promise that resolves when complete
  */
 export async function refreshMapCache(): Promise<void> {
   const cache = getGlobalMapCache();
@@ -370,4 +399,18 @@ export async function refreshMapCache(): Promise<void> {
   cache.lastUpdated = Date.now();
   
   logger.info(`[MapCache] Cache refreshed with ${freshData.size} maps`);
+}
+
+/**
+ * Cleanup function to stop background refresh interval
+ * Call this on server shutdown
+ */
+export function cleanupMapCache(): void {
+  const cache = getGlobalMapCache();
+  
+  if (cache.refreshIntervalId) {
+    clearInterval(cache.refreshIntervalId);
+    cache.refreshIntervalId = null;
+    logger.info('[MapCache] Background refresh interval cleared');
+  }
 }

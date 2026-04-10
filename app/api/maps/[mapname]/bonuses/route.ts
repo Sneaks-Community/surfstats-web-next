@@ -7,6 +7,7 @@ import { unstable_cache } from 'next/cache';
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 500;
+const QUERY_TIMEOUT_MS = 30000; // 30 seconds - prevents indefinite query hanging
 
 interface BonusRecord extends RowDataPacket {
   steamid: string;
@@ -43,30 +44,44 @@ const getBonusRecords = unstable_cache(
   ): Promise<BonusesResponse> => {
     const offset = (page - 1) * pageSize;
 
+    // Create timeout promise to prevent indefinite query hanging
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Query timeout exceeded')), QUERY_TIMEOUT_MS);
+    });
+
     try {
       // Get list of all bonus groups
-      const [bonusGroupsRows] = await pool.query<RowDataPacket[]>(`
-        SELECT DISTINCT zonegroup FROM ck_bonus WHERE mapname = ? ORDER BY zonegroup ASC
-      `, [mapname]);
+      const [bonusGroupsRows] = await Promise.race([
+        pool.query<RowDataPacket[]>(`
+          SELECT DISTINCT zonegroup FROM ck_bonus WHERE mapname = ? ORDER BY zonegroup ASC
+        `, [mapname]),
+        timeoutPromise
+      ]);
       const bonusGroupsList = bonusGroupsRows.map(row => row.zonegroup);
 
       // Get total count for this bonus group
-      const [countRows] = await pool.query<RowDataPacket[]>(`
-        SELECT COUNT(*) as total FROM ck_bonus WHERE mapname = ? AND zonegroup = ?
-      `, [mapname, bonus]);
+      const [countRows] = await Promise.race([
+        pool.query<RowDataPacket[]>(`
+          SELECT COUNT(*) as total FROM ck_bonus WHERE mapname = ? AND zonegroup = ?
+        `, [mapname, bonus]),
+        timeoutPromise
+      ]);
       const totalRecords = countRows[0]?.total || 0;
 
       // Get bonus records with pagination using window function
-      const [bonusRows] = await pool.query<BonusRecord[]>(`
-        SELECT 
-          b.steamid, b.name, b.zonegroup, b.runtime, b.date, b.startspeed,
-          ROW_NUMBER() OVER (ORDER BY b.runtime ASC) as rank,
-          (SELECT MIN(runtime) FROM ck_bonus WHERE mapname = b.mapname AND zonegroup = b.zonegroup) as wr_time
-        FROM ck_bonus b
-        WHERE b.mapname = ? AND b.zonegroup = ?
-        ORDER BY b.runtime ASC
-        LIMIT ? OFFSET ?
-      `, [mapname, bonus, pageSize, offset]);
+      const [bonusRows] = await Promise.race([
+        pool.query<BonusRecord[]>(`
+          SELECT
+            b.steamid, b.name, b.zonegroup, b.runtime, b.date, b.startspeed,
+            ROW_NUMBER() OVER (ORDER BY b.runtime ASC) as rank,
+            (SELECT MIN(runtime) FROM ck_bonus WHERE mapname = b.mapname AND zonegroup = b.zonegroup) as wr_time
+          FROM ck_bonus b
+          WHERE b.mapname = ? AND b.zonegroup = ?
+          ORDER BY b.runtime ASC
+          LIMIT ? OFFSET ?
+        `, [mapname, bonus, pageSize, offset]),
+        timeoutPromise
+      ]);
 
       logger.debug(`[API] Fetched ${bonusRows.length} bonus records for ${mapname} bonus ${bonus}`);
 
@@ -83,6 +98,21 @@ const getBonusRecords = unstable_cache(
         },
       };
     } catch (error: any) {
+      if (error.message === 'Query timeout exceeded') {
+        logger.error(`[API] Query timeout for ${mapname} bonus ${bonus} after ${QUERY_TIMEOUT_MS / 1000} seconds`);
+        return {
+          bonuses: [],
+          bonusGroupsList: [],
+          pagination: {
+            bonus,
+            page,
+            pageSize,
+            offset,
+            total: 0,
+            totalPages: 0,
+          },
+        };
+      }
       logger.error(`[API] Failed to fetch bonus records for ${mapname}: ${error.message}`);
       throw error;
     }

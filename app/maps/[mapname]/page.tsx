@@ -15,6 +15,7 @@ import { unstable_cache } from 'next/cache';
 // Default page size - keeps cache entry under 2MB (each record ~200 bytes, 100 records ~20KB)
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 500;
+const QUERY_TIMEOUT_MS = 30000; // 30 seconds - prevents indefinite query hanging
 
 interface MapRecord {
   steamid: string;
@@ -73,13 +74,21 @@ const getMapRecords = unstable_cache(
     logger.debug(`[Map] Fetching records for: ${mapname} (page ${safePage}, size ${safePageSize})`);
 
     try {
+      // Create timeout promise to prevent indefinite query hanging
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Query timeout exceeded')), QUERY_TIMEOUT_MS);
+      });
+
       // First, get the total counts for all record types in a single query
-      const [countsRows] = await pool.query<RowDataPacket[]>(`
-        SELECT
-          (SELECT COUNT(*) FROM ck_playertimes WHERE mapname = ?) as leaderboardTotal,
-          (SELECT COUNT(*) FROM ck_bonus WHERE mapname = ?) as bonusesTotal,
-          (SELECT COUNT(*) FROM ck_stages WHERE \`map\` = ?) as stagesTotal
-      `, [mapname, mapname, mapname]);
+      const [countsRows] = await Promise.race([
+        pool.query<RowDataPacket[]>(`
+          SELECT
+            (SELECT COUNT(*) FROM ck_playertimes WHERE mapname = ?) as leaderboardTotal,
+            (SELECT COUNT(*) FROM ck_bonus WHERE mapname = ?) as bonusesTotal,
+            (SELECT COUNT(*) FROM ck_stages WHERE \`map\` = ?) as stagesTotal
+        `, [mapname, mapname, mapname]),
+        timeoutPromise
+      ]);
 
       const counts: RecordCounts = {
         leaderboardTotal: countsRows[0]?.leaderboardTotal || 0,
@@ -91,22 +100,28 @@ const getMapRecords = unstable_cache(
       // This query calculates ranks using ROW_NUMBER() which is much faster than correlated subqueries
       
       // Get WR time for the map (needed for all records)
-      const [wrTimeRows] = await pool.query<RowDataPacket[]>(`
-        SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?
-      `, [mapname]);
+      const [wrTimeRows] = await Promise.race([
+        pool.query<RowDataPacket[]>(`
+          SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?
+        `, [mapname]),
+        timeoutPromise
+      ]);
       const wr_time = wrTimeRows[0]?.wr_time || null;
 
       // Get leaderboard records with pagination and window function for rank
-      const [leaderboardRows] = await pool.query<RowDataPacket[] & MapRecord[]>(`
-        SELECT
-          steamid, name, runtimepro, date, startspeed,
-          ROW_NUMBER() OVER (ORDER BY runtimepro ASC) as rank,
-          ? as wr_time
-        FROM ck_playertimes
-        WHERE mapname = ?
-        ORDER BY runtimepro ASC
-        LIMIT ? OFFSET ?
-      `, [wr_time, mapname, safePageSize, offset]);
+      const [leaderboardRows] = await Promise.race([
+        pool.query<RowDataPacket[] & MapRecord[]>(`
+          SELECT
+            steamid, name, runtimepro, date, startspeed,
+            ROW_NUMBER() OVER (ORDER BY runtimepro ASC) as rank,
+            ? as wr_time
+          FROM ck_playertimes
+          WHERE mapname = ?
+          ORDER BY runtimepro ASC
+          LIMIT ? OFFSET ?
+        `, [wr_time, mapname, safePageSize, offset]),
+        timeoutPromise
+      ]);
 
       // Bonuses are fetched client-side via API to keep server payload small
       const bonusRows: BonusRecord[] = [];
@@ -119,6 +134,12 @@ const getMapRecords = unstable_cache(
 
       return { leaderboard: leaderboardRows, bonuses: bonusRows, stages: stageRows, counts, wr_time };
     } catch (error: any) {
+      // Handle timeout specifically
+      if (error.message === 'Query timeout exceeded') {
+        logger.error(`[Map] Query timeout for ${mapname} after ${QUERY_TIMEOUT_MS / 1000} seconds`);
+        return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
+      }
+      
       const errorMessage = error.message || 'Unknown error';
       logger.error(`[Map] Failed to fetch records for ${mapname}: ${errorMessage}`);
       logger.error(`[Map] Error code: ${error.code || 'N/A'}`);

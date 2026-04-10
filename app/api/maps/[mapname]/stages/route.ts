@@ -7,6 +7,7 @@ import { unstable_cache } from 'next/cache';
 
 const TOP_RECORDS_LIMIT = 100;
 const MAX_STAGE_RECORDS = 100;
+const QUERY_TIMEOUT_MS = 30000; // 30 seconds - prevents indefinite query hanging
 
 interface StageRecord extends RowDataPacket {
   steamid: string;
@@ -43,23 +44,37 @@ const getStageRecords = unstable_cache(
     pageSize: number,
     offset: number
   ): Promise<StagesResponse> => {
+    // Create timeout promise to prevent indefinite query hanging
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Query timeout exceeded')), QUERY_TIMEOUT_MS);
+    });
+
     try {
       // Get list of all stages
-      const [stagesListRows] = await pool.query<RowDataPacket[]>(`
-        SELECT DISTINCT stage FROM ck_stages WHERE \`map\` = ? ORDER BY stage ASC
-      `, [mapname]);
+      const [stagesListRows] = await Promise.race([
+        pool.query<RowDataPacket[]>(`
+          SELECT DISTINCT stage FROM ck_stages WHERE \`map\` = ? ORDER BY stage ASC
+        `, [mapname]),
+        timeoutPromise
+      ]);
       const stagesList = stagesListRows.map(row => row.stage);
 
       // Get total count for this stage
-      const [countRows] = await pool.query<RowDataPacket[]>(`
-        SELECT COUNT(*) as total FROM ck_stages WHERE \`map\` = ? AND stage = ?
-      `, [mapname, stage]);
+      const [countRows] = await Promise.race([
+        pool.query<RowDataPacket[]>(`
+          SELECT COUNT(*) as total FROM ck_stages WHERE \`map\` = ? AND stage = ?
+        `, [mapname, stage]),
+        timeoutPromise
+      ]);
       const totalRecords = countRows[0]?.total || 0;
 
       // Get WR time once
-      const [wrResult] = await pool.query<RowDataPacket[]>(`
-        SELECT MIN(runtime) as wr_time FROM ck_stages WHERE map = ? AND stage = ?
-      `, [mapname, stage]);
+      const [wrResult] = await Promise.race([
+        pool.query<RowDataPacket[]>(`
+          SELECT MIN(runtime) as wr_time FROM ck_stages WHERE map = ? AND stage = ?
+        `, [mapname, stage]),
+        timeoutPromise
+      ]);
       const wrTime = wrResult[0]?.wr_time || null;
 
       // Build ORDER BY clause based on sort field
@@ -80,39 +95,45 @@ const getStageRecords = unstable_cache(
       }
 
       // Get total count with rank calculation (always by runtime, date as tiebreaker)
-      const [rankCountRows] = await pool.query<RowDataPacket[]>(`
-        SELECT COUNT(DISTINCT rank) as total FROM (
-          SELECT
-            s.steamid,
-            DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) as rank
-          FROM ck_stages s
-          WHERE s.map = ? AND s.stage = ?
-        ) AS ranked
-      `, [mapname, stage]);
+      const [rankCountRows] = await Promise.race([
+        pool.query<RowDataPacket[]>(`
+          SELECT COUNT(DISTINCT rank) as total FROM (
+            SELECT
+              s.steamid,
+              DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) as rank
+            FROM ck_stages s
+            WHERE s.map = ? AND s.stage = ?
+          ) AS ranked
+        `, [mapname, stage]),
+        timeoutPromise
+      ]);
       const totalWithRank = rankCountRows[0]?.total || 0;
 
       // Get stage records with rank calculation
       // Return all top 100 records sorted by rank for UI to handle pagination and sorting
-      const [stageRows] = await pool.query<StageRecord[]>(`
-        SELECT
-          steamid, name, stage, runtime, date, startspeed, rank, wr_time
-        FROM (
+      const [stageRows] = await Promise.race([
+        pool.query<StageRecord[]>(`
           SELECT
-            s.steamid,
-            pr.name,
-            s.stage,
-            s.runtime,
-            s.date,
-            s.startspeed,
-            DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) as rank,
-            ? as wr_time
-          FROM ck_stages s
-          LEFT JOIN ck_playerrank pr ON s.steamid = pr.steamid
-          WHERE s.map = ? AND s.stage = ?
-        ) AS ranked_data
-        WHERE rank <= ?
-        ORDER BY rank ASC, date ASC
-      `, [wrTime, mapname, stage, MAX_STAGE_RECORDS]);
+            steamid, name, stage, runtime, date, startspeed, rank, wr_time
+          FROM (
+            SELECT
+              s.steamid,
+              pr.name,
+              s.stage,
+              s.runtime,
+              s.date,
+              s.startspeed,
+              DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) as rank,
+              ? as wr_time
+            FROM ck_stages s
+            LEFT JOIN ck_playerrank pr ON s.steamid = pr.steamid
+            WHERE s.map = ? AND s.stage = ?
+          ) AS ranked_data
+          WHERE rank <= ?
+          ORDER BY rank ASC, date ASC
+        `, [wrTime, mapname, stage, MAX_STAGE_RECORDS]),
+        timeoutPromise
+      ]);
 
       logger.debug(`[API] Fetched ${stageRows.length} stage records for ${mapname} stage ${stage} (sort: ${sortField} ${sortOrder}, page: ${Math.floor(offset / pageSize) + 1})`);
 
@@ -133,6 +154,21 @@ const getStageRecords = unstable_cache(
         },
       };
     } catch (error: any) {
+      if (error.message === 'Query timeout exceeded') {
+        logger.error(`[API] Query timeout for ${mapname} stage ${stage} after ${QUERY_TIMEOUT_MS / 1000} seconds`);
+        return {
+          stages: [],
+          stagesList: [],
+          pagination: {
+            stage,
+            page: Math.floor(offset / pageSize) + 1,
+            pageSize,
+            offset,
+            total: 0,
+            totalPages: 0,
+          },
+        };
+      }
       logger.error(`[API] Failed to fetch stage records for ${mapname}: ${error.message}`);
       throw error;
     }
