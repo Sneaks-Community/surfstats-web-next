@@ -59,6 +59,44 @@ const generateBonusColors = (bonusCount: number) => {
   return colors;
 };
 
+// Convert HSL color string to RGBA with given opacity
+const hslToRgba = (hsl: string, opacity: number): string => {
+  // Extract HSL values using regex
+  const match = hsl.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)/);
+  if (!match) return `rgba(59, 130, 246, ${opacity})`; // fallback
+  
+  const hue = parseInt(match[1], 10);
+  const saturation = parseInt(match[2], 10) / 100;
+  const lightness = parseInt(match[3], 10) / 100;
+  
+  // Convert HSL to RGB
+  const c = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+  const m = lightness - c / 2;
+  
+  let r = 0, g = 0, b = 0;
+  
+  if (hue >= 0 && hue < 60) {
+    r = c; g = x; b = 0;
+  } else if (hue >= 60 && hue < 120) {
+    r = x; g = c; b = 0;
+  } else if (hue >= 120 && hue < 180) {
+    r = 0; g = c; b = x;
+  } else if (hue >= 180 && hue < 240) {
+    r = 0; g = x; b = c;
+  } else if (hue >= 240 && hue < 300) {
+    r = x; g = 0; b = c;
+  } else if (hue >= 300 && hue < 360) {
+    r = c; g = 0; b = x;
+  }
+  
+  const r8 = Math.round((r + m) * 255);
+  const g8 = Math.round((g + m) * 255);
+  const b8 = Math.round((b + m) * 255);
+  
+  return `rgba(${r8}, ${g8}, ${b8}, ${opacity})`;
+};
+
 export default function CompletionsOverTimeChart({ data, bonusData }: CompletionsOverTimeChartProps) {
   const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
   const safeBonusData = useMemo(() => bonusData || {}, [bonusData]);
@@ -133,7 +171,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
         label: `Bonus ${bonus}`,
         data: alignedData,
         borderColor: bonusColors[index],
-        backgroundColor: bonusColors[index].replace(')', ', 0.1)').replace('hsl', 'hsl'),
+        backgroundColor: hslToRgba(bonusColors[index], 0.1),
         fill: false,
         tension: 0.1,
         pointRadius: 0,
