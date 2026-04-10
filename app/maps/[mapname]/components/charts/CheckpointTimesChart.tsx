@@ -42,12 +42,17 @@ interface WRCheckpointTimeData {
 interface CheckpointTimesChartProps {
   data: CheckpointTimeData[];
   wrData?: WRCheckpointTimeData[];
+  finishTime?: {
+    avgTime: number | null;
+    wrTime: number | null;
+  };
   isStageMap?: boolean; // true if map has stages (zonetype 3), false for linear maps (zonetype 4)
 }
 
-export default function CheckpointTimesChart({ data, wrData, isStageMap = false }: CheckpointTimesChartProps) {
+export default function CheckpointTimesChart({ data, wrData, finishTime, isStageMap = false }: CheckpointTimesChartProps) {
   const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
   const safeWRData = useMemo(() => Array.isArray(wrData) ? wrData : [], [wrData]);
+  const safeFinishTime = useMemo(() => finishTime || { avgTime: null, wrTime: null }, [finishTime]);
 
   const formatTime = (seconds: number): string => {
     return `${seconds.toFixed(1)}s`;
@@ -60,13 +65,31 @@ export default function CheckpointTimesChart({ data, wrData, isStageMap = false 
       }
       return `CP${d.checkpoint}`;
     });
-    const avgTimes = safeData.map(d => d.avgTime);
+
+    // Add "Finish" label at the end
+    labels.push('Finish');
+
+    const avgTimes: (number | null)[] = safeData.map(d => d.avgTime);
+
+    // Add average finish time if available
+    if (safeFinishTime.avgTime !== null && safeFinishTime.avgTime !== undefined) {
+      avgTimes.push(safeFinishTime.avgTime);
+    } else {
+      avgTimes.push(null);
+    }
 
     // Create a map of checkpoint -> WR time for easy lookup
     const wrTimeMap = new Map(safeWRData.map(cp => [cp.checkpoint, cp.time]));
 
     // Get WR times aligned with average data checkpoints (only include if WR has that checkpoint)
     const wrTimes = safeData.map(d => wrTimeMap.get(d.checkpoint) ?? null);
+
+    // Add WR finish time if available
+    if (safeFinishTime.wrTime !== null && safeFinishTime.wrTime !== undefined) {
+      wrTimes.push(safeFinishTime.wrTime);
+    } else {
+      wrTimes.push(null);
+    }
 
     return {
       labels,
@@ -100,7 +123,7 @@ export default function CheckpointTimesChart({ data, wrData, isStageMap = false 
         }] : []),
       ],
     };
-  }, [safeData, safeWRData, wrData, isStageMap]);
+  }, [safeData, safeWRData, wrData, safeFinishTime, isStageMap]);
 
   const options: ChartOptions<'line'> = useMemo(() => ({
     responsive: true,
@@ -139,6 +162,10 @@ export default function CheckpointTimesChart({ data, wrData, isStageMap = false 
         callbacks: {
           title: (tooltipItems) => {
             const label = tooltipItems[0].label as string;
+            // Handle "Finish" label
+            if (label === 'Finish') {
+              return 'Finish';
+            }
             // Extract number from either 'CP1' or 'S1' format
             const match = label.match(/(CP|S)(\d+)/);
             if (match) {
@@ -151,12 +178,16 @@ export default function CheckpointTimesChart({ data, wrData, isStageMap = false 
           label: (context) => {
             const datasetIndex = context.datasetIndex;
             const value = context.parsed.y ?? 0;
+            const label = context.label as string;
             
             if (datasetIndex === 0) {
               // Average Time dataset
               return `Avg: ${formatTime(value)}`;
             } else if (datasetIndex === 1 && wrData && wrData.length > 0) {
               // WR Time dataset
+              if (label === 'Finish') {
+                return `WR: ${formatTime(value)}`;
+              }
               const checkpoint = safeData[context.dataIndex]?.checkpoint;
               const wrRecord = safeWRData.find(cp => cp.checkpoint === checkpoint);
               return `WR: ${formatTime(value)}`;

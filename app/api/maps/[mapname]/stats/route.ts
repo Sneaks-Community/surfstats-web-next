@@ -36,6 +36,10 @@ interface StatsResponse {
   timeOnMapData: Array<{ date: string; totalDuration: number }>;
   checkpointAvgTimes: Array<{ checkpoint: number; avgTime: number; sampleSize: number }>;
   wrCheckpointTimes?: Array<{ checkpoint: number; time: number }>;
+  finishTime?: {
+    avgTime: number; // Average map completion time
+    wrTime: number | null; // WR holder's total time
+  };
   bonusCompletionRates: Array<{ bonus: number; completionRate: number; completions: number }>;
   bonusCompletionsOverTime: { [bonus: number]: Array<{ date: string; count: number }> };
   isStageMap: boolean; // true if map has stages (zonetype 3), false for linear maps (zonetype 4)
@@ -303,6 +307,38 @@ const getTimeOnMapData = unstable_cache(
   { revalidate: 3600 } // 1 hour cache
 );
 
+/**
+ * Cached function to fetch finish time statistics for a map
+ * Calculates average completion time and WR holder's total time from ck_playertimes
+ */
+const getFinishTimeData = unstable_cache(
+  async (mapname: string) => {
+    try {
+      // Get average completion time and WR time
+      const [finishRows] = await pool.query<RowDataPacket[]>(`
+        SELECT
+          AVG(runtimepro) as avgTime,
+          MIN(runtimepro) as wrTime
+        FROM ck_playertimes
+        WHERE mapname = ?
+      `, [mapname]);
+
+      const avgTime = finishRows[0]?.avgTime || null;
+      const wrTime = finishRows[0]?.wrTime || null;
+
+      return {
+        avgTime: avgTime ? Number(avgTime) : null,
+        wrTime: wrTime ? Number(wrTime) : null,
+      };
+    } catch (error: any) {
+      logger.warn(`[getFinishTimeData] Failed to fetch finish time data for ${mapname}: ${error.message}`);
+      return { avgTime: null, wrTime: null };
+    }
+  },
+  ['finish-time-data'],
+  { revalidate: 3600 } // 1 hour cache
+);
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ mapname: string }> }
@@ -353,19 +389,23 @@ export async function GET(
     // Query 4: WR Checkpoint Times (cached)
     const wrCheckpointTimes = await getWRCheckpointTimes(validMapname, maxCheckpoint);
 
-    // Query 5: Bonus Completion Rates (cached)
+    // Query 5: Finish Time Data (cached)
+    const finishTimeData = await getFinishTimeData(validMapname);
+
+    // Query 6: Bonus Completion Rates (cached)
     const bonusCompletionRates = await getBonusCompletionRates(validMapname, totalCompletions);
 
-    // Query 6: Bonus Completions Over Time (cached)
+    // Query 7: Bonus Completions Over Time (cached)
     const bonusCompletionsOverTime = await getBonusCompletionsOverTime(validMapname);
 
-    logger.debug(`[API Stats] Fetched stats for ${validMapname}: ${completionsOverTime.length} time points, ${checkpointAvgTimes.length} checkpoints, ${bonusCompletionRates.length} bonuses, ${Object.keys(bonusCompletionsOverTime).length} bonus time series, ${wrCheckpointTimes ? wrCheckpointTimes.length : 0} WR checkpoint times`);
+    logger.debug(`[API Stats] Fetched stats for ${validMapname}: ${completionsOverTime.length} time points, ${checkpointAvgTimes.length} checkpoints, ${bonusCompletionRates.length} bonuses, ${Object.keys(bonusCompletionsOverTime).length} bonus time series, ${wrCheckpointTimes ? wrCheckpointTimes.length : 0} WR checkpoint times, finishTime: ${finishTimeData.avgTime ? finishTimeData.avgTime.toFixed(1) : 'null'}s avg, ${finishTimeData.wrTime ? finishTimeData.wrTime.toFixed(1) : 'null'}s WR`);
 
     return NextResponse.json({
       completionsOverTime,
       timeOnMapData,
       checkpointAvgTimes,
       wrCheckpointTimes,
+      finishTime: finishTimeData,
       bonusCompletionRates,
       bonusCompletionsOverTime,
       isStageMap,
