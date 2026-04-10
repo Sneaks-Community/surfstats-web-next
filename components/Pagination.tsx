@@ -195,9 +195,9 @@ export default function Pagination({
 
         {/* Page numbers */}
         <div className="flex items-center gap-1">
-          {pageNumbers.map((page, index) =>
+          {pageNumbers.map((page) =>
             typeof page === 'number' ? renderPageNumber(page) : (
-              <span key={index} className="px-2 text-text-placeholder">...</span>
+              <span key={page} className="px-2 text-text-placeholder">...</span>
             )
           )}
         </div>
