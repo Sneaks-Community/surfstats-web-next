@@ -10,6 +10,20 @@
 
 **ckSurf** is a timer application for speed running maps in CS:GO. It tracks player times, across Maps, Bonuses, and Stages. There are two types of maps - Linear, and Staged. Linear maps have checkpoints, which records time at certain intervals inside of Linear maps. Staged maps have stages, which work similar to checkpoints, with the exception of the ability to restart at any stage within the map. As a player completes a map, stages are recorded similarly to checkpoints. Bonuses do not have checkpoints or stages.
 
+Stage definitions are stored in the `ck_zones` table. There are 3 key columns to make note of which are utilized throughout the project - `zonetype`, `zonegroup`, and `zonetypeid`. Here are their definitions:
+
+- Zonetype 1: Start
+- Zonetype 2: End
+- Zonetype 3: Stage
+- Zonetype 4: Checkpoint
+
+- Zonegroup 0: Map
+- Zonegroup >= 1: Bonus
+
+For example, zonetype 1 in zonegroup 0 is the start zone of the map. Zonetype 1 in zonegroup 2 is the start zone for Bonus 2. Zonetype 2 in Zonegroup 4 is the end zone for Bonus 4.
+
+The `zonetypeid` column is what determines the order of stages in the zone structure. For example, zonetypeid = 0 with zonetype = 3 is Stage 1. Zonetypeid = 4 with zonetype = 3 is Stage 5. Zonetypeid is not utilized in this project for anything other than stages counting.
+
 ### Key Features
 
 - **Dashboard**: Real-time statistics (players, completions, points, recent records)

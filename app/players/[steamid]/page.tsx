@@ -167,11 +167,12 @@ const getPlayerData = unstable_cache(
       }
 
       // Get basic player info and rank (excluding name since we already have it)
+      // Optimized with window function instead of correlated subquery
       const [playerRows] = await pool.query<PlayerData[]>(`
         SELECT
           steamid, name, country, points, lastseen,
-          (SELECT COUNT(*) + 1 FROM ck_playerrank pr2 WHERE pr2.points > pr1.points) as rank
-        FROM ck_playerrank pr1
+          DENSE_RANK() OVER (ORDER BY points DESC) as rank
+        FROM ck_playerrank
         WHERE steamid = ?
       `, [steamid]);
 
@@ -186,74 +187,46 @@ const getPlayerData = unstable_cache(
       const [mapsResult, bonusesResult, stagesResult] = await Promise.all([
         pool.query<MapRecord[]>(`
           SELECT
-            mapname,
-            runtimepro,
-            date,
-            wr_time,
-            DENSE_RANK() OVER (
-              PARTITION BY mapname
-              ORDER BY runtimepro ASC, date ASC
-            ) as player_rank,
-            tier
-          FROM (
-            SELECT
-              pt.mapname,
-              pt.runtimepro,
-              pt.date,
-              wr.min_runtime as wr_time,
-              COALESCE(mt.tier, 1) as tier
-            FROM ck_playertimes pt
-            LEFT JOIN (
-              SELECT mapname, MIN(runtimepro) as min_runtime
-              FROM ck_playertimes
-              GROUP BY mapname
-            ) wr ON pt.mapname = wr.mapname
-            LEFT JOIN ck_maptier mt ON pt.mapname = mt.mapname
-            WHERE pt.steamid = ?
-          ) AS player_maps
-          ORDER BY mapname ASC
+            pt.mapname,
+            pt.runtimepro,
+            pt.date,
+            wr.min_runtime as wr_time,
+            (SELECT COUNT(*) + 1 FROM ck_playertimes pt2
+             WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as player_rank,
+            COALESCE(mt.tier, 1) as tier
+          FROM ck_playertimes pt
+          LEFT JOIN (
+            SELECT mapname, MIN(runtimepro) as min_runtime
+            FROM ck_playertimes
+            GROUP BY mapname
+          ) wr ON pt.mapname = wr.mapname
+          LEFT JOIN ck_maptier mt ON pt.mapname = mt.mapname
+          WHERE pt.steamid = ?
+          ORDER BY pt.mapname ASC
         `, [steamid]),
         pool.query<BonusRecord[]>(`
           SELECT
-            mapname,
-            zonegroup,
-            runtime,
-            date,
-            DENSE_RANK() OVER (
-              PARTITION BY mapname, zonegroup
-              ORDER BY runtime ASC, date ASC
-            ) as player_rank
-          FROM (
-            SELECT
-              b.mapname,
-              b.zonegroup,
-              b.runtime,
-              b.date
-            FROM ck_bonus b
-            WHERE b.steamid = ?
-          ) AS player_bonuses
-          ORDER BY mapname ASC, zonegroup ASC
+            b.mapname,
+            b.zonegroup,
+            b.runtime,
+            b.date,
+            (SELECT COUNT(*) + 1 FROM ck_bonus b2
+             WHERE b2.mapname = b.mapname AND b2.zonegroup = b.zonegroup AND b2.runtime < b.runtime) as player_rank
+          FROM ck_bonus b
+          WHERE b.steamid = ?
+          ORDER BY b.mapname ASC, b.zonegroup ASC
         `, [steamid]),
         pool.query<StageRecord[]>(`
           SELECT
-            map,
-            stage,
-            runtime,
-            date,
-            DENSE_RANK() OVER (
-              PARTITION BY map, stage
-              ORDER BY runtime ASC, date ASC
-            ) as player_rank
-          FROM (
-            SELECT
-              s.map,
-              s.stage,
-              s.runtime,
-              s.date
-            FROM ck_stages s
-            WHERE s.steamid = ?
-          ) AS player_stages
-          ORDER BY map ASC, stage ASC
+            s.map,
+            s.stage,
+            s.runtime,
+            s.date,
+            (SELECT COUNT(*) + 1 FROM ck_stages s2
+             WHERE s2.map = s.map AND s2.stage = s.stage AND s2.runtime < s.runtime) as player_rank
+          FROM ck_stages s
+          WHERE s.steamid = ?
+          ORDER BY s.map ASC, s.stage ASC
         `, [steamid])
       ]);
 
@@ -281,14 +254,19 @@ const getIncompleteMaps = unstable_cache(
     
     try {
       // Use LEFT JOIN anti-join pattern to find maps player has NOT completed
-      // Database handles the comparison instead of client-side iteration
+      // Pre-compute WR times in a subquery to avoid correlated subquery
       const [rows] = await pool.query<RowDataPacket[]>(`
         SELECT
           m.mapname,
           COALESCE(m.tier, 1) as tier,
-          (SELECT MIN(runtimepro) FROM ck_playertimes WHERE mapname = m.mapname) as wr_time
+          wr.min_runtime as wr_time
         FROM ck_maptier m
         LEFT JOIN ck_playertimes pt ON m.mapname = pt.mapname AND pt.steamid = ?
+        LEFT JOIN (
+          SELECT mapname, MIN(runtimepro) as min_runtime
+          FROM ck_playertimes
+          GROUP BY mapname
+        ) wr ON m.mapname = wr.mapname
         WHERE pt.mapname IS NULL
         ORDER BY m.tier ASC, m.mapname ASC
       `, [steamid]);
@@ -317,15 +295,21 @@ const getIncompleteBonuses = unstable_cache(
     
     try {
       // Use LEFT JOIN anti-join pattern to find bonuses player has NOT completed
+      // Pre-compute WR times in a subquery to avoid correlated subquery
       const [rows] = await pool.query<RowDataPacket[]>(`
         SELECT
           z.mapname,
           z.zonegroup,
-          (SELECT MIN(runtime) FROM ck_bonus WHERE mapname = z.mapname AND zonegroup = z.zonegroup) as wr_time
+          wr.min_runtime as wr_time
         FROM ck_zones z
         INNER JOIN ck_maptier m ON z.mapname = m.mapname
         LEFT JOIN ck_bonus br ON z.mapname = br.mapname AND z.zonegroup = br.zonegroup AND br.steamid = ?
-        WHERE z.zonetype = 2 AND br.mapname IS NULL
+        LEFT JOIN (
+          SELECT mapname, zonegroup, MIN(runtime) as min_runtime
+          FROM ck_bonus
+          GROUP BY mapname, zonegroup
+        ) wr ON z.mapname = wr.mapname AND z.zonegroup = wr.zonegroup
+        WHERE z.zonetype = 2 AND z.zonegroup > 0 AND br.mapname IS NULL
         ORDER BY m.tier ASC, z.mapname ASC, z.zonegroup ASC
       `, [steamid]);
       
@@ -356,12 +340,12 @@ const getIncompleteStages = unstable_cache(
       const [rows] = await pool.query<RowDataPacket[]>(`
         SELECT
           z.mapname as map,
-          z.zonegroup as stage
+          z.zonetypeid as stage
         FROM ck_zones z
         INNER JOIN ck_maptier m ON z.mapname = m.mapname
-        LEFT JOIN ck_stages sr ON z.mapname = sr.map AND z.zonegroup = sr.stage AND sr.steamid = ?
-        WHERE z.zonetype = 3 AND sr.map IS NULL
-        ORDER BY m.tier ASC, z.mapname ASC, z.zonegroup ASC
+        LEFT JOIN ck_stages sr ON z.mapname = sr.map AND z.zonetypeid = sr.stage AND sr.steamid = ?
+        WHERE z.zonetype = 3 AND z.zonegroup = 0 AND z.zonetypeid > 0 AND sr.map IS NULL
+        ORDER BY m.tier ASC, z.mapname ASC, z.zonetypeid ASC
       `, [steamid]);
       
       const incompleteStages: IncompleteStageRecord[] = rows.map(r => ({
