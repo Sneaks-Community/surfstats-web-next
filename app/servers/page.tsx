@@ -50,8 +50,8 @@ export default async function ServersPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-white">Live Servers</h1>
-        <p className="text-zinc-400">Current status of our community servers</p>
+        <h1 className="text-3xl font-bold text-text">Live Servers</h1>
+        <p className="text-text-muted">Current status of our community servers</p>
       </div>
 
       <div className="flex flex-col gap-4">
@@ -60,10 +60,10 @@ export default async function ServersPage() {
         ))}
         
         {servers.length === 0 && (
-          <div className="text-center py-12 bg-zinc-900 border border-zinc-800 rounded-xl">
-            <Server className="h-12 w-12 text-zinc-600 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-white">No servers configured</h3>
-            <p className="text-zinc-400 mt-1">Please add servers to your configuration.</p>
+          <div className="text-center py-12 bg-surface border border-border rounded-xl">
+            <Server className="h-12 w-12 text-text-muted mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-text">No servers configured</h3>
+            <p className="text-text-muted mt-1">Please add servers to your configuration.</p>
           </div>
         )}
       </div>
