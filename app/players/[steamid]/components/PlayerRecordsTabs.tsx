@@ -24,6 +24,7 @@ interface IncompleteMapRecord {
   mapname: string;
   tier: number | null;
   wr_time: number | null;
+  mapType: 'linear' | 'staged';
 }
 
 interface BonusRecord {
@@ -65,7 +66,7 @@ interface PlayerRecordsTabsProps {
 
 type TabType = 'maps' | 'bonuses' | 'stages';
 type StatusFilter = 'finished' | 'incomplete';
-type SortField = 'map' | 'rank' | 'time' | 'wrDiff' | 'date' | 'tier' | 'wrTime';
+type SortField = 'map' | 'rank' | 'time' | 'wrDiff' | 'date' | 'tier' | 'wrTime' | 'mapType';
 type SortDirection = 'asc' | 'desc';
 
 const ITEMS_PER_PAGE = 20;
@@ -312,6 +313,9 @@ export default function PlayerRecordsTabs({
           const aWR = a.wr_time ?? Infinity;
           const bWR = b.wr_time ?? Infinity;
           comparison = aWR - bWR;
+          break;
+        case 'mapType':
+          comparison = a.mapType.localeCompare(b.mapType);
           break;
         default:
           comparison = a.mapname.localeCompare(b.mapname);
@@ -641,6 +645,13 @@ export default function PlayerRecordsTabs({
                         <SortIcon field="tier" />
                       </button>
                       <button
+                        onClick={() => handleSort('mapType')}
+                        className="w-20 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
+                      >
+                        Type
+                        <SortIcon field="mapType" />
+                      </button>
+                      <button
                         onClick={() => handleSort('wrTime')}
                         className="w-24 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
                       >
@@ -649,7 +660,7 @@ export default function PlayerRecordsTabs({
                       </button>
                     </>
                   )}
-                  {activeTab !== 'maps' && <><div className="w-20" /><div className="w-24" /></>}
+                  {activeTab !== 'maps' && <><div className="w-20" /><div className="w-20" /><div className="w-24" /></>}
                 </div>
 
                 {/* Mobile Compact Header */}
@@ -665,6 +676,9 @@ export default function PlayerRecordsTabs({
                     <div className="flex items-center gap-2">
                       <button onClick={() => handleSort('tier')} className="flex items-center gap-1 hover:text-text transition-colors">
                         Tier<SortIcon field="tier" />
+                      </button>
+                      <button onClick={() => handleSort('mapType')} className="flex items-center gap-1 hover:text-text transition-colors">
+                        Type<SortIcon field="mapType" />
                       </button>
                       <button onClick={() => handleSort('wrTime')} className="flex items-center gap-1 hover:text-text transition-colors">
                         WR<SortIcon field="wrTime" />
@@ -798,6 +812,15 @@ export default function PlayerRecordsTabs({
                         {record.tier !== null && (
                           <TierBadge tier={record.tier} />
                         )}
+                      </div>
+                      <div className="sm:w-20 sm:text-right sm:flex sm:items-center sm:justify-end">
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${
+                          record.mapType === 'staged'
+                            ? 'bg-orange-500/20 text-orange-400'
+                            : 'bg-blue-500/20 text-blue-400'
+                        }`}>
+                          {record.mapType === 'staged' ? 'Staged' : 'Linear'}
+                        </span>
                       </div>
                       <div className="sm:w-24 sm:text-right sm:flex sm:items-center sm:justify-end">
                         {record.wr_time && (

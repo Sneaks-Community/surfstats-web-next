@@ -13,6 +13,7 @@ import { getTotalsCached } from '@/lib/cache';
 import { getPlayerTimeOnServer } from '@/lib/player-analytics';
 import { getPlayerName } from '@/lib/player-cache';
 import logger from '@/lib/logger';
+import { getAllMapMetadata } from '@/lib/map-cache';
 import TierDistributionChart from './components/TierDistributionChart';
 import PlayerRecordsTabs from './components/PlayerRecordsTabs';
 import ProgressBar from '@/components/ProgressBar';
@@ -55,6 +56,7 @@ interface IncompleteMapRecord {
   mapname: string;
   tier: number | null;
   wr_time: number | null;
+  mapType: 'linear' | 'staged';
 }
 
 interface BonusRecord extends RowDataPacket {
@@ -271,12 +273,21 @@ const getIncompleteMaps = unstable_cache(
         ORDER BY m.tier ASC, m.mapname ASC
       `, [steamid]);
       
-      // Map RowDataPacket to IncompleteMapRecord
-      const incompleteMaps: IncompleteMapRecord[] = rows.map(r => ({
-        mapname: r.mapname,
-        tier: r.tier,
-        wr_time: r.wr_time,
-      }));
+      // Fetch all map metadata from cache to determine map type
+      const allMapMetadata = await getAllMapMetadata();
+      
+      // Map RowDataPacket to IncompleteMapRecord with mapType
+      const incompleteMaps: IncompleteMapRecord[] = rows.map(r => {
+        const mapMetadata = allMapMetadata.get(r.mapname);
+        const mapType: 'linear' | 'staged' = mapMetadata && mapMetadata.stages > 1 ? 'staged' : 'linear';
+        
+        return {
+          mapname: r.mapname,
+          tier: r.tier,
+          wr_time: r.wr_time,
+          mapType,
+        };
+      });
       
       logger.debug(`[Player] Found ${incompleteMaps.length} incomplete maps for ${steamid}`);
       return incompleteMaps;
