@@ -184,8 +184,12 @@ const getPlayerData = unstable_cache(
       }
       const player = playerRows[0];
 
+      // Fetch all map metadata from cache once (reuses existing cache)
+      const allMapMetadata = await getAllMapMetadata();
+
       // PARALLEL: Fetch maps, bonuses, and stages simultaneously
       // Maps include WR time for comparison and player rank (optimized with count-based rank)
+      // Tier is looked up from cache instead of joining ck_maptier
       const [mapsResult, bonusesResult, stagesResult] = await Promise.all([
         pool.query<MapRecord[]>(`
           SELECT
@@ -194,15 +198,13 @@ const getPlayerData = unstable_cache(
             pt.date,
             wr.min_runtime as wr_time,
             (SELECT COUNT(*) + 1 FROM ck_playertimes pt2
-             WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as player_rank,
-            COALESCE(mt.tier, 1) as tier
+             WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as player_rank
           FROM ck_playertimes pt
           LEFT JOIN (
             SELECT mapname, MIN(runtimepro) as min_runtime
             FROM ck_playertimes
             GROUP BY mapname
           ) wr ON pt.mapname = wr.mapname
-          LEFT JOIN ck_maptier mt ON pt.mapname = mt.mapname
           WHERE pt.steamid = ?
           ORDER BY pt.mapname ASC
         `, [steamid]),
@@ -235,6 +237,12 @@ const getPlayerData = unstable_cache(
       const [maps] = mapsResult;
       const [bonuses] = bonusesResult;
       const [stages] = stagesResult;
+
+      // Look up tier from cache for each map
+      for (const map of maps) {
+        const metadata = allMapMetadata.get(map.mapname);
+        map.tier = metadata?.tier ?? 1;
+      }
 
       logger.debug(`[Player] Profile loaded for ${player.name} (${steamid}): ${maps.length} maps, ${bonuses.length} bonuses, ${stages.length} stages`);
       
