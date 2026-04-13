@@ -92,50 +92,34 @@ const getCountriesRankingInternal = async (
   try {
     const offset = (page - 1) * limit;
     
-    // First, get all country data and aggregate in JavaScript
-    // This ensures proper normalization of country names before grouping
+    // Use SQL GROUP BY for efficient aggregation instead of loading all rows into memory
+    // This is O(n) on the database side instead of O(n) in JavaScript with n = total players
     const query = `
-      SELECT country, points
+      SELECT
+        country,
+        SUM(points) as total_points,
+        COUNT(*) as player_count
       FROM ck_playerrank
       WHERE country IS NOT NULL AND country != ''
+      GROUP BY country
+      ORDER BY total_points DESC
     `;
     
     const [rows] = await pool.query<RowDataPacket[]>(query);
     
-    // Aggregate by normalized country code
-    const countryData = new Map<string, { total_points: number; player_count: number; original_names: Set<string> }>();
-    
+    // Normalize country names to ISO codes and filter out invalid entries
+    const countriesArray: CountryRank[] = [];
     for (const row of rows) {
       const countryCode = getCountryCodeFromName(row.country);
-      const existing = countryData.get(countryCode);
-      if (existing) {
-        existing.total_points += row.points;
-        existing.player_count += 1;
-        existing.original_names.add(row.country);
-      } else {
-        countryData.set(countryCode, {
-          total_points: row.points,
-          player_count: 1,
-          original_names: new Set([row.country]),
-        });
-      }
-    }
-    
-    // Convert to array and filter out:
-    // - Countries with 0 points
-    // - Unknown country code "UN"
-    const countriesArray: CountryRank[] = [];
-    for (const [code, data] of countryData) {
-      // Skip countries with 0 points
-      if (data.total_points <= 0) continue;
-      // Skip unknown country code "UN"
-      if (code === 'UN') continue;
+      
+      // Skip countries with 0 points or unknown country code "UN"
+      if (row.total_points <= 0 || countryCode === 'UN') continue;
       
       countriesArray.push({
-        country: code, // Use ISO code as the country identifier
-        country_code: code,
-        total_points: data.total_points,
-        player_count: data.player_count,
+        country: countryCode, // Use ISO code as the country identifier
+        country_code: countryCode,
+        total_points: Number(row.total_points),
+        player_count: Number(row.player_count),
         rank: 0, // Will be calculated after sorting
       });
     }
@@ -191,13 +175,13 @@ const getCountriesRankingInternal = async (
  * Get countries ranking with aggregation
  *
  * Query optimization notes:
- * - Fetches all country data and aggregates in JavaScript for proper normalization
- * - Country names are normalized to ISO codes BEFORE grouping to avoid duplicates
+ * - Uses SQL GROUP BY for efficient aggregation on the database side
+ * - Country names are normalized to ISO codes in application code after aggregation
  * - Supports sorting by rank, country name, points, or player count
  * - Pagination applied after sorting
  *
  * IMPORTANT: Country names in the database may have variations (e.g., "Thailand", "thailand", "THAILAND").
- * We normalize them to ISO codes BEFORE grouping to avoid duplicate entries.
+ * We normalize them to ISO codes in application code to avoid duplicate entries.
  * Cached for 24 hours - country rankings change relatively infrequently
  */
 export const getCountriesRanking = unstable_cache(
