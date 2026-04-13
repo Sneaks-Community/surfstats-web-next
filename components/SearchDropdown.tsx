@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { Search, User, Map } from 'lucide-react';
 import { useMapImagesUrl } from '@/lib/MapImagesUrlContext';
 import { clientError } from '@/lib/client-logger';
@@ -30,10 +31,11 @@ interface SearchDropdownProps {
   debounceMs?: number;
 }
 
-export function SearchDropdown({ 
-  minChars = 3, 
-  debounceMs = 300 
+export function SearchDropdown({
+  minChars = 3,
+  debounceMs = 300
 }: SearchDropdownProps) {
+  const router = useRouter();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResponse>({ players: [], maps: [] });
   const [isOpen, setIsOpen] = useState(false);
@@ -118,7 +120,7 @@ export function SearchDropdown({
     switch (e.key) {
       case 'ArrowDown':
         e.preventDefault();
-        setSelectedIndex(prev => 
+        setSelectedIndex(prev =>
           prev < totalResults - 1 ? prev + 1 : prev
         );
         break;
@@ -131,8 +133,8 @@ export function SearchDropdown({
         if (selectedIndex >= 0) {
           navigateToSelected();
         } else if (query.length >= minChars) {
-          // Submit form to search page
-          window.location.href = `/search?q=${encodeURIComponent(query)}`;
+          // Submit form to search page using Next.js router
+          router.push(`/search?q=${encodeURIComponent(query)}`);
         }
         break;
       case 'Escape':
@@ -144,17 +146,17 @@ export function SearchDropdown({
     }
   };
 
-  // Navigate to selected item
+  // Navigate to selected item using Next.js router
   const navigateToSelected = () => {
     if (selectedIndex < 0) return;
 
     if (selectedIndex < results.players.length) {
       const player = results.players[selectedIndex];
-      window.location.href = `/players/${player.steamid}`;
+      router.push(`/players/${player.steamid}`);
     } else {
       const mapIndex = selectedIndex - results.players.length;
       const map = results.maps[mapIndex];
-      window.location.href = `/maps/${map.mapname}`;
+      router.push(`/maps/${map.mapname}`);
     }
   };
 

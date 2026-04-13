@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { usePagination } from '@/hooks/usePagination';
 import { clientError } from '@/lib/client-logger';
@@ -66,6 +67,9 @@ export default function Pagination({
     }
   }, [onPageChange]);
 
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   // Handle jump to page
   const handleJumpSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -74,11 +78,14 @@ export default function Pagination({
       if (navigationMode === 'client' && onPageChange) {
         handlePageChange(page);
       } else {
-        window.location.href = buildUrl(page);
+        // Use Next.js router instead of window.location.href for client-side navigation
+        const params = new URLSearchParams(searchParams?.toString() || '');
+        params.set('page', page.toString());
+        router.push(`?${params.toString()}`);
       }
       setJumpPage('');
     }
-  }, [jumpPage, totalPages, navigationMode, onPageChange, handlePageChange, buildUrl]);
+  }, [jumpPage, totalPages, navigationMode, onPageChange, handlePageChange, buildUrl, router, searchParams]);
 
   // Render page number button/link
   const renderPageNumber = (page: number | string) => {
