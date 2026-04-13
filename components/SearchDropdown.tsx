@@ -45,12 +45,13 @@ export function SearchDropdown({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const mapImagesUrl = useMapImagesUrl();
 
   // Calculate total results for keyboard navigation
   const totalResults = results.players.length + results.maps.length;
 
-  // Search function
+  // Search function with AbortController to prevent stale race conditions
   const performSearch = useCallback(async (searchQuery: string) => {
     if (searchQuery.length < minChars) {
       setResults({ players: [], maps: [] });
@@ -58,14 +59,28 @@ export function SearchDropdown({
       return;
     }
 
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Create new AbortController for this request
+    abortControllerRef.current = new AbortController();
+
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`);
+      const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
+        signal: abortControllerRef.current.signal,
+      });
       const data: SearchResponse = await response.json();
       setResults(data);
       setIsOpen(true);
       setSelectedIndex(-1);
     } catch (error) {
+      // Ignore abort errors - they're expected when a new search cancels this one
+      if (error instanceof Error && error.name === 'AbortError') {
+        return;
+      }
       clientError(`Search error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setResults({ players: [], maps: [] });
     } finally {
@@ -73,7 +88,7 @@ export function SearchDropdown({
     }
   }, [minChars]);
 
-  // Debounced search effect
+  // Debounced search effect with AbortController cleanup
   useEffect(() => {
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -92,6 +107,11 @@ export function SearchDropdown({
     return () => {
       if (debounceRef.current) {
         clearTimeout(debounceRef.current);
+      }
+      // Abort any pending request on cleanup
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+        abortControllerRef.current = null;
       }
     };
   }, [query, minChars, debounceMs, performSearch]);
