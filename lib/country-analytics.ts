@@ -304,7 +304,7 @@ function getPlayerOrderByClause(sort: PlayerSortKey, order: SortOrder): string {
   };
   
   const column = columnMap[sort];
-  const direction = order.toUpperCase();
+  const direction = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
   
   // For text columns, use COLLATE for case-insensitive sorting
   if (sort === 'player') {
