@@ -8,6 +8,7 @@ import Pagination from '@/components/Pagination';
 import { formatTime, formatDate } from '@/lib/utils';
 import { sanitizePlayerName } from '@/lib/sanitize';
 import { useDebounce } from '@/hooks/useDebounce';
+import { clientError } from '@/lib/client-logger';
 
 interface MapRecord {
   steamid: string;
@@ -183,7 +184,7 @@ export default function MapRecordsTabs({
         setTotalStageRecords(0);
       }
     } catch (error) {
-      console.error('Failed to load stage records:', error);
+      clientError(`Failed to load stage records: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setAllStageRecords([]);
       setTotalStageRecords(0);
     } finally {
@@ -233,7 +234,7 @@ export default function MapRecordsTabs({
         setTotalBonusRecords(0);
       }
     } catch (error) {
-      console.error('Failed to load bonus records:', error);
+      clientError(`Failed to load bonus records: ${error instanceof Error ? error.message : 'Unknown error'}`);
       bonusCacheRef.current.set(cacheKey, []);
       setAllBonusRecords([]);
       setTotalBonusRecords(0);
@@ -307,7 +308,7 @@ export default function MapRecordsTabs({
             setHasMoreToLoad(data.pagination.page < data.pagination.totalPages);
           }
         } catch (error) {
-          console.error('Failed to load records:', error);
+          clientError(`Failed to load records: ${error instanceof Error ? error.message : 'Unknown error'}`);
         }
       }
       setLeaderboardPage(page);

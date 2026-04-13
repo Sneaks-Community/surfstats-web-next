@@ -3,6 +3,7 @@ import { searchPlayers } from '@/lib/player-cache';
 import { getAllMapMetadata } from '@/lib/map-cache';
 import { sanitizeSearchQuery } from '@/lib/sanitize';
 import { getSteamProfiles } from '@/lib/steam';
+import logger from '@/lib/logger';
 
 const MAX_PLAYERS = 3;
 const MAX_MAPS = 3;
@@ -49,7 +50,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ players, maps });
   } catch (error) {
-    console.error('[API/search] Error:', error);
+    logger.error(`[API/search] Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     return NextResponse.json(
       { error: 'Search failed' },
       { status: 500 }

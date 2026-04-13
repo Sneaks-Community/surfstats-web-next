@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Search, User, Map } from 'lucide-react';
 import { useMapImagesUrl } from '@/lib/MapImagesUrlContext';
+import { clientError } from '@/lib/client-logger';
 
 interface PlayerResult {
   steamid: string;
@@ -63,7 +64,7 @@ export function SearchDropdown({
       setIsOpen(true);
       setSelectedIndex(-1);
     } catch (error) {
-      console.error('Search error:', error);
+      clientError(`Search error: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setResults({ players: [], maps: [] });
     } finally {
       setIsLoading(false);

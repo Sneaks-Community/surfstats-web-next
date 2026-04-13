@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { usePagination } from '@/hooks/usePagination';
+import { clientError } from '@/lib/client-logger';
 
 type NavigationMode = 'client' | 'server' | 'none';
 
@@ -160,7 +161,7 @@ export default function Pagination({
 
   // Validation for development mode
   if (process.env.NODE_ENV === 'development' && navigationMode === 'none') {
-    console.error(
+    clientError(
       'Pagination requires either baseUrl (for server-side navigation) or onPageChange (for client-side navigation)'
     );
   }
