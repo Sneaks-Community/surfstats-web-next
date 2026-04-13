@@ -92,20 +92,15 @@ export function sanitizeSearchQuery(query: string | undefined): string {
 
 /**
  * Sanitize a player name (for display purposes)
- * Note: Player names are displayed, not used in queries, so this is for XSS prevention
  * @param name - The player name to sanitize
- * @returns Sanitized name safe for HTML display
+ * @returns Sanitized name safe for display
  */
 export function sanitizePlayerName(name: string | null | undefined): string {
   if (!name || typeof name !== 'string') {
     return 'Unknown';
   }
   
-  // Remove HTML/script tags and special characters that could be used for XSS
-  return name
-    .replace(/[<>]/g, '')
-    .replace(/\b(?:javascript|data|vbscript):/gi, '')
-    .replace(/on\w+=/gi, '')
-    .slice(0, 64) // Limit length
-    .trim() || 'Unknown';
+  // Limit length to prevent display issues
+  // React handles XSS protection automatically through HTML escaping
+  return name.slice(0, 64).trim() || 'Unknown';
 }
