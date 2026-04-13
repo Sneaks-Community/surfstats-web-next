@@ -222,6 +222,7 @@ export default async function MapProfilePage({
           <MapImage
             src={`${mapImagesUrl}${map.mapname}.jpg`}
             alt={map.mapname}
+            unoptimized
             fill
             className="object-cover blur-sm"
             referrerPolicy="no-referrer"
@@ -234,6 +235,7 @@ export default async function MapProfilePage({
             <MapImage
               src={`${mapImagesUrl}${map.mapname}.jpg`}
               alt={map.mapname}
+              unoptimized
               fill
               className="object-cover"
               referrerPolicy="no-referrer"

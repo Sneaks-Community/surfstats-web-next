@@ -152,6 +152,7 @@ export default async function SearchPage({
                         <MapImage
                           src={`${mapImagesUrl}${map.mapname}.jpg`}
                           alt={map.mapname}
+                          unoptimized
                           fill
                           className="object-cover"
                           referrerPolicy="no-referrer"

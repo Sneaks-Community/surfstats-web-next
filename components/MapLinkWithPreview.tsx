@@ -127,6 +127,7 @@ export default function MapLinkWithPreview({
       <MapImage
         src={`${mapImagesUrl}${mapname}.jpg`}
         alt={mapname}
+        unoptimized
         fill
         className="object-cover"
         referrerPolicy="no-referrer"

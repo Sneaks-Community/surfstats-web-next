@@ -118,6 +118,7 @@ export default function ServerCard({ server, mapImagesUrl }: { server: any; mapI
                 <MapImage
                   src={`${mapImagesUrl}${server.map}.jpg`}
                   alt={server.map}
+                  unoptimized
                   fill
                   className="object-cover"
                   referrerPolicy="no-referrer"

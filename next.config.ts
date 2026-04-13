@@ -8,7 +8,7 @@ const ContentSecurityPolicy = `
   default-src 'self';
   script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ''};
   style-src 'self' 'unsafe-inline';
-  img-src 'self' blob: data: https://image.gametracker.com https://steamcommunity.com https://avatars.steamcdn.com https://avatars.steamstatic.com;
+  img-src 'self' blob: data: https:;
   font-src 'self';
   connect-src 'self' https://api.steampowered.com;
   frame-ancestors 'none';
@@ -57,14 +57,13 @@ const nextConfig: NextConfig = {
     ];
   },
   // Restrict remote images to trusted domains only
+  // Note: Map images use unoptimized={true} and bypass the Next.js image proxy entirely,
+  // so they are not included here. Their hostnames are configured at runtime via MAP_IMAGES_URL.
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-        port: '',
-        pathname: '/**',
-      },
+      { protocol: 'https', hostname: 'steamcommunity.com' },
+      { protocol: 'https', hostname: 'avatars.steamstatic.com' },
+      { protocol: 'https', hostname: 'avatars.steamcdn.com' },
     ],
   },
   output: 'standalone',

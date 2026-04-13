@@ -109,6 +109,7 @@ export default async function Home() {
                       <MapImage
                         src={`${mapImagesUrl}${record.map}.jpg`}
                         alt={`${record.map} thumbnail`}
+                        unoptimized
                         width={64}
                         height={64}
                         className="rounded-md"
@@ -156,6 +157,7 @@ export default async function Home() {
                       <MapImage
                         src={`${mapImagesUrl}${completion.map}.jpg`}
                         alt={`${completion.map} thumbnail`}
+                        unoptimized
                         width={64}
                         height={64}
                         className="rounded-md"

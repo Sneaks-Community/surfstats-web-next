@@ -278,6 +278,7 @@ export function SearchDropdown({
                         fill
                         sizes="24px"
                         className="object-cover"
+                        unoptimized
                         onError={(e) => {
                           (e.target as HTMLImageElement).style.display = 'none';
                         }}

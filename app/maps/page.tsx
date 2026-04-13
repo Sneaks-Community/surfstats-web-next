@@ -126,6 +126,7 @@ export default async function MapsPage({
                 <MapImage
                   src={`${mapImagesUrl}${map.mapname}.jpg`}
                   alt={map.mapname}
+                  unoptimized
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-300"
                   referrerPolicy="no-referrer"
