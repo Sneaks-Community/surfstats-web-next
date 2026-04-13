@@ -106,8 +106,26 @@ const getWRCheckpointTimes = unstable_cache(
         return undefined;
       }
       
-      // Build dynamic column list based on max checkpoint
-      const checkpointColumns = Array.from({ length: maxCheckpoint }, (_, i) => `cp${i + 1}`);
+      // Validate checkpoint count first
+      const MAX_CHECKPOINTS = 57; // ck_checkpoints has cp1-cp57 columns
+      if (maxCheckpoint > MAX_CHECKPOINTS || maxCheckpoint < 0) {
+        throw new Error('Invalid checkpoint count');
+      }
+      
+      // Whitelist valid column names to prevent SQL injection
+      const validColumns = new Set<string>();
+      for (let i = 1; i <= MAX_CHECKPOINTS; i++) {
+        validColumns.add(`cp${i}`);
+      }
+      
+      const checkpointColumns: string[] = [];
+      for (let i = 1; i <= maxCheckpoint; i++) {
+        const colName = `cp${i}`;
+        if (!validColumns.has(colName)) {
+          throw new Error(`Invalid checkpoint column: ${colName}`);
+        }
+        checkpointColumns.push(colName);
+      }
       
       // Get WR holder's checkpoint times - fetch only existing cp columns
       const [wrCheckpointRows] = await pool.query<RowDataPacket[]>(`

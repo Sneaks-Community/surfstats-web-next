@@ -80,7 +80,19 @@ const getStageRecords = unstable_cache(
       // Build ORDER BY clause based on sort field
       // NOTE: For stages, we always fetch top 100 by rank (runtime ASC) first
       // Client-side sorting handles other sort fields
-      const orderDirection = sortOrder === 'desc' ? 'DESC' : 'ASC';
+      
+      // Validate sort field to prevent SQL injection
+      const validSortFields = new Set(['rank', 'player', 'time', 'speed', 'date']);
+      if (!validSortFields.has(sortField)) {
+        sortField = 'rank'; // Default to safe value
+      }
+      
+      // Validate sort order to prevent SQL injection
+      const validDirections = new Set(['ASC', 'DESC']);
+      const orderDirection = validDirections.has(sortOrder.toUpperCase())
+        ? sortOrder.toUpperCase()
+        : 'ASC';
+      
       let orderByClause = 'runtime ASC'; // Default to runtime
       if (sortField === 'rank') {
         orderByClause = 'runtime ASC';
