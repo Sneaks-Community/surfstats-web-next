@@ -6,6 +6,7 @@ import MapFilters from '@/components/MapFilters';
 import { getTierColor } from '@/lib/tierColors';
 import Pagination from '@/components/Pagination';
 import { getTierDistribution, getAllMapMetadata, type MapMetadata } from '@/lib/map-cache';
+import { sanitizeSearchQuery } from '@/lib/sanitize';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -43,7 +44,7 @@ export default async function MapsPage({
     return [];
   };
   
-  const q = getParam(params.q);
+  const q = sanitizeSearchQuery(getParam(params.q));
   const page = parseInt(getParam(params.page, '1'), 10);
   const type = getParam(params.type, 'all');
   // Handle tiers from URL - can be comma-separated or multiple params

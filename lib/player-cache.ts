@@ -4,6 +4,7 @@ import { RowDataPacket } from 'mysql2';
 import { unstable_cache } from 'next/cache';
 import logger from '@/lib/logger';
 import { getPlayerCount } from '@/lib/registry-cache';
+import { sanitizeSearchQuery } from './sanitize';
 
 /**
  * Player rank data from database
@@ -56,13 +57,16 @@ async function fetchPlayersInternal(
     const limit = 20;
     const offset = (page - 1) * limit;
     
+    // Sanitize search query to prevent SQL injection via LIKE wildcards
+    const sanitizedSearch = sanitizeSearchQuery(search);
+    
     // Use window function for rank calculation (much more efficient than correlated subquery)
     // RANK() OVER (ORDER BY points DESC) calculates rank based on points
     // This is O(n log n) instead of O(n²) for the correlated subquery
     let query: string;
     const params: any[] = [];
     
-    if (search) {
+    if (sanitizedSearch) {
       // For search, we need to use a subquery to filter first, then calculate rank
       query = `
         SELECT
@@ -78,7 +82,7 @@ async function fetchPlayersInternal(
         ORDER BY ranked.points DESC
         LIMIT ? OFFSET ?
       `;
-      params.push(`%${search}%`, `%${search}%`, limit, offset);
+      params.push(`%${sanitizedSearch}%`, `%${sanitizedSearch}%`, limit, offset);
     } else {
       // For non-search, use window function directly with pagination
       query = `
@@ -96,10 +100,10 @@ async function fetchPlayersInternal(
     
     // Get total count for pagination
     let total: number;
-    if (search) {
+    if (sanitizedSearch) {
       // For search, we need to count matching records
       const countQuery = `SELECT COUNT(*) as total FROM ck_playerrank WHERE name LIKE ? OR steamid LIKE ?`;
-      const countParams = [`%${search}%`, `%${search}%`];
+      const countParams = [`%${sanitizedSearch}%`, `%${sanitizedSearch}%`];
       const [countRows] = await pool.query<RowDataPacket[]>(countQuery, countParams);
       total = countRows[0].total;
     } else {
@@ -131,7 +135,10 @@ export const getPlayers = unstable_cache(
  * Internal function to search players (for search page)
  */
 async function searchPlayersInternal(query: string): Promise<PlayerSearchResult[]> {
-  logger.debug(`[PlayerCache] Searching players for: "${query}"`);
+  // Sanitize search query to prevent SQL injection via LIKE wildcards
+  const sanitizedQuery = sanitizeSearchQuery(query);
+  
+  logger.debug(`[PlayerCache] Searching players for: "${sanitizedQuery}"`);
   
   try {
     const [rows] = await pool.query<RowDataPacket[]>(`
@@ -140,7 +147,7 @@ async function searchPlayersInternal(query: string): Promise<PlayerSearchResult[
       WHERE name LIKE ? OR steamid LIKE ?
       ORDER BY points DESC
       LIMIT 10
-    `, [`%${query}%`, `%${query}%`]);
+    `, [`%${sanitizedQuery}%`, `%${sanitizedQuery}%`]);
     
     return rows.map(row => ({
       steamid: row.steamid,
