@@ -85,7 +85,7 @@ export default function Pagination({
       }
       setJumpPage('');
     }
-  }, [jumpPage, totalPages, navigationMode, onPageChange, handlePageChange, buildUrl, router, searchParams]);
+  }, [jumpPage, totalPages, navigationMode, onPageChange, handlePageChange, router, searchParams]);
 
   // Render page number button/link
   const renderPageNumber = (page: number | string) => {

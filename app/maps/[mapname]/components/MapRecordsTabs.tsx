@@ -1012,18 +1012,31 @@ export default function MapRecordsTabs({
                 </tr>
               </thead>
               <tbody className="bg-surface divide-y divide-border">
-                {paginatedBonusRecords.map((record) => renderCompletionRow(record, 'runtime'))}
-                {paginatedBonusRecords.length === 0 && (
+                {isLoadingBonuses ? (
                   <tr>
-                    <td
-                      colSpan={6}
-                      className="px-2 sm:px-4 py-8 text-center text-text-muted"
-                    >
-                      {debouncedBonusSearch
-                        ? 'No players found matching your search.'
-                        : `No bonus completions for Bonus ${selectedBonus}.`}
+                    <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent"></div>
+                        <span className="text-text-muted text-sm font-medium">Loading bonus completions...</span>
+                      </div>
                     </td>
                   </tr>
+                ) : (
+                  <>
+                    {paginatedBonusRecords.map((record) => renderCompletionRow(record, 'runtime'))}
+                    {paginatedBonusRecords.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-2 sm:px-4 py-8 text-center text-text-muted"
+                        >
+                          {debouncedBonusSearch
+                            ? 'No players found matching your search.'
+                            : `No bonus completions for Bonus ${selectedBonus}.`}
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )}
               </tbody>
             </table>
@@ -1112,18 +1125,31 @@ export default function MapRecordsTabs({
                 </tr>
               </thead>
               <tbody className="bg-surface divide-y divide-border">
-                {paginatedStageRecords.map((record) => renderCompletionRow(record, 'runtime'))}
-                {paginatedStageRecords.length === 0 && (
+                {isLoadingStages ? (
                   <tr>
-                    <td
-                      colSpan={5}
-                      className="px-2 sm:px-4 py-8 text-center text-text-muted"
-                    >
-                      {debouncedStageSearch
-                        ? 'No players found matching your search.'
-                        : `No stage completions for Stage ${selectedStage}.`}
+                    <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent"></div>
+                        <span className="text-text-muted text-sm font-medium">Loading stage completions...</span>
+                      </div>
                     </td>
                   </tr>
+                ) : (
+                  <>
+                    {paginatedStageRecords.map((record) => renderCompletionRow(record, 'runtime'))}
+                    {paginatedStageRecords.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={6}
+                          className="px-2 sm:px-4 py-8 text-center text-text-muted"
+                        >
+                          {debouncedStageSearch
+                            ? 'No players found matching your search.'
+                            : `No stage completions for Stage ${selectedStage}.`}
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )}
               </tbody>
             </table>
