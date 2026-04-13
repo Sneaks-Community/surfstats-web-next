@@ -1,13 +1,33 @@
 import 'server-only';
 import logger from '@/lib/logger';
 
-export async function getSteamAvatars(steamId: string): Promise<{ avatar: string; avatarmedium: string; avatarfull: string } | null> {
-  const apiKey = process.env.STEAM_API_KEY;
-  if (!apiKey) {
-    logger.warn('[Steam] STEAM_API_KEY not configured - avatar fetching disabled');
-    return null;
+/**
+ * Get the base URL for internal API calls
+ * During build time, returns null to skip API calls
+ * At runtime, returns the full site URL
+ */
+function getBaseUrl(): string | null {
+  // NEXT_PUBLIC_SITE_URL is set at build time, so it's available during build
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL;
   }
+  
+  // At runtime, construct from available environment variables
+  const host = process.env.SITE_URL 
+    ? `https://${process.env.SITE_URL}`
+    : process.env.HOSTNAME 
+      ? `http://${process.env.HOSTNAME}:${process.env.PORT || 3000}`
+      : null;
+  
+  return host;
+}
 
+/**
+ * Fetch avatar data for a single SteamID using the server-side proxy
+ * @param steamId - The SteamID to fetch avatars for
+ * @returns Avatar data or null if failed
+ */
+export async function getSteamAvatars(steamId: string): Promise<{ avatar: string; avatarmedium: string; avatarfull: string } | null> {
   const startTime = Date.now();
   
   try {
@@ -20,25 +40,29 @@ export async function getSteamAvatars(steamId: string): Promise<{ avatar: string
 
     logger.debug(`[Steam] Fetching avatar for ${steamId} (SteamID64: ${steamId64})`);
     
-    const response = await fetch(
-      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${apiKey}&steamids=${steamId64}`,
-      { next: { revalidate: 86400 } } // Cache for 24 hours
-    );
+    // Use server-side proxy to keep API key on server
+    const baseUrl = getBaseUrl();
+    
+    // During build time, skip the proxy and return null
+    // The proxy is only needed at runtime to keep API key on server
+    if (!baseUrl) {
+      logger.debug('[Steam] Skipping avatar fetch (build time or no base URL)');
+      return null;
+    }
+    
+    const response = await fetch(`${baseUrl}/api/steam?steamids=${steamId64}`, {
+      next: { revalidate: 86400 } // Cache for 24 hours
+    });
 
     if (!response.ok) {
       const duration = Date.now() - startTime;
-      if (response.status === 403) {
-        logger.error(`[Steam] API key invalid or forbidden (${response.status}) - check STEAM_API_KEY`);
-      } else if (response.status === 429) {
-        logger.error(`[Steam] Rate limited by Steam API (${response.status}) - too many requests`);
-      } else {
-        logger.error(`[Steam] API request failed with status ${response.status} after ${duration}ms`);
-      }
+      logger.error(`[Steam] Proxy request failed with status ${response.status} after ${duration}ms`);
       return null;
     }
 
     const data = await response.json();
-    const player = data.response.players[0];
+    const player = data.players?.[0];
+    
     if (!player) {
       const duration = Date.now() - startTime;
       logger.warn(`[Steam] No player data found for SteamID ${steamId} (${duration}ms)`);
@@ -55,29 +79,19 @@ export async function getSteamAvatars(steamId: string): Promise<{ avatar: string
     };
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    const errorCode = error.code || 'UNKNOWN';
     const errorMessage = error.message || 'Unknown error';
-    
-    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
-      logger.error(`[Steam] Network error - unable to reach Steam API servers (${errorCode})`);
-    } else if (error.code === 'ETIMEDOUT') {
-      logger.error(`[Steam] Request timed out after ${duration}ms`);
-    } else {
-      logger.error(`[Steam] Error fetching avatar for ${steamId} after ${duration}ms: ${errorMessage}`);
-    }
-    
+    logger.error(`[Steam] Error fetching avatar for ${steamId} after ${duration}ms: ${errorMessage}`);
     return null;
   }
 }
 
+/**
+ * Fetch avatar data for multiple SteamIDs using the server-side proxy
+ * @param steamIds - Array of SteamIDs to fetch avatars for
+ * @returns Map of original SteamID to avatar data
+ */
 export async function getSteamProfiles(steamIds: string[]): Promise<Map<string, { avatar: string; avatarmedium: string; avatarfull: string }>> {
   const result = new Map<string, { avatar: string; avatarmedium: string; avatarfull: string }>();
-  
-  const apiKey = process.env.STEAM_API_KEY;
-  if (!apiKey) {
-    logger.warn('[Steam] STEAM_API_KEY not configured - profile fetching disabled');
-    return result;
-  }
   
   if (steamIds.length === 0) {
     return result;
@@ -106,59 +120,41 @@ export async function getSteamProfiles(steamIds: string[]): Promise<Map<string, 
       return result;
     }
 
-    // Steam API allows up to 100 steamids per request
-    const chunks: string[][] = [];
-    for (let i = 0; i < steamId64s.length; i += 100) {
-      chunks.push(steamId64s.slice(i, i + 100));
+    // Use server-side proxy to keep API key on server
+    const baseUrl = getBaseUrl();
+    
+    // During build time, skip the proxy and return empty result
+    // The proxy is only needed at runtime to keep API key on server
+    if (!baseUrl) {
+      logger.debug('[Steam] Skipping profile fetch (build time or no base URL)');
+      return result;
+    }
+    
+    const response = await fetch(
+      `${baseUrl}/api/steam?steamids=${steamId64s.join(',')}`,
+      { next: { revalidate: 86400 } } // Cache for 24 hours
+    );
+
+    if (!response.ok) {
+      const duration = Date.now() - startTime;
+      logger.error(`[Steam] Proxy request failed with status ${response.status} after ${duration}ms`);
+      return result;
     }
 
-    logger.debug(`[Steam] Processing ${chunks.length} API chunk(s)`);
-
-    for (let i = 0; i < chunks.length; i++) {
-      const chunk = chunks[i];
-      const chunkStart = Date.now();
-      
-      try {
-        const response = await fetch(
-          `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${apiKey}&steamids=${chunk.join(',')}`,
-          { next: { revalidate: 86400 } } // Cache for 24 hours
-        );
-
-        if (!response.ok) {
-          const chunkDuration = Date.now() - chunkStart;
-          if (response.status === 403) {
-            logger.error(`[Steam] API key invalid or forbidden (${response.status}) in chunk ${i + 1}/${chunks.length} - check STEAM_API_KEY`);
-          } else if (response.status === 429) {
-            logger.error(`[Steam] Rate limited by Steam API (${response.status}) in chunk ${i + 1}/${chunks.length}`);
-          } else {
-            logger.error(`[Steam] API request failed with status ${response.status} in chunk ${i + 1}/${chunks.length} (${chunkDuration}ms)`);
-          }
-          continue;
-        }
-
-        const data = await response.json();
-        const players = data.response.players || [];
-        
-        for (const player of players) {
-          const originalSteamId = steamId64Map.get(player.steamid);
-          if (originalSteamId) {
-            result.set(originalSteamId, {
-              avatar: player.avatar || '',
-              avatarmedium: player.avatarmedium || '',
-              avatarfull: player.avatarfull || ''
-            });
-          }
-        }
-        
-        const chunkDuration = Date.now() - chunkStart;
-        logger.debug(`[Steam] Chunk ${i + 1}/${chunks.length} completed: ${players.length} profiles (${chunkDuration}ms)`);
-      } catch (chunkError: any) {
-        const chunkDuration = Date.now() - chunkStart;
-        logger.error(`[Steam] Error in chunk ${i + 1}/${chunks.length} after ${chunkDuration}ms: ${chunkError.message || 'Unknown error'}`);
-        // Continue with next chunk
+    const data = await response.json();
+    const players = data.players || [];
+    
+    for (const player of players) {
+      const originalSteamId = steamId64Map.get(player.steamid);
+      if (originalSteamId) {
+        result.set(originalSteamId, {
+          avatar: player.avatar || '',
+          avatarmedium: player.avatarmedium || '',
+          avatarfull: player.avatarfull || ''
+        });
       }
     }
-
+    
     const duration = Date.now() - startTime;
     logger.debug(`[Steam] Profile fetch complete: ${result.size}/${steamIds.length} profiles retrieved (${duration}ms)`);
     
@@ -171,6 +167,11 @@ export async function getSteamProfiles(steamIds: string[]): Promise<Map<string, 
   }
 }
 
+/**
+ * Convert SteamID2 (STEAM_X:Y:Z) to SteamID64
+ * @param steamId - SteamID2 format (e.g., STEAM_1:0:12345)
+ * @returns SteamID64 string or null if invalid
+ */
 export function convertSteamIdTo64(steamId: string): string | null {
   const match = steamId.match(/^STEAM_([0-5]):([0-1]):([0-9]+)$/);
   if (!match) return null;
