@@ -460,6 +460,7 @@ export default async function PlayerProfilePage({
     );
   }
   
+  // Group 1: Player data (required for early exit if not found)
   const data = await getPlayerData(validSteamId);
   
   if (!data) {
@@ -476,17 +477,14 @@ export default async function PlayerProfilePage({
 
   const { player, maps, bonuses, stages } = data;
   
-  // Fetch incomplete records (maps, bonuses, stages not completed by this player)
-  const incompleteData = await getIncompleteRecords(validSteamId);
-  
-  const totals = await getTotalsCached();
-  const steamAvatars = await getSteamAvatars(decodedSteamId);
-  
-  // Fetch playtime from analytics database (optional, box hidden if unavailable)
-  const playtimeData = await getPlayerTimeOnServer(validSteamId);
-  
-  // Fetch linear vs staged per tier for radar chart (returns array directly)
-  const linearVsStagedPerTier = await getLinearVsStagedPerTier(validSteamId);
+  // Group 2: Parallel fetch for remaining data
+  const [incompleteData, totals, steamAvatars, playtimeData, linearVsStagedPerTier] = await Promise.all([
+    getIncompleteRecords(validSteamId),
+    getTotalsCached(),
+    getSteamAvatars(decodedSteamId),
+    getPlayerTimeOnServer(validSteamId),
+    getLinearVsStagedPerTier(validSteamId),
+  ]);
 
   return (
     <div className="space-y-4">
