@@ -53,40 +53,12 @@ export function wrapPoolQuery(
       const errorCode = error.code || 'UNKNOWN';
       const errorMessage = error.message || 'Unknown error';
 
-      // Connection-related errors - handle gracefully
-      if (error.code === 'ECONNREFUSED') {
-        logger.error(`[${prefix}] Connection refused - database server unavailable`);
-        logger.error(`[${prefix}] Error details: ${errorMessage}`);
-        return [[]] as any;
-      }
-
-      if (error.code === 'ENOTFOUND') {
-        logger.error(`[${prefix}] Host not found - unable to resolve host`);
-        logger.error(`[${prefix}] Error details: ${errorMessage}`);
-        return [[]] as any;
-      }
-
-      if (error.code === 'ETIMEDOUT' || error.code === 'PROTOCOL_CONNECTION_LOST') {
-        logger.error(`[${prefix}] Connection timeout or lost - database may be overloaded`);
-        logger.error(`[${prefix}] Error details: ${errorMessage}`);
-        return [[]] as any;
-      }
-
-      if (error.code === 'ER_ACCESS_DENIED_ERROR') {
-        logger.error(`[${prefix}] Access denied - check database credentials`);
-        logger.error(`[${prefix}] Error details: ${errorMessage}`);
-        return [[]] as any;
-      }
-
-      if (error.code === 'ER_BAD_DB_ERROR') {
-        logger.error(`[${prefix}] Database not found - check database name`);
-        logger.error(`[${prefix}] Error details: ${errorMessage}`);
-        return [[]] as any;
-      }
-
-      // Query errors - log and rethrow
-      logger.error(`[${prefix}] Query error (${errorCode}): ${errorMessage}`);
+      // Log all errors with context
+      logger.error(`[${prefix}] Database error (${errorCode}): ${errorMessage}`);
       logger.error(`[${prefix}] Query: ${queryPreview}`);
+
+      // Rethrow all errors to allow callers to handle or propagate them
+      // Returning empty arrays silently masks failures and causes incorrect cached data
       throw error;
     }
   };
