@@ -247,6 +247,18 @@ export async function getBonusGroupsForMap(mapname: string): Promise<BonusGroup[
 }
 
 /**
+ * Get bonus group zone numbers for a specific map (returns array of zonegroup numbers)
+ * This is a synchronous function that operates on the cached data
+ */
+export async function getBonusGroupsByMap(mapname: string): Promise<number[]> {
+  const allBonuses = await getAllBonusGroups();
+  return allBonuses
+    .filter((b) => b.mapname === mapname)
+    .map((b) => b.zonegroup)
+    .sort((a, b) => a - b);
+}
+
+/**
  * Get stages for a specific map
  */
 export async function getStagesForMap(mapname: string): Promise<StageGroup[]> {

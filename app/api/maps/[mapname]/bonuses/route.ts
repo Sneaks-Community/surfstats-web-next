@@ -5,6 +5,7 @@ import { sanitizeMapName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import { unstable_cache } from 'next/cache';
 import { withTimeout } from '@/lib/timeout';
+import { getBonusGroupsByMap } from '@/lib/registry-cache';
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 500;
@@ -46,15 +47,8 @@ const getBonusRecords = unstable_cache(
     const offset = (page - 1) * pageSize;
 
     try {
-      // Get list of all bonus groups
-      const [bonusGroupsRows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT DISTINCT zonegroup FROM ck_bonus WHERE mapname = ? ORDER BY zonegroup ASC
-        `, [mapname]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
-      const bonusGroupsList = bonusGroupsRows.map(row => row.zonegroup);
+      // Get list of all bonus groups from registry cache (already cached for 1 hour)
+      const bonusGroupsList = await getBonusGroupsByMap(mapname);
 
       // Get total count for this bonus group
       const [countRows] = await withTimeout(
