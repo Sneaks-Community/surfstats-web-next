@@ -321,7 +321,6 @@ const getIncompleteBonuses = unstable_cache(
           z.zonegroup,
           wr.min_runtime as wr_time
         FROM ck_zones z
-        INNER JOIN ck_maptier m ON z.mapname = m.mapname
         LEFT JOIN ck_bonus br ON z.mapname = br.mapname AND z.zonegroup = br.zonegroup AND br.steamid = ?
         LEFT JOIN (
           SELECT mapname, zonegroup, MIN(runtime) as min_runtime
@@ -329,7 +328,7 @@ const getIncompleteBonuses = unstable_cache(
           GROUP BY mapname, zonegroup
         ) wr ON z.mapname = wr.mapname AND z.zonegroup = wr.zonegroup
         WHERE z.zonetype = 2 AND z.zonegroup > 0 AND br.mapname IS NULL
-        ORDER BY m.tier ASC, z.mapname ASC, z.zonegroup ASC
+        ORDER BY z.mapname ASC, z.zonegroup ASC
       `, [steamid]);
       
       // Map RowDataPacket to IncompleteBonusRecord
@@ -361,10 +360,9 @@ const getIncompleteStages = unstable_cache(
           z.mapname as map,
           z.zonetypeid as stage
         FROM ck_zones z
-        INNER JOIN ck_maptier m ON z.mapname = m.mapname
         LEFT JOIN ck_stages sr ON z.mapname = sr.map AND z.zonetypeid = sr.stage AND sr.steamid = ?
         WHERE z.zonetype = 3 AND z.zonegroup = 0 AND z.zonetypeid > 0 AND sr.map IS NULL
-        ORDER BY m.tier ASC, z.mapname ASC, z.zonetypeid ASC
+        ORDER BY z.mapname ASC, z.zonetypeid ASC
       `, [steamid]);
       
       const incompleteStages: IncompleteStageRecord[] = rows.map(r => ({
