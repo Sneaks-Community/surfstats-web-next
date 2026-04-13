@@ -4,6 +4,7 @@ import { RowDataPacket } from 'mysql2';
 import { sanitizeMapName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import { unstable_cache } from 'next/cache';
+import { withTimeout } from '@/lib/timeout';
 
 const TOP_RECORDS_LIMIT = 100;
 const MAX_STAGE_RECORDS = 100;
@@ -44,37 +45,35 @@ const getStageRecords = unstable_cache(
     pageSize: number,
     offset: number
   ): Promise<StagesResponse> => {
-    // Create timeout promise to prevent indefinite query hanging
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Query timeout exceeded')), QUERY_TIMEOUT_MS);
-    });
-
     try {
       // Get list of all stages
-      const [stagesListRows] = await Promise.race([
+      const [stagesListRows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT DISTINCT stage FROM ck_stages WHERE \`map\` = ? ORDER BY stage ASC
         `, [mapname]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
       const stagesList = stagesListRows.map(row => row.stage);
 
       // Get total count for this stage
-      const [countRows] = await Promise.race([
+      const [countRows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT COUNT(*) as total FROM ck_stages WHERE \`map\` = ? AND stage = ?
         `, [mapname, stage]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
       const totalRecords = countRows[0]?.total || 0;
 
       // Get WR time once
-      const [wrResult] = await Promise.race([
+      const [wrResult] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT MIN(runtime) as wr_time FROM ck_stages WHERE map = ? AND stage = ?
         `, [mapname, stage]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
       const wrTime = wrResult[0]?.wr_time || null;
 
       // Build ORDER BY clause based on sort field
@@ -107,7 +106,7 @@ const getStageRecords = unstable_cache(
       }
 
       // Get total count with rank calculation (always by runtime, date as tiebreaker)
-      const [rankCountRows] = await Promise.race([
+      const [rankCountRows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT COUNT(DISTINCT rank) as total FROM (
             SELECT
@@ -117,13 +116,14 @@ const getStageRecords = unstable_cache(
             WHERE s.map = ? AND s.stage = ?
           ) AS ranked
         `, [mapname, stage]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
       const totalWithRank = rankCountRows[0]?.total || 0;
 
       // Get stage records with rank calculation
       // Return all top 100 records sorted by rank for UI to handle pagination and sorting
-      const [stageRows] = await Promise.race([
+      const [stageRows] = await withTimeout(
         pool.query<StageRecord[]>(`
           SELECT
             steamid, name, stage, runtime, date, startspeed, rank, wr_time
@@ -144,8 +144,9 @@ const getStageRecords = unstable_cache(
           WHERE rank <= ?
           ORDER BY rank ASC, date ASC
         `, [wrTime, mapname, stage, MAX_STAGE_RECORDS]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
 
       logger.debug(`[API] Fetched ${stageRows.length} stage records for ${mapname} stage ${stage} (sort: ${sortField} ${sortOrder}, page: ${Math.floor(offset / pageSize) + 1})`);
 

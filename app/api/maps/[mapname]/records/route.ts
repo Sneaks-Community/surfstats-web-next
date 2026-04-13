@@ -4,6 +4,7 @@ import { RowDataPacket } from 'mysql2';
 import { sanitizeMapName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import { unstable_cache } from 'next/cache';
+import { withTimeout } from '@/lib/timeout';
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 500;
@@ -32,22 +33,18 @@ const getRecordCountsAndWR = unstable_cache(
   async (mapname: string): Promise<{ counts: RecordCounts; wr_time: number | null }> => {
     const validMapname = sanitizeMapName(mapname);
 
-    // Create timeout promise to prevent indefinite query hanging
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Query timeout exceeded')), QUERY_TIMEOUT_MS);
-    });
-
     try {
       // Get total counts
-      const [countsRows] = await Promise.race([
+      const [countsRows] = await withTimeout(
         pool.query<RecordCountsRow[]>(`
           SELECT
             (SELECT COUNT(*) FROM ck_playertimes WHERE mapname = ?) as leaderboardTotal,
             (SELECT COUNT(*) FROM ck_bonus WHERE mapname = ?) as bonusesTotal,
             (SELECT COUNT(*) FROM ck_stages WHERE \`map\` = ?) as stagesTotal
         `, [validMapname, validMapname, validMapname]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
 
       const counts: RecordCounts = {
         leaderboardTotal: countsRows[0]?.leaderboardTotal || 0,
@@ -56,12 +53,13 @@ const getRecordCountsAndWR = unstable_cache(
       };
 
       // Get WR time
-      const [wrTimeRows] = await Promise.race([
+      const [wrTimeRows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?
         `, [validMapname]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
       const wr_time = wrTimeRows[0]?.wr_time || null;
 
       return { counts, wr_time };
@@ -87,23 +85,19 @@ const getLeaderboardRecords = unstable_cache(
     const validMapname = sanitizeMapName(mapname);
     const offset = (page - 1) * pageSize;
 
-    // Create timeout promise to prevent indefinite query hanging
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Query timeout exceeded')), QUERY_TIMEOUT_MS);
-    });
-
     try {
       // Get WR time
-      const [wrTimeRows] = await Promise.race([
+      const [wrTimeRows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?
         `, [validMapname]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
       const wr_time = wrTimeRows[0]?.wr_time || null;
 
       // Get paginated leaderboard records using window function
-      const [leaderboardRows] = await Promise.race([
+      const [leaderboardRows] = await withTimeout(
         pool.query<MapRecord[]>(`
           SELECT
             steamid, name, runtimepro, date, startspeed,
@@ -114,8 +108,9 @@ const getLeaderboardRecords = unstable_cache(
           ORDER BY runtimepro ASC
           LIMIT ? OFFSET ?
         `, [wr_time, validMapname, pageSize, offset]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
 
       logger.debug(`[API] Fetched ${leaderboardRows.length} records for ${validMapname} (page ${page})`);
 

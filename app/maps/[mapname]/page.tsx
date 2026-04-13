@@ -11,6 +11,7 @@ import TierBadge from '@/components/TierBadge';
 import MapChartGrid from './components/charts/MapChartGrid';
 import { getMapMetadata } from '@/lib/map-cache';
 import { unstable_cache } from 'next/cache';
+import { withTimeout } from '@/lib/timeout';
 
 // Default page size - keeps cache entry under 2MB (each record ~200 bytes, 100 records ~20KB)
 const DEFAULT_PAGE_SIZE = 100;
@@ -74,21 +75,17 @@ const getMapRecords = unstable_cache(
     logger.debug(`[Map] Fetching records for: ${mapname} (page ${safePage}, size ${safePageSize})`);
 
     try {
-      // Create timeout promise to prevent indefinite query hanging
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Query timeout exceeded')), QUERY_TIMEOUT_MS);
-      });
-
       // First, get the total counts for all record types in a single query
-      const [countsRows] = await Promise.race([
+      const [countsRows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT
             (SELECT COUNT(*) FROM ck_playertimes WHERE mapname = ?) as leaderboardTotal,
             (SELECT COUNT(*) FROM ck_bonus WHERE mapname = ?) as bonusesTotal,
             (SELECT COUNT(*) FROM ck_stages WHERE \`map\` = ?) as stagesTotal
         `, [mapname, mapname, mapname]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
 
       const counts: RecordCounts = {
         leaderboardTotal: countsRows[0]?.leaderboardTotal || 0,
@@ -100,16 +97,17 @@ const getMapRecords = unstable_cache(
       // This query calculates ranks using ROW_NUMBER() which is much faster than correlated subqueries
       
       // Get WR time for the map (needed for all records)
-      const [wrTimeRows] = await Promise.race([
+      const [wrTimeRows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?
         `, [mapname]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
       const wr_time = wrTimeRows[0]?.wr_time || null;
 
       // Get leaderboard records with pagination and window function for rank
-      const [leaderboardRows] = await Promise.race([
+      const [leaderboardRows] = await withTimeout(
         pool.query<RowDataPacket[] & MapRecord[]>(`
           SELECT
             steamid, name, runtimepro, date, startspeed,
@@ -120,8 +118,9 @@ const getMapRecords = unstable_cache(
           ORDER BY runtimepro ASC
           LIMIT ? OFFSET ?
         `, [wr_time, mapname, safePageSize, offset]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
 
       // Bonuses are fetched client-side via API to keep server payload small
       const bonusRows: BonusRecord[] = [];

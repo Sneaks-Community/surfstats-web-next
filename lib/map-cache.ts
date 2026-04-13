@@ -2,6 +2,7 @@ import 'server-only';
 import pool from '@/lib/db';
 import { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
+import { withTimeout } from '@/lib/timeout';
 
 // Types for map metadata
 export interface MapMetadata {
@@ -57,13 +58,8 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
   try {
     logger.debug('[MapCache] Fetching all map metadata from database...');
     
-    // Create timeout promise to prevent indefinite query hanging
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Query timeout exceeded')), QUERY_TIMEOUT_MS);
-    });
-    
     // Single query with JOINs - much more efficient than multiple queries or correlated subqueries
-    const [rows] = await Promise.race([
+    const [rows] = await withTimeout(
       pool.query<RowDataPacket[]>(`
         SELECT
           m.mapname,
@@ -112,8 +108,9 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
         WHERE pt_cnt.completions > 0
         ORDER BY m.mapname ASC
       `),
-      timeoutPromise
-    ]);
+      QUERY_TIMEOUT_MS,
+      'Query timeout exceeded'
+    );
     
     const metadataMap = new Map<string, MapMetadata>();
     

@@ -4,6 +4,7 @@ import { RowDataPacket } from 'mysql2';
 import { sanitizeMapName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import { unstable_cache } from 'next/cache';
+import { withTimeout } from '@/lib/timeout';
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 500;
@@ -44,32 +45,29 @@ const getBonusRecords = unstable_cache(
   ): Promise<BonusesResponse> => {
     const offset = (page - 1) * pageSize;
 
-    // Create timeout promise to prevent indefinite query hanging
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Query timeout exceeded')), QUERY_TIMEOUT_MS);
-    });
-
     try {
       // Get list of all bonus groups
-      const [bonusGroupsRows] = await Promise.race([
+      const [bonusGroupsRows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT DISTINCT zonegroup FROM ck_bonus WHERE mapname = ? ORDER BY zonegroup ASC
         `, [mapname]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
       const bonusGroupsList = bonusGroupsRows.map(row => row.zonegroup);
 
       // Get total count for this bonus group
-      const [countRows] = await Promise.race([
+      const [countRows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT COUNT(*) as total FROM ck_bonus WHERE mapname = ? AND zonegroup = ?
         `, [mapname, bonus]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
       const totalRecords = countRows[0]?.total || 0;
 
       // Get bonus records with pagination using window function
-      const [bonusRows] = await Promise.race([
+      const [bonusRows] = await withTimeout(
         pool.query<BonusRecord[]>(`
           SELECT
             b.steamid, b.name, b.zonegroup, b.runtime, b.date, b.startspeed,
@@ -80,8 +78,9 @@ const getBonusRecords = unstable_cache(
           ORDER BY b.runtime ASC
           LIMIT ? OFFSET ?
         `, [mapname, bonus, pageSize, offset]),
-        timeoutPromise
-      ]);
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
 
       logger.debug(`[API] Fetched ${bonusRows.length} bonus records for ${mapname} bonus ${bonus}`);
 
