@@ -5,6 +5,7 @@ import { sanitizeMapName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import { unstable_cache } from 'next/cache';
 import { withTimeout } from '@/lib/timeout';
+import { getStagesByMap } from '@/lib/registry-cache';
 
 const TOP_RECORDS_LIMIT = 100;
 const MAX_STAGE_RECORDS = 100;
@@ -46,15 +47,8 @@ const getStageRecords = unstable_cache(
     offset: number
   ): Promise<StagesResponse> => {
     try {
-      // Get list of all stages
-      const [stagesListRows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT DISTINCT stage FROM ck_stages WHERE \`map\` = ? ORDER BY stage ASC
-        `, [mapname]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
-      const stagesList = stagesListRows.map(row => row.stage);
+      // Get list of all stages from registry cache (already cached for 1 hour)
+      const stagesList = await getStagesByMap(mapname);
 
       // Get total count for this stage
       const [countRows] = await withTimeout(

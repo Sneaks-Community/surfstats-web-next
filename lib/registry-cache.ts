@@ -259,6 +259,17 @@ export async function getBonusGroupsByMap(mapname: string): Promise<number[]> {
 }
 
 /**
+ * Get stage numbers for a specific map (returns array of stage numbers)
+ */
+export async function getStagesByMap(mapname: string): Promise<number[]> {
+  const allStages = await getAllStages();
+  return allStages
+    .filter((s) => s.map === mapname)
+    .map((s) => s.stage)
+    .sort((a, b) => a - b);
+}
+
+/**
  * Get stages for a specific map
  */
 export async function getStagesForMap(mapname: string): Promise<StageGroup[]> {
