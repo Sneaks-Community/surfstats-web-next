@@ -56,11 +56,3 @@ export async function withTimeout<T>(
  * 
  * @deprecated Use `withTimeout` instead for better cleanup
  */
-export function createTimeoutPromise(
-  ms: number,
-  message: string = 'Operation timed out'
-): Promise<never> {
-  return new Promise((_, reject) => {
-    setTimeout(() => reject(new Error(message)), ms);
-  });
-}
