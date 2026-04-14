@@ -5,7 +5,8 @@ import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTierTextColor } from '@/lib/tierColors';
 import { sanitizeSearchQuery, sanitizePlayerName } from '@/lib/sanitize';
 import { getAllMapMetadata } from '@/lib/map-cache';
-import { searchPlayers, PlayerSearchResult } from '@/lib/player-cache';
+import { searchPlayers } from '@/lib/player-cache';
+import type { PlayerSearchResult } from '@/lib/player-cache';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
 
@@ -45,10 +46,11 @@ export default async function SearchPage({
         .slice(0, 10);
       
       logger.debug(`[Search] Results for "${query}": ${players.length} players, ${maps.length} maps (cached)`);
-    } catch (error: any) {
-      const errorMessage = error.message || 'Unknown error';
+    } catch (error: unknown) {
+      const err = error as { message?: string; code?: string };
+      const errorMessage = err.message || 'Unknown error';
       logger.error(`[Search] Query failed for "${query}": ${errorMessage}`);
-      logger.error(`[Search] Error code: ${error.code || 'N/A'}`);
+      logger.error(`[Search] Error code: ${err.code || 'N/A'}`);
     }
   }
 

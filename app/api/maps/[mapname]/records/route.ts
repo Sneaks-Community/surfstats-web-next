@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
+import type { NextRequest } from 'next/server';
+import type { RowDataPacket } from 'mysql2';
 import { sanitizeMapName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import { unstable_cache } from 'next/cache';
@@ -63,8 +64,9 @@ const getRecordCountsAndWR = unstable_cache(
       const wr_time = wrTimeRows[0]?.wr_time || null;
 
       return { counts, wr_time };
-    } catch (error: any) {
-      if (error.message === 'Query timeout exceeded') {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      if (err.message === 'Query timeout exceeded') {
         logger.error(`[API] Query timeout for ${validMapname} after ${QUERY_TIMEOUT_MS / 1000} seconds`);
         return { counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
       }
@@ -120,8 +122,9 @@ const getLeaderboardRecords = unstable_cache(
       logger.debug(`[API] Fetched ${leaderboardRows.length} records for ${validMapname} (page ${page})`);
 
       return { records: leaderboardRows, wr_time: localWrTime };
-    } catch (error: any) {
-      if (error.message === 'Query timeout exceeded') {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      if (err.message === 'Query timeout exceeded') {
         logger.error(`[API] Query timeout for ${validMapname} page ${page} after ${QUERY_TIMEOUT_MS / 1000} seconds`);
         return { records: [], wr_time: null };
       }
@@ -169,8 +172,9 @@ export async function GET(
       },
       wr_time,
     });
-  } catch (error: any) {
-    logger.error(`[API] Failed to fetch records for ${validMapname}: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.error(`[API] Failed to fetch records for ${validMapname}: ${err.message || 'Unknown error'}`);
     return NextResponse.json(
       { error: 'Failed to fetch records' },
       { status: 500 }

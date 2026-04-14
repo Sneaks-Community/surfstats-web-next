@@ -5,6 +5,7 @@ import { Server, Users, ChevronDown, Clock } from 'lucide-react';
 import Link from 'next/link';
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
+import type { ServerStatus, Player } from '@/lib/cache';
 
 function formatTime(seconds?: number) {
   if (typeof seconds !== 'number' || isNaN(seconds)) return 'Unknown';
@@ -16,7 +17,7 @@ function formatTime(seconds?: number) {
   return `${hours}h ${remainingMins}m`;
 }
 
-export default function ServerCard({ server, mapImagesUrl }: { server: any; mapImagesUrl: string }) {
+export default function ServerCard({ server, mapImagesUrl }: { server: ServerStatus; mapImagesUrl: string }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -39,7 +40,7 @@ export default function ServerCard({ server, mapImagesUrl }: { server: any; mapI
               <h2 className="text-base font-semibold text-text">{server.config.name}</h2>
               <span className="relative flex h-2 w-2">
                 {server.online ? (
-                  server.players < server.maxplayers ? (
+                  (server.players ?? 0) < (server.maxplayers ?? 0) ? (
                     <>
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
@@ -62,8 +63,8 @@ export default function ServerCard({ server, mapImagesUrl }: { server: any; mapI
         {server.online ? (
           <div className="flex items-center gap-4 sm:gap-6">
             <div className="hidden sm:block text-right">
-              <MapLinkWithPreview mapname={server.map} className="text-sm font-medium text-primary hover:underline block" onClick={(e) => e.stopPropagation()}>
-                {server.map}
+              <MapLinkWithPreview mapname={server.map ?? 'unknown'} className="text-sm font-medium text-primary hover:underline block" onClick={(e) => e.stopPropagation()}>
+                {server.map ?? 'Unknown Map'}
               </MapLinkWithPreview>
               <div className="text-[10px] uppercase tracking-wider text-text-placeholder mt-0.5">Map</div>
             </div>
@@ -117,7 +118,7 @@ export default function ServerCard({ server, mapImagesUrl }: { server: any; mapI
               <Link href={`/maps/${server.map}`} className="relative h-24 w-40 rounded-lg overflow-hidden border border-border/50 bg-surface-hover flex-shrink-0 hover:border-primary/50 transition-colors">
                 <MapImage
                   src={`${mapImagesUrl}${server.map}.jpg`}
-                  alt={server.map}
+                  alt={server.map ?? 'Unknown Map'}
                   unoptimized
                   fill
                   className="object-cover"
@@ -141,7 +142,7 @@ export default function ServerCard({ server, mapImagesUrl }: { server: any; mapI
             
             {server.playerList && server.playerList.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                {server.playerList.map((player: any, idx: number) => (
+                {server.playerList.map((player: Player, idx: number) => (
                   <div key={idx} className="flex items-center justify-between bg-surface-hover/40 rounded p-2 border border-border/30">
                     <span className="text-sm text-text truncate pr-2 font-medium">
                       {player.name || 'Connecting...'}

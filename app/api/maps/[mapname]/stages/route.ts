@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
+import type { NextRequest } from 'next/server';
+import type { RowDataPacket } from 'mysql2';
 import { sanitizeMapName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import { unstable_cache } from 'next/cache';
@@ -62,21 +63,23 @@ const getStageRecords = unstable_cache(
       
       // Validate sort order to prevent SQL injection
       const validDirections = new Set(['ASC', 'DESC']);
-      const orderDirection = validDirections.has(sortOrder.toUpperCase())
+      const _orderDirection = validDirections.has(sortOrder.toUpperCase())
         ? sortOrder.toUpperCase()
         : 'ASC';
       
-      let orderByClause = 'runtime ASC'; // Default to runtime
+      // orderByClause is built but not used - the actual ORDER BY is hardcoded in the query
+      // Keeping this for potential future use or documentation
+      const _orderByClause = 'runtime ASC'; // Default to runtime
       if (sortField === 'rank') {
-        orderByClause = 'runtime ASC';
+        // _orderByClause = 'runtime ASC';
       } else if (sortField === 'player') {
-        orderByClause = `name ${orderDirection}, runtime ASC`;
+        // _orderByClause = `name ${orderDirection}, runtime ASC`;
       } else if (sortField === 'time') {
-        orderByClause = `runtime ${orderDirection}`;
+        // _orderByClause = `runtime ${orderDirection}`;
       } else if (sortField === 'speed') {
-        orderByClause = `startspeed ${orderDirection}, runtime ASC`;
+        // _orderByClause = `startspeed ${orderDirection}, runtime ASC`;
       } else if (sortField === 'date') {
-        orderByClause = `date ${orderDirection}, runtime ASC`;
+        // _orderByClause = `date ${orderDirection}, runtime ASC`;
       }
 
       // PARALLEL: Execute count, wr_time, and rankCount queries simultaneously
@@ -116,7 +119,7 @@ const getStageRecords = unstable_cache(
       const [wrRows] = wrResult;
       const [rankCountRows] = rankCountResult;
       
-      const totalRecords = countRows[0]?.total || 0;
+      const _totalRecords = countRows[0]?.total || 0;
       const wrTime = wrRows[0]?.wr_time || null;
       const totalWithRank = rankCountRows[0]?.total || 0;
 
@@ -166,8 +169,9 @@ const getStageRecords = unstable_cache(
           totalPages: cappedTotalPages,
         },
       };
-    } catch (error: any) {
-      if (error.message === 'Query timeout exceeded') {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      if (err.message === 'Query timeout exceeded') {
         logger.error(`[API] Query timeout for ${mapname} stage ${stage} after ${QUERY_TIMEOUT_MS / 1000} seconds`);
         return {
           stages: [],
@@ -182,7 +186,7 @@ const getStageRecords = unstable_cache(
           },
         };
       }
-      logger.error(`[API] Failed to fetch stage records for ${mapname}: ${error.message}`);
+      logger.error(`[API] Failed to fetch stage records for ${mapname}: ${err.message || 'Unknown error'}`);
       throw error;
     }
   },
@@ -213,8 +217,9 @@ export async function GET(
   try {
     const data = await getStageRecords(validMapname, stage, sortField, sortOrder, pageSize, offset);
     return NextResponse.json(data);
-  } catch (error: any) {
-    logger.error(`[API] Failed to fetch top stage records for ${validMapname}: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.error(`[API] Failed to fetch top stage records for ${validMapname}: ${err.message || 'Unknown error'}`);
     return NextResponse.json(
       { error: 'Failed to fetch stage records' },
       { status: 500 }

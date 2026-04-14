@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { searchPlayers } from '@/lib/player-cache';
 import { getAllMapMetadata } from '@/lib/map-cache';
 import { sanitizeSearchQuery } from '@/lib/sanitize';

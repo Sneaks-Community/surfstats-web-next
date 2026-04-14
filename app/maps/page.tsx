@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   title: 'Maps',
 };
 
-interface FilterOptions {
+interface _FilterOptions {
   tier: number;
   count: number;
 }

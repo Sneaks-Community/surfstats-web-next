@@ -1,7 +1,7 @@
 import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
+import type { RowDataPacket } from 'mysql2';
 import Link from 'next/link';
-import { getSteamAvatars, getSteamProfileUrl } from '@/lib/steam';
+import { getSteamAvatars } from '@/lib/steam';
 import { unstable_cache } from 'next/cache';
 import { sanitizeSteamId } from '@/lib/sanitize';
 import { getTotalsCached } from '@/lib/cache';
@@ -104,10 +104,11 @@ const getPlayerData = unstable_cache(
       logger.debug(`[Player] Profile loaded for ${player.name} (${steamid}): ${maps.length} maps, ${bonuses.length} bonuses, ${stages.length} stages`);
       
       return { player, maps, bonuses, stages };
-    } catch (error: any) {
-      const errorMessage = error.message || 'Unknown error';
+    } catch (error: unknown) {
+      const err = error as { message?: string; code?: string };
+      const errorMessage = err.message || 'Unknown error';
       logger.error(`[Player] Failed to fetch profile for ${steamid}: ${errorMessage}`);
-      logger.error(`[Player] Error code: ${error.code || 'N/A'}`);
+      logger.error(`[Player] Error code: ${err.code || 'N/A'}`);
       return null;
     }
   },
@@ -200,10 +201,11 @@ const getIncompleteRecords = unstable_cache(
       logger.debug(`[Player] Incomplete records for ${steamid}: ${incompleteMaps.length} maps, ${incompleteBonuses.length} bonuses, ${incompleteStages.length} stages`);
 
       return { incompleteMaps, incompleteBonuses, incompleteStages };
-    } catch (error: any) {
-      const errorMessage = error.message || 'Unknown error';
+    } catch (error: unknown) {
+      const err = error as { message?: string; code?: string };
+      const errorMessage = err.message || 'Unknown error';
       logger.error(`[Player] Failed to fetch incomplete records for ${steamid}: ${errorMessage}`);
-      logger.error(`[Player] Error code: ${error.code || 'N/A'}`);
+      logger.error(`[Player] Error code: ${err.code || 'N/A'}`);
       return { incompleteMaps: [], incompleteBonuses: [], incompleteStages: [] };
     }
   },
@@ -257,8 +259,9 @@ const getLinearVsStagedPerTier = unstable_cache(
       logger.debug(`[Player] Total for ${steamid}: linear=${totalLinear}, staged=${totalStaged}`);
       
       return distribution;
-    } catch (error: any) {
-      logger.error(`[Player] Failed to fetch linear vs staged per tier: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      logger.error(`[Player] Failed to fetch linear vs staged per tier: ${err.message || 'Unknown error'}`);
       // Return empty array with all tiers at 0
       const emptyArray: { tier: number; linear: number; staged: number }[] = [];
       for (let tier = 1; tier <= 10; tier++) {
@@ -294,8 +297,9 @@ export async function generateMetadata({ params }: { params: Promise<{ steamid: 
     return {
       title: `${name} - Player Profile`,
     };
-  } catch (error: any) {
-    logger.error(`[Player] Failed to generate metadata for ${validSteamId}: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.error(`[Player] Failed to generate metadata for ${validSteamId}: ${err.message || 'Unknown error'}`);
     return {
       title: 'Player Profile',
     };
@@ -339,7 +343,7 @@ export default async function PlayerProfilePage({
     );
   }
 
-  const { player, maps, bonuses, stages } = data;
+  const { player: _player, maps: _maps, bonuses: _bonuses, stages: _stages } = data;
   
   // Group 2: Parallel fetch for remaining data
   const [incompleteData, totals, steamAvatars, playtimeData, linearVsStagedPerTier] = await Promise.all([

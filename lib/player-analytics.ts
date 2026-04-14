@@ -1,7 +1,7 @@
 import 'server-only';
 import analyticsPool, { isAnalyticsAvailable } from '@/lib/db-analytics';
 import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
+import type { RowDataPacket } from 'mysql2';
 import { unstable_cache } from 'next/cache';
 import { convertSteamId2ToSteamId3Numeric } from '@/lib/steam';
 import logger from '@/lib/logger';
@@ -61,9 +61,10 @@ async function getPlayerTimeOnServerInternal(steamId: string): Promise<PlayerTim
       totalSeconds: row.total_duration || 0,
       connectionCount: row.connection_count || 0,
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Log error but don't throw - analytics is optional
-    const errorMessage = error.message || 'Unknown error';
+    const err = error as { message?: string };
+    const errorMessage = err.message || 'Unknown error';
     logger.error(`[Analytics] Failed to fetch time data for ${steamId}: ${errorMessage}`);
     return null;
   }
@@ -145,8 +146,9 @@ export async function getPlayersTimeOnServer(steamIds: string[]): Promise<Map<st
         result.set(steamId, { totalSeconds: 0, connectionCount: 0 });
       }
     }
-  } catch (error: any) {
-    const errorMessage = error.message || 'Unknown error';
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    const errorMessage = err.message || 'Unknown error';
     logger.error(`[Analytics] Failed to fetch batch time data: ${errorMessage}`);
     
     // Return empty results for all SteamIDs on error
@@ -210,7 +212,7 @@ async function getPerformanceTrendInternal(steamId: string): Promise<Performance
       let dateStr: string;
       if (typeof row.date === 'string') {
         dateStr = row.date.split('T')[0]; // Extract date part only
-      } else if (row.date && typeof (row.date as any).toISOString === 'function') {
+      } else if (row.date && typeof (row.date as Date).toISOString === 'function') {
         dateStr = (row.date as Date).toISOString().split('T')[0];
       } else {
         continue; // Skip invalid date values
@@ -247,8 +249,9 @@ async function getPerformanceTrendInternal(steamId: string): Promise<Performance
     result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return result;
-  } catch (error: any) {
-    const errorMessage = error.message || 'Unknown error';
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    const errorMessage = err.message || 'Unknown error';
     logger.error(`[Analytics] Failed to fetch performance trend for ${steamId}: ${errorMessage}`);
     return null;
   }

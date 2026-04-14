@@ -1,15 +1,16 @@
-import { RowDataPacket } from 'mysql2';
+import type { RowDataPacket } from 'mysql2';
 import Link from 'next/link';
-import { getSteamAvatars, getSteamProfileUrl } from '@/lib/steam';
+import { getSteamProfileUrl } from '@/lib/steam';
 import { Trophy, Activity, Clock } from 'lucide-react';
 import Image from 'next/image';
 import { formatDate } from '@/lib/utils';
 import { sanitizePlayerName } from '@/lib/sanitize';
 import CountryBadge from '@/components/CountryBadge';
 import { countryNameToCode } from '@/lib/countries';
-import { getTotalsCached } from '@/lib/cache';
-import { getPlayerTimeOnServer } from '@/lib/player-analytics';
-import { getAllMapMetadata } from '@/lib/map-cache';
+// Unused imports - kept for potential future use
+// import { getTotalsCached } from '@/lib/cache';
+// import { getPlayerTimeOnServer } from '@/lib/player-analytics';
+// import { getAllMapMetadata } from '@/lib/map-cache';
 import TierDistributionChart from './TierDistributionChart';
 import PlayerRecordsTabs from './PlayerRecordsTabs';
 import ProgressBar from '@/components/ProgressBar';

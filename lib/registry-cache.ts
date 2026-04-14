@@ -1,6 +1,6 @@
 import 'server-only';
 import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
+import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
 
 // Types for bonus and stage registries
@@ -93,10 +93,11 @@ async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stages: Sta
     logger.debug(`[RegistryCache] Fetched ${bonuses.length} bonus groups, ${stages.length} stages, and ${playerCount} players in ${duration}ms`);
     
     return { bonuses, stages, playerCount };
-  } catch (error: any) {
+  } catch (error: unknown) {
     const duration = Date.now() - startTime;
+    const err = error as { message?: string };
     logger.error(`[RegistryCache] Failed to fetch registry data after ${duration}ms`);
-    logger.error(`[RegistryCache] Error: ${error.message || 'Unknown error'}`);
+    logger.error(`[RegistryCache] Error: ${err.message || 'Unknown error'}`);
     throw error;
   }
 }
@@ -117,8 +118,9 @@ async function doRefreshRegistryCache(): Promise<void> {
     cache.lastUpdated = Date.now();
     
     logger.info(`[RegistryCache] Cache refreshed with ${bonuses.length} bonuses, ${stages.length} stages, and ${playerCount} players`);
-  } catch (error: any) {
-    logger.error(`[RegistryCache] Cache refresh failed: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.error(`[RegistryCache] Cache refresh failed: ${err.message || 'Unknown error'}`);
     throw error;
   }
 }

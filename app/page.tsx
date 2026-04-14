@@ -15,8 +15,9 @@ async function getStats() {
     const stats = await getStatsCached();
     logger.debug('[Home] Stats loaded successfully');
     return stats;
-  } catch (error: any) {
-    const errorMessage = error.message || 'Unknown error';
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    const errorMessage = err.message || 'Unknown error';
     logger.error(`[Home] Failed to load stats: ${errorMessage}`);
     logger.error('[Home] Dashboard will display without stats data');
     return null;
@@ -29,8 +30,9 @@ async function getLatestCompletions() {
     const completions = await getLatestCompletionsCached();
     logger.debug('[Home] Latest completions loaded successfully');
     return completions;
-  } catch (error: any) {
-    const errorMessage = error.message || 'Unknown error';
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    const errorMessage = err.message || 'Unknown error';
     logger.error(`[Home] Failed to load latest completions: ${errorMessage}`);
     logger.error('[Home] Dashboard will display without completions data');
     return [];

@@ -1,5 +1,5 @@
 import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
+import type { RowDataPacket } from 'mysql2';
 import { getSteamProfileUrl } from '@/lib/steam';
 import Link from 'next/link';
 import { Map as MapIcon, Users, Layers, Target, Download } from 'lucide-react';
@@ -132,16 +132,17 @@ const getMapRecords = unstable_cache(
       logger.debug(`[Map] ${mapname} loaded: ${leaderboardRows.length}/${counts.leaderboardTotal} leaderboard records, ${bonusRows.length} bonus records, ${stageRows.length} stage records`);
 
       return { leaderboard: leaderboardRows, bonuses: bonusRows, stages: stageRows, counts, wr_time };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string; code?: string };
       // Handle timeout specifically
-      if (error.message === 'Query timeout exceeded') {
+      if (err.message === 'Query timeout exceeded') {
         logger.error(`[Map] Query timeout for ${mapname} after ${QUERY_TIMEOUT_MS / 1000} seconds`);
         return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
       }
       
-      const errorMessage = error.message || 'Unknown error';
+      const errorMessage = err.message || 'Unknown error';
       logger.error(`[Map] Failed to fetch records for ${mapname}: ${errorMessage}`);
-      logger.error(`[Map] Error code: ${error.code || 'N/A'}`);
+      logger.error(`[Map] Error code: ${err.code || 'N/A'}`);
       return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
     }
   },

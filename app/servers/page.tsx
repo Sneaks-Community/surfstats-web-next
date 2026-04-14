@@ -1,5 +1,5 @@
 import { Server } from 'lucide-react';
-import { getServersCached } from '@/lib/cache';
+import { getServersCached, type ServerStatus } from '@/lib/cache';
 import ServerCard from './ServerCard';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
@@ -11,36 +11,15 @@ export const metadata: Metadata = {
   title: 'Servers',
 };
 
-interface Player {
-  name: string;
-  raw?: any;
-  time?: number;
-  score?: number;
-}
-
-interface ServerStatus {
-  config: {
-    name: string;
-    ip: string;
-    port: number;
-  };
-  online: boolean;
-  name?: string;
-  map?: string;
-  players?: number;
-  maxplayers?: number;
-  ping?: number;
-  playerList?: Player[];
-}
-
 export default async function ServersPage() {
   let servers: ServerStatus[] = [];
   
   try {
     servers = await getServersCached();
     logger.debug(`[Servers] Loaded ${servers.length} servers`);
-  } catch (error: any) {
-    const errorMessage = error.message || 'Unknown error';
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    const errorMessage = err.message || 'Unknown error';
     logger.error(`[Servers] Failed to load servers: ${errorMessage}`);
     logger.error('[Servers] Server list will be empty');
   }

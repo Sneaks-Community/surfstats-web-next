@@ -1,6 +1,6 @@
 import 'server-only';
 import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
+import type { RowDataPacket } from 'mysql2';
 import { unstable_cache } from 'next/cache';
 import logger from '@/lib/logger';
 import { getCountryNamesFromCode, getCountryCodeFromName } from '@/lib/countries';
@@ -146,7 +146,7 @@ const getCountriesRankingInternal = async (
       if (sortColumn === 'country') {
         comparison = a.country.localeCompare(b.country);
       } else {
-        comparison = (a as any)[sortColumn] - (b as any)[sortColumn];
+        comparison = (a.total_points ?? 0) - (b.total_points ?? 0);
       }
       return order === 'asc' ? comparison : -comparison;
     });

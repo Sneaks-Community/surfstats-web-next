@@ -245,9 +245,11 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
         x: {
           grid: {
             // Only show grid lines at year boundaries (every 12 months)
-            color: (context: any) => {
+            color: (ctx) => {
               // Only draw grid line at year boundaries (index divisible by 12)
-              if (context.tick && context.tick.index % 12 === 0) {
+              // Use any to access the index property since Chart.js types don't include it
+              const ctxAny = ctx as any;
+              if (ctxAny.tick && typeof ctxAny.tick.index === 'number' && ctxAny.tick.index % 12 === 0) {
                 return 'rgba(148, 163, 184, 0.2)';
               }
               return 'transparent';

@@ -1,7 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
 import analyticsPool from '@/lib/db-analytics';
-import { RowDataPacket } from 'mysql2';
+import type { NextRequest } from 'next/server';
+import type { RowDataPacket } from 'mysql2';
 import { sanitizeMapName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import { getMapMetadata } from '@/lib/map-cache';
@@ -153,8 +154,9 @@ const getWRCheckpointTimes = unstable_cache(
       }
       
       return checkpointData;
-    } catch (error: any) {
-      logger.warn(`[getWRCheckpointTimes] Failed to fetch WR checkpoint times for ${mapname}: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      logger.warn(`[getWRCheckpointTimes] Failed to fetch WR checkpoint times for ${mapname}: ${err.message || 'Unknown error'}`);
       return undefined;
     }
   },
@@ -334,8 +336,9 @@ const getTimeOnMapData = unstable_cache(
           totalDuration: cumulativeTotalHours,
         };
       });
-    } catch (error: any) {
-      logger.warn(`[getTimeOnMapData] Failed to fetch time on map data for ${mapname}: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      logger.warn(`[getTimeOnMapData] Failed to fetch time on map data for ${mapname}: ${err.message || 'Unknown error'}`);
     }
     
     return timeOnMapData;
@@ -367,8 +370,9 @@ const getFinishTimeData = unstable_cache(
         avgTime: avgTime ? Number(avgTime) : null,
         wrTime: wrTime ? Number(wrTime) : null,
       };
-    } catch (error: any) {
-      logger.warn(`[getFinishTimeData] Failed to fetch finish time data for ${mapname}: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      logger.warn(`[getFinishTimeData] Failed to fetch finish time data for ${mapname}: ${err.message || 'Unknown error'}`);
       return { avgTime: null, wrTime: null };
     }
   },
@@ -389,7 +393,7 @@ export async function GET(
   }
 
   const searchParams = request.nextUrl.searchParams;
-  const days = Math.min(365, Math.max(1, parseInt(searchParams.get('days') || String(DEFAULT_DAYS), 10)));
+  const _days = Math.min(365, Math.max(1, parseInt(searchParams.get('days') || String(DEFAULT_DAYS), 10)));
 
   try {
     // Get map metadata (already cached with 1 hour TTL in lib/map-cache.ts)
@@ -447,8 +451,9 @@ export async function GET(
       bonusCompletionsOverTime,
       isStageMap,
     } as StatsResponse);
-  } catch (error: any) {
-    logger.error(`[API Stats] Failed to fetch stats for ${validMapname}: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.error(`[API Stats] Failed to fetch stats for ${validMapname}: ${err.message || 'Unknown error'}`);
     return NextResponse.json(
       { error: 'Failed to fetch map statistics' },
       { status: 500 }

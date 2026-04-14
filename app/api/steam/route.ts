@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { getSteamProfiles } from '@/lib/steam';
 import { sanitizeSteamId } from '@/lib/sanitize';
 import logger from '@/lib/logger';
@@ -15,12 +16,6 @@ interface SteamPlayer {
   profilestate: number;
   lastlogoff: number;
   commentpermission: string;
-}
-
-interface SteamWrapperResponse {
-  response?: {
-    players: SteamPlayer[];
-  };
 }
 
 /**
@@ -108,9 +103,10 @@ export async function GET(request: NextRequest) {
     logger.debug(`[Steam API] Successfully fetched ${players.length} players in ${duration}ms`);
     
     return NextResponse.json({ players });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string };
     const duration = Date.now() - startTime;
-    logger.error(`[Steam API] Error fetching data after ${duration}ms: ${error.message}`);
+    logger.error(`[Steam API] Error fetching data after ${duration}ms: ${err.message || 'Unknown error'}`);
     
     return NextResponse.json({ error: 'Failed to fetch Steam data' }, { status: 500 });
   }

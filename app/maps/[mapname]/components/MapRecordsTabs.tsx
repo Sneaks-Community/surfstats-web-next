@@ -72,21 +72,21 @@ function formatTimeDiff(time: number, wrTime: number | null): string {
 export default function MapRecordsTabs({
   records,
   totalRecords,
-  bonusRecords,
-  stageRecords,
+  bonusRecords: _bonusRecords,
+  stageRecords: _stageRecords,
   mapname,
   numBonuses,
   numStages,
-  wr_time,
+  wr_time: _wr_time,
 }: MapRecordsTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   // State for loading additional records from API
   const [allLeaderboardRecords, setAllLeaderboardRecords] = useState<MapRecord[]>(records);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [loadedPage, setLoadedPage] = useState(Math.ceil(records.length / ITEMS_PER_PAGE));
-  const [hasMoreToLoad, setHasMoreToLoad] = useState(totalRecords > records.length);
+  const [_isLoadingMore, _setIsLoadingMore] = useState(false);
+  const [_loadedPage, setLoadedPage] = useState(Math.ceil(records.length / ITEMS_PER_PAGE));
+  const [_hasMoreToLoad, setHasMoreToLoad] = useState(totalRecords > records.length);
   // Ref to track loaded pages as a Set (for arbitrary page navigation)
   const loadedPagesRef = useRef<Set<number>>(new Set());
 
@@ -96,13 +96,13 @@ export default function MapRecordsTabs({
 
   // State for stages loaded via API
   const [allStageRecords, setAllStageRecords] = useState<StageRecord[]>([]);
-  const [stagesList, setStagesList] = useState<number[]>([]);
+  const [_stagesList, setStagesList] = useState<number[]>([]);
   const [totalStageRecords, setTotalStageRecords] = useState(0);
   const [isLoadingStages, setIsLoadingStages] = useState(false);
 
   // State for bonuses loaded via API
   const [allBonusRecords, setAllBonusRecords] = useState<BonusRecord[]>([]);
-  const [bonusGroupsList, setBonusGroupsList] = useState<number[]>([]);
+  const [_bonusGroupsList, setBonusGroupsList] = useState<number[]>([]);
   const [totalBonusRecords, setTotalBonusRecords] = useState(0);
   const [isLoadingBonuses, setIsLoadingBonuses] = useState(false);
 

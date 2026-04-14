@@ -1,6 +1,6 @@
 import 'server-only';
 import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
+import type { RowDataPacket } from 'mysql2';
 import { GameDig } from 'gamedig';
 import { unstable_cache } from 'next/cache';
 import logger from '@/lib/logger';
@@ -14,14 +14,20 @@ interface ServerConfig {
   port: number;
 }
 
-interface Player {
+interface GameDigPlayer {
   name: string;
-  raw?: any;
+  raw?: Record<string, unknown>;
   time?: number;
   score?: number;
 }
 
-interface ServerStatus {
+export interface Player {
+  name: string;
+  time?: number;
+  score?: number;
+}
+
+export interface ServerStatus {
   config: ServerConfig;
   online: boolean;
   name?: string;
@@ -85,9 +91,10 @@ async function fetchServersFromGame(): Promise<ServerStatus[]> {
     let configs: ServerConfig[];
     try {
       configs = JSON.parse(serversJson);
-    } catch (parseError: any) {
+    } catch (parseError: unknown) {
+      const err = parseError as { message?: string };
       logger.error('[ServerCache] Failed to parse SERVERS_JSON environment variable');
-      logger.error(`[ServerCache] JSON parse error: ${parseError.message}`);
+      logger.error(`[ServerCache] JSON parse error: ${err.message || 'Unknown error'}`);
       return [];
     }
     
@@ -121,15 +128,16 @@ async function fetchServersFromGame(): Promise<ServerStatus[]> {
             players: state.players.length,
             maxplayers: state.maxplayers,
             ping: state.ping,
-            playerList: state.players.map((p: any) => ({
+            playerList: state.players.map((p: GameDigPlayer) => ({
               name: p.name || '',
-              time: p.time || p.raw?.time || 0,
+              time: (typeof p.time === 'number' ? p.time : (typeof p.raw?.time === 'number' ? p.raw.time : 0)),
               score: p.score || 0
             })),
           };
-        } catch (error: any) {
-          const duration = Date.now() - serverStart;
-          const errorCode = error.code || 'UNKNOWN';
+        } catch (error: unknown) {
+          const _duration = Date.now() - serverStart;
+          const err = error as { code?: string };
+          const errorCode = err.code || 'UNKNOWN';
           logger.debug(`[ServerCache] Server ${config.name} offline: ${errorCode}`);
           return {
             config,
@@ -144,8 +152,9 @@ async function fetchServersFromGame(): Promise<ServerStatus[]> {
     logger.debug(`[ServerCache] Fetch complete: ${onlineCount}/${statuses.length} online (${duration}ms)`);
     
     return statuses;
-  } catch (error: any) {
-    logger.error(`[ServerCache] Unexpected error: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.error(`[ServerCache] Unexpected error: ${err.message || 'Unknown error'}`);
     return [];
   }
 }
@@ -163,8 +172,9 @@ async function refreshServerCache(): Promise<void> {
     const duration = Date.now() - startTime;
     const age = Math.round((Date.now() - cache.lastUpdated) / 1000);
     logger.debug(`[ServerCache] Background refresh complete (age: ${age}s, duration: ${duration}ms)`);
-  } catch (error: any) {
-    logger.error(`[ServerCache] Background refresh failed: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.error(`[ServerCache] Background refresh failed: ${err.message || 'Unknown error'}`);
   }
 }
 
@@ -277,10 +287,11 @@ function fetchStatsInternal() {
         recentRecords,
       };
     })
-    .catch((error: any) => {
+    .catch((error: unknown) => {
+      const err = error as { message?: string };
       const duration = Date.now() - startTime;
       logger.error(`[Cache] Failed to fetch stats after ${duration}ms`);
-      logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+      logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
       throw error;
     });
 }
@@ -354,10 +365,11 @@ function fetchLatestCompletionsInternal() {
     logger.debug(`[Cache] Latest completions fetched successfully in ${duration}ms (${result.length} records: ${mapCount} map, ${bonusCount} bonus)`);
     
     return result;
-  }).catch((error: any) => {
+  }).catch((error: unknown) => {
+    const err = error as { message?: string };
     const duration = Date.now() - startTime;
     logger.error(`[Cache] Failed to fetch latest completions after ${duration}ms`);
-    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
     throw error;
   });
 }
@@ -383,10 +395,11 @@ function fetchTotalsInternal() {
     logger.debug(`[Cache] Totals fetched successfully in ${duration}ms: maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}`);
     
     return totals;
-  }).catch((error: any) => {
+  }).catch((error: unknown) => {
+    const err = error as { message?: string };
     const duration = Date.now() - startTime;
     logger.error(`[Cache] Failed to fetch totals after ${duration}ms`);
-    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
     throw error;
   });
 }
@@ -421,9 +434,10 @@ export async function prewarmCaches() {
     `);
     const duration = Date.now() - startTime;
     logger.info(`[Cache] Stats pre-warmed successfully (${rows.length} stats, ${recentRecords.length} records, ${duration}ms)`);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string };
     logger.error('[Cache] Stats cache pre-warm failed');
-    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
   }
   
   // Pre-warm totals - use direct getMapTotals call instead of unstable_cache
@@ -433,9 +447,10 @@ export async function prewarmCaches() {
     const totals = await getMapTotals();
     const duration = Date.now() - startTime;
     logger.info(`[Cache] Totals pre-warmed successfully (maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}, ${duration}ms)`);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string };
     logger.error('[Cache] Totals cache pre-warm failed');
-    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
   }
   
   // Pre-warm servers cache
@@ -443,9 +458,10 @@ export async function prewarmCaches() {
     const startTime = Date.now();
     await getServersCached();
     logger.info(`[Cache] Servers cache pre-warmed successfully (${Date.now() - startTime}ms)`);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string };
     logger.error('[Cache] Servers cache pre-warm failed');
-    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
   }
   
   // Pre-warm map metadata cache (1-hour TTL)
@@ -453,9 +469,10 @@ export async function prewarmCaches() {
     const startTime = Date.now();
     await getAllMapMetadata();
     logger.info(`[Cache] Map metadata cache pre-warmed successfully (${Date.now() - startTime}ms)`);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string };
     logger.error('[Cache] Map metadata cache pre-warm failed');
-    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
   }
   
   // Pre-warm bonus/stage registry cache (1-hour TTL)
@@ -463,8 +480,9 @@ export async function prewarmCaches() {
     const startTime = Date.now();
     await Promise.all([getAllBonusGroups(), getAllStages()]);
     logger.info(`[Cache] Registry cache pre-warmed successfully (${Date.now() - startTime}ms)`);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string };
     logger.error('[Cache] Registry cache pre-warm failed');
-    logger.error(`[Cache] Error: ${error.message || 'Unknown error'}`);
+    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
   }
 }

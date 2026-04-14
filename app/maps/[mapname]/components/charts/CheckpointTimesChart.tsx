@@ -189,7 +189,7 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
                 return `WR: ${formatTime(value)}`;
               }
               const checkpoint = safeData[context.dataIndex]?.checkpoint;
-              const wrRecord = safeWRData.find(cp => cp.checkpoint === checkpoint);
+              const _wrRecord = safeWRData.find(cp => cp.checkpoint === checkpoint);
               return `WR: ${formatTime(value)}`;
             }
             return formatTime(value);

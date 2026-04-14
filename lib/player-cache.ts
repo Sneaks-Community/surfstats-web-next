@@ -1,6 +1,6 @@
 import 'server-only';
 import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
+import type { RowDataPacket } from 'mysql2';
 import { unstable_cache } from 'next/cache';
 import logger from '@/lib/logger';
 import { getPlayerCount } from '@/lib/registry-cache';
@@ -64,7 +64,7 @@ async function fetchPlayersInternal(
     // RANK() OVER (ORDER BY points DESC) calculates rank based on points
     // This is O(n log n) instead of O(n²) for the correlated subquery
     let query: string;
-    const params: any[] = [];
+    const params: (string | number)[] = [];
     
     if (sanitizedSearch) {
       // For search, we need to use a subquery to filter first, then calculate rank
@@ -114,10 +114,11 @@ async function fetchPlayersInternal(
     logger.debug(`[PlayerCache] Retrieved ${rows.length} players (page ${page} of ${Math.ceil(total / limit)}, ${total} total)`);
     
     return { players: rows, total, totalPages: Math.ceil(total / limit) };
-  } catch (error: any) {
-    const errorMessage = error.message || 'Unknown error';
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: string };
+    const errorMessage = err.message || 'Unknown error';
     logger.error(`[PlayerCache] Failed to fetch players: ${errorMessage}`);
-    logger.error(`[PlayerCache] Error code: ${error.code || 'N/A'}`);
+    logger.error(`[PlayerCache] Error code: ${err.code || 'N/A'}`);
     return { players: [], total: 0, totalPages: 0 };
   }
 }
@@ -154,10 +155,11 @@ async function searchPlayersInternal(query: string): Promise<PlayerSearchResult[
       name: row.name,
       points: row.points
     }));
-  } catch (error: any) {
-    const errorMessage = error.message || 'Unknown error';
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: string };
+    const errorMessage = err.message || 'Unknown error';
     logger.error(`[PlayerCache] Failed to search players: ${errorMessage}`);
-    logger.error(`[PlayerCache] Error code: ${error.code || 'N/A'}`);
+    logger.error(`[PlayerCache] Error code: ${err.code || 'N/A'}`);
     return [];
   }
 }
@@ -190,10 +192,11 @@ async function getPlayerNameInternal(steamid: string): Promise<PlayerNameResult>
     }
     
     return { name: rows[0].name };
-  } catch (error: any) {
-    const errorMessage = error.message || 'Unknown error';
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: string };
+    const errorMessage = err.message || 'Unknown error';
     logger.error(`[PlayerCache] Failed to fetch player name for ${steamid}: ${errorMessage}`);
-    logger.error(`[PlayerCache] Error code: ${error.code || 'N/A'}`);
+    logger.error(`[PlayerCache] Error code: ${err.code || 'N/A'}`);
     return { name: '' };
   }
 }

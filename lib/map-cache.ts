@@ -1,6 +1,6 @@
 import 'server-only';
 import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
+import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
 import { withTimeout } from '@/lib/timeout';
 
@@ -140,17 +140,18 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
     }
     
     return metadataMap;
-  } catch (error: any) {
+  } catch (error: unknown) {
     const duration = Date.now() - startTime;
+    const err = error as { message?: string };
     
     // Handle timeout specifically
-    if (error.message === 'Query timeout exceeded') {
+    if (err.message === 'Query timeout exceeded') {
       logger.error(`[MapCache] Query timeout after ${duration}ms`);
       throw new Error(`Map metadata query exceeded ${QUERY_TIMEOUT_MS / 1000} second timeout`);
     }
     
     logger.error(`[MapCache] Failed to fetch map metadata after ${duration}ms`);
-    logger.error(`[MapCache] Error: ${error.message || 'Unknown error'}`);
+    logger.error(`[MapCache] Error: ${err.message || 'Unknown error'}`);
     throw error;
   }
 }
@@ -168,8 +169,9 @@ async function refreshMapCacheBackground(): Promise<void> {
     cache.data = freshData;
     cache.lastUpdated = Date.now();
     logger.info(`[MapCache] Background refresh complete: ${freshData.size} maps`);
-  } catch (error: any) {
-    logger.error(`[MapCache] Background refresh failed: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.error(`[MapCache] Background refresh failed: ${err.message || 'Unknown error'}`);
     // Don't throw - background refresh failures shouldn't block user requests
   }
 }

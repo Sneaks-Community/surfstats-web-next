@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { getCountriesRanking, getCountriesStats, CountrySortKey, SortOrder } from '@/lib/country-analytics';
+import { getCountriesRanking, getCountriesStats } from '@/lib/country-analytics';
+import type { CountrySortKey, SortOrder } from '@/lib/country-analytics';
 import CountryBadge from '@/components/CountryBadge';
 import Pagination from '@/components/Pagination';
 import SortableTableHeader from '@/components/SortableTableHeader';

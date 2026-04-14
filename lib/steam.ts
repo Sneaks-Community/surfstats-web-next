@@ -68,14 +68,15 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
     logger.debug(`[Steam API] Successfully fetched ${players.length} players in ${duration}ms`);
     
     return players;
-  } catch (error: any) {
+  } catch (error: unknown) {
     const duration = Date.now() - startTime;
-    const errorCode = error.code || 'UNKNOWN';
-    const errorMessage = error.message || 'Unknown error';
+    const err = error as { code?: string; message?: string };
+    const errorCode = err.code || 'UNKNOWN';
+    const errorMessage = err.message || 'Unknown error';
     
-    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+    if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
       logger.error(`[Steam API] Network error - unable to reach Steam API servers (${errorCode})`);
-    } else if (error.code === 'ETIMEDOUT') {
+    } else if (err.code === 'ETIMEDOUT') {
       logger.error(`[Steam API] Request timed out after ${duration}ms`);
     } else {
       logger.error(`[Steam API] Error fetching data after ${duration}ms: ${errorMessage}`);
@@ -121,9 +122,10 @@ export async function getSteamAvatars(steamId: string): Promise<{ avatar: string
       avatarmedium: player.avatarmedium || '',
       avatarfull: player.avatarfull || ''
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     const duration = Date.now() - startTime;
-    const errorMessage = error.message || 'Unknown error';
+    const err = error as { message?: string };
+    const errorMessage = err.message || 'Unknown error';
     logger.error(`[Steam] Error fetching avatar for ${steamId} after ${duration}ms: ${errorMessage}`);
     return null;
   }
@@ -182,9 +184,10 @@ export async function getSteamProfiles(steamIds: string[]): Promise<Map<string, 
     logger.debug(`[Steam] Profile fetch complete: ${result.size}/${steamIds.length} profiles retrieved (${duration}ms)`);
     
     return result;
-  } catch (error: any) {
+  } catch (error: unknown) {
     const duration = Date.now() - startTime;
-    const errorMessage = error.message || 'Unknown error';
+    const err = error as { message?: string };
+    const errorMessage = err.message || 'Unknown error';
     logger.error(`[Steam] Failed to fetch profiles after ${duration}ms: ${errorMessage}`);
     return result;
   }

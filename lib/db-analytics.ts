@@ -1,7 +1,6 @@
 import 'server-only';
 import mysql from 'mysql2/promise';
 import logger from '@/lib/logger';
-import { wrapPoolQuery } from '@/lib/db-query-logger';
 
 // Track whether the analytics database connection is actually working
 let analyticsConnectionHealthy = false;

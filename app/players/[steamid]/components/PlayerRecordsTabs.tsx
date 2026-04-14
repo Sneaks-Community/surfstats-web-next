@@ -78,7 +78,6 @@ export default function PlayerRecordsTabs({
   incompleteMaps,
   incompleteBonuses,
   incompleteStages,
-  steamid,
 }: PlayerRecordsTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();

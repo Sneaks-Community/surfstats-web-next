@@ -1,6 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import pool from '@/lib/db';
-import { RowDataPacket } from 'mysql2';
+import type { RowDataPacket } from 'mysql2';
 import { sanitizeMapName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import { unstable_cache } from 'next/cache';
@@ -90,8 +91,9 @@ const getBonusRecords = unstable_cache(
           totalPages: Math.ceil(totalRecords / pageSize),
         },
       };
-    } catch (error: any) {
-      if (error.message === 'Query timeout exceeded') {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      if (err.message === 'Query timeout exceeded') {
         logger.error(`[API] Query timeout for ${mapname} bonus ${bonus} after ${QUERY_TIMEOUT_MS / 1000} seconds`);
         return {
           bonuses: [],
@@ -106,7 +108,7 @@ const getBonusRecords = unstable_cache(
           },
         };
       }
-      logger.error(`[API] Failed to fetch bonus records for ${mapname}: ${error.message}`);
+      logger.error(`[API] Failed to fetch bonus records for ${mapname}: ${err.message || 'Unknown error'}`);
       throw error;
     }
   },
@@ -137,8 +139,9 @@ export async function GET(
   try {
     const data = await getBonusRecords(validMapname, bonus, page, pageSize);
     return NextResponse.json(data);
-  } catch (error: any) {
-    logger.error(`[API] Failed to fetch bonus records for ${validMapname}: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.error(`[API] Failed to fetch bonus records for ${validMapname}: ${err.message || 'Unknown error'}`);
     return NextResponse.json(
       { error: 'Failed to fetch bonus records' },
       { status: 500 }
