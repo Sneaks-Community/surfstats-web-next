@@ -2,28 +2,91 @@ import 'server-only';
 import logger from '@/lib/logger';
 
 /**
- * Get the base URL for internal API calls
- * During build time, returns null to skip API calls
- * At runtime, returns the full site URL
+ * Steam API interface types
  */
-function getBaseUrl(): string | null {
-  // NEXT_PUBLIC_SITE_URL is set at build time, so it's available during build
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL;
-  }
-  
-  // At runtime, construct from available environment variables
-  const host = process.env.SITE_URL 
-    ? `https://${process.env.SITE_URL}`
-    : process.env.HOSTNAME 
-      ? `http://${process.env.HOSTNAME}:${process.env.PORT || 3000}`
-      : null;
-  
-  return host;
+interface SteamPlayer {
+  steamid: string;
+  personaname: string;
+  profileurl: string;
+  avatar: string;
+  avatarmedium: string;
+  avatarfull: string;
+  personastate: number;
+  communityvisibilitystate: number;
+  profilestate: number;
+  lastlogoff: number;
+  commentpermission: string;
+}
+
+interface SteamAPIResponse {
+  players: SteamPlayer[];
+}
+
+interface SteamWrapperResponse {
+  response?: SteamAPIResponse;
 }
 
 /**
- * Fetch avatar data for a single SteamID using the server-side proxy
+ * Fetch player data directly from Steam API
+ * This is the core function that makes the actual Steam API call
+ * @param steamId64s - Array of SteamID64 values to fetch
+ * @returns Array of Steam player data or empty array on error
+ */
+async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]> {
+  const startTime = Date.now();
+  const apiKey = process.env.STEAM_API_KEY;
+
+  if (!apiKey) {
+    logger.error('[Steam API] STEAM_API_KEY not configured');
+    return [];
+  }
+
+  try {
+    const response = await fetch(
+      `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${apiKey}&steamids=${steamId64s.join(',')}`,
+      { next: { revalidate: 86400 } } // Cache for 24 hours
+    );
+
+    if (!response.ok) {
+      const duration = Date.now() - startTime;
+      if (response.status === 403) {
+        logger.error(`[Steam API] API key invalid or forbidden (${response.status}) - check STEAM_API_KEY`);
+      } else if (response.status === 429) {
+        logger.error(`[Steam API] Rate limited by Steam API (${response.status}) - too many requests`);
+      } else {
+        logger.error(`[Steam API] API request failed with status ${response.status} after ${duration}ms`);
+      }
+      return [];
+    }
+
+    const data: SteamWrapperResponse = await response.json();
+    const duration = Date.now() - startTime;
+    
+    // Steam API returns data in { response: { players: [...] } } format
+    const players = data.response?.players || [];
+    
+    logger.debug(`[Steam API] Successfully fetched ${players.length} players in ${duration}ms`);
+    
+    return players;
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    const errorCode = error.code || 'UNKNOWN';
+    const errorMessage = error.message || 'Unknown error';
+    
+    if (error.code === 'ENOTFOUND' || error.code === 'ECONNREFUSED') {
+      logger.error(`[Steam API] Network error - unable to reach Steam API servers (${errorCode})`);
+    } else if (error.code === 'ETIMEDOUT') {
+      logger.error(`[Steam API] Request timed out after ${duration}ms`);
+    } else {
+      logger.error(`[Steam API] Error fetching data after ${duration}ms: ${errorMessage}`);
+    }
+    
+    return [];
+  }
+}
+
+/**
+ * Fetch avatar data for a single SteamID using the Steam API directly
  * @param steamId - The SteamID to fetch avatars for
  * @returns Avatar data or null if failed
  */
@@ -40,35 +103,16 @@ export async function getSteamAvatars(steamId: string): Promise<{ avatar: string
 
     logger.debug(`[Steam] Fetching avatar for ${steamId} (SteamID64: ${steamId64})`);
     
-    // Use server-side proxy to keep API key on server
-    const baseUrl = getBaseUrl();
+    // Call Steam API directly - no HTTP proxy needed
+    const players = await fetchSteamPlayerData([steamId64]);
     
-    // During build time, skip the proxy and return null
-    // The proxy is only needed at runtime to keep API key on server
-    if (!baseUrl) {
-      logger.debug('[Steam] Skipping avatar fetch (build time or no base URL)');
-      return null;
-    }
-    
-    const response = await fetch(`${baseUrl}/api/steam?steamids=${steamId64}`, {
-      next: { revalidate: 86400 } // Cache for 24 hours
-    });
-
-    if (!response.ok) {
-      const duration = Date.now() - startTime;
-      logger.error(`[Steam] Proxy request failed with status ${response.status} after ${duration}ms`);
-      return null;
-    }
-
-    const data = await response.json();
-    const player = data.players?.[0];
-    
-    if (!player) {
+    if (players.length === 0) {
       const duration = Date.now() - startTime;
       logger.warn(`[Steam] No player data found for SteamID ${steamId} (${duration}ms)`);
       return null;
     }
 
+    const player = players[0];
     const duration = Date.now() - startTime;
     logger.debug(`[Steam] Successfully fetched avatar for ${player.personaname || steamId} (${duration}ms)`);
     
@@ -86,7 +130,7 @@ export async function getSteamAvatars(steamId: string): Promise<{ avatar: string
 }
 
 /**
- * Fetch avatar data for multiple SteamIDs using the server-side proxy
+ * Fetch avatar data for multiple SteamIDs using the Steam API directly
  * @param steamIds - Array of SteamIDs to fetch avatars for
  * @returns Map of original SteamID to avatar data
  */
@@ -120,29 +164,8 @@ export async function getSteamProfiles(steamIds: string[]): Promise<Map<string, 
       return result;
     }
 
-    // Use server-side proxy to keep API key on server
-    const baseUrl = getBaseUrl();
-    
-    // During build time, skip the proxy and return empty result
-    // The proxy is only needed at runtime to keep API key on server
-    if (!baseUrl) {
-      logger.debug('[Steam] Skipping profile fetch (build time or no base URL)');
-      return result;
-    }
-    
-    const response = await fetch(
-      `${baseUrl}/api/steam?steamids=${steamId64s.join(',')}`,
-      { next: { revalidate: 86400 } } // Cache for 24 hours
-    );
-
-    if (!response.ok) {
-      const duration = Date.now() - startTime;
-      logger.error(`[Steam] Proxy request failed with status ${response.status} after ${duration}ms`);
-      return result;
-    }
-
-    const data = await response.json();
-    const players = data.players || [];
+    // Call Steam API directly - no HTTP proxy needed
+    const players = await fetchSteamPlayerData(steamId64s);
     
     for (const player of players) {
       const originalSteamId = steamId64Map.get(player.steamid);
