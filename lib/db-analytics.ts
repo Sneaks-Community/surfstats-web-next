@@ -43,17 +43,36 @@ analyticsPool.on('enqueue', () => {
   logger.warn('[Analytics DB] Queue limit reached, waiting for available connection');
 });
 
-// Wrap the pool with slow query logging (preserves analyticsConnectionHealthy tracking)
-wrapPoolQuery(analyticsPool, { prefix: 'Analytics DB' });
+// Wrap the pool with slow query logging and health tracking
+const originalAnalyticsQuery = analyticsPool.query.bind(analyticsPool);
+analyticsPool.query = async function (sql: any, values?: any[]) {
+  const queryPreview = typeof sql === 'string'
+    ? sql.substring(0, 300) + (sql.length > 300 ? '...' : '')
+    : 'prepared statement';
 
-// Override the wrapped query to preserve analyticsConnectionHealthy tracking
-const originalAnalyticsQuery = analyticsPool.query.bind(analyticsPool) as any;
-analyticsPool.query = async (...args: any[]) => {
   try {
-    const result = await originalAnalyticsQuery(...args);
+    const startTime = Date.now();
+    const result = await originalAnalyticsQuery(sql, values);
+    const duration = Date.now() - startTime;
+
+    // Log all queries at debug level
+    logger.debug(`[Analytics DB] Query executed in ${duration}ms: ${queryPreview}`);
+
+    // Log slow queries as warning
+    if (duration > 1000) {
+      logger.warn(`[Analytics DB] Slow query detected (${duration}ms): ${queryPreview}`);
+    }
+
     analyticsConnectionHealthy = true;
     return result;
   } catch (error: any) {
+    const errorCode = error.code || 'UNKNOWN';
+    const errorMessage = error.message || 'Unknown error';
+
+    // Log all errors with context
+    logger.error(`[Analytics DB] Database error (${errorCode}): ${errorMessage}`);
+    logger.error(`[Analytics DB] Query: ${queryPreview}`);
+
     analyticsConnectionHealthy = false;
     throw error;
   }
