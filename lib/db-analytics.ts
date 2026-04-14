@@ -22,7 +22,7 @@ const analyticsPool = mysql.createPool({
   database: process.env.ANALYTICS_MYSQL_DATABASE || 'player_analytics_surf',
   waitForConnections: true,
   connectionLimit: 5, // Smaller pool for secondary database
-  queueLimit: 0,
+  queueLimit: 100,
 });
 
 // Log pool connection events (debug mode only)
