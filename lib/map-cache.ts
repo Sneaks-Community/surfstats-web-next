@@ -341,11 +341,6 @@ export async function getTierDistributionWithStages(): Promise<Map<number, { lin
   const allMetadata = await getAllMapMetadata();
   const distribution = new Map<number, { linear: number; staged: number }>();
   
-  // Initialize all tiers 1-10
-  for (let tier = 1; tier <= 10; tier++) {
-    distribution.set(tier, { linear: 0, staged: 0 });
-  }
-  
   for (const map of allMetadata.values()) {
     const tier = map.tier;
     const stages = map.stages || 0;

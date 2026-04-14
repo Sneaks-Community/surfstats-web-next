@@ -339,8 +339,15 @@ function fetchLatestCompletionsInternal() {
       bonus: row.bonus,
     }));
     
-    const mapCount = result.filter(r => r.type === 'map').length;
-    const bonusCount = result.filter(r => r.type === 'bonus').length;
+    // Single pass to count map and bonus completions
+    const { mapCount, bonusCount } = result.reduce(
+      (acc, r) => {
+        if (r.type === 'map') acc.mapCount++;
+        else if (r.type === 'bonus') acc.bonusCount++;
+        return acc;
+      },
+      { mapCount: 0, bonusCount: 0 }
+    );
     logger.debug(`[Cache] Latest completions fetched successfully in ${duration}ms (${result.length} records: ${mapCount} map, ${bonusCount} bonus)`);
     
     return result;
