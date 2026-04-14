@@ -50,6 +50,7 @@ async function initializeDatabase() {
     await prewarmCaches();
     
     logger.info('[DB] Initialization complete');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     const errorCode = error.code || 'UNKNOWN';
     const errorMessage = error.message || 'Unknown error';

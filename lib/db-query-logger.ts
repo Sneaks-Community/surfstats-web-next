@@ -1,5 +1,5 @@
 import 'server-only';
-import mysql from 'mysql2/promise';
+import type mysql from 'mysql2/promise';
 import logger from './logger';
 
 export interface DbQueryLoggerOptions {
@@ -28,8 +28,10 @@ export function wrapPoolQuery(
   options: DbQueryLoggerOptions
 ): void {
   const { prefix, slowThresholdMs = 1000 } = options;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const originalQuery = pool.query.bind(pool) as any;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pool.query = async (...args: any[]) => {
     const queryPreview = typeof args[0] === 'string'
       ? args[0].substring(0, 300) + (args[0].length > 300 ? '...' : '')
@@ -49,6 +51,7 @@ export function wrapPoolQuery(
       }
 
       return result;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (error: any) {
       const errorCode = error.code || 'UNKNOWN';
       const errorMessage = error.message || 'Unknown error';

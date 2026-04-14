@@ -44,6 +44,7 @@ analyticsPool.on('enqueue', () => {
 
 // Wrap the pool with slow query logging and health tracking
 const originalAnalyticsQuery = analyticsPool.query.bind(analyticsPool);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 analyticsPool.query = async function (sql: any, values?: any[]) {
   const queryPreview = typeof sql === 'string'
     ? sql.substring(0, 300) + (sql.length > 300 ? '...' : '')
@@ -64,9 +65,10 @@ analyticsPool.query = async function (sql: any, values?: any[]) {
 
     analyticsConnectionHealthy = true;
     return result;
-  } catch (error: any) {
-    const errorCode = error.code || 'UNKNOWN';
-    const errorMessage = error.message || 'Unknown error';
+  } catch (error: unknown) {
+    const err = error as { code?: string; message?: string };
+    const errorCode = err.code || 'UNKNOWN';
+    const errorMessage = err.message || 'Unknown error';
 
     // Log all errors with context
     logger.error(`[Analytics DB] Database error (${errorCode}): ${errorMessage}`);
@@ -94,10 +96,10 @@ async function initializeAnalyticsDatabase() {
     connection.release();
     analyticsConnectionHealthy = true;
     logger.info('[Analytics DB] Database connection established successfully');
-  } catch (error: any) {
+  } catch (error: unknown) {
     // Log but don't throw - analytics database is optional
     analyticsConnectionHealthy = false;
-    logger.warn(`[Analytics DB] Database connection failed: ${error.message}`);
+    logger.warn(`[Analytics DB] Database connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     logger.warn('[Analytics DB] Analytics features will be disabled');
   }
 }
