@@ -50,26 +50,6 @@ const getStageRecords = unstable_cache(
       // Get list of all stages from registry cache (already cached for 1 hour)
       const stagesList = await getStagesByMap(mapname);
 
-      // Get total count for this stage
-      const [countRows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT COUNT(*) as total FROM ck_stages WHERE \`map\` = ? AND stage = ?
-        `, [mapname, stage]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
-      const totalRecords = countRows[0]?.total || 0;
-
-      // Get WR time once
-      const [wrResult] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT MIN(runtime) as wr_time FROM ck_stages WHERE map = ? AND stage = ?
-        `, [mapname, stage]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
-      const wrTime = wrResult[0]?.wr_time || null;
-
       // Build ORDER BY clause based on sort field
       // NOTE: For stages, we always fetch top 100 by rank (runtime ASC) first
       // Client-side sorting handles other sort fields
@@ -99,24 +79,50 @@ const getStageRecords = unstable_cache(
         orderByClause = `date ${orderDirection}, runtime ASC`;
       }
 
-      // Get total count with rank calculation (always by runtime, date as tiebreaker)
-      const [rankCountRows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT COUNT(DISTINCT rank) as total FROM (
-            SELECT
-              s.steamid,
-              DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) as rank
-            FROM ck_stages s
-            WHERE s.map = ? AND s.stage = ?
-          ) AS ranked
-        `, [mapname, stage]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
+      // PARALLEL: Execute count, wr_time, and rankCount queries simultaneously
+      // These queries have no dependencies on each other
+      const [countResult, wrResult, rankCountResult] = await Promise.all([
+        withTimeout(
+          pool.query<RowDataPacket[]>(`
+            SELECT COUNT(*) as total FROM ck_stages WHERE \`map\` = ? AND stage = ?
+          `, [mapname, stage]),
+          QUERY_TIMEOUT_MS,
+          'Query timeout exceeded'
+        ),
+        withTimeout(
+          pool.query<RowDataPacket[]>(`
+            SELECT MIN(runtime) as wr_time FROM ck_stages WHERE map = ? AND stage = ?
+          `, [mapname, stage]),
+          QUERY_TIMEOUT_MS,
+          'Query timeout exceeded'
+        ),
+        withTimeout(
+          pool.query<RowDataPacket[]>(`
+            SELECT COUNT(DISTINCT rank) as total FROM (
+              SELECT
+                s.steamid,
+                DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) as rank
+              FROM ck_stages s
+              WHERE s.map = ? AND s.stage = ?
+            ) AS ranked
+          `, [mapname, stage]),
+          QUERY_TIMEOUT_MS,
+          'Query timeout exceeded'
+        )
+      ]);
+
+      // Extract results from parallel execution
+      const [countRows] = countResult;
+      const [wrRows] = wrResult;
+      const [rankCountRows] = rankCountResult;
+      
+      const totalRecords = countRows[0]?.total || 0;
+      const wrTime = wrRows[0]?.wr_time || null;
       const totalWithRank = rankCountRows[0]?.total || 0;
 
       // Get stage records with rank calculation
       // Return all top 100 records sorted by rank for UI to handle pagination and sorting
+      // This query depends on wr_time, so it executes after the parallel queries
       const [stageRows] = await withTimeout(
         pool.query<StageRecord[]>(`
           SELECT

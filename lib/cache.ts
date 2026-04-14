@@ -237,42 +237,45 @@ export function getServerCacheStats(): { lastUpdated: number; ageSeconds: number
 function fetchStatsInternal() {
   const startTime = Date.now();
   
-  return pool.query<RowDataPacket[]>('SELECT `key`, `value` FROM ck_stats')
-    .then(([rows]) => {
+  // PARALLEL: Fetch stats and recent records simultaneously
+  return Promise.all([
+    pool.query<RowDataPacket[]>('SELECT `key`, `value` FROM ck_stats'),
+    pool.query<RowDataPacket[]>(`
+      SELECT lr.steamid, lr.name, lr.runtime, lr.map, lr.date, pr.country
+      FROM ck_latestrecords lr
+      LEFT JOIN ck_playerrank pr ON lr.steamid = pr.steamid
+      ORDER BY lr.date DESC
+      LIMIT 5
+    `)
+  ])
+    .then(([statsResult, recordsResult]) => {
+      const [statsRows] = statsResult;
+      const [recentRecords] = recordsResult;
+      
       // If database returned empty (connection failed), throw to prevent caching
-      if (!rows || rows.length === 0) {
+      if (!statsRows || statsRows.length === 0) {
         const error = new Error('Database returned empty stats');
         logger.error('[Cache] Stats query returned empty result - database may be unavailable');
         throw error;
       }
       
-      const statsMap = rows.reduce((acc, row) => {
+      const statsMap = statsRows.reduce((acc, row) => {
         acc[row.key] = row.value;
         return acc;
       }, {} as Record<string, number>);
-
-      // Fetch top 5 recent records
-      logger.debug('[Cache] Fetching recent records...');
-      return pool.query<RowDataPacket[]>(`
-        SELECT lr.steamid, lr.name, lr.runtime, lr.map, lr.date, pr.country
-        FROM ck_latestrecords lr
-        LEFT JOIN ck_playerrank pr ON lr.steamid = pr.steamid
-        ORDER BY lr.date DESC
-        LIMIT 5
-      `).then(([recentRecords]) => {
-        const duration = Date.now() - startTime;
-        logger.debug(`[Cache] Stats fetched successfully in ${duration}ms (${rows.length} stats, ${recentRecords.length} records)`);
-        
-        return {
-          playerCount: statsMap['player_count'] || 0,
-          mapCompletions: statsMap['map_completions'] || 0,
-          bonusCompletions: statsMap['bonus_completions'] || 0,
-          stageCompletions: statsMap['stage_completions'] || 0,
-          totalPoints: statsMap['total_points'] || 0,
-          playersMonth: statsMap['players_month'] || 0,
-          recentRecords,
-        };
-      });
+      
+      const duration = Date.now() - startTime;
+      logger.debug(`[Cache] Stats fetched successfully in ${duration}ms (${statsRows.length} stats, ${recentRecords.length} records)`);
+      
+      return {
+        playerCount: statsMap['player_count'] || 0,
+        mapCompletions: statsMap['map_completions'] || 0,
+        bonusCompletions: statsMap['bonus_completions'] || 0,
+        stageCompletions: statsMap['stage_completions'] || 0,
+        totalPoints: statsMap['total_points'] || 0,
+        playersMonth: statsMap['players_month'] || 0,
+        recentRecords,
+      };
     })
     .catch((error: any) => {
       const duration = Date.now() - startTime;
