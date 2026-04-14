@@ -107,7 +107,7 @@ const getWRCheckpointTimes = unstable_cache(
       }
       
       // Validate checkpoint count first
-      const MAX_CHECKPOINTS = 57; // ck_checkpoints has cp1-cp57 columns
+      const MAX_CHECKPOINTS = 75; // ck_checkpoints has cp1-cp75 columns
       if (maxCheckpoint > MAX_CHECKPOINTS || maxCheckpoint < 0) {
         throw new Error('Invalid checkpoint count');
       }
@@ -208,8 +208,27 @@ const getCheckpointStats = unstable_cache(
       return { checkpointAvgTimes: [], wrCheckpointTimes: [] };
     }
 
-    // Build dynamic column list based on max checkpoint count
-    const checkpointColumns = Array.from({ length: maxCheckpoint }, (_, i) => `cp${i + 1}`);
+    // Validate checkpoint count first
+    const MAX_CHECKPOINTS = 75; // ck_checkpoints has cp1-cp75 columns
+    if (maxCheckpoint > MAX_CHECKPOINTS || maxCheckpoint < 0) {
+      throw new Error('Invalid checkpoint count');
+    }
+
+    // Whitelist valid column names to prevent SQL injection (same as getWRCheckpointTimes)
+    const validColumns = new Set<string>();
+    for (let i = 1; i <= MAX_CHECKPOINTS; i++) {
+      validColumns.add(`cp${i}`);
+    }
+
+    // Build dynamic column list based on max checkpoint count with validation
+    const checkpointColumns: string[] = [];
+    for (let i = 1; i <= maxCheckpoint; i++) {
+      const colName = `cp${i}`;
+      if (!validColumns.has(colName)) {
+        throw new Error(`Invalid checkpoint column: ${colName}`);
+      }
+      checkpointColumns.push(colName);
+    }
 
     // Fetch only existing checkpoint columns
     const [checkpointRows] = await pool.query<RowDataPacket[]>(`

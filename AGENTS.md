@@ -232,7 +232,7 @@ The application works with the ckSurf database schema (surf85) and optional anal
 | **ck_zones** | Zone definitions (mapname, zoneid, zonetype, pointa/b, zonegroup, zonename, hookname) |
 | **ck_stats** | Global statistics cache (key, value, last_updated) |
 | **ck_playerrank** | Player rankings (steamid, name, country, points, finishedmaps, lastseen) |
-| **ck_checkpoints** | Checkpoint times (steamid, mapname, cp1-cp57, zonegroup) |
+| **ck_checkpoints** | Checkpoint times (steamid, mapname, cp1-cp75, zonegroup) |
 | **ck_latestrecords** | Latest records cache (steamid, name, runtime, map, date) |
 | **ck_playeroptions** | Player settings (steamid, speedmeter, quake_sounds, etc.) |
 | **ck_playertitles** | Player titles/flags (steamid, vip, mapper, teacher, custom1-20) |
