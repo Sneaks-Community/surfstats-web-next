@@ -76,25 +76,30 @@ const getRecordCountsAndWR = unstable_cache(
 );
 
 // Cached function to fetch paginated leaderboard records
+// Accepts wr_time as optional parameter to avoid duplicate queries when already fetched
 const getLeaderboardRecords = unstable_cache(
   async (
     mapname: string,
     page: number,
-    pageSize: number
+    pageSize: number,
+    wr_time: number | null = null
   ): Promise<{ records: MapRecord[]; wr_time: number | null }> => {
     const validMapname = sanitizeMapName(mapname);
     const offset = (page - 1) * pageSize;
 
     try {
-      // Get WR time
-      const [wrTimeRows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?
-        `, [validMapname]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
-      const wr_time = wrTimeRows[0]?.wr_time || null;
+      // Get WR time if not already provided (avoids duplicate query)
+      let localWrTime = wr_time;
+      if (localWrTime === null) {
+        const [wrTimeRows] = await withTimeout(
+          pool.query<RowDataPacket[]>(`
+            SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?
+          `, [validMapname]),
+          QUERY_TIMEOUT_MS,
+          'Query timeout exceeded'
+        );
+        localWrTime = wrTimeRows[0]?.wr_time || null;
+      }
 
       // Get paginated leaderboard records using window function
       const [leaderboardRows] = await withTimeout(
@@ -107,14 +112,14 @@ const getLeaderboardRecords = unstable_cache(
           WHERE mapname = ?
           ORDER BY runtimepro ASC
           LIMIT ? OFFSET ?
-        `, [wr_time, validMapname, pageSize, offset]),
+        `, [localWrTime, validMapname, pageSize, offset]),
         QUERY_TIMEOUT_MS,
         'Query timeout exceeded'
       );
 
       logger.debug(`[API] Fetched ${leaderboardRows.length} records for ${validMapname} (page ${page})`);
 
-      return { records: leaderboardRows, wr_time };
+      return { records: leaderboardRows, wr_time: localWrTime };
     } catch (error: any) {
       if (error.message === 'Query timeout exceeded') {
         logger.error(`[API] Query timeout for ${validMapname} page ${page} after ${QUERY_TIMEOUT_MS / 1000} seconds`);
@@ -150,8 +155,8 @@ export async function GET(
     // Fetch counts and WR time
     const { counts, wr_time } = await getRecordCountsAndWR(validMapname);
 
-    // Fetch paginated records
-    const { records } = await getLeaderboardRecords(validMapname, page, pageSize);
+    // Fetch paginated records, passing wr_time to avoid duplicate query
+    const { records } = await getLeaderboardRecords(validMapname, page, pageSize, wr_time);
 
     return NextResponse.json({
       records,
