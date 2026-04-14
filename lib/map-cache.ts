@@ -21,7 +21,7 @@ export interface MapMetadata {
 
 // Configuration constants
 const QUERY_TIMEOUT_MS = 30000; // 30 seconds - prevents indefinite query hanging
-const CACHE_REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes - background refresh interval
+const CACHE_REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour - background refresh interval
 
 // Global cache structure with background refresh support
 interface GlobalMapCache {
