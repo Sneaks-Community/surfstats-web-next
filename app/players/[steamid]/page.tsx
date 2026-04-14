@@ -10,20 +10,6 @@ import { getPlayerName } from '@/lib/player-cache';
 import logger from '@/lib/logger';
 import PlayerProfileContent from './components/PlayerProfileContent';
 
-// Clear old cache entries to force re-execution of unstable_cache functions
-// This is needed when the function body changes but the cache key stays the same
-if (typeof globalThis !== 'undefined') {
-  // @ts-ignore - clearing Next.js unstable_cache entries
-  delete (globalThis as any)['player-linear-vs-staged-per-tier'];
-  // @ts-ignore
-  delete (globalThis as any)['player-incomplete-records'];
-  // @ts-ignore
-  delete (globalThis as any)['player-incomplete-maps'];
-  // @ts-ignore
-  delete (globalThis as any)['player-incomplete-bonuses'];
-  // @ts-ignore
-  delete (globalThis as any)['player-incomplete-stages'];
-}
 
 const getPlayerData = unstable_cache(
   async (steamid: string) => {
