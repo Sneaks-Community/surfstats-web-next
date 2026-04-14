@@ -102,6 +102,28 @@ async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stages: Sta
 }
 
 /**
+ * Refresh the registry cache
+ * Returns a promise that resolves when the refresh completes
+ */
+async function doRefreshRegistryCache(): Promise<void> {
+  try {
+    logger.debug('[RegistryCache] Fetching fresh registry data...');
+    const { bonuses, stages, playerCount } = await fetchRegistryData();
+    
+    const cache = getGlobalRegistryCache();
+    cache.bonuses = bonuses;
+    cache.stages = stages;
+    cache.playerCount = playerCount;
+    cache.lastUpdated = Date.now();
+    
+    logger.info(`[RegistryCache] Cache refreshed with ${bonuses.length} bonuses, ${stages.length} stages, and ${playerCount} players`);
+  } catch (error: any) {
+    logger.error(`[RegistryCache] Cache refresh failed: ${error.message}`);
+    throw error;
+  }
+}
+
+/**
  * Initialize the registry cache - called automatically on first access
  */
 function initRegistryCache(): void {
@@ -120,14 +142,7 @@ function initRegistryCache(): void {
   logger.info('[RegistryCache] Initializing bonus/stage registry cache (1 hour TTL)...');
   
   // Initial fetch - store promise so callers can await it
-  cache.initialFetchPromise = fetchRegistryData()
-    .then(({ bonuses, stages, playerCount }) => {
-      cache.bonuses = bonuses;
-      cache.stages = stages;
-      cache.playerCount = playerCount;
-      cache.lastUpdated = Date.now();
-      logger.info(`[RegistryCache] Cache initialized with ${bonuses.length} bonuses, ${stages.length} stages, and ${playerCount} players`);
-    })
+  cache.initialFetchPromise = doRefreshRegistryCache()
     .catch((err) => {
       logger.error(`[RegistryCache] Initial fetch failed: ${err.message}`);
     });
@@ -147,7 +162,6 @@ export async function getAllBonusGroups(): Promise<BonusGroup[]> {
   // Wait for initial fetch to complete before returning
   if (cache.initialFetchPromise) {
     await cache.initialFetchPromise;
-    cache.initialFetchPromise = null;
   }
   
   // Check if cache is still valid
@@ -157,13 +171,17 @@ export async function getAllBonusGroups(): Promise<BonusGroup[]> {
     return cache.bonuses;
   }
   
-  // Cache expired or empty - fetch fresh data
+  // Cache expired or empty - fetch fresh data with deduplication
   logger.debug('[RegistryCache] Cache expired, fetching fresh data...');
-  const { bonuses, stages, playerCount } = await fetchRegistryData();
-  cache.bonuses = bonuses;
-  cache.stages = stages;
-  cache.playerCount = playerCount;
-  cache.lastUpdated = now;
+  
+  // Re-assign initialFetchPromise to prevent race conditions
+  // This ensures only one refresh happens even if multiple callers check expiry concurrently
+  cache.initialFetchPromise = doRefreshRegistryCache().catch((err) => {
+    logger.error(`[RegistryCache] Refresh failed: ${err.message}`);
+  });
+  
+  await cache.initialFetchPromise;
+  cache.initialFetchPromise = null;
   
   return cache.bonuses;
 }
@@ -182,7 +200,6 @@ export async function getAllStages(): Promise<StageGroup[]> {
   // Wait for initial fetch to complete before returning
   if (cache.initialFetchPromise) {
     await cache.initialFetchPromise;
-    cache.initialFetchPromise = null;
   }
   
   // Check if cache is still valid
@@ -192,13 +209,17 @@ export async function getAllStages(): Promise<StageGroup[]> {
     return cache.stages;
   }
   
-  // Cache expired or empty - fetch fresh data
+  // Cache expired or empty - fetch fresh data with deduplication
   logger.debug('[RegistryCache] Cache expired, fetching fresh data...');
-  const { bonuses, stages, playerCount } = await fetchRegistryData();
-  cache.bonuses = bonuses;
-  cache.stages = stages;
-  cache.playerCount = playerCount;
-  cache.lastUpdated = now;
+  
+  // Re-assign initialFetchPromise to prevent race conditions
+  // This ensures only one refresh happens even if multiple callers check expiry concurrently
+  cache.initialFetchPromise = doRefreshRegistryCache().catch((err) => {
+    logger.error(`[RegistryCache] Refresh failed: ${err.message}`);
+  });
+  
+  await cache.initialFetchPromise;
+  cache.initialFetchPromise = null;
   
   return cache.stages;
 }
@@ -217,7 +238,6 @@ export async function getPlayerCount(): Promise<number> {
   // Wait for initial fetch to complete before returning
   if (cache.initialFetchPromise) {
     await cache.initialFetchPromise;
-    cache.initialFetchPromise = null;
   }
   
   // Check if cache is still valid
@@ -227,13 +247,17 @@ export async function getPlayerCount(): Promise<number> {
     return cache.playerCount;
   }
   
-  // Cache expired or empty - fetch fresh data
+  // Cache expired or empty - fetch fresh data with deduplication
   logger.debug('[RegistryCache] Cache expired, fetching fresh data...');
-  const { bonuses, stages, playerCount } = await fetchRegistryData();
-  cache.bonuses = bonuses;
-  cache.stages = stages;
-  cache.playerCount = playerCount;
-  cache.lastUpdated = now;
+  
+  // Re-assign initialFetchPromise to prevent race conditions
+  // This ensures only one refresh happens even if multiple callers check expiry concurrently
+  cache.initialFetchPromise = doRefreshRegistryCache().catch((err) => {
+    logger.error(`[RegistryCache] Refresh failed: ${err.message}`);
+  });
+  
+  await cache.initialFetchPromise;
+  cache.initialFetchPromise = null;
   
   return cache.playerCount;
 }
@@ -348,20 +372,4 @@ export function getRegistryCacheStats(): {
     stageCount: cache.stages.length,
     playerCount: cache.playerCount,
   };
-}
-
-/**
- * Force refresh the cache (useful for admin operations)
- */
-export async function refreshRegistryCache(): Promise<void> {
-  const cache = getGlobalRegistryCache();
-  logger.info('[RegistryCache] Force refreshing cache...');
-  
-  const { bonuses, stages, playerCount } = await fetchRegistryData();
-  cache.bonuses = bonuses;
-  cache.stages = stages;
-  cache.playerCount = playerCount;
-  cache.lastUpdated = Date.now();
-  
-  logger.info(`[RegistryCache] Cache refreshed with ${bonuses.length} bonuses, ${stages.length} stages, and ${playerCount} players`);
 }
