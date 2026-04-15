@@ -3,6 +3,18 @@ import logger from './logger';
 
 const client = createClient({
   url: process.env.VALKEY_URL || 'redis://localhost:6379',
+  username: process.env.VALKEY_USERNAME,
+  password: process.env.VALKEY_PASSWORD,
+  socket: {
+    tls: process.env.VALKEY_TLS === 'true',
+    rejectUnauthorized: process.env.VALKEY_TLS_REJECT_UNAUTHORIZED !== 'false',
+    connectTimeout: parseInt(process.env.VALKEY_CONNECT_TIMEOUT || '5000'),
+  },
+  retryStrategy: (times) => {
+    // Exponential backoff with max delay of 5 seconds
+    const delay = Math.min(times * 500, 5000);
+    return delay;
+  },
 });
 
 client.on('error', (err: Error) => {
