@@ -1,5 +1,3 @@
-import pool from '@/lib/db';
-import type { RowDataPacket } from 'mysql2';
 import { getSteamProfileUrl } from '@/lib/steam';
 import Link from 'next/link';
 import { Map as MapIcon, Users, Layers, Target, Download } from 'lucide-react';
@@ -10,145 +8,10 @@ import MapRecordsTabs from './components/MapRecordsTabs';
 import TierBadge from '@/components/TierBadge';
 import MapChartGrid from './components/charts/MapChartGrid';
 import { getMapMetadata } from '@/lib/map-cache';
-import { unstable_cache } from 'next/cache';
-import { withTimeout } from '@/lib/timeout';
+import { getMapRecordsFromCache } from '@/lib/valkey-map-records-cache';
 
 // Default page size - keeps cache entry under 2MB (each record ~200 bytes, 100 records ~20KB)
 const DEFAULT_PAGE_SIZE = 100;
-const MAX_PAGE_SIZE = 500;
-const QUERY_TIMEOUT_MS = 30000; // 30 seconds - prevents indefinite query hanging
-
-interface MapRecord {
-  steamid: string;
-  name: string;
-  runtimepro: number;
-  date: string;
-  rank: number;
-  wr_time: number | null;
-  startspeed: number;
-}
-
-interface BonusRecord {
-  steamid: string;
-  name: string;
-  zonegroup: number;
-  runtime: number;
-  date: string;
-  rank: number;
-  wr_time: number | null;
-  startspeed: number;
-}
-
-interface StageRecord {
-  steamid: string;
-  name: string;
-  stage: number;
-  runtime: number;
-  date: string;
-  rank: number;
-  wr_time: number | null;
-  startspeed: number;
-}
-
-interface RecordCounts {
-  leaderboardTotal: number;
-  bonusesTotal: number;
-  stagesTotal: number;
-}
-
-interface MapRecordsResult {
-  leaderboard: MapRecord[];
-  bonuses: BonusRecord[];
-  stages: StageRecord[];
-  counts: RecordCounts;
-  wr_time: number | null;
-}
-
-// Cached function to fetch map records (leaderboard, counts, WR time)
-const getMapRecords = unstable_cache(
-  async (mapname: string, page: number = 1, pageSize: number = DEFAULT_PAGE_SIZE): Promise<MapRecordsResult> => {
-    // Enforce limits to prevent cache bloat
-    const safePageSize = Math.min(Math.max(1, pageSize), MAX_PAGE_SIZE);
-    const safePage = Math.max(1, page);
-    const offset = (safePage - 1) * safePageSize;
-
-    logger.debug(`[Map] Fetching records for: ${mapname} (page ${safePage}, size ${safePageSize})`);
-
-    try {
-      // First, get the total counts for all record types in a single query
-      const [countsRows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT
-            (SELECT COUNT(*) FROM ck_playertimes WHERE mapname = ?) as leaderboardTotal,
-            (SELECT COUNT(*) FROM ck_bonus WHERE mapname = ?) as bonusesTotal,
-            (SELECT COUNT(*) FROM ck_stages WHERE \`map\` = ?) as stagesTotal
-        `, [mapname, mapname, mapname]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
-
-      const counts: RecordCounts = {
-        leaderboardTotal: countsRows[0]?.leaderboardTotal || 0,
-        bonusesTotal: countsRows[0]?.bonusesTotal || 0,
-        stagesTotal: countsRows[0]?.stagesTotal || 0,
-      };
-
-      // Use window functions for efficient rank calculation - O(n) instead of O(n²)
-      // This query calculates ranks using ROW_NUMBER() which is much faster than correlated subqueries
-      
-      // Get WR time for the map (needed for all records)
-      const [wrTimeRows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?
-        `, [mapname]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
-      const wr_time = wrTimeRows[0]?.wr_time || null;
-
-      // Get leaderboard records with pagination and window function for rank
-      const [leaderboardRows] = await withTimeout(
-        pool.query<RowDataPacket[] & MapRecord[]>(`
-          SELECT
-            steamid, name, runtimepro, date, startspeed,
-            ROW_NUMBER() OVER (ORDER BY runtimepro ASC) as rank,
-            ? as wr_time
-          FROM ck_playertimes
-          WHERE mapname = ?
-          ORDER BY runtimepro ASC
-          LIMIT ? OFFSET ?
-        `, [wr_time, mapname, safePageSize, offset]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
-
-      // Bonuses are fetched client-side via API to keep server payload small
-      const bonusRows: BonusRecord[] = [];
-
-      // Stages are fetched client-side via API to avoid huge payloads
-      // (maps can have 300K+ stage records which exceeds 2MB cache limit)
-      const stageRows: StageRecord[] = [];
-
-      logger.debug(`[Map] ${mapname} loaded: ${leaderboardRows.length}/${counts.leaderboardTotal} leaderboard records, ${bonusRows.length} bonus records, ${stageRows.length} stage records`);
-
-      return { leaderboard: leaderboardRows, bonuses: bonusRows, stages: stageRows, counts, wr_time };
-    } catch (error: unknown) {
-      const err = error as { message?: string; code?: string };
-      // Handle timeout specifically
-      if (err.message === 'Query timeout exceeded') {
-        logger.error(`[Map] Query timeout for ${mapname} after ${QUERY_TIMEOUT_MS / 1000} seconds`);
-        return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
-      }
-      
-      const errorMessage = err.message || 'Unknown error';
-      logger.error(`[Map] Failed to fetch records for ${mapname}: ${errorMessage}`);
-      logger.error(`[Map] Error code: ${err.code || 'N/A'}`);
-      return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
-    }
-  },
-  [], // Empty keyParts array - Next.js uses function arguments as cache key
-  { revalidate: 300 } // Revalidate cache every 5 minutes
-);
 
 export async function generateMetadata({ params }: { params: Promise<{ mapname: string }> }) {
   const { mapname } = await params;
@@ -194,7 +57,7 @@ export default async function MapProfilePage({
   
   const [map, recordsData] = await Promise.all([
     getMapMetadata(validMapname),
-    getMapRecords(validMapname, 1, DEFAULT_PAGE_SIZE)
+    getMapRecordsFromCache(validMapname, 1, DEFAULT_PAGE_SIZE)
   ]);
   
   logger.debug(`[Map Page] Map data for ${validMapname}: stages=${map?.stages}, checkpoints=${map?.checkpoints}`);
@@ -203,16 +66,20 @@ export default async function MapProfilePage({
     return (
       <div className="text-center py-20 bg-surface border border-border rounded-xl">
         <h1 className="text-2xl font-bold text-text mb-2">Map Not Found</h1>
-        <p className="text-text-muted">The map {decodedMapname} could not be found.</p>
+        <p className="text-text-muted">The map "{decodedMapname}" was not found in the database.</p>
         <Link href="/maps" className="inline-block mt-6 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-md transition-colors">
           Back to Maps
         </Link>
       </div>
     );
   }
-
-  const { leaderboard, bonuses, stages, counts, wr_time } = recordsData;
-  const total = counts.leaderboardTotal;
+  
+  const leaderboard = recordsData.leaderboard;
+  const bonuses = recordsData.bonuses;
+  const stages = recordsData.stages;
+  const total = recordsData.counts.leaderboardTotal;
+  const wr_time = recordsData.wr_time;
+  
   const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
 
   return (

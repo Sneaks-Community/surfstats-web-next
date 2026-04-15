@@ -2,10 +2,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Search } from 'lucide-react';
 import { cache } from 'react';
-import { getSteamProfiles } from '@/lib/steam';
+import { getSteamProfilesFromCache } from '@/lib/steam';
 import Pagination from '@/components/Pagination';
 import { formatDate } from '@/lib/utils';
-import { getPlayers } from '@/lib/player-cache';
+import { getPlayersFromCache } from '@/lib/player-cache';
 import { sanitizeSearchQuery } from '@/lib/sanitize';
 import type { Metadata } from 'next';
 
@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 // Cache Steam profile fetches within a request to avoid duplicate calls
-const getCachedSteamProfiles = cache(getSteamProfiles);
+const getCachedSteamProfiles = cache(getSteamProfilesFromCache);
 
 export default async function PlayersPage({
   searchParams,
@@ -26,7 +26,7 @@ export default async function PlayersPage({
   const page = parseInt(params.page || '1', 10);
   
   // Fetch players first to get steam IDs
-  const { players, total, totalPages } = await getPlayers(page, q);
+  const { players, total, totalPages } = await getPlayersFromCache(page, q);
   
   // Extract steam IDs and fetch avatars (cached within request via React.cache)
   const steamIds = players.map(p => p.steamid);

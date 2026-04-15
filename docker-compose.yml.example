@@ -1,4 +1,5 @@
 services:
+
   surfstats-web-next:
     build:
       context: .
@@ -19,3 +20,33 @@ services:
     - .env
     environment:
       - NODE_ENV=production
+    depends_on:
+      valkey:
+        condition: service_healthy
+    
+  valkey:
+    image: valkey/valkey:9-alpine
+    container_name: surfstats-valkey
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkey_data:/data
+    command: valkey-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    security_opt:
+      - "apparmor=docker-default"
+      - "no-new-privileges=true"
+    cap_drop:
+      - ALL
+    cap_add:
+      - CAP_CHOWN
+      - CAP_SETUID
+      - CAP_SETGID
+
+volumes:
+  valkey_data:

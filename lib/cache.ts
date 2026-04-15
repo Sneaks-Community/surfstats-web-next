@@ -2,7 +2,6 @@ import 'server-only';
 import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import { GameDig } from 'gamedig';
-import { unstable_cache } from 'next/cache';
 import logger from '@/lib/logger';
 import { getAllMapMetadata, getTotals as getMapTotals } from './map-cache';
 import { getAllBonusGroups, getAllStages } from './registry-cache';
@@ -78,16 +77,16 @@ function getGlobalServerCache(): GlobalServerCache {
 // Fetch servers from live game servers
 async function fetchServersFromGame(): Promise<ServerStatus[]> {
   const startTime = Date.now();
-  
+
   try {
     logger.debug('[ServerCache] Fetching server statuses...');
     let serversJson = process.env.SERVERS_JSON || '[]';
-    
+
     // Remove surrounding single quotes if they exist
     if (serversJson.startsWith("'") && serversJson.endsWith("'")) {
       serversJson = serversJson.slice(1, -1);
     }
-    
+
     let configs: ServerConfig[];
     try {
       configs = JSON.parse(serversJson);
@@ -97,14 +96,14 @@ async function fetchServersFromGame(): Promise<ServerStatus[]> {
       logger.error(`[ServerCache] JSON parse error: ${err.message || 'Unknown error'}`);
       return [];
     }
-    
+
     if (!Array.isArray(configs)) {
       logger.error('[ServerCache] SERVERS_JSON is not an array');
       return [];
     }
-    
+
     logger.debug(`[ServerCache] Querying ${configs.length} servers...`);
-    
+
     const statuses = await Promise.all(
       configs.map(async (config) => {
         const serverStart = Date.now();
@@ -116,10 +115,10 @@ async function fetchServersFromGame(): Promise<ServerStatus[]> {
             maxAttempts: 1,
             socketTimeout: 2000,
           });
-          
+
           const duration = Date.now() - serverStart;
           logger.debug(`[ServerCache] Server ${config.name} responded in ${duration}ms`);
-          
+
           return {
             config,
             online: true,
@@ -130,8 +129,13 @@ async function fetchServersFromGame(): Promise<ServerStatus[]> {
             ping: state.ping,
             playerList: state.players.map((p: GameDigPlayer) => ({
               name: p.name || '',
-              time: (typeof p.time === 'number' ? p.time : (typeof p.raw?.time === 'number' ? p.raw.time : 0)),
-              score: p.score || 0
+              time:
+                typeof p.time === 'number'
+                  ? p.time
+                  : typeof p.raw?.time === 'number'
+                  ? p.raw.time
+                  : 0,
+              score: p.score || 0,
             })),
           };
         } catch (error: unknown) {
@@ -146,204 +150,269 @@ async function fetchServersFromGame(): Promise<ServerStatus[]> {
         }
       })
     );
-    
-    const onlineCount = statuses.filter(s => s.online).length;
+
+    const onlineCount = statuses.filter((s) => s.online).length;
     const duration = Date.now() - startTime;
-    logger.debug(`[ServerCache] Fetch complete: ${onlineCount}/${statuses.length} online (${duration}ms)`);
-    
+    logger.debug(
+      `[ServerCache] Fetched ${statuses.length} servers (${onlineCount} online) in ${duration}ms`
+    );
+
     return statuses;
   } catch (error: unknown) {
+    const duration = Date.now() - startTime;
     const err = error as { message?: string };
-    logger.error(`[ServerCache] Unexpected error: ${err.message || 'Unknown error'}`);
+    logger.error(`[ServerCache] Failed to fetch server statuses after ${duration}ms`);
+    logger.error(`[ServerCache] Error: ${err.message || 'Unknown error'}`);
     return [];
   }
 }
 
-// Refresh the server cache
-async function refreshServerCache(): Promise<void> {
-  const cache = getGlobalServerCache();
-  const startTime = Date.now();
-  
-  try {
-    logger.debug('[ServerCache] Background refresh starting...');
-    cache.data = await fetchServersFromGame();
-    cache.lastUpdated = Date.now();
-    
-    const duration = Date.now() - startTime;
-    const age = Math.round((Date.now() - cache.lastUpdated) / 1000);
-    logger.debug(`[ServerCache] Background refresh complete (age: ${age}s, duration: ${duration}ms)`);
-  } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[ServerCache] Background refresh failed: ${err.message || 'Unknown error'}`);
-  }
-}
+export { fetchServersFromGame };
 
-// Initialize the background refresh mechanism
+// Initialize background refresh
 function initServerCache(): void {
-  if (typeof window !== 'undefined') {
-    // Skip in browser context
-    return;
-  }
-  
   const cache = getGlobalServerCache();
-  
+
   if (cache.initialized) {
     return;
   }
-  
+
   cache.initialized = true;
-  logger.info('[ServerCache] Initializing background server cache (30s interval)...');
-  
-  // Initial fetch - store promise so callers can await it
-  cache.initialFetchPromise = refreshServerCache().catch(err => {
-    logger.error(`[ServerCache] Initial refresh failed: ${err.message}`);
-  });
-  
-  // Set up interval for background refresh
+
+  // Initial fetch
+  cache.initialFetchPromise = (async () => {
+    try {
+      const servers = await fetchServersFromGame();
+      cache.data = servers;
+      cache.lastUpdated = Date.now();
+      logger.info(`[ServerCache] Initial fetch complete (${servers.length} servers)`);
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      logger.error(`[ServerCache] Initial fetch failed: ${err.message}`);
+    }
+  })();
+
+  // Start background refresh interval
   cache.intervalId = setInterval(() => {
-    refreshServerCache().catch(err => {
-      logger.error(`[ServerCache] Interval refresh failed: ${err.message}`);
-    });
+    fetchServersFromGame()
+      .then((servers) => {
+        cache.data = servers;
+        cache.lastUpdated = Date.now();
+        logger.debug(`[ServerCache] Background refresh complete (${servers.length} servers)`);
+      })
+      .catch((err) => {
+        logger.error(`[ServerCache] Background refresh error: ${err.message}`);
+      });
   }, SERVER_REFRESH_INTERVAL);
-  
-  logger.info('[ServerCache] Background refresh interval started');
+
+  logger.info(`[ServerCache] Background refresh scheduled every ${SERVER_REFRESH_INTERVAL / 1000} seconds`);
 }
 
-// Public function to get servers from in-memory cache
+/**
+ * Get server status from cache
+ * Returns cached data immediately - background refresh handles updates
+ */
 export async function getServersCached(): Promise<ServerStatus[]> {
   // Initialize cache on first call (runs on server)
   if (typeof window === 'undefined') {
     initServerCache();
   }
-  
+
   const cache = getGlobalServerCache();
-  
+
   // Wait for initial fetch to complete before returning
   if (cache.initialFetchPromise) {
     await cache.initialFetchPromise;
   }
-  
-  // Return cached data
+
+  // Always return cached data - background refresh handles updates
+  // This prevents blocking user requests on slow queries
   return cache.data;
 }
 
-// Get cache metadata for debugging/monitoring
-export function getServerCacheStats(): { lastUpdated: number; ageSeconds: number; initialized: boolean } {
-  const cache = getGlobalServerCache();
-  return {
-    lastUpdated: cache.lastUpdated,
-    ageSeconds: cache.lastUpdated ? Math.round((Date.now() - cache.lastUpdated) / 1000) : -1,
-    initialized: cache.initialized,
-  };
-}
-
 // ============================================================
-// UNSTABLE_CACHE: Used for stats and totals (database queries)
-// These don't need background refresh as database queries are fast
+// DASHBOARD STATS CACHE (cache wrapper)
 // ============================================================
 
-// Fetch stats from database - throws on error so cache doesn't store bad data
-// Note: This is a sync function returning a Promise (not async) for unstable_cache compatibility
-function fetchStatsInternal() {
+const getStatsInternal = async (): Promise<{
+  playerCount: number;
+  playersMonth: number;
+  mapCompletions: number;
+  bonusCompletions: number;
+  stageCompletions: number;
+  totalPoints: number;
+  recentRecords: Array<{
+    steamid: string;
+    name: string;
+    runtime: number;
+    map: string;
+    date: string;
+    country: string | null;
+  }>;
+}> => {
   const startTime = Date.now();
-  
-  // PARALLEL: Fetch stats and recent records simultaneously
-  return Promise.all([
-    pool.query<RowDataPacket[]>('SELECT `key`, `value` FROM ck_stats'),
-    pool.query<RowDataPacket[]>(`
+
+  try {
+    const [statsRows] = await pool.query<RowDataPacket[]>('SELECT `key`, `value` FROM ck_stats');
+    const statsMap = new Map<string, string>();
+    statsRows.forEach((row) => {
+      statsMap.set(row.key, row.value);
+    });
+
+    const [recentRecords] = await pool.query<RowDataPacket[]>(`
       SELECT lr.steamid, lr.name, lr.runtime, lr.map, lr.date, pr.country
       FROM ck_latestrecords lr
       LEFT JOIN ck_playerrank pr ON lr.steamid = pr.steamid
       ORDER BY lr.date DESC
       LIMIT 5
-    `)
-  ])
-    .then(([statsResult, recordsResult]) => {
-      const [statsRows] = statsResult;
-      const [recentRecords] = recordsResult;
-      
-      // If database returned empty (connection failed), throw to prevent caching
-      if (!statsRows || statsRows.length === 0) {
-        const error = new Error('Database returned empty stats');
-        logger.error('[Cache] Stats query returned empty result - database may be unavailable');
-        throw error;
-      }
-      
-      const statsMap = statsRows.reduce((acc, row) => {
-        acc[row.key] = row.value;
-        return acc;
-      }, {} as Record<string, number>);
-      
-      const duration = Date.now() - startTime;
-      logger.debug(`[Cache] Stats fetched successfully in ${duration}ms (${statsRows.length} stats, ${recentRecords.length} records)`);
-      
-      return {
-        playerCount: statsMap['player_count'] || 0,
-        mapCompletions: statsMap['map_completions'] || 0,
-        bonusCompletions: statsMap['bonus_completions'] || 0,
-        stageCompletions: statsMap['stage_completions'] || 0,
-        totalPoints: statsMap['total_points'] || 0,
-        playersMonth: statsMap['players_month'] || 0,
-        recentRecords,
-      };
-    })
-    .catch((error: unknown) => {
-      const err = error as { message?: string };
-      const duration = Date.now() - startTime;
-      logger.error(`[Cache] Failed to fetch stats after ${duration}ms`);
-      logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
-      throw error;
-    });
+    `);
+
+    const playerCount = parseInt(statsMap.get('player_count') || '0', 10);
+    const playersMonth = parseInt(statsMap.get('players_month') || '0', 10);
+    const mapCompletions = parseInt(statsMap.get('map_completions') || '0', 10);
+    const bonusCompletions = parseInt(statsMap.get('bonus_completions') || '0', 10);
+    const stageCompletions = parseInt(statsMap.get('stage_completions') || '0', 10);
+    const totalPoints = parseInt(statsMap.get('total_points') || '0', 10);
+
+    const duration = Date.now() - startTime;
+    logger.debug(`[StatsCache] Fetched stats in ${duration}ms`);
+
+    return {
+      playerCount,
+      playersMonth,
+      mapCompletions,
+      bonusCompletions,
+      stageCompletions,
+      totalPoints,
+      recentRecords: recentRecords as Array<{
+        steamid: string;
+        name: string;
+        runtime: number;
+        map: string;
+        date: string;
+        country: string | null;
+      }>,
+    };
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.error(`[StatsCache] Failed to fetch stats: ${err.message}`);
+    return {
+      playerCount: 0,
+      playersMonth: 0,
+      mapCompletions: 0,
+      bonusCompletions: 0,
+      stageCompletions: 0,
+      totalPoints: 0,
+      recentRecords: [],
+    };
+  }
+};
+
+import { cacheGet, cacheSet } from './valkey-cache';
+
+const DASHBOARD_STATS_KEY = 'surfstats:dashboard:stats';
+const DASHBOARD_STATS_TTL = 300; // 5 minutes
+
+/**
+ * Get dashboard stats from Valkey cache
+ */
+export async function getStatsFromCache(): Promise<{
+  playerCount: number;
+  playersMonth: number;
+  mapCompletions: number;
+  bonusCompletions: number;
+  stageCompletions: number;
+  totalPoints: number;
+  recentRecords: Array<{
+    steamid: string;
+    name: string;
+    runtime: number;
+    map: string;
+    date: string;
+    country: string | null;
+  }>;
+}> {
+  const cached = await cacheGet<{
+    playerCount: number;
+    playersMonth: number;
+    mapCompletions: number;
+    bonusCompletions: number;
+    stageCompletions: number;
+    totalPoints: number;
+    recentRecords: Array<{
+      steamid: string;
+      name: string;
+      runtime: number;
+      map: string;
+      date: string;
+      country: string | null;
+    }>;
+  }>(DASHBOARD_STATS_KEY);
+
+  if (cached) {
+    return cached;
+  }
+
+  const stats = await getStatsInternal();
+
+  await cacheSet(DASHBOARD_STATS_KEY, stats, DASHBOARD_STATS_TTL);
+
+  return stats;
 }
 
-// Cache stats for 5 minutes - only successful results get cached
-export const getStatsCached = unstable_cache(
-  fetchStatsInternal,
-  ['dashboard-stats'],
-  { revalidate: 300 }
-);
+// =========================
+// LATEST COMPLETIONS CACHE
+// =========================
 
-// Fetch latest completions (map + bonus) - combined and sorted by date
-// Note: This is a sync function returning a Promise (not async) for unstable_cache compatibility
-function fetchLatestCompletionsInternal() {
+const getLatestCompletionsInternal = async (): Promise<
+  Array<{
+    steamid: string;
+    name: string;
+    runtime: number;
+    map: string;
+    date: string;
+    type: string;
+    bonus: number | null;
+  }>
+> => {
   const startTime = Date.now();
-  
-  // Fetch top N from each table separately using indexes, then combine and sort in application code.
-  return Promise.all([
-    pool.query<RowDataPacket[]>(`
-      SELECT
-        pt.steamid,
-        pt.name,
-        pt.mapname,
-        pt.runtimepro as runtime,
-        pt.date,
-        'map' as type,
-        NULL as bonus
-      FROM ck_playertimes pt
-      ORDER BY pt.date DESC
-      LIMIT 25
-    `),
-    pool.query<RowDataPacket[]>(`
-      SELECT
-        b.steamid,
-        b.name,
-        b.mapname,
-        b.runtime,
-        b.date,
-        'bonus' as type,
-        b.zonegroup as bonus
-      FROM ck_bonus b
-      ORDER BY b.date DESC
-      LIMIT 25
-    `)
-  ]).then(([mapRows, bonusRows]) => {
-    const duration = Date.now() - startTime;
-    
+
+  try {
+    // Fetch map and bonus completions separately, then combine and sort
+    const [mapRows, bonusRows] = await Promise.all([
+      pool.query<RowDataPacket[]>(`
+        SELECT
+          pt.steamid,
+          pt.name,
+          pt.mapname,
+          pt.runtimepro as runtime,
+          pt.date,
+          'map' as type,
+          NULL as bonus
+        FROM ck_playertimes pt
+        ORDER BY pt.date DESC
+        LIMIT 25
+      `),
+      pool.query<RowDataPacket[]>(`
+        SELECT
+          b.steamid,
+          b.name,
+          b.mapname,
+          b.runtime,
+          b.date,
+          'bonus' as type,
+          b.zonegroup as bonus
+        FROM ck_bonus b
+        ORDER BY b.date DESC
+        LIMIT 25
+      `),
+    ]);
+
     // Combine and sort in application code
     const combined = [...mapRows[0], ...bonusRows[0]];
     combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    
-    const result = combined.slice(0, 10).map(row => ({
+
+    const result = combined.slice(0, 10).map((row) => ({
       steamid: row.steamid,
       name: row.name,
       map: row.mapname,
@@ -352,75 +421,113 @@ function fetchLatestCompletionsInternal() {
       type: row.type,
       bonus: row.bonus,
     }));
-    
-    // Single pass to count map and bonus completions
-    const { mapCount, bonusCount } = result.reduce(
-      (acc, r) => {
-        if (r.type === 'map') acc.mapCount++;
-        else if (r.type === 'bonus') acc.bonusCount++;
-        return acc;
-      },
-      { mapCount: 0, bonusCount: 0 }
-    );
-    logger.debug(`[Cache] Latest completions fetched successfully in ${duration}ms (${result.length} records: ${mapCount} map, ${bonusCount} bonus)`);
-    
+
+    const duration = Date.now() - startTime;
+    logger.debug(`[CompletionsCache] Fetched ${result.length} completions in ${duration}ms`);
+
     return result;
-  }).catch((error: unknown) => {
+  } catch (error: unknown) {
     const err = error as { message?: string };
-    const duration = Date.now() - startTime;
-    logger.error(`[Cache] Failed to fetch latest completions after ${duration}ms`);
-    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
-    throw error;
-  });
+    logger.error(`[CompletionsCache] Failed to fetch completions: ${err.message}`);
+    return [];
+  }
+};
+
+const LATEST_COMPLETIONS_KEY = 'surfstats:dashboard:completions';
+const LATEST_COMPLETIONS_TTL = 300; // 5 minutes
+
+/**
+ * Get latest completions from Valkey cache
+ */
+export async function getLatestCompletionsFromCache(): Promise<
+  Array<{
+    steamid: string;
+    name: string;
+    runtime: number;
+    map: string;
+    date: string;
+    type: string;
+    bonus: number | null;
+  }>
+> {
+  const cached = await cacheGet<Array<{
+    steamid: string;
+    name: string;
+    runtime: number;
+    map: string;
+    date: string;
+    type: string;
+    bonus: number | null;
+  }>>(LATEST_COMPLETIONS_KEY);
+
+  if (cached) {
+    return cached;
+  }
+
+  const completions = await getLatestCompletionsInternal();
+
+  await cacheSet(LATEST_COMPLETIONS_KEY, completions, LATEST_COMPLETIONS_TTL);
+
+  return completions;
 }
 
-// Cache latest completions for 5 minutes (300 seconds)
-export const getLatestCompletionsCached = unstable_cache(
-  fetchLatestCompletionsInternal,
-  ['dashboard-completions'],
-  { revalidate: 300 }
-);
+// =============
+// TOTALS CACHE
+// =============
 
-// Fetch totals (maps, bonuses, stages) - used for player progress bars
-// Now uses the global map cache instead of database queries
-// Note: This is a sync function returning a Promise (not async) for unstable_cache compatibility
-function fetchTotalsInternal() {
+const fetchTotalsInternal = async () => {
   const startTime = Date.now();
-  
-  logger.debug('[Cache] Fetching totals from global map cache...');
-  
-  // Use the global map cache instead of database queries
-  return getMapTotals().then(totals => {
+
+  try {
+    const totals = await getMapTotals();
     const duration = Date.now() - startTime;
-    logger.debug(`[Cache] Totals fetched successfully in ${duration}ms: maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}`);
-    
+    logger.debug(`[TotalsCache] Fetched totals in ${duration}ms`);
     return totals;
-  }).catch((error: unknown) => {
+  } catch (error: unknown) {
     const err = error as { message?: string };
-    const duration = Date.now() - startTime;
-    logger.error(`[Cache] Failed to fetch totals after ${duration}ms`);
-    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
-    throw error;
-  });
+    logger.error(`[TotalsCache] Failed to fetch totals: ${err.message}`);
+    return { totalMaps: 0, totalBonuses: 0, totalStages: 0 };
+  }
+};
+
+const TOTALS_KEY = 'surfstats:totals:data';
+const TOTALS_TTL = 300; // 5 minutes
+
+/**
+ * Get totals from Valkey cache
+ */
+export async function getTotalsFromCache(): Promise<{
+  totalMaps: number;
+  totalBonuses: number;
+  totalStages: number;
+}> {
+  const cached = await cacheGet<{
+    totalMaps: number;
+    totalBonuses: number;
+    totalStages: number;
+  }>(TOTALS_KEY);
+
+  if (cached) {
+    return cached;
+  }
+
+  const totals = await fetchTotalsInternal();
+
+  await cacheSet(TOTALS_KEY, totals, TOTALS_TTL);
+
+  return totals;
 }
 
-// Cache totals for 5 minutes (300 seconds)
-// Note: The underlying map cache has a 1-hour TTL, so this provides an additional layer
-export const getTotalsCached = unstable_cache(
-  fetchTotalsInternal,
-  ['totals-data'],
-  { revalidate: 300 }
-);
+// ============================================================
+// CACHE PREWARMING
+// ============================================================
+// This function is called from the root layout to pre-warm caches
+// on first request. This may be reworked with Valkey implementation.
 
-// Pre-warm all caches on startup
-// Note: We use direct database calls instead of unstable_cache wrappers because
-// unstable_cache requires a React Server Component context which isn't available
-// during module initialization. The direct calls still trigger cache initialization
-// for the global in-memory caches (map-cache, player-cache, registry-cache).
-export async function prewarmCaches() {
+export async function prewarmCaches(): Promise<void> {
   logger.info('[Cache] Pre-warming caches...');
-  
-  // Pre-warm stats - use direct database query instead of unstable_cache
+
+  // Pre-warm stats - use direct database query instead of cache
   // This still triggers the global cache initialization for subsequent requests
   try {
     const startTime = Date.now();
@@ -433,26 +540,30 @@ export async function prewarmCaches() {
       LIMIT 5
     `);
     const duration = Date.now() - startTime;
-    logger.info(`[Cache] Stats pre-warmed successfully (${rows.length} stats, ${recentRecords.length} records, ${duration}ms)`);
+    logger.info(
+      `[Cache] Stats pre-warmed successfully (${rows.length} stats, ${recentRecords.length} records, ${duration}ms)`
+    );
   } catch (error: unknown) {
     const err = error as { message?: string };
     logger.error('[Cache] Stats cache pre-warm failed');
     logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
   }
-  
-  // Pre-warm totals - use direct getMapTotals call instead of unstable_cache
+
+  // Pre-warm totals - use direct getMapTotals call instead of cache
   // This triggers the global map cache initialization
   try {
     const startTime = Date.now();
     const totals = await getMapTotals();
     const duration = Date.now() - startTime;
-    logger.info(`[Cache] Totals pre-warmed successfully (maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}, ${duration}ms)`);
+    logger.info(
+      `[Cache] Totals pre-warmed successfully (maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}, ${duration}ms)`
+    );
   } catch (error: unknown) {
     const err = error as { message?: string };
     logger.error('[Cache] Totals cache pre-warm failed');
     logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
   }
-  
+
   // Pre-warm servers cache
   try {
     const startTime = Date.now();
@@ -463,7 +574,7 @@ export async function prewarmCaches() {
     logger.error('[Cache] Servers cache pre-warm failed');
     logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
   }
-  
+
   // Pre-warm map metadata cache (1-hour TTL)
   try {
     const startTime = Date.now();
@@ -474,7 +585,7 @@ export async function prewarmCaches() {
     logger.error('[Cache] Map metadata cache pre-warm failed');
     logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
   }
-  
+
   // Pre-warm bonus/stage registry cache (1-hour TTL)
   try {
     const startTime = Date.now();

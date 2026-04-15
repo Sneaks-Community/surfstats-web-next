@@ -113,28 +113,14 @@ Both pools use [`wrapPoolQuery`](lib/db-query-logger.ts) for slow query logging.
 
 ### 3. Caching Strategy
 
-The application uses **three caching layers**:
+The application uses **Valkey (Redis-compatible)** for all caching needs with a **cache-aside pattern**. The `redis` npm package (v5.12.1) is used as a Valkey-compatible client.
 
-#### Layer 1: In-Memory Global Cache (Background Refresh)
-Uses `globalThis` for persistence across Next.js hot reloads:
+Valkey connection client is located at [`lib/valkey.ts`](lib/valkey.ts), with other caches in the `lib` folder.
 
-- **Map metadata** ([`lib/map-cache.ts`](lib/map-cache.ts)): 1 hour TTL, auto-refresh
-- **Bonus/stage registry** ([`lib/registry-cache.ts`](lib/registry-cache.ts)): 1 hour TTL, auto-refresh
-- **Server status** ([`lib/cache.ts`](lib/cache.ts)): 30 second background refresh interval
+**Important**: All cache keys use the `surfstats:` namespace prefix for consistency. Keys are sanitized using [`sanitizeMapName()`](lib/sanitize.ts) and [`sanitizeSearchQuery()`](lib/sanitize.ts) before use.
 
-#### Layer 2: `unstable_cache` (API Route Results)
-Next.js `unstable_cache` with revalidation:
-
-- **Server status**: 30 seconds (matches background refresh)
-- **Records/leaderboards**: 300 seconds (5 minutes)
-- **Map metadata**: 3600 seconds (1 hour, backed by in-memory cache)
-- **Stats**: 300 seconds (5 minutes)
-- **Player list**: 3600 seconds (1 hour)
-
-#### Layer 3: Browser/CDN Cache
+#### Browser/CDN Cache
 HTTP caching headers on API responses.
-
-**Important**: In-memory caches use `globalThis` keys (e.g., `globalThis.serverCache`, `globalThis.mapMetadataCache`) to persist across serverless function invocations and hot reloads.
 
 ### 4. Error Handling
 

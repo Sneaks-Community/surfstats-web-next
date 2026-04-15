@@ -1,9 +1,9 @@
 import 'server-only';
 import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
-import { unstable_cache } from 'next/cache';
 import logger from '@/lib/logger';
 import { getCountryNamesFromCode, getCountryCodeFromName } from '@/lib/countries';
+import { cacheGet, cacheSet } from './valkey-cache';
 
 /**
  * Country ranking data from database (raw query result)
@@ -63,11 +63,25 @@ const getDistinctCountriesInternal = async (): Promise<string[]> => {
   }
 };
 
-export const getDistinctCountries = unstable_cache(
-  getDistinctCountriesInternal,
-  ['distinct-countries'],
-  { revalidate: 86400 } // Cache for 24 hours
-);
+const DISTINCT_COUNTRIES_KEY = 'surfstats:countries:distinct';
+const DISTINCT_COUNTRIES_TTL = 86400; // 24 hours
+
+/**
+ * Get distinct countries from Valkey cache
+ */
+export async function getDistinctCountriesFromCache(): Promise<string[]> {
+  const cached = await cacheGet<string[]>(DISTINCT_COUNTRIES_KEY);
+
+  if (cached) {
+    return cached;
+  }
+
+  const countries = await getDistinctCountriesInternal();
+
+  await cacheSet(DISTINCT_COUNTRIES_KEY, countries, DISTINCT_COUNTRIES_TTL);
+
+  return countries;
+}
 
 /**
  * Internal function for getting countries ranking with aggregation
@@ -184,11 +198,32 @@ const getCountriesRankingInternal = async (
  * We normalize them to ISO codes in application code to avoid duplicate entries.
  * Cached for 24 hours - country rankings change relatively infrequently
  */
-export const getCountriesRanking = unstable_cache(
-  getCountriesRankingInternal,
-  ['countries-ranking'],
-  { revalidate: 86400 } // Cache for 24 hours
-);
+const COUNTRIES_RANKING_KEY = 'surfstats:countries:ranking';
+const COUNTRIES_RANKING_TTL = 86400; // 24 hours
+
+/**
+ * Get countries ranking from Valkey cache
+ */
+export async function getCountriesRankingFromCache(
+  sort: CountrySortKey = 'points',
+  order: SortOrder = 'desc',
+  page: number = 1,
+  limit: number = 50
+): Promise<{ countries: CountryRank[]; total: number; totalPages: number }> {
+  const cacheKey = `${COUNTRIES_RANKING_KEY}:${sort}:${order}:${page}:${limit}`;
+  
+  const cached = await cacheGet<{ countries: CountryRank[]; total: number; totalPages: number }>(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const result = await getCountriesRankingInternal(sort, order, page, limit);
+
+  await cacheSet(cacheKey, result, COUNTRIES_RANKING_TTL);
+
+  return result;
+}
 
 /**
  * Sort keys for country players
@@ -331,13 +366,23 @@ const getCountriesStatsInternal = async (): Promise<{ totalCountries: number; to
   }
 };
 
+const COUNTRIES_STATS_KEY = 'surfstats:countries:stats';
+const COUNTRIES_STATS_TTL = 86400; // 24 hours
+
 /**
- * Get country statistics summary
+ * Get country statistics summary from Valkey cache
  * Used for displaying total countries count
- * Cached for 24 hours - country statistics change very infrequently
  */
-export const getCountriesStats = unstable_cache(
-  getCountriesStatsInternal,
-  ['countries-stats'],
-  { revalidate: 86400 } // Cache for 24 hours
-);
+export async function getCountriesStatsFromCache(): Promise<{ totalCountries: number; totalPlayers: number }> {
+  const cached = await cacheGet<{ totalCountries: number; totalPlayers: number }>(COUNTRIES_STATS_KEY);
+
+  if (cached) {
+    return cached;
+  }
+
+  const stats = await getCountriesStatsInternal();
+
+  await cacheSet(COUNTRIES_STATS_KEY, stats, COUNTRIES_STATS_TTL);
+
+  return stats;
+}

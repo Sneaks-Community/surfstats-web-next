@@ -71,9 +71,7 @@ interface PlayerProfileContentProps {
     totalBonuses: number;
     totalStages: number;
   };
-  steamAvatars: {
-    avatarfull: string;
-  } | null;
+  steamAvatars: Map<string, { avatar: string; avatarmedium: string; avatarfull: string }> | null;
   playtimeData: {
     totalSeconds: number;
   } | null;
@@ -105,6 +103,7 @@ export default async function PlayerProfileContent({
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end -mt-8 sm:-mt-10 mb-4">
             {(() => {
               const profileUrl = getSteamProfileUrl(steamid);
+              const avatar = steamAvatars?.get(steamid);
               return profileUrl ? (
                 <a
                   href={profileUrl}
@@ -112,9 +111,9 @@ export default async function PlayerProfileContent({
                   rel="noopener noreferrer"
                   className="relative h-16 w-16 sm:h-24 sm:w-24 rounded-xl overflow-hidden border-4 border-surface flex-shrink-0"
                 >
-                  {steamAvatars?.avatarfull ? (
+                  {avatar?.avatarfull ? (
                     <Image
-                      src={steamAvatars.avatarfull}
+                      src={avatar.avatarfull}
                       alt={player.name}
                       fill
                       className="object-cover"
@@ -128,9 +127,9 @@ export default async function PlayerProfileContent({
                 </a>
               ) : (
                 <div className="relative h-16 w-16 sm:h-24 sm:w-24 rounded-xl overflow-hidden border-4 border-surface bg-surface-hover flex-shrink-0">
-                  {steamAvatars?.avatarfull ? (
+                  {avatar?.avatarfull ? (
                     <Image
-                      src={steamAvatars.avatarfull}
+                      src={avatar.avatarfull}
                       alt={player.name}
                       fill
                       className="object-cover"

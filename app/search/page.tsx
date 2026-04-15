@@ -5,7 +5,7 @@ import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTierTextColor } from '@/lib/tierColors';
 import { sanitizeSearchQuery, sanitizePlayerName } from '@/lib/sanitize';
 import { getAllMapMetadata } from '@/lib/map-cache';
-import { searchPlayers } from '@/lib/player-cache';
+import { searchPlayersFromCache } from '@/lib/player-cache';
 import type { PlayerSearchResult } from '@/lib/player-cache';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
@@ -34,7 +34,7 @@ export default async function SearchPage({
   if (query.length >= 2) {
     try {
       // Search players using cached function
-      players = await searchPlayers(query);
+      players = await searchPlayersFromCache(query);
       
       // Search maps using cached map metadata (no DB hit)
       const allMaps = await getAllMapMetadata();

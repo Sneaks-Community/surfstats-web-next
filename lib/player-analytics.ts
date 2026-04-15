@@ -2,9 +2,9 @@ import 'server-only';
 import analyticsPool, { isAnalyticsAvailable } from '@/lib/db-analytics';
 import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
-import { unstable_cache } from 'next/cache';
 import { convertSteamId2ToSteamId3Numeric } from '@/lib/steam';
 import logger from '@/lib/logger';
+import { cacheGet, cacheSet } from './valkey-cache';
 
 // Check if analytics database is configured (env vars are set)
 const isAnalyticsConfigured = !!(
@@ -70,15 +70,32 @@ async function getPlayerTimeOnServerInternal(steamId: string): Promise<PlayerTim
   }
 }
 
+const PLAYER_TIME_KEY = 'surfstats:player:time';
+const PLAYER_TIME_TTL = 300; // 5 minutes
+
 /**
- * Cached version of getPlayerTimeOnServer for use in server components
+ * Get player time on server from Valkey cache
  * Cache for 5 minutes (300 seconds) to reduce database load on high-traffic pages
  */
-export const getPlayerTimeOnServer = unstable_cache(
-  getPlayerTimeOnServerInternal,
-  ['player-time-on-server'],
-  { revalidate: 300 }
-);
+export async function getPlayerTimeOnServerFromCache(
+  steamId: string
+): Promise<PlayerTimeResult | null> {
+  const cacheKey = `${PLAYER_TIME_KEY}:${steamId}`;
+  
+  const cached = await cacheGet<PlayerTimeResult>(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const result = await getPlayerTimeOnServerInternal(steamId);
+
+  if (result) {
+    await cacheSet(cacheKey, result, PLAYER_TIME_TTL);
+  }
+
+  return result;
+}
 
 /**
  * Get total playtime for multiple players in a single query
@@ -258,11 +275,31 @@ async function getPerformanceTrendInternal(steamId: string): Promise<Performance
 }
 
 /**
+ * Cache key and TTL for performance trend data
+ */
+const PERFORMANCE_TREND_KEY = 'surfstats:player:performance-trend';
+const PERFORMANCE_TREND_TTL = 300; // 5 minutes
+
+/**
  * Cached version of getPerformanceTrend for use in server components
  * Cache for 5 minutes (300 seconds) to reduce database load on high-traffic pages
  */
-export const getPerformanceTrend = unstable_cache(
-  getPerformanceTrendInternal,
-  ['player-performance-trend'],
-  { revalidate: 300 }
-);
+export async function getPerformanceTrendFromCache(
+  steamId: string
+): Promise<PerformanceTrendResult[] | null> {
+  const cacheKey = `${PERFORMANCE_TREND_KEY}:${steamId}`;
+  
+  const cached = await cacheGet<PerformanceTrendResult[]>(cacheKey);
+  
+  if (cached !== null) {
+    return cached;
+  }
+  
+  const result = await getPerformanceTrendInternal(steamId);
+  
+  if (result !== null) {
+    await cacheSet(cacheKey, result, PERFORMANCE_TREND_TTL);
+  }
+  
+  return result;
+}

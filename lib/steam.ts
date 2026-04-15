@@ -1,5 +1,6 @@
 import 'server-only';
 import logger from '@/lib/logger';
+import { cacheGet, cacheSet } from './valkey-cache';
 
 /**
  * Steam API interface types
@@ -44,7 +45,7 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
   try {
     const response = await fetch(
       `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${apiKey}&steamids=${steamId64s.join(',')}`,
-      { next: { revalidate: 86400 } } // Cache for 24 hours
+      { next: { revalidate: 604800 } } // Cache for 7 days
     );
 
     if (!response.ok) {
@@ -86,12 +87,20 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
   }
 }
 
+const STEAM_AVATAR_TTL = 604800; // 7 days
+
 /**
- * Fetch avatar data for a single SteamID using the Steam API directly
- * @param steamId - The SteamID to fetch avatars for
- * @returns Avatar data or null if failed
+ * Get Steam avatar from Valkey cache
  */
-export async function getSteamAvatars(steamId: string): Promise<{ avatar: string; avatarmedium: string; avatarfull: string } | null> {
+export async function getSteamAvatarFromCache(steamId: string): Promise<{ avatar: string; avatarmedium: string; avatarfull: string } | null> {
+  const cacheKey = `surfstats:steam:avatar:${steamId}`;
+  
+  const cached = await cacheGet<{ avatar: string; avatarmedium: string; avatarfull: string }>(cacheKey);
+  
+  if (cached) {
+    return cached;
+  }
+
   const startTime = Date.now();
   
   try {
@@ -117,11 +126,16 @@ export async function getSteamAvatars(steamId: string): Promise<{ avatar: string
     const duration = Date.now() - startTime;
     logger.debug(`[Steam] Successfully fetched avatar for ${player.personaname || steamId} (${duration}ms)`);
     
-    return {
+    const avatarData = {
       avatar: player.avatar || '',
       avatarmedium: player.avatarmedium || '',
       avatarfull: player.avatarfull || ''
     };
+    
+    // Cache the result
+    await cacheSet(cacheKey, avatarData, STEAM_AVATAR_TTL);
+    
+    return avatarData;
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
     const err = error as { message?: string };
@@ -132,11 +146,11 @@ export async function getSteamAvatars(steamId: string): Promise<{ avatar: string
 }
 
 /**
- * Fetch avatar data for multiple SteamIDs using the Steam API directly
+ * Get Steam profiles from Valkey cache
  * @param steamIds - Array of SteamIDs to fetch avatars for
  * @returns Map of original SteamID to avatar data
  */
-export async function getSteamProfiles(steamIds: string[]): Promise<Map<string, { avatar: string; avatarmedium: string; avatarfull: string }>> {
+export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map<string, { avatar: string; avatarmedium: string; avatarfull: string }>> {
   const result = new Map<string, { avatar: string; avatarmedium: string; avatarfull: string }>();
   
   if (steamIds.length === 0) {
@@ -166,17 +180,47 @@ export async function getSteamProfiles(steamIds: string[]): Promise<Map<string, 
       return result;
     }
 
-    // Call Steam API directly - no HTTP proxy needed
-    const players = await fetchSteamPlayerData(steamId64s);
-    
-    for (const player of players) {
-      const originalSteamId = steamId64Map.get(player.steamid);
-      if (originalSteamId) {
-        result.set(originalSteamId, {
-          avatar: player.avatar || '',
-          avatarmedium: player.avatarmedium || '',
-          avatarfull: player.avatarfull || ''
-        });
+    // Check cache for each SteamID first
+    const uncachedSteamIds: string[] = [];
+    for (const steamId of steamIds) {
+      const cacheKey = `surfstats:steam:avatar:${steamId}`;
+      const cached = await cacheGet<{ avatar: string; avatarmedium: string; avatarfull: string }>(cacheKey);
+      if (cached) {
+        result.set(steamId, cached);
+      } else {
+        uncachedSteamIds.push(steamId);
+      }
+    }
+
+    // Fetch uncached profiles from Steam API
+    if (uncachedSteamIds.length > 0) {
+      const uncachedSteamId64s: string[] = [];
+      const uncachedSteamId64Map = new Map<string, string>();
+      
+      for (const steamId of uncachedSteamIds) {
+        const steamId64 = convertSteamIdTo64(steamId);
+        if (steamId64) {
+          uncachedSteamId64Map.set(steamId64, steamId);
+          uncachedSteamId64s.push(steamId64);
+        }
+      }
+
+      const players = await fetchSteamPlayerData(uncachedSteamId64s);
+      
+      for (const player of players) {
+        const originalSteamId = uncachedSteamId64Map.get(player.steamid);
+        if (originalSteamId) {
+          const avatarData = {
+            avatar: player.avatar || '',
+            avatarmedium: player.avatarmedium || '',
+            avatarfull: player.avatarfull || ''
+          };
+          result.set(originalSteamId, avatarData);
+          
+          // Cache the result
+          const cacheKey = `surfstats:steam:avatar:${originalSteamId}`;
+          await cacheSet(cacheKey, avatarData, STEAM_AVATAR_TTL);
+        }
       }
     }
     

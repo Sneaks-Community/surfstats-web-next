@@ -3,7 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { getCountryPlayers } from '@/lib/country-analytics';
 import type { PlayerSortKey, SortOrder } from '@/lib/country-analytics';
-import { getSteamProfiles } from '@/lib/steam';
+import { getSteamProfilesFromCache } from '@/lib/steam';
 import { isValidCountryCode, getPrimaryCountryName } from '@/lib/countries';
 import CountryBadge from '@/components/CountryBadge';
 import Pagination from '@/components/Pagination';
@@ -13,7 +13,7 @@ import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
 // Cache Steam profile fetches within a request to avoid duplicate calls
-const getCachedSteamProfiles = cache(getSteamProfiles);
+const getCachedSteamProfiles = cache(getSteamProfilesFromCache);
 
 interface CountryPageProps {
   params: Promise<{ countrycode: string }>;

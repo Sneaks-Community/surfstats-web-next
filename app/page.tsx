@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { Users, Map as MapIcon, Trophy, Clock, Activity } from 'lucide-react';
 import { formatTime, formatDate } from '@/lib/utils';
-import { getStatsCached, getLatestCompletionsCached } from '@/lib/cache';
+import { getStatsFromCache, getLatestCompletionsFromCache } from '@/lib/cache';
 import logger from '@/lib/logger';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import MapImage from '@/components/MapImage';
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 // Wrapper that catches errors and returns null for display
 async function getStats() {
   try {
-    const stats = await getStatsCached();
+    const stats = await getStatsFromCache();
     logger.debug('[Home] Stats loaded successfully');
     return stats;
   } catch (error: unknown) {
@@ -27,7 +27,7 @@ async function getStats() {
 // Wrapper that catches errors and returns null for display
 async function getLatestCompletions() {
   try {
-    const completions = await getLatestCompletionsCached();
+    const completions = await getLatestCompletionsFromCache();
     logger.debug('[Home] Latest completions loaded successfully');
     return completions;
   } catch (error: unknown) {

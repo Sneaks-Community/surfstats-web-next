@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { getSteamProfiles } from '@/lib/steam';
+import { getSteamProfilesFromCache } from '@/lib/steam';
 import { sanitizeSteamId } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 
@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
   try {
     // Use the shared utility to fetch Steam profiles directly
     // This avoids the internal HTTP round-trip
-    const avatarsMap = await getSteamProfiles(validSteamIds);
+    const avatarsMap = await getSteamProfilesFromCache(validSteamIds);
     
     // Convert Map to array format expected by the API
     const players: SteamPlayer[] = [];

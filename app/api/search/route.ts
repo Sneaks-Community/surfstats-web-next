@@ -1,9 +1,9 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { searchPlayers } from '@/lib/player-cache';
+import { searchPlayersFromCache } from '@/lib/player-cache';
 import { getAllMapMetadata } from '@/lib/map-cache';
 import { sanitizeSearchQuery } from '@/lib/sanitize';
-import { getSteamProfiles } from '@/lib/steam';
+import { getSteamProfilesFromCache } from '@/lib/steam';
 import logger from '@/lib/logger';
 
 const MAX_PLAYERS = 3;
@@ -25,12 +25,12 @@ export async function GET(request: NextRequest) {
 
   try {
     // Search players using cached function
-    const allPlayers = await searchPlayers(sanitizedQuery);
+    const allPlayers = await searchPlayersFromCache(sanitizedQuery);
     const playerResults = allPlayers.slice(0, MAX_PLAYERS);
 
     // Fetch avatars for players
     const steamIds = playerResults.map(p => p.steamid);
-    const avatars = await getSteamProfiles(steamIds);
+    const avatars = await getSteamProfilesFromCache(steamIds);
 
     const players = playerResults.map(player => ({
       steamid: player.steamid,

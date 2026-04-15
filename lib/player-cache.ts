@@ -1,10 +1,10 @@
 import 'server-only';
 import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
-import { unstable_cache } from 'next/cache';
 import logger from '@/lib/logger';
 import { getPlayerCount } from '@/lib/registry-cache';
 import { sanitizeSearchQuery } from './sanitize';
+import { cacheGet, cacheSet } from './valkey-cache';
 
 /**
  * Player rank data from database
@@ -123,14 +123,38 @@ async function fetchPlayersInternal(
   }
 }
 
+const PLAYERS_LIST_KEY = 'surfstats:players:list';
+const PLAYERS_LIST_TTL = 3600; // 1 hour
+
 /**
- * Fetch paginated players list with 1 hour cache
+ * Get paginated players list from Valkey cache
  */
-export const getPlayers = unstable_cache(
-  fetchPlayersInternal,
-  ['players-list'],
-  { revalidate: 3600 } // Cache for 1 hour
-);
+export async function getPlayersFromCache(
+  page: number,
+  search: string
+): Promise<{
+  players: PlayerRank[];
+  total: number;
+  totalPages: number;
+}> {
+  const cacheKey = `${PLAYERS_LIST_KEY}:${page}:${search}`;
+  
+  const cached = await cacheGet<{
+    players: PlayerRank[];
+    total: number;
+    totalPages: number;
+  }>(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const result = await fetchPlayersInternal(page, search);
+
+  await cacheSet(cacheKey, result, PLAYERS_LIST_TTL);
+
+  return result;
+}
 
 /**
  * Internal function to search players (for search page)
@@ -164,15 +188,28 @@ async function searchPlayersInternal(query: string): Promise<PlayerSearchResult[
   }
 }
 
+const PLAYER_SEARCH_KEY = 'surfstats:players:search';
+const PLAYER_SEARCH_TTL = 3600; // 1 hour
+
 /**
- * Search players with 1 hour cache
+ * Search players from Valkey cache
  * Used by the search page to find players matching a query
  */
-export const searchPlayers = unstable_cache(
-  searchPlayersInternal,
-  ['players-search'],
-  { revalidate: 3600 } // Cache for 1 hour
-);
+export async function searchPlayersFromCache(query: string): Promise<PlayerSearchResult[]> {
+  const cacheKey = `${PLAYER_SEARCH_KEY}:${query}`;
+  
+  const cached = await cacheGet<PlayerSearchResult[]>(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const results = await searchPlayersInternal(query);
+
+  await cacheSet(cacheKey, results, PLAYER_SEARCH_TTL);
+
+  return results;
+}
 
 /**
  * Internal function to fetch player name
@@ -201,12 +238,25 @@ async function getPlayerNameInternal(steamid: string): Promise<PlayerNameResult>
   }
 }
 
+const PLAYER_NAME_KEY = 'surfstats:player:name';
+const PLAYER_NAME_TTL = 86400; // 24 hours
+
 /**
- * Get player name with 24 hour cache
+ * Get player name from Valkey cache
  * Used by generateMetadata and getPlayerData to avoid duplicate queries
  */
-export const getPlayerName = unstable_cache(
-  getPlayerNameInternal,
-  ['player-name'],
-  { revalidate: 86400 } // Cache for 24 hours
-);
+export async function getPlayerNameFromCache(steamid: string): Promise<{ name: string }> {
+  const cacheKey = `${PLAYER_NAME_KEY}:${steamid}`;
+  
+  const cached = await cacheGet<{ name: string }>(cacheKey);
+
+  if (cached) {
+    return cached;
+  }
+
+  const result = await getPlayerNameInternal(steamid);
+
+  await cacheSet(cacheKey, result, PLAYER_NAME_TTL);
+
+  return result;
+}

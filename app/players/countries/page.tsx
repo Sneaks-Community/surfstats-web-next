@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { getCountriesRanking, getCountriesStats } from '@/lib/country-analytics';
+import { getCountriesRankingFromCache, getCountriesStatsFromCache } from '@/lib/country-analytics';
 import type { CountrySortKey, SortOrder } from '@/lib/country-analytics';
 import CountryBadge from '@/components/CountryBadge';
 import Pagination from '@/components/Pagination';
@@ -31,8 +31,8 @@ export default async function CountriesPage({
   const validatedOrder: SortOrder = order === 'asc' ? 'asc' : 'desc';
   
   // Fetch countries ranking
-  const { countries, totalPages } = await getCountriesRanking(validatedSort, validatedOrder, page, 25);
-  const stats = await getCountriesStats();
+  const { countries, totalPages } = await getCountriesRankingFromCache(validatedSort, validatedOrder, page, 25);
+    const stats = await getCountriesStatsFromCache();
   
   // Build query params for pagination
   const queryParams: Record<string, string> = {};
