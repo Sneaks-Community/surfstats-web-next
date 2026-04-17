@@ -7,7 +7,7 @@ import { getMapMetadataFromCache } from './valkey-map-cache';
 import { sanitizeMapName } from './sanitize';
 import logger from './logger';
 
-const STATS_CACHE_TTL = 3600; // 1 hour
+const STATS_CACHE_TTL = 43200; // 12 hours
 
 interface CompletionsOverTimeData extends RowDataPacket {
   date: string;

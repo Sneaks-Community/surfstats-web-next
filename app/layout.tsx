@@ -5,9 +5,13 @@ import { MapImagesUrlProvider } from '@/lib/MapImagesUrlContext';
 import { ThemeProvider } from '@/lib/theme-context';
 import { generateThemeStyles } from '@/lib/theme-config';
 import { startServerBackgroundRefresh } from '@/lib/server-background-refresh';
+import { startMapGraphPrecache } from '@/lib/map-graph-precache';
 
 // Start background server refresh on server startup
 startServerBackgroundRefresh();
+
+// Start map graph precache at server startup (fire-and-forget, non-blocking)
+startMapGraphPrecache();
 
 // Force dynamic rendering to read environment variables at runtime, not build time
 export const dynamic = 'force-dynamic';

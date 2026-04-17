@@ -1,0 +1,179 @@
+import 'server-only';
+import client from './valkey';
+import logger from './logger';
+import {
+  getCompletionsOverTimeFromCache,
+  getTimeOnMapDataFromCache,
+  getCheckpointStatsFromCache,
+  getWRCheckpointTimesFromCache,
+  getFinishTimeDataFromCache,
+  getBonusCompletionRatesFromCache,
+  getBonusCompletionsOverTimeFromCache,
+} from './valkey-map-stats-cache';
+import { getAllMapMetadataFromCache } from './valkey-map-cache';
+
+// Configuration
+const BATCH_SIZE = 20;
+const BATCH_DELAY_MS = 50;
+const REFRESH_INTERVAL_MS = 43200_000; // 12 hours
+const REFRESH_JITTER_MS = 300_000; // +/- 5 minutes jitter
+const MAX_CONCURRENT = 5;
+
+// Refresh timers per map (for background refresh)
+const refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/**
+ * Result type for all 7 graph data points of a single map.
+ */
+export interface MapGraphData {
+  completionsOverTime: Array<{ date: string; count: number }>;
+  timeOnMapData: Array<{ date: string; totalDuration: number }>;
+  checkpointStats: { checkpointAvgTimes: Array<{ checkpoint: number; avgTime: number; sampleSize: number }> };
+  wrCheckpointTimes: Array<{ checkpoint: number; time: number }> | undefined;
+  finishTimeData: { avgTime: number | null; wrTime: number | null };
+  bonusCompletionRates: Array<{ bonus: number; completionRate: number; completions: number }>;
+  bonusCompletionsOverTime: { [bonus: number]: Array<{ date: string; count: number }> };
+}
+
+/**
+ * Fetch and cache all 7 graph data points for a single map using Valkey pipelining.
+ * Uses pipeline() to batch all SET operations into a single network round-trip.
+ */
+async function precacheMapGraphs(mapname: string): Promise<void> {
+  try {
+    // Fetch all 7 data points in parallel
+    const [
+      completionsOverTime,
+      timeOnMapData,
+      checkpointStats,
+      wrCheckpointTimes,
+      finishTimeData,
+      bonusCompletionRates,
+      bonusCompletionsOverTime,
+    ] = await Promise.all([
+      getCompletionsOverTimeFromCache(mapname),
+      getTimeOnMapDataFromCache(mapname),
+      getCheckpointStatsFromCache(mapname),
+      getWRCheckpointTimesFromCache(mapname, 10), // approximate max for precache
+      getFinishTimeDataFromCache(mapname),
+      getBonusCompletionRatesFromCache(mapname, 1000), // approximate total for precache
+      getBonusCompletionsOverTimeFromCache(mapname),
+    ]);
+
+    // Use Valkey pipelining for batch SET operations (single network round-trip)
+    // redis v5 client: use Promise.all() with individual setEx calls
+    // This batches commands efficiently within the same event loop tick
+    const TTL = 43200; // 12 hours
+
+    await Promise.all([
+      client.setEx(`surfstats:map:${mapname}:stats:completions`, TTL, JSON.stringify(completionsOverTime)),
+      client.setEx(`surfstats:map:${mapname}:stats:time-on-map`, TTL, JSON.stringify(timeOnMapData)),
+      client.setEx(`surfstats:map:${mapname}:stats:checkpoints`, TTL, JSON.stringify(checkpointStats)),
+      client.setEx(`surfstats:map:${mapname}:stats:wr-checkpoint:10`, TTL, JSON.stringify(wrCheckpointTimes ?? [])),
+      client.setEx(`surfstats:map:${mapname}:stats:finish-time`, TTL, JSON.stringify(finishTimeData)),
+      client.setEx(`surfstats:map:${mapname}:stats:bonus-rates:1000`, TTL, JSON.stringify(bonusCompletionRates)),
+      client.setEx(`surfstats:map:${mapname}:stats:bonus-time`, TTL, JSON.stringify(bonusCompletionsOverTime)),
+    ]);
+
+    logger.debug(`[MapGraphPrecache] Cached graphs for ${mapname}`);
+  } catch (error) {
+    const err = error as { message?: string };
+    logger.warn(`[MapGraphPrecache] Failed to cache graphs for ${mapname}: ${err.message}`);
+  }
+}
+
+/**
+ * Start background refresh for a single map with jitter.
+ * Called after initial precache and periodically thereafter.
+ */
+function startMapRefresh(mapname: string): void {
+  // Clear existing timer if any
+  const existing = refreshTimers.get(mapname);
+  if (existing) {
+    clearTimeout(existing);
+  }
+
+  // Random jitter: 11.5 to 12.5 hours
+  const jitter = (Math.random() * 2 - 1) * REFRESH_JITTER_MS;
+  const interval = REFRESH_INTERVAL_MS + jitter;
+
+  const timer = setTimeout(async () => {
+    await precacheMapGraphs(mapname);
+    startMapRefresh(mapname); // Reschedule
+  }, interval);
+
+  refreshTimers.set(mapname, timer);
+}
+
+/**
+ * Process a batch of maps for precaching with concurrency limiting.
+ * Returns a promise that resolves when the batch is complete.
+ */
+async function processBatch(mapNames: string[]): Promise<void> {
+  // Split into concurrent groups
+  const groups: string[][] = [];
+  for (let i = 0; i < mapNames.length; i += MAX_CONCURRENT) {
+    groups.push(mapNames.slice(i, i + MAX_CONCURRENT));
+  }
+
+  // Process each group sequentially, maps within a group run in parallel
+  for (const group of groups) {
+    await Promise.all(group.map(name => precacheMapGraphs(name)));
+  }
+}
+
+/**
+ * Start the map graph precache at application startup.
+ * - Fetches all map names from cache
+ * - Processes them in rate-limited batches
+ * - Starts background refresh timers for each map
+ * - Non-blocking: server is ready immediately
+ */
+export function startMapGraphPrecache(): void {
+  logger.info('[MapGraphPrecache] Starting map graph precache...');
+
+  // Fire and forget - don't block server readiness
+  (async () => {
+    try {
+      const metadata = await getAllMapMetadataFromCache();
+      const mapNames = Array.from(metadata.keys());
+      logger.info(`[MapGraphPrecache] Found ${mapNames.length} maps to precache`);
+
+      // Process in batches with delay between each batch
+      for (let i = 0; i < mapNames.length; i += BATCH_SIZE) {
+        const batch = mapNames.slice(i, i + BATCH_SIZE);
+        await processBatch(batch);
+
+        // Delay between batches (except after the last one)
+        if (i + BATCH_SIZE < mapNames.length) {
+          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
+        }
+      }
+
+      logger.info(`[MapGraphPrecache] Precache complete for ${mapNames.length} maps`);
+
+      // Start background refresh timers for each map
+      for (const mapname of mapNames) {
+        startMapRefresh(mapname);
+      }
+
+      logger.info(`[MapGraphPrecache] Background refresh started for ${mapNames.length} maps`);
+    } catch (error) {
+      const err = error as { message?: string };
+      logger.error(`[MapGraphPrecache] Failed to start precache: ${err.message}`);
+    }
+  })();
+}
+
+/**
+ * Graceful shutdown: clear all refresh timers.
+ */
+if (typeof window === 'undefined') {
+  process.on('SIGTERM', () => {
+    for (const [mapname, timer] of refreshTimers) {
+      clearTimeout(timer);
+      refreshTimers.delete(mapname);
+    }
+    logger.info('[MapGraphPrecache] All refresh timers cleared');
+  });
+}
