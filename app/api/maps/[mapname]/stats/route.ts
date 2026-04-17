@@ -4,12 +4,12 @@ import { sanitizeMapName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import {
   getWRCheckpointTimesFromCache,
-  getBonusCompletionRatesFromCache,
   getCheckpointStatsFromCache,
   getBonusCompletionsOverTimeFromCache,
   getCompletionsOverTimeFromCache,
   getTimeOnMapDataFromCache,
   getFinishTimeDataFromCache,
+  getPercentileTimesFromCache,
 } from '@/lib/valkey-map-stats-cache';
 import { getMapMetadataFromCache } from '@/lib/valkey-map-cache';
 
@@ -24,9 +24,15 @@ interface StatsResponse {
     avgTime: number; // Average map completion time
     wrTime: number | null; // WR holder's total time
   };
-  bonusCompletionRates: Array<{ bonus: number; completionRate: number; completions: number }>;
   bonusCompletionsOverTime: { [bonus: number]: Array<{ date: string; count: number }> };
   isStageMap: boolean; // true if map has stages (zonetype 3), false for linear maps (zonetype 4)
+  percentileTimes: {
+    wrTime: number | null;
+    p1Time: number | null;
+    p10Time: number | null;
+    medianTime: number | null;
+    avgTime: number | null;
+  } | null;
 }
 
 export async function GET(
@@ -61,9 +67,9 @@ export async function GET(
         completionsOverTime: [],
         timeOnMapData: [],
         checkpointAvgTimes: [],
-        bonusCompletionRates: [],
         bonusCompletionsOverTime: {},
         isStageMap,
+        percentileTimes: null,
       } as StatsResponse);
     }
 
@@ -82,13 +88,13 @@ export async function GET(
     // Query 5: Finish Time Data (cached)
     const finishTimeData = await getFinishTimeDataFromCache(validMapname);
 
-    // Query 6: Bonus Completion Rates (cached)
-    const bonusCompletionRates = await getBonusCompletionRatesFromCache(validMapname, totalCompletions);
-
-    // Query 7: Bonus Completions Over Time (cached)
+    // Query 6: Bonus Completions Over Time (cached)
     const bonusCompletionsOverTime = await getBonusCompletionsOverTimeFromCache(validMapname);
 
-    logger.debug(`[API Stats] Fetched stats for ${validMapname}: ${completionsOverTime.length} time points, ${checkpointAvgTimes.length} checkpoints, ${bonusCompletionRates.length} bonuses, ${Object.keys(bonusCompletionsOverTime).length} bonus time series, ${wrCheckpointTimes ? wrCheckpointTimes.length : 0} WR checkpoint times, finishTime: ${finishTimeData.avgTime ? finishTimeData.avgTime.toFixed(1) : 'null'}s avg, ${finishTimeData.wrTime ? finishTimeData.wrTime.toFixed(1) : 'null'}s WR`);
+    // Query 7: Percentile Times (cached)
+    const percentileTimes = await getPercentileTimesFromCache(validMapname);
+
+    logger.debug(`[API Stats] Fetched stats for ${validMapname}: ${completionsOverTime.length} time points, ${checkpointAvgTimes.length} checkpoints, ${Object.keys(bonusCompletionsOverTime).length} bonus time series, ${wrCheckpointTimes ? wrCheckpointTimes.length : 0} WR checkpoint times, finishTime: ${finishTimeData.avgTime ? finishTimeData.avgTime.toFixed(1) : 'null'}s avg, ${finishTimeData.wrTime ? finishTimeData.wrTime.toFixed(1) : 'null'}s WR, percentileTimes: ${percentileTimes ? `wr=${percentileTimes.wrTime?.toFixed(1) ?? 'null'}s` : 'null'}`);
 
     return NextResponse.json({
       completionsOverTime,
@@ -96,9 +102,9 @@ export async function GET(
       checkpointAvgTimes,
       wrCheckpointTimes,
       finishTime: finishTimeData,
-      bonusCompletionRates,
       bonusCompletionsOverTime,
       isStageMap,
+      percentileTimes,
     } as StatsResponse);
   } catch (error: unknown) {
     const err = error as { message?: string };

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import CompletionsOverTimeChart from './CompletionsOverTimeChart';
 import TimeOnMapChart from './TimeOnMapChart';
 import CheckpointTimesChart from './CheckpointTimesChart';
-import BonusCompletionChart from './BonusCompletionChart';
+import PercentileBreakdownChart from './PercentileBreakdownChart';
 
 interface ChartData {
   completionsOverTime: Array<{ date: string; count: number }>;
@@ -18,6 +18,13 @@ interface ChartData {
   bonusCompletionRates: Array<{ bonus: number; completionRate: number; completions: number }>;
   bonusCompletionsOverTime: { [bonus: number]: Array<{ date: string; count: number }> };
   isStageMap: boolean; // true if map has stages (zonetype 3), false for linear maps (zonetype 4)
+  percentileTimes: {
+    wrTime: number | null;
+    p1Time: number | null;
+    p10Time: number | null;
+    medianTime: number | null;
+    avgTime: number | null;
+  } | null;
 }
 
 interface MapChartGridProps {
@@ -94,7 +101,7 @@ export default function MapChartGrid({ mapname }: MapChartGridProps) {
         finishTime={data.finishTime}
         isStageMap={data.isStageMap}
       />
-      <BonusCompletionChart data={data.bonusCompletionRates} />
+      <PercentileBreakdownChart data={data.percentileTimes} />
     </div>
   );
 }

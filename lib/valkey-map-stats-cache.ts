@@ -13,13 +13,6 @@ interface CompletionsOverTimeData extends RowDataPacket {
   date: string;
   count: number;
 }
-
-interface BonusData extends RowDataPacket {
-  bonus: number;
-  completions: number;
-  total: number;
-}
-
 interface BonusTimeSeriesData extends RowDataPacket {
   date: string;
   bonus: number;
@@ -164,57 +157,6 @@ export async function getWRCheckpointTimesFromCache(
     const err = error as { message?: string };
     logger.warn(`[Cache] Failed to fetch WR checkpoint times for ${mapname}: ${err.message || 'Unknown error'}`);
     return undefined;
-  }
-}
-
-/**
- * Get bonus completion rates from cache
- */
-export async function getBonusCompletionRatesFromCache(
-  mapname: string,
-  totalCompletions: number
-): Promise<Array<{ bonus: number; completionRate: number; completions: number }>> {
-  const validMapname = sanitizeMapName(mapname);
-  if (!validMapname) {
-    logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return [];
-  }
-  const key = `surfstats:map:${validMapname}:stats:bonus-rates:${totalCompletions}`;
-
-  const cached = await cacheGet<Array<{ bonus: number; completionRate: number; completions: number }>>(key);
-  if (cached !== null) {
-    logger.debug(`[Cache] Hit: ${key}`);
-    return cached;
-  }
-
-  logger.debug(`[Cache] Miss: ${key}`);
-
-  try {
-    const [bonusRows] = await pool.query<BonusData[]>(`
-      SELECT
-        zonegroup as bonus,
-        COUNT(*) as completions,
-        ? as total
-      FROM ck_bonus
-      WHERE mapname = ?
-      GROUP BY zonegroup
-      ORDER BY zonegroup ASC
-    `, [totalCompletions, validMapname]);
-
-    const result = bonusRows.map(row => ({
-      bonus: row.bonus,
-      completionRate: row.completions / row.total,
-      completions: row.completions,
-    }));
-
-    await cacheSet(key, result, STATS_CACHE_TTL);
-    logger.debug(`[Cache] SET ${key} with TTL ${STATS_CACHE_TTL}s`);
-
-    return result;
-  } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.warn(`[Cache] Failed to fetch bonus completion rates for ${mapname}: ${err.message || 'Unknown error'}`);
-    return [];
   }
 }
 
@@ -487,5 +429,106 @@ export async function getFinishTimeDataFromCache(mapname: string): Promise<{ avg
     const err = error as { message?: string };
     logger.warn(`[Cache] Failed to fetch finish time data for ${mapname}: ${err.message || 'Unknown error'}`);
     return { avgTime: null, wrTime: null };
+  }
+}
+
+/**
+ * Get percentile completion times from cache
+ * Uses MariaDB-compatible queries with LIMIT/OFFSET
+ */
+export async function getPercentileTimesFromCache(
+  mapname: string
+): Promise<{
+  wrTime: number | null;
+  p1Time: number | null;
+  p10Time: number | null;
+  medianTime: number | null;
+  avgTime: number | null;
+} | null> {
+  const validMapname = sanitizeMapName(mapname);
+  if (!validMapname) {
+    logger.warn(`[Cache] Invalid map name: ${mapname}`);
+    return null;
+  }
+  const key = `surfstats:map:${validMapname}:stats:percentiles`;
+
+  const cached = await cacheGet<{
+    wrTime: number | null;
+    p1Time: number | null;
+    p10Time: number | null;
+    medianTime: number | null;
+    avgTime: number | null;
+  }>(key);
+  if (cached !== null) {
+    logger.debug(`[Cache] Hit: ${key}`);
+    return cached;
+  }
+
+  logger.debug(`[Cache] Miss: ${key}`);
+
+  try {
+    // First, get count, min (WR), and avg in a single query
+    const [summaryRows] = await pool.query<RowDataPacket[]>(`
+      SELECT
+        MIN(runtimepro) as wrTime,
+        AVG(runtimepro) as avgTime,
+        COUNT(*) as totalCount
+      FROM ck_playertimes
+      WHERE mapname = ?
+    `, [validMapname]);
+
+    const summary = summaryRows[0];
+    const totalCount = summary?.totalCount || 0;
+
+    if (totalCount === 0) {
+      const result = { wrTime: null, p1Time: null, p10Time: null, medianTime: null, avgTime: null };
+      await cacheSet(key, result, STATS_CACHE_TTL);
+      logger.debug(`[Cache] SET ${key} with TTL ${STATS_CACHE_TTL}s`);
+      return result;
+    }
+
+    // Calculate offsets for percentiles (0-indexed)
+    const p1Offset = Math.max(0, Math.floor(totalCount * 0.01));
+    const p10Offset = Math.max(0, Math.floor(totalCount * 0.10));
+    const medianOffset = Math.max(0, Math.floor(totalCount * 0.50));
+
+    // Get each percentile value using LIMIT 1 OFFSET
+    const [p1Rows] = await pool.query<RowDataPacket[]>(`
+      SELECT runtimepro FROM ck_playertimes
+      WHERE mapname = ?
+      ORDER BY runtimepro ASC
+      LIMIT 1 OFFSET ?
+    `, [validMapname, p1Offset]);
+
+    const [p10Rows] = await pool.query<RowDataPacket[]>(`
+      SELECT runtimepro FROM ck_playertimes
+      WHERE mapname = ?
+      ORDER BY runtimepro ASC
+      LIMIT 1 OFFSET ?
+    `, [validMapname, p10Offset]);
+
+    const [medianRows] = await pool.query<RowDataPacket[]>(`
+      SELECT runtimepro FROM ck_playertimes
+      WHERE mapname = ?
+      ORDER BY runtimepro ASC
+      LIMIT 1 OFFSET ?
+    `, [validMapname, medianOffset]);
+
+    const result = {
+      wrTime: summary?.wrTime ? Number(summary.wrTime) : null,
+      p1Time: p1Rows[0]?.runtimepro ? Number(p1Rows[0].runtimepro) : null,
+      p10Time: p10Rows[0]?.runtimepro ? Number(p10Rows[0].runtimepro) : null,
+      medianTime: medianRows[0]?.runtimepro ? Number(medianRows[0].runtimepro) : null,
+      avgTime: summary?.avgTime ? Number(summary.avgTime) : null,
+    };
+
+    await cacheSet(key, result, STATS_CACHE_TTL);
+    logger.debug(`[Cache] SET ${key} with TTL ${STATS_CACHE_TTL}s`);
+
+    return result;
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.warn(`[Cache] Failed to fetch percentile times for ${mapname}: ${err.message || 'Unknown error'}`);
+    return null;
   }
 }

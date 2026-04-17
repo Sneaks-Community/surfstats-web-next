@@ -7,8 +7,8 @@ import {
   getCheckpointStatsFromCache,
   getWRCheckpointTimesFromCache,
   getFinishTimeDataFromCache,
-  getBonusCompletionRatesFromCache,
   getBonusCompletionsOverTimeFromCache,
+  getPercentileTimesFromCache,
 } from './valkey-map-stats-cache';
 import { getAllMapMetadataFromCache } from './valkey-map-cache';
 
@@ -23,7 +23,7 @@ const MAX_CONCURRENT = 5;
 const refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 /**
- * Result type for all 7 graph data points of a single map.
+ * Result type for all 8 graph data points of a single map.
  */
 export interface MapGraphData {
   completionsOverTime: Array<{ date: string; count: number }>;
@@ -31,33 +31,39 @@ export interface MapGraphData {
   checkpointStats: { checkpointAvgTimes: Array<{ checkpoint: number; avgTime: number; sampleSize: number }> };
   wrCheckpointTimes: Array<{ checkpoint: number; time: number }> | undefined;
   finishTimeData: { avgTime: number | null; wrTime: number | null };
-  bonusCompletionRates: Array<{ bonus: number; completionRate: number; completions: number }>;
   bonusCompletionsOverTime: { [bonus: number]: Array<{ date: string; count: number }> };
+  percentileTimes: {
+    wrTime: number | null;
+    p1Time: number | null;
+    p10Time: number | null;
+    medianTime: number | null;
+    avgTime: number | null;
+  } | null;
 }
 
 /**
- * Fetch and cache all 7 graph data points for a single map using Valkey pipelining.
+ * Fetch and cache all 8 graph data points for a single map using Valkey pipelining.
  * Uses pipeline() to batch all SET operations into a single network round-trip.
  */
 async function precacheMapGraphs(mapname: string): Promise<void> {
   try {
-    // Fetch all 7 data points in parallel
+    // Fetch all 8 data points in parallel
     const [
       completionsOverTime,
       timeOnMapData,
       checkpointStats,
       wrCheckpointTimes,
       finishTimeData,
-      bonusCompletionRates,
       bonusCompletionsOverTime,
+      percentileTimes,
     ] = await Promise.all([
       getCompletionsOverTimeFromCache(mapname),
       getTimeOnMapDataFromCache(mapname),
       getCheckpointStatsFromCache(mapname),
       getWRCheckpointTimesFromCache(mapname, 10), // approximate max for precache
       getFinishTimeDataFromCache(mapname),
-      getBonusCompletionRatesFromCache(mapname, 1000), // approximate total for precache
       getBonusCompletionsOverTimeFromCache(mapname),
+      getPercentileTimesFromCache(mapname),
     ]);
 
     // Use Valkey pipelining for batch SET operations (single network round-trip)
@@ -71,8 +77,8 @@ async function precacheMapGraphs(mapname: string): Promise<void> {
       client.setEx(`surfstats:map:${mapname}:stats:checkpoints`, TTL, JSON.stringify(checkpointStats)),
       client.setEx(`surfstats:map:${mapname}:stats:wr-checkpoint:10`, TTL, JSON.stringify(wrCheckpointTimes ?? [])),
       client.setEx(`surfstats:map:${mapname}:stats:finish-time`, TTL, JSON.stringify(finishTimeData)),
-      client.setEx(`surfstats:map:${mapname}:stats:bonus-rates:1000`, TTL, JSON.stringify(bonusCompletionRates)),
       client.setEx(`surfstats:map:${mapname}:stats:bonus-time`, TTL, JSON.stringify(bonusCompletionsOverTime)),
+      client.setEx(`surfstats:map:${mapname}:stats:percentiles`, TTL, JSON.stringify(percentileTimes)),
     ]);
 
     logger.debug(`[MapGraphPrecache] Cached graphs for ${mapname}`);
