@@ -2,7 +2,7 @@ import 'server-only';
 import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
-import { getPlayerCount } from '@/lib/registry-cache';
+import { getPlayerCountFromCache } from '@/lib/valkey-registry-cache';
 import { sanitizeSearchQuery } from './sanitize';
 import { cacheGet, cacheSet } from './valkey-cache';
 
@@ -108,7 +108,7 @@ async function fetchPlayersInternal(
       total = countRows[0].total;
     } else {
       // Use cached player count for non-search queries
-      total = await getPlayerCount();
+      total = await getPlayerCountFromCache();
     }
     
     logger.debug(`[PlayerCache] Retrieved ${rows.length} players (page ${page} of ${Math.ceil(total / limit)}, ${total} total)`);

@@ -5,7 +5,8 @@ import MapImage from '@/components/MapImage';
 import MapFilters from '@/components/MapFilters';
 import { getTierColor } from '@/lib/tierColors';
 import Pagination from '@/components/Pagination';
-import { getTierDistribution, getAllMapMetadata, type MapMetadata } from '@/lib/map-cache';
+import { type MapMetadata } from '@/lib/map-cache';
+import { getAllMapMetadataFromCache, getTierDistributionFromCache } from '@/lib/valkey-map-cache';
 import { sanitizeSearchQuery } from '@/lib/sanitize';
 import type { Metadata } from 'next';
 
@@ -53,8 +54,8 @@ export default async function MapsPage({
   const mapper = getParam(params.mapper);
   const bonuses = getParam(params.bonuses, 'all');
 
-  // Fetch all map metadata from shared cache
-  const allMetadata = await getAllMapMetadata();
+  // Fetch all map metadata from Valkey cache
+  const allMetadata = await getAllMapMetadataFromCache();
   
   // Apply filters to cached data
   const filteredMaps: MapMetadata[] = [];
@@ -93,7 +94,7 @@ export default async function MapsPage({
   const totalPages = Math.ceil(total / limit);
   
   // Get filter options from cache
-  const tierDistribution = await getTierDistribution();
+  const tierDistribution = await getTierDistributionFromCache();
   const filterOptions = {
     tiers: Array.from(tierDistribution.entries())
       .map(([tier, count]) => ({ tier, count }))

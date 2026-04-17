@@ -44,10 +44,36 @@ interface StageRecord {
 
 interface PlayerProfileContentProps {
   data: {
-    player: RowDataPacket;
-    maps: RowDataPacket[];
-    bonuses: RowDataPacket[];
-    stages: RowDataPacket[];
+    player: RowDataPacket | {
+      steamid: string;
+      name: string;
+      country: string;
+      points: number;
+      lastseen: string;
+      rank: number;
+    };
+    maps: RowDataPacket[] | Array<{
+      mapname: string;
+      runtimepro: number;
+      date: string;
+      tier: number;
+      wr_time: number | null;
+      player_rank: number;
+    }>;
+    bonuses: RowDataPacket[] | Array<{
+      mapname: string;
+      zonegroup: number;
+      runtime: number;
+      date: string;
+      player_rank: number;
+    }>;
+    stages: RowDataPacket[] | Array<{
+      map: string;
+      stage: number;
+      runtime: number;
+      date: string;
+      player_rank: number;
+    }>;
   };
   incompleteData: {
     incompleteMaps: Array<{

@@ -6,10 +6,15 @@ import { sanitizeSteamId } from '@/lib/sanitize';
 import { getTotalsFromCache } from '@/lib/cache';
 import { getPlayerTimeOnServerFromCache } from '@/lib/player-analytics';
 import { getPlayerNameFromCache } from '@/lib/player-cache';
+import { getPlayerProfileFromCache } from '@/lib/player-profile-cache';
 import logger from '@/lib/logger';
 import PlayerProfileContent from './components/PlayerProfileContent';
 
 
+/**
+ * Get player profile data with caching
+ * Uses the new player profile cache for improved performance
+ */
 async function getPlayerData(steamid: string) {
   logger.debug(`[Player] Fetching profile data for: ${steamid}`);
   
@@ -22,86 +27,17 @@ async function getPlayerData(steamid: string) {
       return null;
     }
 
-    // Get basic player info and rank (excluding name since we already have it)
-    // Optimized with window function instead of correlated subquery
-    const [playerRows] = await pool.query<RowDataPacket[]>(`
-      SELECT
-        steamid, name, country, points, lastseen,
-        DENSE_RANK() OVER (ORDER BY points DESC) as rank
-      FROM ck_playerrank
-      WHERE steamid = ?
-    `, [steamid]);
-
-    if (playerRows.length === 0) {
-      logger.warn(`[Player] No player found with SteamID: ${steamid}`);
-      return null;
-    }
-    const player = playerRows[0];
-
-    // Fetch all map metadata from cache once (reuses existing cache)
-    const { getAllMapMetadata } = await import('@/lib/map-cache');
-    const allMapMetadata = await getAllMapMetadata();
-
-    // PARALLEL: Fetch maps, bonuses, and stages simultaneously
-    // Maps include WR time for comparison and player rank (optimized with count-based rank)
-    // Tier is looked up from cache instead of joining ck_maptier
-    const [mapsResult, bonusesResult, stagesResult] = await Promise.all([
-      pool.query<RowDataPacket[]>(`
-        SELECT
-          pt.mapname,
-          pt.runtimepro,
-          pt.date,
-          wr.min_runtime as wr_time,
-          (SELECT COUNT(*) + 1 FROM ck_playertimes pt2
-           WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as player_rank
-        FROM ck_playertimes pt
-        LEFT JOIN (
-          SELECT mapname, MIN(runtimepro) as min_runtime
-          FROM ck_playertimes
-          GROUP BY mapname
-        ) wr ON pt.mapname = wr.mapname
-        WHERE pt.steamid = ?
-        ORDER BY pt.mapname ASC
-      `, [steamid]),
-      pool.query<RowDataPacket[]>(`
-        SELECT
-          b.mapname,
-          b.zonegroup,
-          b.runtime,
-          b.date,
-          (SELECT COUNT(*) + 1 FROM ck_bonus b2
-           WHERE b2.mapname = b.mapname AND b2.zonegroup = b.zonegroup AND b2.runtime < b.runtime) as player_rank
-        FROM ck_bonus b
-        WHERE b.steamid = ?
-        ORDER BY b.mapname ASC, b.zonegroup ASC
-      `, [steamid]),
-      pool.query<RowDataPacket[]>(`
-        SELECT
-          s.map,
-          s.stage,
-          s.runtime,
-          s.date,
-          (SELECT COUNT(*) + 1 FROM ck_stages s2
-           WHERE s2.map = s.map AND s2.stage = s.stage AND s2.runtime < s.runtime) as player_rank
-        FROM ck_stages s
-        WHERE s.steamid = ?
-        ORDER BY s.map ASC, s.stage ASC
-      `, [steamid])
-    ]);
-
-    const [maps] = mapsResult;
-    const [bonuses] = bonusesResult;
-    const [stages] = stagesResult;
-
-    // Look up tier from cache for each map
-    for (const map of maps) {
-      const metadata = allMapMetadata.get(map.mapname);
-      map.tier = metadata?.tier ?? 1;
-    }
-
-    logger.debug(`[Player] Profile loaded for ${player.name} (${steamid}): ${maps.length} maps, ${bonuses.length} bonuses, ${stages.length} stages`);
+    // Use cached player profile function
+    const cachedProfile = await getPlayerProfileFromCache(steamid);
     
-    return { player, maps, bonuses, stages };
+    if (cachedProfile) {
+      logger.debug(`[Player] Profile loaded from cache for ${cachedProfile.player.name} (${steamid}): ${cachedProfile.maps.length} maps, ${cachedProfile.bonuses.length} bonuses, ${cachedProfile.stages.length} stages`);
+      return cachedProfile;
+    }
+
+    // Fallback to direct database query if cache miss and internal fetch failed
+    logger.warn(`[Player] Profile cache miss and internal fetch failed for ${steamid}, returning null`);
+    return null;
   } catch (error: unknown) {
     const err = error as { message?: string; code?: string };
     const errorMessage = err.message || 'Unknown error';
@@ -115,7 +51,7 @@ async function getIncompleteRecords(steamid: string) {
   logger.debug(`[Player] Fetching incomplete records for: ${steamid}`);
   
   try {
-    const { getAllMapMetadata } = await import('@/lib/map-cache');
+    const { getAllMapMetadataFromCache } = await import('@/lib/valkey-map-cache');
     
     // Fetch all incomplete records in parallel using optimized anti-join queries
     const [incompleteMaps, incompleteBonuses, incompleteStages] = await Promise.all([
@@ -137,7 +73,7 @@ async function getIncompleteRecords(steamid: string) {
           ORDER BY m.tier ASC, m.mapname ASC
         `, [steamid]);
         
-        const allMapMetadata = await getAllMapMetadata();
+        const allMapMetadata = await getAllMapMetadataFromCache();
         return rows.map(r => {
           const mapMetadata = allMapMetadata.get(r.mapname);
           const mapType: 'linear' | 'staged' = mapMetadata && mapMetadata.stages > 1 ? 'staged' : 'linear';

@@ -11,7 +11,7 @@ import {
   getTimeOnMapDataFromCache,
   getFinishTimeDataFromCache,
 } from '@/lib/valkey-map-stats-cache';
-import { getMapMetadata } from '@/lib/map-cache';
+import { getMapMetadataFromCache } from '@/lib/valkey-map-cache';
 
 const DEFAULT_DAYS = 365 * 9; // ~9 years to cover data since 2017
 
@@ -47,7 +47,7 @@ export async function GET(
   try {
     // Get map metadata (already cached with 1 hour TTL in lib/map-cache.ts)
     // This includes completions count and wr_holder_steamid
-    const mapMetadata = await getMapMetadata(validMapname);
+    const mapMetadata = await getMapMetadataFromCache(validMapname);
     const totalCompletions = mapMetadata?.completions || 0;
     const checkpoints = mapMetadata?.checkpoints || 0;
     const stages = mapMetadata?.stages || 0;

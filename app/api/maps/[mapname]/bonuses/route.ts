@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { sanitizeMapName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import { getBonusRecordsFromCache } from '@/lib/valkey-map-records-cache';
-import { getBonusGroupsByMap } from '@/lib/registry-cache';
+import { getBonusGroupsByMapFromCache } from '@/lib/valkey-registry-cache';
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 500;
@@ -31,8 +31,8 @@ export async function GET(
   try {
     const data = await getBonusRecordsFromCache(validMapname, bonus, page, pageSize);
 
-    // Get bonus groups list from registry cache
-    const bonusGroupsList = await getBonusGroupsByMap(validMapname);
+    // Get bonus groups list from Valkey cache
+    const bonusGroupsList = await getBonusGroupsByMapFromCache(validMapname);
 
     return NextResponse.json({
       ...data,

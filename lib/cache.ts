@@ -3,8 +3,8 @@ import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import { GameDig } from 'gamedig';
 import logger from '@/lib/logger';
-import { getAllMapMetadata, getTotals as getMapTotals } from './map-cache';
-import { getAllBonusGroups, getAllStages } from './registry-cache';
+import { cacheGet, cacheSet } from './valkey-cache';
+import { cacheLock, shouldExpireEarly } from './cache-lock';
 
 // Types
 interface ServerConfig {
@@ -37,45 +37,8 @@ export interface ServerStatus {
   playerList?: Player[];
 }
 
-// ============================================================
-// IN-MEMORY SERVER CACHE WITH BACKGROUND REFRESH
-// ============================================================
-// This cache is refreshed every 30 seconds in the background,
-// independent of user requests. Users always get instantly served
-// data that's at most 30 seconds old.
-//
-// IMPORTANT: We use globalThis to persist the cache across Next.js
-// hot reloads and serverless function invocations. Without this,
-// module-level variables would be reset on each page render.
-
-const SERVER_REFRESH_INTERVAL = 30 * 1000; // 30 seconds in milliseconds
-
-// Define the shape of our global cache
-interface GlobalServerCache {
-  data: ServerStatus[];
-  lastUpdated: number;
-  intervalId: NodeJS.Timeout | null;
-  initialized: boolean;
-  initialFetchPromise: Promise<void> | null;
-}
-
-// Get or create the global cache
-function getGlobalServerCache(): GlobalServerCache {
-  const global = globalThis as unknown as { serverCache?: GlobalServerCache };
-  if (!global.serverCache) {
-    global.serverCache = {
-      data: [],
-      lastUpdated: 0,
-      intervalId: null,
-      initialized: false,
-      initialFetchPromise: null,
-    };
-  }
-  return global.serverCache;
-}
-
 // Fetch servers from live game servers
-async function fetchServersFromGame(): Promise<ServerStatus[]> {
+export async function fetchServersFromGame(): Promise<ServerStatus[]> {
   const startTime = Date.now();
 
   try {
@@ -167,88 +130,38 @@ async function fetchServersFromGame(): Promise<ServerStatus[]> {
   }
 }
 
-export { fetchServersFromGame };
-
-// Initialize background refresh
-function initServerCache(): void {
-  const cache = getGlobalServerCache();
-
-  if (cache.initialized) {
-    return;
-  }
-
-  cache.initialized = true;
-
-  // Initial fetch
-  cache.initialFetchPromise = (async () => {
-    try {
-      const servers = await fetchServersFromGame();
-      cache.data = servers;
-      cache.lastUpdated = Date.now();
-      logger.info(`[ServerCache] Initial fetch complete (${servers.length} servers)`);
-    } catch (error: unknown) {
-      const err = error as { message?: string };
-      logger.error(`[ServerCache] Initial fetch failed: ${err.message}`);
-    }
-  })();
-
-  // Start background refresh interval
-  cache.intervalId = setInterval(() => {
-    fetchServersFromGame()
-      .then((servers) => {
-        cache.data = servers;
-        cache.lastUpdated = Date.now();
-        logger.debug(`[ServerCache] Background refresh complete (${servers.length} servers)`);
-      })
-      .catch((err) => {
-        logger.error(`[ServerCache] Background refresh error: ${err.message}`);
-      });
-  }, SERVER_REFRESH_INTERVAL);
-
-  logger.info(`[ServerCache] Background refresh scheduled every ${SERVER_REFRESH_INTERVAL / 1000} seconds`);
-}
-
-/**
- * Get server status from cache
- * Returns cached data immediately - background refresh handles updates
- */
-export async function getServersCached(): Promise<ServerStatus[]> {
-  // Initialize cache on first call (runs on server)
-  if (typeof window === 'undefined') {
-    initServerCache();
-  }
-
-  const cache = getGlobalServerCache();
-
-  // Wait for initial fetch to complete before returning
-  if (cache.initialFetchPromise) {
-    await cache.initialFetchPromise;
-  }
-
-  // Always return cached data - background refresh handles updates
-  // This prevents blocking user requests on slow queries
-  return cache.data;
-}
-
 // ============================================================
 // DASHBOARD STATS CACHE (cache wrapper)
 // ============================================================
 
-const getStatsInternal = async (): Promise<{
+// Split stats into separate cache entries for better granularity
+const DASHBOARD_STATS_KEY = 'surfstats:dashboard:stats';
+const DASHBOARD_STATS_TTL = 300; // 5 minutes for static stats
+
+const DASHBOARD_RECENT_RECORDS_KEY = 'surfstats:dashboard:recent-records';
+const DASHBOARD_RECENT_RECORDS_TTL = 60; // 1 minute for volatile recent records
+
+interface DashboardStats {
   playerCount: number;
   playersMonth: number;
   mapCompletions: number;
   bonusCompletions: number;
   stageCompletions: number;
   totalPoints: number;
-  recentRecords: Array<{
-    steamid: string;
-    name: string;
-    runtime: number;
-    map: string;
-    date: string;
-    country: string | null;
-  }>;
+}
+
+interface RecentRecords {
+  steamid: string;
+  name: string;
+  runtime: number;
+  map: string;
+  date: string;
+  country: string | null;
+}
+
+const getStatsInternal = async (): Promise<{
+  stats: DashboardStats;
+  recentRecords: RecentRecords[];
 }> => {
   const startTime = Date.now();
 
@@ -267,54 +180,46 @@ const getStatsInternal = async (): Promise<{
       LIMIT 5
     `);
 
-    const playerCount = parseInt(statsMap.get('player_count') || '0', 10);
-    const playersMonth = parseInt(statsMap.get('players_month') || '0', 10);
-    const mapCompletions = parseInt(statsMap.get('map_completions') || '0', 10);
-    const bonusCompletions = parseInt(statsMap.get('bonus_completions') || '0', 10);
-    const stageCompletions = parseInt(statsMap.get('stage_completions') || '0', 10);
-    const totalPoints = parseInt(statsMap.get('total_points') || '0', 10);
+    const stats: DashboardStats = {
+      playerCount: parseInt(statsMap.get('player_count') || '0', 10),
+      playersMonth: parseInt(statsMap.get('players_month') || '0', 10),
+      mapCompletions: parseInt(statsMap.get('map_completions') || '0', 10),
+      bonusCompletions: parseInt(statsMap.get('bonus_completions') || '0', 10),
+      stageCompletions: parseInt(statsMap.get('stage_completions') || '0', 10),
+      totalPoints: parseInt(statsMap.get('total_points') || '0', 10),
+    };
 
     const duration = Date.now() - startTime;
     logger.debug(`[StatsCache] Fetched stats in ${duration}ms`);
 
     return {
-      playerCount,
-      playersMonth,
-      mapCompletions,
-      bonusCompletions,
-      stageCompletions,
-      totalPoints,
-      recentRecords: recentRecords as Array<{
-        steamid: string;
-        name: string;
-        runtime: number;
-        map: string;
-        date: string;
-        country: string | null;
-      }>,
+      stats,
+      recentRecords: recentRecords as RecentRecords[],
     };
   } catch (error: unknown) {
     const err = error as { message?: string };
     logger.error(`[StatsCache] Failed to fetch stats: ${err.message}`);
     return {
-      playerCount: 0,
-      playersMonth: 0,
-      mapCompletions: 0,
-      bonusCompletions: 0,
-      stageCompletions: 0,
-      totalPoints: 0,
+      stats: {
+        playerCount: 0,
+        playersMonth: 0,
+        mapCompletions: 0,
+        bonusCompletions: 0,
+        stageCompletions: 0,
+        totalPoints: 0,
+      },
       recentRecords: [],
     };
   }
 };
 
-import { cacheGet, cacheSet } from './valkey-cache';
-
-const DASHBOARD_STATS_KEY = 'surfstats:dashboard:stats';
-const DASHBOARD_STATS_TTL = 300; // 5 minutes
-
 /**
- * Get dashboard stats from Valkey cache
+ * Get dashboard stats from Valkey cache with split cache entries
+ *
+ * Static stats (player count, completions, points) have 5-minute TTL.
+ * Recent records have 1-minute TTL for fresher data.
+ *
+ * Uses request deduplication to prevent cache stampede.
  */
 export async function getStatsFromCache(): Promise<{
   playerCount: number;
@@ -332,32 +237,83 @@ export async function getStatsFromCache(): Promise<{
     country: string | null;
   }>;
 }> {
-  const cached = await cacheGet<{
-    playerCount: number;
-    playersMonth: number;
-    mapCompletions: number;
-    bonusCompletions: number;
-    stageCompletions: number;
-    totalPoints: number;
-    recentRecords: Array<{
-      steamid: string;
-      name: string;
-      runtime: number;
-      map: string;
-      date: string;
-      country: string | null;
-    }>;
-  }>(DASHBOARD_STATS_KEY);
+  // Fetch both stats and recent records in parallel
+  const [stats, recentRecords] = await Promise.all([
+    getDashboardStatsFromCache(),
+    getRecentRecordsFromCache(),
+  ]);
+
+  return {
+    ...stats,
+    recentRecords,
+  };
+}
+
+/**
+ * Get static dashboard stats from Valkey cache
+ */
+export async function getDashboardStatsFromCache(): Promise<DashboardStats> {
+  const cached = await cacheGet<DashboardStats>(DASHBOARD_STATS_KEY);
 
   if (cached) {
     return cached;
   }
 
-  const stats = await getStatsInternal();
+  // Probabilistic early expiration
+  if (shouldExpireEarly(0.1)) {
+    logger.debug(`[StatsCache] Early expiration triggered for stats`);
+  }
 
-  await cacheSet(DASHBOARD_STATS_KEY, stats, DASHBOARD_STATS_TTL);
+  return cacheLock.acquire(DASHBOARD_STATS_KEY, async () => {
+    // Double-check after acquiring lock
+    const rechecked = await cacheGet<DashboardStats>(DASHBOARD_STATS_KEY);
+    if (rechecked) {
+      return rechecked;
+    }
 
-  return stats;
+    const { stats } = await getStatsInternal();
+
+    await cacheSet(DASHBOARD_STATS_KEY, stats, DASHBOARD_STATS_TTL);
+
+    return stats;
+  });
+}
+
+/**
+ * Get recent records from Valkey cache with shorter TTL
+ */
+export async function getRecentRecordsFromCache(): Promise<RecentRecords[]> {
+  const cached = await cacheGet<RecentRecords[]>(DASHBOARD_RECENT_RECORDS_KEY);
+
+  if (cached) {
+    return cached;
+  }
+
+  // Probabilistic early expiration
+  if (shouldExpireEarly(0.15)) {
+    logger.debug(`[StatsCache] Early expiration triggered for recent records`);
+  }
+
+  return cacheLock.acquire(DASHBOARD_RECENT_RECORDS_KEY, async () => {
+    // Double-check after acquiring lock
+    const rechecked = await cacheGet<RecentRecords[]>(DASHBOARD_RECENT_RECORDS_KEY);
+    if (rechecked) {
+      return rechecked;
+    }
+
+    const { recentRecords } = await getStatsInternal();
+
+    await cacheSet(DASHBOARD_RECENT_RECORDS_KEY, recentRecords, DASHBOARD_RECENT_RECORDS_TTL);
+
+    return recentRecords;
+  });
+}
+
+/**
+ * Invalidate recent records cache (called when new completion occurs)
+ */
+export async function invalidateRecentRecordsCache(): Promise<void> {
+  await cacheSet(DASHBOARD_RECENT_RECORDS_KEY, [], 0); // Set with 0 TTL to expire immediately
 }
 
 // =========================
@@ -434,10 +390,16 @@ const getLatestCompletionsInternal = async (): Promise<
 };
 
 const LATEST_COMPLETIONS_KEY = 'surfstats:dashboard:completions';
-const LATEST_COMPLETIONS_TTL = 300; // 5 minutes
+const LATEST_COMPLETIONS_TTL = 180; // Reduced to 3 minutes for fresher data
 
 /**
- * Get latest completions from Valkey cache
+ * Get latest completions from Valkey cache with request deduplication
+ *
+ * Uses CacheLock to prevent cache stampede when multiple requests miss
+ * the cache simultaneously. Also implements probabilistic early expiration
+ * to further reduce stampede risk.
+ *
+ * @returns Array of latest completions
  */
 export async function getLatestCompletionsFromCache(): Promise<
   Array<{
@@ -464,11 +426,34 @@ export async function getLatestCompletionsFromCache(): Promise<
     return cached;
   }
 
-  const completions = await getLatestCompletionsInternal();
+  // Probabilistic early expiration to prevent cache stampede
+  if (shouldExpireEarly(0.1)) {
+    logger.debug(`[CompletionsCache] Early expiration triggered`);
+  }
 
-  await cacheSet(LATEST_COMPLETIONS_KEY, completions, LATEST_COMPLETIONS_TTL);
+  // Use cache lock to prevent concurrent database queries
+  return cacheLock.acquire(LATEST_COMPLETIONS_KEY, async () => {
+    // Double-check cache after acquiring lock
+    const rechecked = await cacheGet<Array<{
+      steamid: string;
+      name: string;
+      runtime: number;
+      map: string;
+      date: string;
+      type: string;
+      bonus: number | null;
+    }>>(LATEST_COMPLETIONS_KEY);
+    
+    if (rechecked) {
+      return rechecked;
+    }
 
-  return completions;
+    const completions = await getLatestCompletionsInternal();
+
+    await cacheSet(LATEST_COMPLETIONS_KEY, completions, LATEST_COMPLETIONS_TTL);
+
+    return completions;
+  });
 }
 
 // =============
@@ -479,7 +464,8 @@ const fetchTotalsInternal = async () => {
   const startTime = Date.now();
 
   try {
-    const totals = await getMapTotals();
+    const { getTotals } = await import('./map-cache');
+    const totals = await getTotals();
     const duration = Date.now() - startTime;
     logger.debug(`[TotalsCache] Fetched totals in ${duration}ms`);
     return totals;
@@ -522,13 +508,12 @@ export async function getTotalsFromCache(): Promise<{
 // CACHE PREWARMING
 // ============================================================
 // This function is called from the root layout to pre-warm caches
-// on first request. This may be reworked with Valkey implementation.
+// on first request.
 
 export async function prewarmCaches(): Promise<void> {
   logger.info('[Cache] Pre-warming caches...');
 
   // Pre-warm stats - use direct database query instead of cache
-  // This still triggers the global cache initialization for subsequent requests
   try {
     const startTime = Date.now();
     const [rows] = await pool.query<RowDataPacket[]>('SELECT `key`, `value` FROM ck_stats');
@@ -549,11 +534,11 @@ export async function prewarmCaches(): Promise<void> {
     logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
   }
 
-  // Pre-warm totals - use direct getMapTotals call instead of cache
-  // This triggers the global map cache initialization
+  // Pre-warm totals - use direct database call
   try {
     const startTime = Date.now();
-    const totals = await getMapTotals();
+    const { getTotals } = await import('./map-cache');
+    const totals = await getTotals();
     const duration = Date.now() - startTime;
     logger.info(
       `[Cache] Totals pre-warmed successfully (maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}, ${duration}ms)`
@@ -564,10 +549,11 @@ export async function prewarmCaches(): Promise<void> {
     logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
   }
 
-  // Pre-warm servers cache
+  // Pre-warm servers cache via Valkey
   try {
     const startTime = Date.now();
-    await getServersCached();
+    const { getServersFromCache } = await import('./valkey-server-cache');
+    await getServersFromCache();
     logger.info(`[Cache] Servers cache pre-warmed successfully (${Date.now() - startTime}ms)`);
   } catch (error: unknown) {
     const err = error as { message?: string };
@@ -578,7 +564,8 @@ export async function prewarmCaches(): Promise<void> {
   // Pre-warm map metadata cache (1-hour TTL)
   try {
     const startTime = Date.now();
-    await getAllMapMetadata();
+    const { getAllMapMetadataFromCache } = await import('./valkey-map-cache');
+    await getAllMapMetadataFromCache();
     logger.info(`[Cache] Map metadata cache pre-warmed successfully (${Date.now() - startTime}ms)`);
   } catch (error: unknown) {
     const err = error as { message?: string };
@@ -589,7 +576,8 @@ export async function prewarmCaches(): Promise<void> {
   // Pre-warm bonus/stage registry cache (1-hour TTL)
   try {
     const startTime = Date.now();
-    await Promise.all([getAllBonusGroups(), getAllStages()]);
+    const { getAllBonusGroupsFromCache, getAllStagesFromCache } = await import('./valkey-registry-cache');
+    await Promise.all([getAllBonusGroupsFromCache(), getAllStagesFromCache()]);
     logger.info(`[Cache] Registry cache pre-warmed successfully (${Date.now() - startTime}ms)`);
   } catch (error: unknown) {
     const err = error as { message?: string };

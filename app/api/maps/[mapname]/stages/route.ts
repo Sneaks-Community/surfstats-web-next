@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server';
 import { sanitizeMapName } from '@/lib/sanitize';
 import logger from '@/lib/logger';
 import { getStageRecordsFromCache } from '@/lib/valkey-map-records-cache';
-import { getStagesByMap } from '@/lib/registry-cache';
+import { getStagesByMapFromCache } from '@/lib/valkey-registry-cache';
 
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 500;
@@ -41,8 +41,8 @@ export async function GET(
       offset
     );
 
-    // Get stages list from registry cache
-    const stagesList = await getStagesByMap(validMapname);
+    // Get stages list from Valkey cache
+    const stagesList = await getStagesByMapFromCache(validMapname);
 
     return NextResponse.json({
       ...data,

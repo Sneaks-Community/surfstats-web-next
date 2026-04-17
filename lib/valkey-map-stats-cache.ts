@@ -3,7 +3,7 @@ import { cacheGet, cacheSet } from './valkey-cache';
 import pool from './db';
 import analyticsPool from './db-analytics';
 import type { RowDataPacket } from 'mysql2';
-import { getMapMetadata } from './map-cache';
+import { getMapMetadataFromCache } from './valkey-map-cache';
 import { sanitizeMapName } from './sanitize';
 import logger from './logger';
 
@@ -103,7 +103,7 @@ export async function getWRCheckpointTimesFromCache(
   logger.debug(`[Cache] Miss: ${key}`);
 
   try {
-    const mapMetadata = await getMapMetadata(validMapname);
+    const mapMetadata = await getMapMetadataFromCache(validMapname);
     const wrSteamid = mapMetadata?.wr_holder_steamid || null;
 
     if (!wrSteamid) {
@@ -238,7 +238,7 @@ export async function getCheckpointStatsFromCache(mapname: string): Promise<Chec
   logger.debug(`[Cache] Miss: ${key}`);
 
   try {
-    const mapMetadata = await getMapMetadata(validMapname);
+    const mapMetadata = await getMapMetadataFromCache(validMapname);
     const checkpoints = mapMetadata?.checkpoints || 0;
     const stages = mapMetadata?.stages || 0;
     const maxCheckpoint = checkpoints > 0 ? checkpoints : stages;

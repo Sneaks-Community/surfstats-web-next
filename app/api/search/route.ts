@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { searchPlayersFromCache } from '@/lib/player-cache';
-import { getAllMapMetadata } from '@/lib/map-cache';
+import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
 import { sanitizeSearchQuery } from '@/lib/sanitize';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import logger from '@/lib/logger';
@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
     }));
 
     // Search maps using cached map metadata
-    const allMaps = await getAllMapMetadata();
+    const allMaps = await getAllMapMetadataFromCache();
     const queryLower = sanitizedQuery.toLowerCase();
     const maps = Array.from(allMaps.values())
       .filter(map => map.mapname.toLowerCase().includes(queryLower))

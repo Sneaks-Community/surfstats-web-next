@@ -21,38 +21,13 @@ export interface MapMetadata {
 
 // Configuration constants
 const QUERY_TIMEOUT_MS = 30000; // 30 seconds - prevents indefinite query hanging
-const CACHE_REFRESH_INTERVAL = 60 * 60 * 1000; // 1 hour - background refresh interval
-
-// Global cache structure with background refresh support
-interface GlobalMapCache {
-  data: Map<string, MapMetadata>;
-  lastUpdated: number;
-  initialized: boolean;
-  initialFetchPromise: Promise<void> | null;
-  refreshIntervalId: NodeJS.Timeout | null;
-}
-
-// Get or create the global cache using globalThis for persistence across hot reloads
-function getGlobalMapCache(): GlobalMapCache {
-  const global = globalThis as unknown as { mapMetadataCache?: GlobalMapCache };
-  if (!global.mapMetadataCache) {
-    global.mapMetadataCache = {
-      data: new Map(),
-      lastUpdated: 0,
-      initialized: false,
-      initialFetchPromise: null,
-      refreshIntervalId: null,
-    };
-  }
-  return global.mapMetadataCache;
-}
 
 /**
  * Fetch all map metadata from database in a single optimized query
  * Uses JOINs instead of correlated subqueries for better performance
  * Includes timeout protection to prevent indefinite query hanging
  */
-async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
+export async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
   const startTime = Date.now();
   
   try {
@@ -133,12 +108,6 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
     const duration = Date.now() - startTime;
     logger.debug(`[MapCache] Fetched ${metadataMap.size} maps in ${duration}ms`);
     
-    // Debug: Log first map's checkpoints value
-    const firstMap = metadataMap.values().next().value;
-    if (firstMap) {
-      logger.debug(`[MapCache] Sample map: ${firstMap.mapname} - stages: ${firstMap.stages}, checkpoints: ${firstMap.checkpoints}`);
-    }
-    
     return metadataMap;
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
@@ -157,84 +126,10 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
 }
 
 /**
- * Refresh the map cache in the background
- * Returns a promise that resolves when the refresh completes
+ * Get metadata for a single map from database
  */
-async function refreshMapCacheBackground(): Promise<void> {
-  const cache = getGlobalMapCache();
-  
-  try {
-    logger.debug('[MapCache] Background refresh started...');
-    const freshData = await fetchAllMapMetadata();
-    cache.data = freshData;
-    cache.lastUpdated = Date.now();
-    logger.info(`[MapCache] Background refresh complete: ${freshData.size} maps`);
-  } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[MapCache] Background refresh failed: ${err.message || 'Unknown error'}`);
-    // Don't throw - background refresh failures shouldn't block user requests
-  }
-}
-
-/**
- * Initialize the map cache with background refresh
- * Called automatically on first access
- */
-function initMapCache(): void {
-  if (typeof window !== 'undefined') {
-    // Skip in browser context
-    return;
-  }
-  
-  const cache = getGlobalMapCache();
-  
-  if (cache.initialized) {
-    return;
-  }
-  
-  cache.initialized = true;
-  logger.info('[MapCache] Initializing map metadata cache with background refresh...');
-  
-  // Initial fetch - store promise so callers can await it
-  cache.initialFetchPromise = refreshMapCacheBackground();
-  
-  // Start background refresh interval
-  cache.refreshIntervalId = setInterval(() => {
-    refreshMapCacheBackground().catch((err) => {
-      logger.error(`[MapCache] Background refresh error: ${err.message}`);
-    });
-  }, CACHE_REFRESH_INTERVAL);
-  
-  logger.info(`[MapCache] Background refresh scheduled every ${CACHE_REFRESH_INTERVAL / 1000} seconds`);
-}
-
-/**
- * Get all map metadata from cache
- * Returns cached data immediately - background refresh handles updates
- */
-export async function getAllMapMetadata(): Promise<Map<string, MapMetadata>> {
-  // Initialize cache on first call (runs on server)
-  if (typeof window === 'undefined') {
-    initMapCache();
-  }
-  
-  const cache = getGlobalMapCache();
-  
-  // Wait for initial fetch to complete before returning
-  if (cache.initialFetchPromise) {
-    await cache.initialFetchPromise;
-  }
-  
-  // Always return cached data - background refresh handles updates
-  // This prevents blocking user requests on slow queries
-  return cache.data;
-}
-
-/**
- * Get metadata for a single map
- */
-export async function getMapMetadata(mapname: string): Promise<MapMetadata | null> {
-  const allMetadata = await getAllMapMetadata();
+export async function getMapMetadataFromDb(mapname: string): Promise<MapMetadata | null> {
+  const allMetadata = await fetchAllMapMetadata();
   return allMetadata.get(mapname) || null;
 }
 
@@ -242,7 +137,7 @@ export async function getMapMetadata(mapname: string): Promise<MapMetadata | nul
  * Get all map names as an array
  */
 export async function getMapNames(): Promise<string[]> {
-  const allMetadata = await getAllMapMetadata();
+  const allMetadata = await fetchAllMapMetadata();
   return Array.from(allMetadata.keys());
 }
 
@@ -250,7 +145,7 @@ export async function getMapNames(): Promise<string[]> {
  * Get total number of maps
  */
 export async function getTotalMapCount(): Promise<number> {
-  const allMetadata = await getAllMapMetadata();
+  const allMetadata = await fetchAllMapMetadata();
   return allMetadata.size;
 }
 
@@ -258,7 +153,7 @@ export async function getTotalMapCount(): Promise<number> {
  * Get total number of bonuses across all maps
  */
 export async function getTotalBonusCount(): Promise<number> {
-  const allMetadata = await getAllMapMetadata();
+  const allMetadata = await fetchAllMapMetadata();
   let total = 0;
   for (const map of allMetadata.values()) {
     total += map.bonuses || 0;
@@ -270,7 +165,7 @@ export async function getTotalBonusCount(): Promise<number> {
  * Get total number of stages across all maps
  */
 export async function getTotalStageCount(): Promise<number> {
-  const allMetadata = await getAllMapMetadata();
+  const allMetadata = await fetchAllMapMetadata();
   let total = 0;
   for (const map of allMetadata.values()) {
     total += map.stages || 0;
@@ -286,7 +181,7 @@ export async function getTotals(): Promise<{
   totalBonuses: number;
   totalStages: number;
 }> {
-  const allMetadata = await getAllMapMetadata();
+  const allMetadata = await fetchAllMapMetadata();
   
   let totalBonuses = 0;
   let totalStages = 0;
@@ -307,7 +202,7 @@ export async function getTotals(): Promise<{
  * Get maps filtered by tier
  */
 export async function getMapsByTier(tier: number): Promise<MapMetadata[]> {
-  const allMetadata = await getAllMapMetadata();
+  const allMetadata = await fetchAllMapMetadata();
   const maps: MapMetadata[] = [];
   
   for (const map of allMetadata.values()) {
@@ -323,7 +218,7 @@ export async function getMapsByTier(tier: number): Promise<MapMetadata[]> {
  * Get tier distribution (count of maps per tier)
  */
 export async function getTierDistribution(): Promise<Map<number, number>> {
-  const allMetadata = await getAllMapMetadata();
+  const allMetadata = await fetchAllMapMetadata();
   const distribution = new Map<number, number>();
   
   for (const map of allMetadata.values()) {
@@ -340,7 +235,7 @@ export async function getTierDistribution(): Promise<Map<number, number>> {
  * Staged maps: maps with >0 stages
  */
 export async function getTierDistributionWithStages(): Promise<Map<number, { linear: number; staged: number }>> {
-  const allMetadata = await getAllMapMetadata();
+  const allMetadata = await fetchAllMapMetadata();
   const distribution = new Map<number, { linear: number; staged: number }>();
   
   for (const map of allMetadata.values()) {
@@ -360,51 +255,4 @@ export async function getTierDistributionWithStages(): Promise<Map<number, { lin
   }
   
   return distribution;
-}
-
-/**
- * Get cache stats for debugging/monitoring
- */
-export function getMapCacheStats(): {
-  lastUpdated: number;
-  ageSeconds: number;
-  initialized: boolean;
-  mapCount: number;
-} {
-  const cache = getGlobalMapCache();
-  return {
-    lastUpdated: cache.lastUpdated,
-    ageSeconds: cache.lastUpdated ? Math.round((Date.now() - cache.lastUpdated) / 1000) : -1,
-    initialized: cache.initialized,
-    mapCount: cache.data.size,
-  };
-}
-
-/**
- * Force refresh the cache (useful for admin operations)
- * This performs a synchronous refresh and returns a promise that resolves when complete
- */
-export async function refreshMapCache(): Promise<void> {
-  const cache = getGlobalMapCache();
-  logger.info('[MapCache] Force refreshing cache...');
-  
-  const freshData = await fetchAllMapMetadata();
-  cache.data = freshData;
-  cache.lastUpdated = Date.now();
-  
-  logger.info(`[MapCache] Cache refreshed with ${freshData.size} maps`);
-}
-
-/**
- * Cleanup function to stop background refresh interval
- * Call this on server shutdown
- */
-export function cleanupMapCache(): void {
-  const cache = getGlobalMapCache();
-  
-  if (cache.refreshIntervalId) {
-    clearInterval(cache.refreshIntervalId);
-    cache.refreshIntervalId = null;
-    logger.info('[MapCache] Background refresh interval cleared');
-  }
 }

@@ -4,7 +4,7 @@ import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTierTextColor } from '@/lib/tierColors';
 import { sanitizeSearchQuery, sanitizePlayerName } from '@/lib/sanitize';
-import { getAllMapMetadata } from '@/lib/map-cache';
+import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
 import { searchPlayersFromCache } from '@/lib/player-cache';
 import type { PlayerSearchResult } from '@/lib/player-cache';
 import logger from '@/lib/logger';
@@ -36,8 +36,8 @@ export default async function SearchPage({
       // Search players using cached function
       players = await searchPlayersFromCache(query);
       
-      // Search maps using cached map metadata (no DB hit)
-      const allMaps = await getAllMapMetadata();
+      // Search maps using cached map metadata (Valkey cache)
+      const allMaps = await getAllMapMetadataFromCache();
       const queryLower = query.toLowerCase();
       maps = Array.from(allMaps.values())
         .filter(map => map.mapname.toLowerCase().includes(queryLower))

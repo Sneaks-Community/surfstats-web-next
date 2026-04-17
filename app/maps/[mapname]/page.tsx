@@ -7,7 +7,7 @@ import logger from '@/lib/logger';
 import MapRecordsTabs from './components/MapRecordsTabs';
 import TierBadge from '@/components/TierBadge';
 import MapChartGrid from './components/charts/MapChartGrid';
-import { getMapMetadata } from '@/lib/map-cache';
+import { getMapMetadataFromCache } from '@/lib/valkey-map-cache';
 import { getMapRecordsFromCache } from '@/lib/valkey-map-records-cache';
 
 // Default page size - keeps cache entry under 2MB (each record ~200 bytes, 100 records ~20KB)
@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ mapname: 
     return { title: 'Map Not Found' };
   }
   
-  const map = await getMapMetadata(validMapname);
+  const map = await getMapMetadataFromCache(validMapname);
   
   if (!map) {
     return { title: 'Map Not Found' };
@@ -56,7 +56,7 @@ export default async function MapProfilePage({
   }
   
   const [map, recordsData] = await Promise.all([
-    getMapMetadata(validMapname),
+    getMapMetadataFromCache(validMapname),
     getMapRecordsFromCache(validMapname, 1, DEFAULT_PAGE_SIZE)
   ]);
   

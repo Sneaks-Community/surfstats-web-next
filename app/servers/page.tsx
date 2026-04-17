@@ -1,5 +1,5 @@
 import { Server } from 'lucide-react';
-import { getServersCached, type ServerStatus } from '@/lib/cache';
+import { getServersFromCache, type ServerStatus } from '@/lib/valkey-server-cache';
 import ServerCard from './ServerCard';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
@@ -15,7 +15,7 @@ export default async function ServersPage() {
   let servers: ServerStatus[] = [];
   
   try {
-    servers = await getServersCached();
+    servers = await getServersFromCache();
     logger.debug(`[Servers] Loaded ${servers.length} servers`);
   } catch (error: unknown) {
     const err = error as { message?: string };

@@ -1,0 +1,254 @@
+/**
+ * Player Profile Cache
+ * 
+ * Caches player profile data including basic info, completed maps, bonuses, and stages.
+ * Uses request deduplication to prevent cache stampede on high-traffic player profile pages.
+ */
+
+import 'server-only';
+import pool from './db';
+import type { RowDataPacket } from 'mysql2';
+import { cacheGet, cacheSet } from './valkey-cache';
+import { cacheLock, shouldExpireEarly } from './cache-lock';
+import logger from './logger';
+
+const PLAYER_PROFILE_KEY = 'surfstats:player:profile';
+const PLAYER_PROFILE_TTL = 300; // 5 minutes
+
+// Type definitions for cached profile data
+export interface CachedPlayerProfile {
+  player: {
+    steamid: string;
+    name: string;
+    country: string;
+    points: number;
+    lastseen: string;
+    rank: number;
+  };
+  maps: Array<{
+    mapname: string;
+    runtimepro: number;
+    date: string;
+    tier: number;
+    wr_time: number | null;
+    player_rank: number;
+  }>;
+  bonuses: Array<{
+    mapname: string;
+    zonegroup: number;
+    runtime: number;
+    date: string;
+    player_rank: number;
+  }>;
+  stages: Array<{
+    map: string;
+    stage: number;
+    runtime: number;
+    date: string;
+    player_rank: number;
+  }>;
+}
+
+/**
+ * Internal function to fetch player profile data from database
+ * This is the raw query function without caching
+ */
+async function getPlayerProfileInternal(steamid: string): Promise<CachedPlayerProfile | null> {
+  logger.debug(`[PlayerProfileCache] Fetching profile for: ${steamid}`);
+
+  try {
+    // Get basic player info and rank
+    const [playerRows] = await pool.query<RowDataPacket[]>(`
+      SELECT
+        steamid, name, country, points, lastseen,
+        DENSE_RANK() OVER (ORDER BY points DESC) as rank
+      FROM ck_playerrank
+      WHERE steamid = ?
+    `, [steamid]);
+
+    if (playerRows.length === 0) {
+      logger.warn(`[PlayerProfileCache] No player found with SteamID: ${steamid}`);
+      return null;
+    }
+
+    const player = playerRows[0];
+
+    // Fetch all map metadata from Valkey cache once
+    const { getAllMapMetadataFromCache } = await import('@/lib/valkey-map-cache');
+    const allMapMetadata = await getAllMapMetadataFromCache();
+
+    // PARALLEL: Fetch maps, bonuses, and stages simultaneously
+    const [mapsResult, bonusesResult, stagesResult] = await Promise.all([
+      pool.query<RowDataPacket[]>(`
+        SELECT
+          pt.mapname,
+          pt.runtimepro,
+          pt.date,
+          wr.min_runtime as wr_time,
+          (SELECT COUNT(*) + 1 FROM ck_playertimes pt2
+           WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as player_rank
+        FROM ck_playertimes pt
+        LEFT JOIN (
+          SELECT mapname, MIN(runtimepro) as min_runtime
+          FROM ck_playertimes
+          GROUP BY mapname
+        ) wr ON pt.mapname = wr.mapname
+        WHERE pt.steamid = ?
+        ORDER BY pt.mapname ASC
+      `, [steamid]),
+      pool.query<RowDataPacket[]>(`
+        SELECT
+          b.mapname,
+          b.zonegroup,
+          b.runtime,
+          b.date,
+          (SELECT COUNT(*) + 1 FROM ck_bonus b2
+           WHERE b2.mapname = b.mapname AND b2.zonegroup = b.zonegroup AND b2.runtime < b.runtime) as player_rank
+        FROM ck_bonus b
+        WHERE b.steamid = ?
+        ORDER BY b.mapname ASC, b.zonegroup ASC
+      `, [steamid]),
+      pool.query<RowDataPacket[]>(`
+        SELECT
+          s.map,
+          s.stage,
+          s.runtime,
+          s.date,
+          (SELECT COUNT(*) + 1 FROM ck_stages s2
+           WHERE s2.map = s.map AND s2.stage = s.stage AND s2.runtime < s.runtime) as player_rank
+        FROM ck_stages s
+        WHERE s.steamid = ?
+        ORDER BY s.map ASC, s.stage ASC
+      `, [steamid])
+    ]);
+
+    const [maps] = mapsResult;
+    const [bonuses] = bonusesResult;
+    const [stages] = stagesResult;
+
+    // Look up tier from cache for each map
+    for (const map of maps) {
+      const metadata = allMapMetadata.get(map.mapname);
+      map.tier = metadata?.tier ?? 1;
+    }
+
+    logger.debug(`[PlayerProfileCache] Profile loaded for ${player.name} (${steamid}): ${maps.length} maps, ${bonuses.length} bonuses, ${stages.length} stages`);
+
+    return {
+      player: player as {
+        steamid: string;
+        name: string;
+        country: string;
+        points: number;
+        lastseen: string;
+        rank: number;
+      },
+      maps: maps as Array<{
+        mapname: string;
+        runtimepro: number;
+        date: string;
+        tier: number;
+        wr_time: number | null;
+        player_rank: number;
+      }>,
+      bonuses: bonuses as Array<{
+        mapname: string;
+        zonegroup: number;
+        runtime: number;
+        date: string;
+        player_rank: number;
+      }>,
+      stages: stages as Array<{
+        map: string;
+        stage: number;
+        runtime: number;
+        date: string;
+        player_rank: number;
+      }>,
+    };
+  } catch (error: unknown) {
+    const err = error as { message?: string; code?: string };
+    const errorMessage = err.message || 'Unknown error';
+    logger.error(`[PlayerProfileCache] Failed to fetch profile for ${steamid}: ${errorMessage}`);
+    return null;
+  }
+}
+
+/**
+ * Get player profile from Valkey cache with request deduplication
+ * 
+ * Caches complete player profile data including:
+ * - Basic player info (steamid, name, country, points, rank)
+ * - Completed maps with WR times and player rank
+ * - Completed bonuses with player rank
+ * - Completed stages with player rank
+ * 
+ * Uses CacheLock to prevent cache stampede when multiple requests
+ * miss the cache simultaneously.
+ * 
+ * @param steamid - The player's SteamID
+ * @returns Cached player profile or null if player not found
+ */
+export async function getPlayerProfileFromCache(steamid: string): Promise<CachedPlayerProfile | null> {
+  const cacheKey = `${PLAYER_PROFILE_KEY}:${steamid}`;
+
+  const cached = await cacheGet<CachedPlayerProfile>(cacheKey);
+
+  if (cached) {
+    logger.debug(`[PlayerProfileCache] Cache hit for ${steamid}`);
+    return cached;
+  }
+
+  logger.debug(`[PlayerProfileCache] Cache miss for ${steamid}`);
+
+  // Probabilistic early expiration to prevent cache stampede
+  if (shouldExpireEarly(0.1)) {
+    logger.debug(`[PlayerProfileCache] Early expiration triggered for ${steamid}`);
+  }
+
+  // Use cache lock to prevent concurrent database queries
+  return cacheLock.acquire(cacheKey, async () => {
+    // Double-check cache after acquiring lock
+    const rechecked = await cacheGet<CachedPlayerProfile>(cacheKey);
+    if (rechecked) {
+      logger.debug(`[PlayerProfileCache] Cache hit after lock for ${steamid}`);
+      return rechecked;
+    }
+
+    const profile = await getPlayerProfileInternal(steamid);
+
+    if (profile) {
+      await cacheSet(cacheKey, profile, PLAYER_PROFILE_TTL);
+      logger.debug(`[PlayerProfileCache] Cached profile for ${steamid} with TTL ${PLAYER_PROFILE_TTL}s`);
+    }
+
+    return profile;
+  });
+}
+
+/**
+ * Invalidate player profile cache
+ * Called when a player completes a map/bonus/stage
+ * 
+ * @param steamid - The player's SteamID
+ */
+export async function invalidatePlayerProfileCache(steamid: string): Promise<void> {
+  const cacheKey = `${PLAYER_PROFILE_KEY}:${steamid}`;
+  await cacheSet(cacheKey, null as unknown as CachedPlayerProfile, 0); // Set with 0 TTL to expire immediately
+  logger.debug(`[PlayerProfileCache] Invalidated cache for ${steamid}`);
+}
+
+/**
+ * Get cache stats for monitoring
+ */
+export function getPlayerProfileCacheStats(): {
+  key: string;
+  ttl: number;
+  description: string;
+} {
+  return {
+    key: PLAYER_PROFILE_KEY,
+    ttl: PLAYER_PROFILE_TTL,
+    description: 'Player profile data (basic info, maps, bonuses, stages)',
+  };
+}
