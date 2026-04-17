@@ -11,8 +11,10 @@ import pino from 'pino';
  *   npm run dev 2>&1 | npx pino-pretty
  */
 
-// Determine log level from environment (default to 'info')
-const logLevel = process.env.LOG_LEVEL ?? 'warn';
+// Determine log level from environment (default to 'warn')
+// During Next.js production build, silence all logs to avoid build output noise
+const isNextBuild = process.env.NEXT_PHASE === 'phase-production-build';
+const logLevel = isNextBuild ? 'silent' : (process.env.LOG_LEVEL ?? 'warn');
 
 /**
  * Base logger instance for the application
