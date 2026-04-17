@@ -4,6 +4,10 @@ import { Navigation } from '@/components/navigation';
 import { MapImagesUrlProvider } from '@/lib/MapImagesUrlContext';
 import { ThemeProvider } from '@/lib/theme-context';
 import { generateThemeStyles } from '@/lib/theme-config';
+import { startServerBackgroundRefresh } from '@/lib/server-background-refresh';
+
+// Start background server refresh on server startup
+startServerBackgroundRefresh();
 
 // Force dynamic rendering to read environment variables at runtime, not build time
 export const dynamic = 'force-dynamic';
