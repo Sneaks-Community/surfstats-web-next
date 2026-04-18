@@ -150,10 +150,24 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
     },
   }), [safeData]);
 
+  // Summary stats for the info panel
+  const summaryInfo = useMemo(() => {
+    if (safeData.length === 0) return null;
+    const totalLinear = safeData.reduce((sum, d) => sum + d.linear, 0);
+    const totalStaged = safeData.reduce((sum, d) => sum + d.staged, 0);
+    const bestTier = safeData.reduce((best, d) =>
+      (d.linear + d.staged) > (best.linear + best.staged) ? d : best
+    );
+    return { totalLinear, totalStaged, bestTier: bestTier.tier };
+  }, [safeData]);
+
   // If no data, show empty state
   if (chartData.labels.length === 0) {
     return (
       <div className="bg-surface border border-border rounded-xl p-2 h-full flex flex-col">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <h3 className="text-sm font-semibold text-text">Tier Distribution</h3>
+        </div>
         <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
           No completions
         </div>
@@ -163,6 +177,15 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
 
   return (
     <div className="bg-surface border border-border rounded-xl p-2 h-full flex flex-col">
+      <div className="flex items-center justify-between mb-2 px-1">
+        <h3 className="text-sm font-semibold text-text">Tier Distribution</h3>
+        {summaryInfo && (
+          <div className="flex items-center gap-2 text-xs text-text-muted">
+            <span className="text-yellow-500">L:{summaryInfo.totalLinear}</span>
+            <span className="text-purple-500">S:{summaryInfo.totalStaged}</span>
+          </div>
+        )}
+      </div>
       <div className="flex-1 min-h-[200px]">
         <Radar data={chartData} options={options} />
       </div>

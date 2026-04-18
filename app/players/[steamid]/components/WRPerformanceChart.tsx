@@ -101,18 +101,6 @@ const getMovingAvgWindowSize = (granularity: AggregationGranularity): number => 
   }
 };
 
-/**
- * Get time range label based on granularity
- */
-const getTimeRangeLabel = (granularity: AggregationGranularity): string => {
-  switch (granularity) {
-    case 'day': return 'days with completions';
-    case 'week': return 'weeks with completions';
-    case 'month': return 'months with completions';
-    case 'quarter': return 'quarters with completions';
-  }
-};
-
 export default function WRPerformanceChart({ data }: WRPerformanceChartProps) {
   const safeData = useMemo(() => {
     if (!Array.isArray(data)) return [];
@@ -334,7 +322,7 @@ export default function WRPerformanceChart({ data }: WRPerformanceChartProps) {
   if (chartData === null) {
     return (
       <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-        <h3 className="text-sm font-semibold text-text mb-2">WR Performance</h3>
+        <h3 className="text-sm font-semibold text-text mb-2">Completion Percentile</h3>
         <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
           No completions
         </div>
@@ -345,7 +333,7 @@ export default function WRPerformanceChart({ data }: WRPerformanceChartProps) {
   return (
     <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-text">WR Performance</h3>
+        <h3 className="text-sm font-semibold text-text">Completion Percentile</h3>
         {summaryStats && (
           <div className="flex items-center gap-3 text-xs text-text-muted">
             <span>Avg: <span className="text-text font-medium">{summaryStats.avgWR.toFixed(1)}%</span></span>
@@ -359,12 +347,6 @@ export default function WRPerformanceChart({ data }: WRPerformanceChartProps) {
       <div className="flex-1 min-h-[200px]">
         <Line data={chartData} options={options} />
       </div>
-      {summaryStats && (
-        <div className="flex items-center justify-between mt-3 pt-3 border-t border-border text-xs text-text-muted">
-          <span>{summaryStats.total} {getTimeRangeLabel(granularity)}</span>
-          <span>Latest: <span className="text-text font-medium">{summaryStats.latestWR.toFixed(1)}%</span></span>
-        </div>
-      )}
     </div>
   );
 }
