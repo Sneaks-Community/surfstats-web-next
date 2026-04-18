@@ -303,3 +303,128 @@ export async function getPerformanceTrendFromCache(
   
   return result;
 }
+
+// Activity Heatmap Data Interface
+interface PlayerConnectData extends RowDataPacket {
+  connect_time: string | Date;
+}
+
+interface HeatmapDataPoint {
+  dayOfWeek: number; // 0=Sunday, 1=Monday, ..., 6=Saturday
+  hour: number;      // 0-23
+  count: number;
+}
+
+/**
+ * Fetch player connection activity heatmap data
+ * Returns a grid of day-of-week vs hour-of-day connection counts
+ * @param steamId - SteamID2 format (e.g., STEAM_1:0:95515509)
+ * @returns 2D array of connection counts [dayOfWeek][hour], or null if unavailable
+ */
+async function getPlayerActivityHeatmapInternal(
+  steamId: string
+): Promise<HeatmapDataPoint[] | null> {
+  // Return null if analytics is not configured
+  if (!isAnalyticsConfigured) {
+    return null;
+  }
+
+  const steamId3Numeric = convertSteamId2ToSteamId3Numeric(steamId);
+  if (steamId3Numeric === null) {
+    logger.warn(`[Analytics] Invalid SteamID format: ${steamId}`);
+    return null;
+  }
+
+  try {
+    logger.debug(`[Analytics] Fetching activity heatmap for ${steamId} (steamid3=${steamId3Numeric})`);
+
+    const [rows] = await analyticsPool.query<PlayerConnectData[]>(`
+      SELECT
+        connect_time
+      FROM player_analytics
+      WHERE steamid3 = ?
+      ORDER BY connect_time DESC
+      LIMIT 10000
+    `, [steamId3Numeric]);
+
+    logger.debug(`[Analytics] Found ${rows.length} connection records for ${steamId}`);
+
+    if (rows.length === 0) {
+      logger.debug(`[Analytics] No connection records found for ${steamId}`);
+      return [];
+    }
+
+    // Aggregate by day of week and hour
+    const aggregated = new Map<string, number>();
+
+    for (const row of rows) {
+      // connect_time is stored as Unix timestamp (seconds) in the database
+      // MySQL returns it as a number, which needs to be multiplied by 1000 for JavaScript Date
+      let date: Date;
+      if (typeof row.connect_time === 'number') {
+        date = new Date(row.connect_time * 1000);
+      } else if (typeof row.connect_time === 'string') {
+        date = new Date(row.connect_time);
+      } else if (row.connect_time instanceof Date) {
+        date = row.connect_time;
+      } else {
+        continue;
+      }
+
+      // Skip invalid dates
+      if (isNaN(date.getTime())) {
+        continue;
+      }
+
+      const dayOfWeek = date.getDay(); // 0=Sunday, 6=Saturday
+      const hour = date.getHours();
+      const key = `${dayOfWeek}-${hour}`;
+
+      aggregated.set(key, (aggregated.get(key) || 0) + 1);
+    }
+
+    // Convert to array format
+    const result: HeatmapDataPoint[] = [];
+    for (const [key, count] of aggregated) {
+      const [dayOfWeek, hour] = key.split('-').map(Number);
+      result.push({ dayOfWeek, hour, count });
+    }
+
+    return result;
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    const errorMessage = err.message || 'Unknown error';
+    logger.error(`[Analytics] Failed to fetch activity heatmap for ${steamId}: ${errorMessage}`);
+    return null;
+  }
+}
+
+/**
+ * Cache key and TTL for activity heatmap data
+ */
+const ACTIVITY_HEATMAP_KEY = 'surfstats:player:activity-heatmap';
+const ACTIVITY_HEATMAP_TTL = 3600; // 1 hour (data changes slowly)
+
+/**
+ * Cached version of getPlayerActivityHeatmap for use in server components
+ * Cache for 1 hour (3600 seconds) to reduce database load on high-traffic pages
+ */
+export async function getActivityHeatmapFromCache(
+  steamId: string
+): Promise<HeatmapDataPoint[] | null> {
+  const cacheKey = `${ACTIVITY_HEATMAP_KEY}:${steamId}`;
+
+  const cached = await cacheGet<HeatmapDataPoint[]>(cacheKey);
+
+  if (cached !== null) {
+    return cached;
+  }
+
+  const result = await getPlayerActivityHeatmapInternal(steamId);
+
+  if (result !== null) {
+    await cacheSet(cacheKey, result, ACTIVITY_HEATMAP_TTL);
+  }
+
+  return result;
+}

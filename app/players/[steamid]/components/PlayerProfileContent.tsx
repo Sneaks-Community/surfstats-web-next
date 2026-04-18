@@ -15,6 +15,8 @@ import TierDistributionChart from './TierDistributionChart';
 import PlayerRecordsTabs from './PlayerRecordsTabs';
 import ProgressBar from '@/components/ProgressBar';
 import PlayerTimeDisplay from './PlayerTimeDisplay';
+import WRPerformanceChart from './WRPerformanceChart';
+import ActivityHeatmapChart from './ActivityHeatmapChart';
 
 // Type definitions for player records
 interface MapRecord {
@@ -106,6 +108,17 @@ interface PlayerProfileContentProps {
     linear: number;
     staged: number;
   }[];
+  wrPerformanceData: Array<{
+    mapname: string;
+    wrPercentage: number;
+    tier: number;
+    date: string;
+  }>;
+  activityHeatmap: Array<{
+    dayOfWeek: number;
+    hour: number;
+    count: number;
+  }> | null;
   steamid: string;
 }
 
@@ -116,6 +129,8 @@ export default async function PlayerProfileContent({
   steamAvatars,
   playtimeData,
   linearVsStagedPerTier,
+  wrPerformanceData,
+  activityHeatmap,
   steamid,
 }: PlayerProfileContentProps) {
   const { player, maps, bonuses, stages } = data;
@@ -257,19 +272,33 @@ export default async function PlayerProfileContent({
             </div>
           )}
         </div>
-        {/* Placeholder for additional charts */}
+        {/* WR Performance + Activity Heatmap */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:col-span-3">
-          <div className="bg-surface border border-border rounded-xl p-4 flex flex-col h-[130px] lg:h-auto">
-            <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
-            <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
-              Additional stats
-            </div>
+          {/* WR Performance Chart */}
+          <div className="h-[280px] lg:h-auto">
+            {wrPerformanceData && wrPerformanceData.length > 0 ? (
+              <WRPerformanceChart data={wrPerformanceData} />
+            ) : (
+              <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
+                <h3 className="text-sm font-semibold text-text mb-2">WR Performance</h3>
+                <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
+                  No completions
+                </div>
+              </div>
+            )}
           </div>
-          <div className="bg-surface border border-border rounded-xl p-4 flex flex-col h-[130px] lg:h-auto">
-            <h3 className="text-sm font-semibold text-text mb-2">Coming Soon</h3>
-            <div className="flex-1 flex items-center justify-center text-text-muted text-sm">
-              Additional stats
-            </div>
+          {/* Activity Heatmap */}
+          <div className="h-[280px] lg:h-auto">
+            {activityHeatmap && activityHeatmap.length > 0 ? (
+              <ActivityHeatmapChart data={activityHeatmap} />
+            ) : (
+              <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
+                <h3 className="text-sm font-semibold text-text mb-2">Activity Heatmap</h3>
+                <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
+                  No connection data
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

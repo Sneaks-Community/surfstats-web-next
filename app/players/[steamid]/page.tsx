@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import { sanitizeSteamId } from '@/lib/sanitize';
 import { getTotalsFromCache } from '@/lib/cache';
-import { getPlayerTimeOnServerFromCache } from '@/lib/player-analytics';
+import { getPlayerTimeOnServerFromCache, getActivityHeatmapFromCache } from '@/lib/player-analytics';
 import { getPlayerNameFromCache } from '@/lib/player-cache';
 import { getPlayerProfileFromCache } from '@/lib/player-profile-cache';
 import logger from '@/lib/logger';
@@ -269,13 +269,31 @@ export default async function PlayerProfilePage({
   const { player: _player, maps: _maps, bonuses: _bonuses, stages: _stages } = data;
   
   // Group 2: Parallel fetch for remaining data
-  const [incompleteData, totals, steamAvatars, playtimeData, linearVsStagedPerTier] = await Promise.all([
+  const [incompleteData, totals, steamAvatars, playtimeData, linearVsStagedPerTier, activityHeatmap] = await Promise.all([
     getIncompleteRecords(validSteamId),
     getTotalsFromCache(),
     getSteamProfilesFromCache([decodedSteamId]),
     getPlayerTimeOnServerFromCache(validSteamId),
     getLinearVsStagedPerTier(validSteamId),
+    getActivityHeatmapFromCache(validSteamId),
   ]);
+
+  // Compute WR performance data from maps
+  const wrPerformanceData = (data.maps as Array<{
+    mapname: string;
+    runtimepro: number;
+    date: string;
+    tier: number;
+    wr_time: number | null;
+    player_rank: number;
+  }>)
+    .filter(m => m.wr_time !== null && m.wr_time !== undefined && m.runtimepro > 0)
+    .map(m => ({
+      mapname: m.mapname,
+      wrPercentage: (m.wr_time! / m.runtimepro) * 100,
+      tier: m.tier,
+      date: m.date,
+    }));
 
   return (
     <div className="space-y-4">
@@ -286,6 +304,8 @@ export default async function PlayerProfilePage({
         steamAvatars={steamAvatars}
         playtimeData={playtimeData}
         linearVsStagedPerTier={linearVsStagedPerTier}
+        wrPerformanceData={wrPerformanceData}
+        activityHeatmap={activityHeatmap}
         steamid={validSteamId}
       />
     </div>
