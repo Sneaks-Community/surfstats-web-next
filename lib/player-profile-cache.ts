@@ -58,11 +58,18 @@ async function getPlayerProfileInternal(steamid: string): Promise<CachedPlayerPr
 
   try {
     // Get basic player info and rank
+    // Wrap window function in subquery so DENSE_RANK evaluates on full table,
+    // then filter to the requested player. This fixes the bug where the WHERE
+    // clause filtered to a single row before the window function ran, always
+    // returning rank 1.
     const [playerRows] = await pool.query<RowDataPacket[]>(`
-      SELECT
-        steamid, name, country, points, lastseen,
-        DENSE_RANK() OVER (ORDER BY points DESC) as rank
-      FROM ck_playerrank
+      SELECT steamid, name, country, points, lastseen, rank
+      FROM (
+        SELECT
+          steamid, name, country, points, lastseen,
+          DENSE_RANK() OVER (ORDER BY points DESC) as rank
+        FROM ck_playerrank
+      ) ranked
       WHERE steamid = ?
     `, [steamid]);
 
