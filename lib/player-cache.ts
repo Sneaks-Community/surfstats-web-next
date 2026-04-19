@@ -63,6 +63,7 @@ async function fetchPlayersInternal(
     // Use window function for rank calculation (much more efficient than correlated subquery)
     // RANK() OVER (ORDER BY points DESC) calculates rank based on points
     // This is O(n log n) instead of O(n²) for the correlated subquery
+    // Count finishedmaps from ck_playertimes directly to ensure accuracy
     let query: string;
     const params: (string | number)[] = [];
     
@@ -71,14 +72,19 @@ async function fetchPlayersInternal(
       query = `
         SELECT
           ranked.steamid, ranked.name, ranked.country, ranked.points,
-          ranked.finishedmaps, ranked.lastseen, ranked.rank
+          COALESCE(completions.map_count, 0) as finishedmaps, ranked.lastseen, ranked.rank
         FROM (
           SELECT
-            steamid, name, country, points, finishedmaps, lastseen,
+            steamid, name, country, points, lastseen,
             RANK() OVER (ORDER BY points DESC) as rank
           FROM ck_playerrank
           WHERE name LIKE ? OR steamid LIKE ?
         ) ranked
+        LEFT JOIN (
+          SELECT steamid, COUNT(DISTINCT mapname) as map_count
+          FROM ck_playertimes
+          GROUP BY steamid
+        ) completions ON ranked.steamid = completions.steamid
         ORDER BY ranked.points DESC
         LIMIT ? OFFSET ?
       `;
@@ -87,10 +93,20 @@ async function fetchPlayersInternal(
       // For non-search, use window function directly with pagination
       query = `
         SELECT
-          steamid, name, country, points, finishedmaps, lastseen,
-          RANK() OVER (ORDER BY points DESC) as rank
-        FROM ck_playerrank
-        ORDER BY points DESC
+          ranked.steamid, ranked.name, ranked.country, ranked.points,
+          COALESCE(completions.map_count, 0) as finishedmaps, ranked.lastseen, ranked.rank
+        FROM (
+          SELECT
+            steamid, name, country, points, lastseen,
+            RANK() OVER (ORDER BY points DESC) as rank
+          FROM ck_playerrank
+        ) ranked
+        LEFT JOIN (
+          SELECT steamid, COUNT(DISTINCT mapname) as map_count
+          FROM ck_playertimes
+          GROUP BY steamid
+        ) completions ON ranked.steamid = completions.steamid
+        ORDER BY ranked.points DESC
         LIMIT ? OFFSET ?
       `;
       params.push(limit, offset);
