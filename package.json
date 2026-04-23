@@ -17,7 +17,7 @@
     "country-flag-icons": "^1.6.16",
     "gamedig": "^5.3.2",
     "lucide-react": "^1.8.0",
-    "mysql2": "^3.22.0",
+    "mysql2": "^3.22.2",
     "next": "^16.2.4",
     "pino": "^9.14.0",
     "postcss": "^8.5.10",
