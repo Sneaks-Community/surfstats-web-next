@@ -103,11 +103,11 @@ interface PlayerProfileContentProps {
   playtimeData: {
     totalSeconds: number;
   } | null;
-  linearVsStagedPerTier: {
+  linearVsStagedPerTier: Array<{
     tier: number;
     linear: number;
     staged: number;
-  }[];
+  }>;
   wrPerformanceData: Array<{
     mapname: string;
     wrPercentage: number;

@@ -65,7 +65,7 @@ async function fetchPlayersInternal(
     // This is O(n log n) instead of O(n²) for the correlated subquery
     // Count finishedmaps from ck_playertimes directly to ensure accuracy
     let query: string;
-    const params: (string | number)[] = [];
+    const params: Array<string | number> = [];
     
     if (sanitizedSearch) {
       // For search, we need to use a subquery to filter first, then calculate rank

@@ -102,7 +102,7 @@ export const cacheLock = new CacheLock();
  * @param probability - Probability of early expiration (0-1, default 0.1 = 10%)
  * @returns true if should expire early, false otherwise
  */
-export function shouldExpireEarly(probability: number = 0.1): boolean {
+export function shouldExpireEarly(probability = 0.1): boolean {
   return Math.random() < probability;
 }
 
@@ -118,7 +118,7 @@ export function shouldExpireEarly(probability: number = 0.1): boolean {
  */
 export function getWithEarlyExpiration<T>(
   cachedValue: T | null,
-  probability: number = 0.1
+  probability = 0.1
 ): T | null {
   if (cachedValue !== null) {
     return cachedValue;

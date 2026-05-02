@@ -23,7 +23,7 @@ interface UsePaginationOptions {
 }
 
 interface UsePaginationResult {
-  pageNumbers: (number | string)[]; // Array of page numbers with '...' for gaps
+  pageNumbers: Array<number | string>; // Array of page numbers with '...' for gaps
   hasNextPage: boolean;
   hasPrevPage: boolean;
   canGoToFirst: boolean;
@@ -42,7 +42,7 @@ export function usePagination({
   delta = 2,
 }: UsePaginationOptions): UsePaginationResult {
   return useMemo(() => {
-    const pageNumbers: (number | string)[] = [];
+    const pageNumbers: Array<number | string> = [];
 
     if (totalPages <= 0) {
       return {

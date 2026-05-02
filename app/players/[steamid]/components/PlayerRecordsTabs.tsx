@@ -454,7 +454,7 @@ export default function PlayerRecordsTabs({
     { id: 'stages' as TabType, label: 'Stages', icon: Layers, color: 'text-orange-500' },
   ];
 
-  const statusFilters: { id: StatusFilter; label: string; count: number; icon: typeof CheckCircle }[] = [
+  const statusFilters: Array<{ id: StatusFilter; label: string; count: number; icon: typeof CheckCircle }> = [
     { id: 'finished', label: 'Finished', count: activeTab === 'maps' ? maps.length : activeTab === 'bonuses' ? bonuses.length : stages.length, icon: CheckCircle },
     { id: 'incomplete', label: 'Incomplete', count: activeTab === 'maps' ? incompleteMaps.length : activeTab === 'bonuses' ? incompleteBonuses.length : incompleteStages.length, icon: Circle },
   ];

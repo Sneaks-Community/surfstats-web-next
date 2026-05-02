@@ -113,7 +113,7 @@ export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
         },
         callbacks: {
           title: (tooltipItems) => {
-            const date = tooltipItems[0].label as string;
+            const date = tooltipItems[0].label;
             return `Date: ${date}`;
           },
           label: (context) => {

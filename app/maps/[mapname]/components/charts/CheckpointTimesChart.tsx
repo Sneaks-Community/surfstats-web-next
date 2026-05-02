@@ -69,7 +69,7 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
     // Add "Finish" label at the end
     labels.push('Finish');
 
-    const avgTimes: (number | null)[] = safeData.map(d => d.avgTime);
+    const avgTimes: Array<number | null> = safeData.map(d => d.avgTime);
 
     // Add average finish time if available
     if (safeFinishTime.avgTime !== null && safeFinishTime.avgTime !== undefined) {
@@ -161,7 +161,7 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
         },
         callbacks: {
           title: (tooltipItems) => {
-            const label = tooltipItems[0].label as string;
+            const label = tooltipItems[0].label;
             // Handle "Finish" label
             if (label === 'Finish') {
               return 'Finish';
@@ -178,7 +178,7 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
           label: (context) => {
             const datasetIndex = context.datasetIndex;
             const value = context.parsed.y ?? 0;
-            const label = context.label as string;
+            const label = context.label;
             
             if (datasetIndex === 0) {
               // Average Time dataset

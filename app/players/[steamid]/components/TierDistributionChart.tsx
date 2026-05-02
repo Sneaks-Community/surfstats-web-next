@@ -116,7 +116,7 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
             return tooltipItems[0].label || '';
           },
           label: (context) => {
-            const count = context.parsed.r as number;
+            const count = context.parsed.r;
             const datasetLabel = context.dataset.label;
             return `${datasetLabel}: ${count} maps`;
           },

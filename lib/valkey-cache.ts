@@ -17,7 +17,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
       logger.debug(`[Cache] Miss: ${key}`);
       return null;
     }
-    const value = JSON.parse(cached as string) as T;
+    const value = JSON.parse(cached) as T;
     logger.debug(`[Cache] Hit: ${key}`);
     return value;
   } catch {

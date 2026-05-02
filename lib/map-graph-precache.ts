@@ -31,7 +31,7 @@ export interface MapGraphData {
   checkpointStats: { checkpointAvgTimes: Array<{ checkpoint: number; avgTime: number; sampleSize: number }> };
   wrCheckpointTimes: Array<{ checkpoint: number; time: number }> | undefined;
   finishTimeData: { avgTime: number | null; wrTime: number | null };
-  bonusCompletionsOverTime: { [bonus: number]: Array<{ date: string; count: number }> };
+  bonusCompletionsOverTime: Record<number, Array<{ date: string; count: number }>>;
   percentileTimes: {
     wrTime: number | null;
     p1Time: number | null;

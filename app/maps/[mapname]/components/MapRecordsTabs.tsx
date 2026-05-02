@@ -201,7 +201,7 @@ export default function MapRecordsTabs({
   }, [activeTab, selectedStage, numStages]);
 
   // Function to load bonus records from API with client-side caching
-  const loadBonusRecords = async (bonus: number, page: number = 1) => {
+  const loadBonusRecords = async (bonus: number, page = 1) => {
     if (isLoadingBonuses) return;
 
     // Check client-side cache first

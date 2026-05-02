@@ -188,8 +188,8 @@ export async function getLeaderboardRecordsFromCache(
  */
 export async function getMapRecordsFromCache(
   mapname: string,
-  page: number = 1,
-  pageSize: number = 100
+  page = 1,
+  pageSize = 100
 ): Promise<{
   leaderboard: MapRecord[];
   bonuses: BonusRecord[];

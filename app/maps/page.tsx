@@ -33,7 +33,7 @@ export default async function MapsPage({
 }) {
   const params = await searchParams;
   // Helper to handle string | string[] from searchParams (returns first value)
-  const getParam = (value: string | string[] | undefined, defaultValue: string = ''): string => {
+  const getParam = (value: string | string[] | undefined, defaultValue = ''): string => {
     if (Array.isArray(value)) return value[0] || defaultValue;
     return value || defaultValue;
   };

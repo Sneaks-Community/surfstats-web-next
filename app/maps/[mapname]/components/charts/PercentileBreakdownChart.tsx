@@ -106,7 +106,7 @@ export default function PercentileBreakdownChart({ data }: PercentileBreakdownCh
         },
         callbacks: {
           title: (tooltipItems) => {
-            const label = tooltipItems[0].label as string;
+            const label = tooltipItems[0].label;
             return label;
           },
           label: (context) => {

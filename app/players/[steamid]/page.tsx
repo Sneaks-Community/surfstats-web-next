@@ -140,7 +140,7 @@ async function getIncompleteRecords(steamid: string) {
   }
 }
 
-async function getLinearVsStagedPerTier(steamid: string): Promise<{ tier: number; linear: number; staged: number }[]> {
+async function getLinearVsStagedPerTier(steamid: string): Promise<Array<{ tier: number; linear: number; staged: number }>> {
   logger.debug(`[Player] Fetching linear vs staged per tier for: ${steamid}`);
   
   try {
@@ -161,7 +161,7 @@ async function getLinearVsStagedPerTier(steamid: string): Promise<{ tier: number
     logger.debug(`[Player] Raw query results for ${steamid}: ${JSON.stringify(rows)}`);
     
     // Initialize all tiers 1-10 with zeros
-    const distribution: { tier: number; linear: number; staged: number }[] = [];
+    const distribution: Array<{ tier: number; linear: number; staged: number }> = [];
     for (let tier = 1; tier <= 10; tier++) {
       distribution.push({ tier, linear: 0, staged: 0 });
     }
@@ -189,7 +189,7 @@ async function getLinearVsStagedPerTier(steamid: string): Promise<{ tier: number
     const err = error as { message?: string };
     logger.error(`[Player] Failed to fetch linear vs staged per tier: ${err.message || 'Unknown error'}`);
     // Return empty array with all tiers at 0
-    const emptyArray: { tier: number; linear: number; staged: number }[] = [];
+    const emptyArray: Array<{ tier: number; linear: number; staged: number }> = [];
     for (let tier = 1; tier <= 10; tier++) {
       emptyArray.push({ tier, linear: 0, staged: 0 });
     }

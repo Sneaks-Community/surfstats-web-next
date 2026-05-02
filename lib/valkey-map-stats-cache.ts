@@ -100,7 +100,7 @@ export async function getWRCheckpointTimesFromCache(
     const wrSteamid = mapMetadata?.wr_holder_steamid || null;
 
     if (!wrSteamid) {
-      const result: undefined = undefined;
+      const result = undefined;
       await cacheSet(key, result, STATS_CACHE_TTL);
       return undefined;
     }
@@ -131,7 +131,7 @@ export async function getWRCheckpointTimesFromCache(
     `, [validMapname, wrSteamid]);
 
     if (wrCheckpointRows.length === 0) {
-      const result: undefined = undefined;
+      const result = undefined;
       await cacheSet(key, result, STATS_CACHE_TTL);
       return undefined;
     }
@@ -234,7 +234,7 @@ export async function getCheckpointStatsFromCache(mapname: string): Promise<Chec
  */
 export async function getBonusCompletionsOverTimeFromCache(
   mapname: string
-): Promise<{ [bonus: number]: Array<{ date: string; count: number }> }> {
+): Promise<Record<number, Array<{ date: string; count: number }>>> {
   const validMapname = sanitizeMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
@@ -242,7 +242,7 @@ export async function getBonusCompletionsOverTimeFromCache(
   }
   const key = `surfstats:map:${validMapname}:stats:bonus-time`;
 
-  const cached = await cacheGet<{ [bonus: number]: Array<{ date: string; count: number }> }>(key);
+  const cached = await cacheGet<Record<number, Array<{ date: string; count: number }>>>(key);
   if (cached !== null) {
     logger.debug(`[Cache] Hit: ${key}`);
     return cached;
@@ -262,7 +262,7 @@ export async function getBonusCompletionsOverTimeFromCache(
       ORDER BY date ASC, zonegroup ASC
     `, [validMapname]);
 
-    const bonusData: { [bonus: number]: Array<{ date: string; count: number }> } = {};
+    const bonusData: Record<number, Array<{ date: string; count: number }>> = {};
 
     for (const row of bonusRows) {
       if (!bonusData[row.bonus]) {

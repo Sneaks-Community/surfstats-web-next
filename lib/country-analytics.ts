@@ -98,8 +98,8 @@ export async function getDistinctCountriesFromCache(): Promise<string[]> {
 const getCountriesRankingInternal = async (
   sort: CountrySortKey = 'points',
   order: SortOrder = 'desc',
-  page: number = 1,
-  limit: number = 50
+  page = 1,
+  limit = 50
 ): Promise<{ countries: CountryRank[]; total: number; totalPages: number }> => {
   logger.debug(`[CountryAnalytics] Fetching countries ranking (sort: ${sort}, order: ${order}, page: ${page})`);
   
@@ -207,8 +207,8 @@ const COUNTRIES_RANKING_TTL = 86400; // 24 hours
 export async function getCountriesRankingFromCache(
   sort: CountrySortKey = 'points',
   order: SortOrder = 'desc',
-  page: number = 1,
-  limit: number = 50
+  page = 1,
+  limit = 50
 ): Promise<{ countries: CountryRank[]; total: number; totalPages: number }> {
   const cacheKey = `${COUNTRIES_RANKING_KEY}:${sort}:${order}:${page}:${limit}`;
   
@@ -242,8 +242,8 @@ export type PlayerSortKey = 'rank' | 'player' | 'points' | 'maps' | 'lastseen';
  */
 export async function getCountryPlayers(
   countryCode: string,
-  page: number = 1,
-  limit: number = 20,
+  page = 1,
+  limit = 20,
   sort: PlayerSortKey = 'rank',
   order: SortOrder = 'desc'
 ): Promise<{ players: CountryPlayer[]; total: number; totalPages: number; countryName: string }> {

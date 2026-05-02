@@ -35,9 +35,7 @@ interface CompletionsOverTimeData {
   count: number;
 }
 
-interface BonusTimeSeriesData {
-  [bonus: number]: Array<{ date: string; count: number }>;
-}
+type BonusTimeSeriesData = Record<number, Array<{ date: string; count: number }>>;
 
 interface CompletionsOverTimeChartProps {
   data: CompletionsOverTimeData[];
@@ -131,7 +129,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
   const chartData = useMemo(() => {
     const datasets: Array<{
       label: string;
-      data: (number | null)[];
+      data: Array<number | null>;
       borderColor: string;
       backgroundColor: string;
       fill: boolean;
@@ -223,7 +221,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
           },
           callbacks: {
             title: (tooltipItems) => {
-              const date = tooltipItems[0].label as string;
+              const date = tooltipItems[0].label;
               return formatDate(date);
             },
             label: (context) => {
@@ -265,7 +263,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
             autoSkip: false,
             callback: (value, index) => {
               // Chart.js passes the numeric index to the tick callback
-              const date = chartData.labels[index as number];
+              const date = chartData.labels[index];
               if (!date) return '';
               
               // Parse the date to determine appropriate formatting based on data density

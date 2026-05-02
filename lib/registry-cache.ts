@@ -46,19 +46,19 @@ export async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stag
       `),
     ]);
     
-    const bonuses: BonusGroup[] = (bonusResult[0] as RowDataPacket[]).map((row) => ({
+    const bonuses: BonusGroup[] = (bonusResult[0]).map((row) => ({
       mapname: row.mapname,
       zonegroup: row.zonegroup,
       wr_time: row.wr_time || null,
     }));
     
-    const stages: StageGroup[] = (stageResult[0] as RowDataPacket[]).map((row) => ({
+    const stages: StageGroup[] = (stageResult[0]).map((row) => ({
       map: row.map,
       stage: row.stage,
       count: row.count,
     }));
     
-    const playerCount = (countResult[0] as RowDataPacket[])[0].total;
+    const playerCount = (countResult[0])[0].total;
     
     const duration = Date.now() - startTime;
     logger.debug(`[RegistryCache] Fetched ${bonuses.length} bonus groups, ${stages.length} stages, and ${playerCount} players in ${duration}ms`);
@@ -142,12 +142,12 @@ export async function getStagesForMap(mapname: string): Promise<StageGroup[]> {
 export async function getIncompleteMapsForPlayer(
   steamid: string,
   finishedMapNames: Set<string>
-): Promise<{ mapname: string; tier: number; wr_time: number | null }[]> {
+): Promise<Array<{ mapname: string; tier: number; wr_time: number | null }>> {
   // Import here to avoid circular dependency
   const { fetchAllMapMetadata } = await import('./map-cache');
   
   const allMetadata = await fetchAllMapMetadata();
-  const incompleteMaps: { mapname: string; tier: number; wr_time: number | null }[] = [];
+  const incompleteMaps: Array<{ mapname: string; tier: number; wr_time: number | null }> = [];
   
   for (const [mapname, metadata] of allMetadata) {
     if (!finishedMapNames.has(mapname)) {

@@ -16,7 +16,7 @@ interface ChartData {
     wrTime: number | null;
   };
   bonusCompletionRates: Array<{ bonus: number; completionRate: number; completions: number }>;
-  bonusCompletionsOverTime: { [bonus: number]: Array<{ date: string; count: number }> };
+  bonusCompletionsOverTime: Record<number, Array<{ date: string; count: number }>>;
   isStageMap: boolean; // true if map has stages (zonetype 3), false for linear maps (zonetype 4)
   percentileTimes: {
     wrTime: number | null;

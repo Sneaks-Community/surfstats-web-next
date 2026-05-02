@@ -71,7 +71,7 @@ export default function Pagination({
   const searchParams = useSearchParams();
 
   // Handle jump to page
-  const handleJumpSubmit = useCallback((e: React.FormEvent) => {
+  const handleJumpSubmit = useCallback((e: React.SyntheticEvent) => {
     e.preventDefault();
     const page = parseInt(jumpPage, 10);
     if (page >= 1 && page <= totalPages) {

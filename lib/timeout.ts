@@ -25,7 +25,7 @@
 export async function withTimeout<T>(
   promise: Promise<T>,
   ms: number,
-  message: string = 'Operation timed out'
+  message = 'Operation timed out'
 ): Promise<T> {
   // Create a deferred promise for the timeout
   let timeoutId: NodeJS.Timeout | null = null;

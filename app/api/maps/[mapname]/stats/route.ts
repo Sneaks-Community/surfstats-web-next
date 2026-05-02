@@ -24,7 +24,7 @@ interface StatsResponse {
     avgTime: number; // Average map completion time
     wrTime: number | null; // WR holder's total time
   };
-  bonusCompletionsOverTime: { [bonus: number]: Array<{ date: string; count: number }> };
+  bonusCompletionsOverTime: Record<number, Array<{ date: string; count: number }>>;
   isStageMap: boolean; // true if map has stages (zonetype 3), false for linear maps (zonetype 4)
   percentileTimes: {
     wrTime: number | null;
