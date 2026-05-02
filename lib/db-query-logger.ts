@@ -34,7 +34,7 @@ export function wrapPoolQuery(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   pool.query = async (...args: any[]) => {
     const queryPreview = typeof args[0] === 'string'
-      ? args[0].substring(0, 300) + (args[0].length > 300 ? '...' : '')
+      ? args[0].substring(0, 600) + (args[0].length > 600 ? '...' : '')
       : 'prepared statement';
 
     try {

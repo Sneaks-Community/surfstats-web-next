@@ -78,9 +78,13 @@ export function sanitizeSearchQuery(query: string | undefined): string {
   
   // Remove any non-printable or special characters
   sanitized = sanitized
-    .replace(/[<>\"'&;\\]/g, '') // Remove potential XSS/Injection characters
+    .replace(/[<>"'&;\\]/g, '') // Remove potential XSS/Injection characters
     .replace(/\s+/g, ' ')        // Normalize whitespace
     .trim();
+  
+  // Escape SQL LIKE wildcards to prevent LIKE wildcard injection
+  // % matches any sequence of characters, _ matches any single character
+  sanitized = sanitized.replace(/([%_])/g, '\\$1');
   
   // Validate against allowed characters
   if (!SEARCH_REGEX.test(sanitized)) {

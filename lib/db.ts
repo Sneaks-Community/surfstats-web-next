@@ -3,14 +3,35 @@ import mysql from 'mysql2/promise';
 import logger from '@/lib/logger';
 import { wrapPoolQuery } from '@/lib/db-query-logger';
 
+// Fail-fast on missing required environment variables
+const MYSQL_HOST = process.env.MYSQL_HOST;
+const MYSQL_USER = process.env.MYSQL_USER;
+const MYSQL_PASSWORD = process.env.MYSQL_PASSWORD;
+const MYSQL_DATABASE = process.env.MYSQL_DATABASE;
+
+if (!MYSQL_HOST) {
+  throw new Error('MYSQL_HOST environment variable is required');
+}
+if (!MYSQL_USER) {
+  throw new Error('MYSQL_USER environment variable is required');
+}
+if (!MYSQL_PASSWORD) {
+  throw new Error('MYSQL_PASSWORD environment variable is required');
+}
+if (!MYSQL_DATABASE) {
+  throw new Error('MYSQL_DATABASE environment variable is required');
+}
+
 const pool = mysql.createPool({
-  host: process.env.MYSQL_HOST || 'localhost',
-  user: process.env.MYSQL_USER || 'root',
-  password: process.env.MYSQL_PASSWORD || '',
-  database: process.env.MYSQL_DATABASE || 'cksurf',
+  host: MYSQL_HOST,
+  user: MYSQL_USER,
+  password: MYSQL_PASSWORD,
+  database: MYSQL_DATABASE,
   waitForConnections: true,
-  connectionLimit: 10,
+  connectionLimit: 20,
   queueLimit: 100,
+  // Milliseconds before a timeout occurs during the initial connection to the MySQL server
+  connectTimeout: 5000,
 });
 
 // Log pool connection events (debug mode only)
