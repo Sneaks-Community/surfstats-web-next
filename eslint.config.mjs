@@ -94,6 +94,12 @@ export default defineConfig(
       "jsx-a11y/aria-props": "warn",
       "react/no-unescaped-entities": "off",
 
+      "react-hooks/exhaustive-deps": "warn",
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/static-components": "warn",
+      "react-hooks/immutability": "warn",
+
       "no-console": ["warn", { allow: ["warn", "error", "debug"] }],
 
       // Warn on lexical declarations in case blocks (let/const in switch)
