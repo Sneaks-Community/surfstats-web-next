@@ -45,8 +45,8 @@ async function getPlayerTimeOnServerInternal(steamId: string): Promise<PlayerTim
     // Falls back to original query if summary table doesn't exist
     const [rows] = await analyticsPool.query<PlayerTimeData[]>(`
       SELECT
-        total_duration as total_duration,
-        connection_count as connection_count
+        total_duration,
+        connection_count
       FROM player_analytics_summary
       WHERE steamid3 = ?
     `, [steamId3Numeric]);
