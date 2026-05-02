@@ -5,7 +5,7 @@ import pino from 'pino';
  * Pino logger configuration for the application
  *
  * Environment variables:
- * - LOG_LEVEL: Minimum log level (trace, debug, info, warn, error, fatal, silent). Defaults to 'info'.
+ * - LOG_LEVEL: Minimum log level (trace, debug, info, warn, error, fatal, silent). Defaults to 'warn'.
  *
  * Note: In development, pipe logs through `pino-pretty` CLI for human-readable output:
  *   npm run dev 2>&1 | npx pino-pretty
