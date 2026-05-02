@@ -6,7 +6,7 @@ import { Trophy, Target, Layers, Search, ArrowUpDown, ArrowUp, ArrowDown, X } fr
 import Link from 'next/link';
 import Pagination from '@/components/Pagination';
 import { formatTime, formatDate } from '@/lib/utils';
-import { sanitizePlayerName } from '@/lib/sanitize';
+import { validatePlayerName } from '@/lib/validators';
 import { useDebounce } from '@/hooks/useDebounce';
 import { clientError } from '@/lib/client-logger';
 
@@ -588,7 +588,7 @@ export default function MapRecordsTabs({
           className="text-primary hover:text-primary font-medium transition-colors text-base"
           prefetch={false}
         >
-          {sanitizePlayerName(record.name)}
+          {validatePlayerName(record.name)}
         </Link>
       </td>
       <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
@@ -645,7 +645,7 @@ export default function MapRecordsTabs({
           className="text-primary hover:text-primary font-medium transition-colors text-base"
           prefetch={false}
         >
-          {sanitizePlayerName(record.name)}
+          {validatePlayerName(record.name)}
         </Link>
       </td>
       <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">

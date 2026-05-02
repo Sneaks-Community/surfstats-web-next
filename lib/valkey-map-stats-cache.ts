@@ -4,7 +4,7 @@ import pool from './db';
 import analyticsPool from './db-analytics';
 import type { RowDataPacket } from 'mysql2';
 import { getMapMetadataFromCache } from './valkey-map-cache';
-import { sanitizeMapName } from './sanitize';
+import { validateMapName } from './validators';
 import logger from './logger';
 
 const STATS_CACHE_TTL = 43200; // 12 hours
@@ -80,7 +80,7 @@ export async function getWRCheckpointTimesFromCache(
     return undefined;
   }
 
-  const validMapname = sanitizeMapName(mapname);
+  const validMapname = validateMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return undefined;
@@ -164,7 +164,7 @@ export async function getWRCheckpointTimesFromCache(
  * Get checkpoint stats from cache
  */
 export async function getCheckpointStatsFromCache(mapname: string): Promise<CheckpointStatsResult> {
-  const validMapname = sanitizeMapName(mapname);
+  const validMapname = validateMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return { checkpointAvgTimes: [] };
@@ -235,7 +235,7 @@ export async function getCheckpointStatsFromCache(mapname: string): Promise<Chec
 export async function getBonusCompletionsOverTimeFromCache(
   mapname: string
 ): Promise<Record<number, Array<{ date: string; count: number }>>> {
-  const validMapname = sanitizeMapName(mapname);
+  const validMapname = validateMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return {};
@@ -289,7 +289,7 @@ export async function getBonusCompletionsOverTimeFromCache(
  * Get completions over time from cache
  */
 export async function getCompletionsOverTimeFromCache(mapname: string): Promise<Array<{ date: string; count: number }>> {
-  const validMapname = sanitizeMapName(mapname);
+  const validMapname = validateMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return [];
@@ -335,7 +335,7 @@ export async function getCompletionsOverTimeFromCache(mapname: string): Promise<
  * Get time on map data from cache
  */
 export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<{ date: string; totalDuration: number }>> {
-  const validMapname = sanitizeMapName(mapname);
+  const validMapname = validateMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return [];
@@ -389,7 +389,7 @@ export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<
  * Get finish time data from cache
  */
 export async function getFinishTimeDataFromCache(mapname: string): Promise<{ avgTime: number | null; wrTime: number | null }> {
-  const validMapname = sanitizeMapName(mapname);
+  const validMapname = validateMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return { avgTime: null, wrTime: null };
@@ -445,7 +445,7 @@ export async function getPercentileTimesFromCache(
   medianTime: number | null;
   avgTime: number | null;
 } | null> {
-  const validMapname = sanitizeMapName(mapname);
+  const validMapname = validateMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return null;

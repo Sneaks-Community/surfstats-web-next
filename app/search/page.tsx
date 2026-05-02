@@ -3,7 +3,7 @@ import { Search as SearchIcon, Map as MapIcon, Users, ChevronRight } from 'lucid
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTierTextColor } from '@/lib/tierColors';
-import { sanitizeSearchQuery, sanitizePlayerName } from '@/lib/sanitize';
+import { validateSearchQuery, validatePlayerName } from '@/lib/validators';
 import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
 import { searchPlayersFromCache } from '@/lib/player-cache';
 import type { PlayerSearchResult } from '@/lib/player-cache';
@@ -26,7 +26,7 @@ export default async function SearchPage({
 }) {
   const { q } = await searchParams;
   // Sanitize search query to prevent XSS and injection
-  const query = sanitizeSearchQuery(q);
+  const query = validateSearchQuery(q);
   
   let players: PlayerSearchResult[] = [];
   let maps: MapResult[] = [];
@@ -103,7 +103,7 @@ export default async function SearchPage({
                   >
                     <div>
                       <div className="font-medium text-primary group-hover:text-primary transition-colors">
-                        {sanitizePlayerName(player.name)}
+                        {validatePlayerName(player.name)}
                       </div>
                       <div className="text-xs text-text-placeholder mt-0.5">{player.steamid}</div>
                     </div>

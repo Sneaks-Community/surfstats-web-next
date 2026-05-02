@@ -2,7 +2,7 @@ import { getSteamProfileUrl } from '@/lib/steam';
 import Link from 'next/link';
 import { Map as MapIcon, Users, Layers, Target, Download } from 'lucide-react';
 import MapImage from '@/components/MapImage';
-import { sanitizeMapName, sanitizePlayerName } from '@/lib/sanitize';
+import { validateMapName, validatePlayerName } from '@/lib/validators';
 import logger from '@/lib/logger';
 import MapRecordsTabs from './components/MapRecordsTabs';
 import TierBadge from '@/components/TierBadge';
@@ -16,7 +16,7 @@ const DEFAULT_PAGE_SIZE = 100;
 export async function generateMetadata({ params }: { params: Promise<{ mapname: string }> }) {
   const { mapname } = await params;
   const decodedMapname = decodeURIComponent(mapname);
-  const validMapname = sanitizeMapName(decodedMapname);
+  const validMapname = validateMapName(decodedMapname);
   
   if (!validMapname) {
     return { title: 'Map Not Found' };
@@ -42,7 +42,7 @@ export default async function MapProfilePage({
   const decodedMapname = decodeURIComponent(mapname);
   
   // Validate and sanitize map name input
-  const validMapname = sanitizeMapName(decodedMapname);
+  const validMapname = validateMapName(decodedMapname);
   if (!validMapname) {
     return (
       <div className="text-center py-20 bg-surface border border-border rounded-xl">
@@ -158,10 +158,10 @@ export default async function MapProfilePage({
                     rel="noopener noreferrer"
                     className="text-primary hover:text-primary transition-colors underline"
                   >
-                    {sanitizePlayerName(map.mapper)}
+                    {validatePlayerName(map.mapper)}
                   </a>
                 ) : (
-                  <span>{sanitizePlayerName(map.mapper)}</span>
+                  <span>{validatePlayerName(map.mapper)}</span>
                 );
               })()}
             </p>

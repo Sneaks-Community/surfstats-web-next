@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { searchPlayersFromCache } from '@/lib/player-cache';
 import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
-import { sanitizeSearchQuery } from '@/lib/sanitize';
+import { validateSearchQuery } from '@/lib/validators';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import logger from '@/lib/logger';
 
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Sanitize query to prevent XSS
-  const sanitizedQuery = sanitizeSearchQuery(query);
+  const sanitizedQuery = validateSearchQuery(query);
 
   try {
     // Search players using cached function

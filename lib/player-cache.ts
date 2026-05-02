@@ -3,7 +3,7 @@ import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
 import { getPlayerCountFromCache } from '@/lib/valkey-registry-cache';
-import { sanitizeSearchQuery } from './sanitize';
+import { validateSearchQuery } from './validators';
 import { cacheGet, cacheSet } from './valkey-cache';
 
 /**
@@ -58,7 +58,7 @@ async function fetchPlayersInternal(
     const offset = (page - 1) * limit;
     
     // Sanitize search query to prevent SQL injection via LIKE wildcards
-    const sanitizedSearch = sanitizeSearchQuery(search);
+    const sanitizedSearch = validateSearchQuery(search);
     
     // Use window function for rank calculation (much more efficient than correlated subquery)
     // RANK() OVER (ORDER BY points DESC) calculates rank based on points
@@ -177,7 +177,7 @@ export async function getPlayersFromCache(
  */
 async function searchPlayersInternal(query: string): Promise<PlayerSearchResult[]> {
   // Sanitize search query to prevent SQL injection via LIKE wildcards
-  const sanitizedQuery = sanitizeSearchQuery(query);
+  const sanitizedQuery = validateSearchQuery(query);
   
   logger.debug(`[PlayerCache] Searching players for: "${sanitizedQuery}"`);
   

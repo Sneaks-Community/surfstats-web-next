@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { sanitizeMapName } from '@/lib/sanitize';
+import { validateMapName } from '@/lib/validators';
 import logger from '@/lib/logger';
 import {
   getRecordCountsAndWRFromCache,
@@ -16,7 +16,7 @@ export async function GET(
 ) {
   const { mapname } = await params;
   const decodedMapname = decodeURIComponent(mapname);
-  const validMapname = sanitizeMapName(decodedMapname);
+  const validMapname = validateMapName(decodedMapname);
 
   if (!validMapname) {
     return NextResponse.json({ error: 'Invalid map name' }, { status: 400 });

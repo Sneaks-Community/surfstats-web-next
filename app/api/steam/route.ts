@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getSteamProfilesFromCache } from '@/lib/steam';
-import { sanitizeSteamId } from '@/lib/sanitize';
+import { validateSteamId } from '@/lib/validators';
 import logger from '@/lib/logger';
 
 interface SteamPlayer {
@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
   for (const rawId of rawIds) {
     // First try to sanitize (handles STEAM_1:0:12345 format)
-    const sanitized = sanitizeSteamId(rawId);
+    const sanitized = validateSteamId(rawId);
     
     if (sanitized) {
       // Check if it's already SteamID64 format or was converted

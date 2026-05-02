@@ -7,7 +7,7 @@ import { getTierColor } from '@/lib/tierColors';
 import Pagination from '@/components/Pagination';
 import { type MapMetadata } from '@/lib/map-cache';
 import { getAllMapMetadataFromCache, getTierDistributionFromCache } from '@/lib/valkey-map-cache';
-import { sanitizeSearchQuery } from '@/lib/sanitize';
+import { validateSearchQuery } from '@/lib/validators';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -45,7 +45,7 @@ export default async function MapsPage({
     return [];
   };
   
-  const q = sanitizeSearchQuery(getParam(params.q));
+  const q = validateSearchQuery(getParam(params.q));
   const page = parseInt(getParam(params.page, '1'), 10);
   const type = getParam(params.type, 'all');
   // Handle tiers from URL - can be comma-separated or multiple params

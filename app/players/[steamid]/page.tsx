@@ -2,7 +2,7 @@ import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import Link from 'next/link';
 import { getSteamProfilesFromCache } from '@/lib/steam';
-import { sanitizeSteamId } from '@/lib/sanitize';
+import { validateSteamId } from '@/lib/validators';
 import { getTotalsFromCache } from '@/lib/cache';
 import { getPlayerTimeOnServerFromCache, getActivityHeatmapFromCache } from '@/lib/player-analytics';
 import { getPlayerNameFromCache } from '@/lib/player-cache';
@@ -200,7 +200,7 @@ async function getLinearVsStagedPerTier(steamid: string): Promise<Array<{ tier: 
 export async function generateMetadata({ params }: { params: Promise<{ steamid: string }> }) {
   const { steamid } = await params;
   const decodedSteamId = decodeURIComponent(steamid);
-  const validSteamId = sanitizeSteamId(decodedSteamId);
+  const validSteamId = validateSteamId(decodedSteamId);
   
   if (!validSteamId) {
     return {
@@ -238,7 +238,7 @@ export default async function PlayerProfilePage({
   const decodedSteamId: string = decodeURIComponent(steamid);
   
   // Validate and sanitize SteamID input
-  const validSteamId = sanitizeSteamId(decodedSteamId) ?? decodedSteamId;
+  const validSteamId = validateSteamId(decodedSteamId) ?? decodedSteamId;
   if (!validSteamId) {
     return (
       <div className="text-center py-20 bg-surface border border-border rounded-xl">

@@ -2,7 +2,7 @@ import 'server-only';
 import { cacheGet, cacheSet } from './valkey-cache';
 import pool from './db';
 import type { RowDataPacket } from 'mysql2';
-import { sanitizeMapName } from './sanitize';
+import { validateMapName } from './validators';
 import { withTimeout } from './timeout';
 import logger from './logger';
 
@@ -64,7 +64,7 @@ interface StageGroup {
  * Get record counts and WR time from cache
  */
 export async function getRecordCountsAndWRFromCache(mapname: string): Promise<{ counts: RecordCounts; wr_time: number | null }> {
-  const validMapname = sanitizeMapName(mapname);
+  const validMapname = validateMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return { counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
@@ -127,7 +127,7 @@ export async function getLeaderboardRecordsFromCache(
   pageSize: number,
   wr_time: number | null = null
 ): Promise<{ records: MapRecord[]; wr_time: number | null }> {
-  const validMapname = sanitizeMapName(mapname);
+  const validMapname = validateMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return { records: [], wr_time: null };
@@ -197,7 +197,7 @@ export async function getMapRecordsFromCache(
   counts: RecordCounts;
   wr_time: number | null;
 }> {
-  const validMapname = sanitizeMapName(mapname);
+  const validMapname = validateMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
@@ -263,7 +263,7 @@ export async function getStageRecordsFromCache(
     totalPages: number;
   };
 }> {
-  const validMapname = sanitizeMapName(mapname);
+  const validMapname = validateMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return {
@@ -415,7 +415,7 @@ export async function getBonusRecordsFromCache(
     totalPages: number;
   };
 }> {
-  const validMapname = sanitizeMapName(mapname);
+  const validMapname = validateMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return {

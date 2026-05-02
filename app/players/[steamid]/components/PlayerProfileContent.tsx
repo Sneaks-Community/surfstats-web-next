@@ -4,7 +4,7 @@ import { getSteamProfileUrl } from '@/lib/steam';
 import { Trophy, Activity, Clock } from 'lucide-react';
 import Image from 'next/image';
 import { formatDate } from '@/lib/utils';
-import { sanitizePlayerName } from '@/lib/sanitize';
+import { validatePlayerName } from '@/lib/validators';
 import CountryBadge from '@/components/CountryBadge';
 import { countryNameToCode } from '@/lib/countries';
 // Unused imports - kept for potential future use
@@ -162,7 +162,7 @@ export default async function PlayerProfileContent({
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-surface-hover">
-                      <span className="text-4xl font-bold text-text-placeholder">{sanitizePlayerName(player.name).charAt(0).toUpperCase()}</span>
+                      <span className="text-4xl font-bold text-text-placeholder">{validatePlayerName(player.name).charAt(0).toUpperCase()}</span>
                     </div>
                   )}
                 </a>
@@ -178,14 +178,14 @@ export default async function PlayerProfileContent({
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-surface-hover">
-                      <span className="text-4xl font-bold text-text-placeholder">{sanitizePlayerName(player.name).charAt(0).toUpperCase()}</span>
+                      <span className="text-4xl font-bold text-text-placeholder">{validatePlayerName(player.name).charAt(0).toUpperCase()}</span>
                     </div>
                   )}
                 </div>
               );
             })()}
             <div className="flex-1 pb-2">
-              <h1 className="text-3xl font-bold text-text">{sanitizePlayerName(player.name)}</h1>
+              <h1 className="text-3xl font-bold text-text">{validatePlayerName(player.name)}</h1>
               <div className="flex flex-wrap items-center gap-4 mt-2 text-sm text-text-muted">
                 {(() => {
                   const profileUrl = getSteamProfileUrl(steamid);

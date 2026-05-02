@@ -6,7 +6,7 @@ import { getSteamProfilesFromCache } from '@/lib/steam';
 import Pagination from '@/components/Pagination';
 import { formatDate } from '@/lib/utils';
 import { getPlayersFromCache } from '@/lib/player-cache';
-import { sanitizeSearchQuery } from '@/lib/sanitize';
+import { validateSearchQuery } from '@/lib/validators';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -22,7 +22,7 @@ export default async function PlayersPage({
   searchParams: Promise<{ q?: string; page?: string }>;
 }) {
   const params = await searchParams;
-  const q = sanitizeSearchQuery(params.q);
+  const q = validateSearchQuery(params.q);
   const page = parseInt(params.page || '1', 10);
   
   // Fetch players first to get steam IDs

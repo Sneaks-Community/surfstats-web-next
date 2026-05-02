@@ -6,7 +6,7 @@ import { Map as MapIcon, Target, Layers, Search, X, ArrowUpDown, ArrowUp, ArrowD
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import Pagination from '@/components/Pagination';
 import { formatTime, formatDate } from '@/lib/utils';
-import { sanitizePlayerName } from '@/lib/sanitize';
+import { validatePlayerName } from '@/lib/validators';
 import TierBadge from '@/components/TierBadge';
 import { useDebounce } from '@/hooks/useDebounce';
 
@@ -704,7 +704,7 @@ export default function PlayerRecordsTabs({
                     >
                       <div className="flex-1 min-w-0">
                         <MapLinkWithPreview mapname={record.mapname}>
-                          {sanitizePlayerName(record.mapname)}
+                          {validatePlayerName(record.mapname)}
                         </MapLinkWithPreview>
                       </div>
                       <div className="sm:w-20 flex justify-end">
@@ -742,7 +742,7 @@ export default function PlayerRecordsTabs({
                   >
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.mapname}>
-                        {sanitizePlayerName(record.mapname)}
+                        {validatePlayerName(record.mapname)}
                       </MapLinkWithPreview>
                       <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">
                         B{record.zonegroup}
@@ -772,7 +772,7 @@ export default function PlayerRecordsTabs({
                   >
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.map}>
-                        {sanitizePlayerName(record.map)}
+                        {validatePlayerName(record.map)}
                       </MapLinkWithPreview>
                       <span className="text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">
                         S{record.stage}
@@ -803,7 +803,7 @@ export default function PlayerRecordsTabs({
                   >
                     <div className="flex-1 min-w-0">
                       <MapLinkWithPreview mapname={record.mapname}>
-                        {sanitizePlayerName(record.mapname)}
+                        {validatePlayerName(record.mapname)}
                       </MapLinkWithPreview>
                     </div>
                     <div className="flex items-center gap-4 sm:gap-4">
@@ -840,7 +840,7 @@ export default function PlayerRecordsTabs({
                   >
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.mapname}>
-                        {sanitizePlayerName(record.mapname)}
+                        {validatePlayerName(record.mapname)}
                       </MapLinkWithPreview>
                       <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">
                         B{record.zonegroup}
@@ -867,7 +867,7 @@ export default function PlayerRecordsTabs({
                   >
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.map}>
-                        {sanitizePlayerName(record.map)}
+                        {validatePlayerName(record.map)}
                       </MapLinkWithPreview>
                       <span className="text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">
                         S{record.stage}
