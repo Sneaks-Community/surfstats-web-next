@@ -25,9 +25,17 @@ export const mapNameSchema = z.string().trim().min(1).max(128).regex(
 );
 
 /**
- * Search query schema: printable ASCII, XSS-safe, SQL LIKE-wildcard escaped.
+ * Search query schema: printable ASCII, XSS-safe, SQL LIKE-percent-escaped.
+ *
  * The transform pipeline removes potentially dangerous characters, normalizes
- * whitespace, and escapes SQL LIKE wildcards (% and _).
+ * whitespace, and escapes the SQL `%` LIKE wildcard.
+ *
+ * Note: Underscore (`_`) is intentionally NOT escaped. It remains a valid
+ * character in search queries so users can search for maps with underscores
+ * in their names (e.g., `surf_1day`). The `_` wildcard is harmless —
+ * it matches exactly one character and cannot be used for data extraction
+ * or injection attacks. Parameterized queries provide the real SQL injection
+ * protection.
  */
 export const searchQuerySchema = z
   .string()
@@ -40,8 +48,8 @@ export const searchQuerySchema = z
     let sanitized = query.replace(/[<>"'&;\\]/g, '');
     // Normalize whitespace
     sanitized = sanitized.replace(/\s+/g, ' ').trim();
-    // Escape SQL LIKE wildcards to prevent LIKE wildcard injection
-    sanitized = sanitized.replace(/([%_])/g, '\\$1');
+    // Escape SQL LIKE `%` wildcard to prevent LIKE wildcard injection
+    sanitized = sanitized.replace(/%/g, '\\%');
     return sanitized;
   });
 
