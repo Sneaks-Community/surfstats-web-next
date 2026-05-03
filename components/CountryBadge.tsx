@@ -80,9 +80,10 @@ export default function CountryBadge({
   }
 
   // Get the flag component dynamically
-  const FlagComponent = (Flags as Record<string, React.FC<React.SVGProps<SVGSVGElement>>>)[isoCode];
+  const FlagsRecord = Flags as Record<string, React.FC<React.SVGProps<SVGSVGElement>>> | undefined;
+  const FlagComponent = FlagsRecord?.[isoCode];
 
-  if (!FlagComponent) {
+  if (FlagComponent == null) {
     const displayName = getCountryDisplayName(isoCode, countryCode || undefined);
     return (
       <span className={`inline-flex items-center gap-2 text-zinc-500 ${className}`} title={countryCode || 'Unknown'}>

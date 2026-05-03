@@ -8,7 +8,7 @@
 import 'server-only';
 import pool from './db';
 import type { RowDataPacket } from 'mysql2';
-import { cacheGet, cacheSet } from './valkey-cache';
+import { cacheGet, cacheSet, cacheDelete } from './valkey-cache';
 import { cacheLock, shouldExpireEarly } from './cache-lock';
 import logger from './logger';
 
@@ -241,7 +241,8 @@ export async function getPlayerProfileFromCache(steamid: string): Promise<Cached
  */
 export async function invalidatePlayerProfileCache(steamid: string): Promise<void> {
   const cacheKey = `${PLAYER_PROFILE_KEY}:${steamid}`;
-  await cacheSet(cacheKey, null as unknown as CachedPlayerProfile, 0); // Set with 0 TTL to expire immediately
+  // Delete the cache key directly instead of setting with 0 TTL
+  await cacheDelete(cacheKey);
   logger.debug(`[PlayerProfileCache] Invalidated cache for ${steamid}`);
 }
 

@@ -63,7 +63,7 @@ export class CacheLock {
       // Execute the factory function
       const result = await factory();
       lockEntry.resolve(result);
-      return result as T;
+      return result;
     } catch (error) {
       lockEntry.reject(error);
       throw error;

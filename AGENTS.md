@@ -117,7 +117,7 @@ The application uses **Valkey (Redis-compatible)** for all caching needs with a 
 
 Valkey connection client is located at [`lib/valkey.ts`](lib/valkey.ts), with other caches in the `lib` folder.
 
-**Important**: All cache keys use the `surfstats:` namespace prefix for consistency. Keys are sanitized using [`sanitizeMapName()`](lib/sanitize.ts) and [`sanitizeSearchQuery()`](lib/sanitize.ts) before use.
+**Important**: All cache keys use the `surfstats:` namespace prefix for consistency. Keys are validated using [`validateMapName()`](lib/validators.ts) and [`validateSearchQuery()`](lib/validators.ts) before use.
 
 #### Browser/CDN Cache
 HTTP caching headers on API responses.
@@ -141,10 +141,16 @@ async function getStats() {
 
 ### 5. Security
 
-- Use [`sanitizeMapName()`](lib/sanitize.ts) for all map name inputs
-- Use [`sanitizeSteamId()`](lib/sanitize.ts) for SteamID validation
-- Use [`sanitizeSearchQuery()`](lib/sanitize.ts) for search inputs
+- Use [`validateMapName()`](lib/validators.ts) for all map name inputs
+- Use [`validateSteamId()`](lib/validators.ts) for SteamID validation
+- Use [`validateSearchQuery()`](lib/validators.ts) for search inputs
+- Use [`validatePlayerName()`](lib/validators.ts) for player name display
 - Use parameterized queries for all database operations (mysql2 promise API)
+- Import `'server-only'` for modules that should never run on the client
+
+### 6. Input Validation
+
+All input validation uses [Zod v4](https://zod.dev) schemas defined in [`lib/validators.ts`](lib/validators.ts). The library provides TypeScript-first schema validation with built-in sanitization (trim, regex, XSS removal, SQL LIKE wildcard escaping). Never write custom sanitization logic - always use the exported validator functions.
 - Import `'server-only'` for modules that should never run on the client
 
 ### 6. Logging

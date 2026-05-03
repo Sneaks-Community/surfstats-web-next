@@ -21,7 +21,10 @@ export function startServerBackgroundRefresh(): void {
   }
 
   // Immediate initial fetch so data is available right away
-  refreshServers();
+  refreshServers().catch((err: unknown) => {
+    const message = err instanceof Error ? err.message : String(err);
+    logger.error(`[ServerRefresh] Initial refresh failed: ${message}`);
+  });
 
   // Periodic refresh every 30 seconds
   refreshTimer = setInterval(refreshServers, REFRESH_INTERVAL_MS);

@@ -160,7 +160,7 @@ const getCountriesRankingInternal = async (
       if (sortColumn === 'country') {
         comparison = a.country.localeCompare(b.country);
       } else {
-        comparison = (a.total_points ?? 0) - (b.total_points ?? 0);
+        comparison = a.total_points - b.total_points;
       }
       return order === 'asc' ? comparison : -comparison;
     });

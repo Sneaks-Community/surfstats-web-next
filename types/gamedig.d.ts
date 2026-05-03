@@ -22,6 +22,8 @@ declare module 'gamedig' {
     ping: number;
   }
 
+  // GameDig is a namespace with static methods, not meant to be instantiated
+  // eslint-disable-next-line @typescript-eslint/no-extraneous-class
   export class GameDig {
     static query(options: GameDigOptions): Promise<GameDigState>;
   }

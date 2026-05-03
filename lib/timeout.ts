@@ -41,7 +41,8 @@ export async function withTimeout<T>(
   } finally {
     // Cleanup: clear timeout if it hasn't fired yet
     // This prevents memory leaks when the promise resolves before timeout
-    if (timeoutId !== null) {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (timeoutId != null) {
       clearTimeout(timeoutId);
     }
   }

@@ -139,7 +139,7 @@ export function startMapGraphPrecache(): void {
   logger.info('[MapGraphPrecache] Starting map graph precache...');
 
   // Fire and forget - don't block server readiness
-  (async () => {
+  (async () => { // eslint-disable-line @typescript-eslint/no-floating-promises
     try {
       const metadata = await getAllMapMetadataFromCache();
       const mapNames = Array.from(metadata.keys());

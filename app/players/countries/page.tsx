@@ -19,8 +19,8 @@ export default async function CountriesPage({
   const params = await searchParams;
   
   // Parse and validate sort/order parameters
-  const sort = (params.sort as CountrySortKey) || 'points';
-  const order = (params.order as SortOrder) || 'desc';
+  const sort = (typeof params.sort === 'string' ? params.sort : undefined) as CountrySortKey | undefined || 'points';
+  const order = (typeof params.order === 'string' ? params.order : undefined) as SortOrder | undefined || 'desc';
   const page = parseInt(params.page || '1', 10);
   
   // Validate sort column

@@ -111,7 +111,7 @@ export default function WRPerformanceChart({ data }: WRPerformanceChartProps) {
   // Determine granularity and aggregate data
   const { granularity, aggregatedData } = useMemo(() => {
     if (safeData.length === 0) {
-      return { granularity: 'day' as AggregationGranularity, aggregatedData: [] as AggregatedDataPoint[], earliestDate: null as Date | null, latestDate: null as Date | null };
+      return { granularity: 'day' as AggregationGranularity, aggregatedData: [], earliestDate: null, latestDate: null };
     }
     
     const earliest = new Date(safeData[0].date);

@@ -229,8 +229,6 @@ async function getPerformanceTrendInternal(steamId: string): Promise<Performance
       let dateStr: string;
       if (typeof row.date === 'string') {
         dateStr = row.date.split('T')[0]; // Extract date part only
-      } else if (row.date && typeof (row.date as Date).toISOString === 'function') {
-        dateStr = (row.date as Date).toISOString().split('T')[0];
       } else {
         continue; // Skip invalid date values
       }
@@ -240,8 +238,9 @@ async function getPerformanceTrendInternal(steamId: string): Promise<Performance
         aggregated.set(dateStr, new Map());
       }
       
-      const tierData = aggregated.get(dateStr)!;
-      const current = tierData.get(tier) || { total: 0, count: 0 };
+      const tierData = aggregated.get(dateStr);
+      if (!tierData) continue;
+      const current = tierData.get(tier) ?? { total: 0, count: 0 };
       current.total += row.runtimepro;
       current.count += 1;
       tierData.set(tier, current);

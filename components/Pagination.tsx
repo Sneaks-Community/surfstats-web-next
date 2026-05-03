@@ -79,7 +79,8 @@ export default function Pagination({
         handlePageChange(page);
       } else {
         // Use Next.js router instead of window.location.href for client-side navigation
-        const params = new URLSearchParams(searchParams?.toString() || '');
+        const searchStr = searchParams.toString() || '';
+        const params = new URLSearchParams(searchStr);
         params.set('page', page.toString());
         router.push(`?${params.toString()}`);
       }

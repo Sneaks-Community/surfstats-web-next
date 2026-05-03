@@ -70,7 +70,7 @@ export async function GET(
         bonusCompletionsOverTime: {},
         isStageMap,
         percentileTimes: null,
-      } as StatsResponse);
+      });
     }
 
     // Query 1: Completions Over Time (cached)

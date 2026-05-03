@@ -114,8 +114,8 @@ let cachedThemeConfig: ReturnType<typeof createThemeConfig> | null = null;
  * Create theme configuration from environment variables
  */
 function createThemeConfig() {
-  const primary = (process.env.THEME_PRIMARY as ColorFamily) || 'emerald';
-  const secondary = (process.env.THEME_SECONDARY as ColorFamily) || 'cyan';
+  const primary = (process.env.THEME_PRIMARY ?? 'emerald') as ColorFamily;
+  const secondary = (process.env.THEME_SECONDARY ?? 'cyan') as ColorFamily;
   
   // Debug log - theme config once at server start
   // console.log('[Theme Config] Initialized with THEME_PRIMARY:', process.env.THEME_PRIMARY || '(not set)', '-> using:', primary);
@@ -123,14 +123,14 @@ function createThemeConfig() {
   
   return {
     light: {
-      primary: (process.env.THEME_LIGHT_PRIMARY as ColorFamily) || primary,
-      secondary: (process.env.THEME_LIGHT_SECONDARY as ColorFamily) || secondary,
-      background: (process.env.THEME_LIGHT_BACKGROUND as BackgroundFamily) || 'gray',
+      primary: (process.env.THEME_LIGHT_PRIMARY ?? primary) as ColorFamily,
+      secondary: (process.env.THEME_LIGHT_SECONDARY ?? secondary) as ColorFamily,
+      background: (process.env.THEME_LIGHT_BACKGROUND ?? 'gray') as BackgroundFamily,
     },
     dark: {
-      primary: (process.env.THEME_DARK_PRIMARY as ColorFamily) || primary,
-      secondary: (process.env.THEME_DARK_SECONDARY as ColorFamily) || secondary,
-      background: (process.env.THEME_DARK_BACKGROUND as BackgroundFamily) || 'zinc',
+      primary: (process.env.THEME_DARK_PRIMARY ?? primary) as ColorFamily,
+      secondary: (process.env.THEME_DARK_SECONDARY ?? secondary) as ColorFamily,
+      background: (process.env.THEME_DARK_BACKGROUND ?? 'zinc') as BackgroundFamily,
     },
   };
 }

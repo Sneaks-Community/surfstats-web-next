@@ -110,8 +110,9 @@ async function initializeDatabase() {
 if (!isBuildPhase) {
   if (typeof window === 'undefined') {
     setImmediate(() => {
-      initializeDatabase().catch((err) => {
-        logger.error('[DB] Deferred initialization failed:', err);
+      initializeDatabase().catch((err: unknown) => {
+        const message = err instanceof Error ? err.message : String(err);
+        logger.error({ msg: '[DB] Deferred initialization failed', error: message });
       });
     });
   }

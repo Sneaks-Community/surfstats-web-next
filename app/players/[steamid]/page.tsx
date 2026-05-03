@@ -287,10 +287,10 @@ export default async function PlayerProfilePage({
     wr_time: number | null;
     player_rank: number;
   }>)
-    .filter(m => m.wr_time !== null && m.wr_time !== undefined && m.runtimepro > 0)
+    .filter(m => m.wr_time != null && m.runtimepro > 0)
     .map(m => ({
       mapname: m.mapname,
-      wrPercentage: (m.wr_time! / m.runtimepro) * 100,
+      wrPercentage: ((m.wr_time ?? 0) / m.runtimepro) * 100,
       tier: m.tier,
       date: m.date,
     }));

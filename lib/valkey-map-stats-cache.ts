@@ -46,18 +46,21 @@ function processCheckpointData(
         if (!checkpointStats.has(i)) {
           checkpointStats.set(i, { reached: 0, totalTime: 0, sampleSize: 0 });
         }
-        const stats = checkpointStats.get(i)!;
-        stats.reached += 1;
-        stats.totalTime += cpTime as number;
-        stats.sampleSize += 1;
+        const stats = checkpointStats.get(i);
+        if (stats) {
+          stats.reached += 1;
+          stats.totalTime += cpTime as number;
+          stats.sampleSize += 1;
+        }
       }
     }
   }
 
   const checkpointAvgTimes = Array.from(checkpointStats.keys())
     .sort((a, b) => a - b)
-    .map(cpNum => {
-      const stats = checkpointStats.get(cpNum)!;
+    .flatMap(cpNum => {
+      const stats = checkpointStats.get(cpNum);
+      if (!stats) return [];
       return {
         checkpoint: cpNum,
         avgTime: stats.totalTime / stats.sampleSize,
@@ -265,6 +268,7 @@ export async function getBonusCompletionsOverTimeFromCache(
     const bonusData: Record<number, Array<{ date: string; count: number }>> = {};
 
     for (const row of bonusRows) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (!bonusData[row.bonus]) {
         bonusData[row.bonus] = [];
       }
@@ -478,7 +482,7 @@ export async function getPercentileTimesFromCache(
     `, [validMapname]);
 
     const summary = summaryRows[0];
-    const totalCount = summary?.totalCount || 0;
+    const totalCount = summary.totalCount || 0;
 
     if (totalCount === 0) {
       const result = { wrTime: null, p1Time: null, p10Time: null, medianTime: null, avgTime: null };
@@ -515,11 +519,11 @@ export async function getPercentileTimesFromCache(
     `, [validMapname, medianOffset]);
 
     const result = {
-      wrTime: summary?.wrTime ? Number(summary.wrTime) : null,
-      p1Time: p1Rows[0]?.runtimepro ? Number(p1Rows[0].runtimepro) : null,
-      p10Time: p10Rows[0]?.runtimepro ? Number(p10Rows[0].runtimepro) : null,
-      medianTime: medianRows[0]?.runtimepro ? Number(medianRows[0].runtimepro) : null,
-      avgTime: summary?.avgTime ? Number(summary.avgTime) : null,
+      wrTime: summary.wrTime ? Number(summary.wrTime) : null,
+      p1Time: p1Rows[0].runtimepro ? Number(p1Rows[0].runtimepro) : null,
+      p10Time: p10Rows[0].runtimepro ? Number(p10Rows[0].runtimepro) : null,
+      medianTime: medianRows[0].runtimepro ? Number(medianRows[0].runtimepro) : null,
+      avgTime: summary.avgTime ? Number(summary.avgTime) : null,
     };
 
     await cacheSet(key, result, STATS_CACHE_TTL);

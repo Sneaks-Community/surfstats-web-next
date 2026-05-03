@@ -34,6 +34,7 @@ export function clientDebug(message: string): void {
  */
 export function clientInfo(message: string): void {
   if (isDevelopment) {
+    // eslint-disable-next-line no-console
     console.info(`[Client] ${message}`);
   }
 }

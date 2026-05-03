@@ -72,7 +72,7 @@ async function initializeAnalyticsDatabase() {
 }
 
 // Initialize on module load
-initializeAnalyticsDatabase();
+initializeAnalyticsDatabase(); // eslint-disable-line @typescript-eslint/no-floating-promises
 
 export default analyticsPool;
 

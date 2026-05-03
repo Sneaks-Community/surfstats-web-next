@@ -28,7 +28,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
 /**
  * Set a value in cache
  */
-export async function cacheSet<T>(key: string, value: T, ttl: number): Promise<void> {
+export async function cacheSet(key: string, value: unknown, ttl: number): Promise<void> {
   try {
     const serialized = JSON.stringify(value);
     await client.setEx(key, ttl, serialized);
@@ -69,11 +69,11 @@ export async function cacheDeleteMany(keys: string[]): Promise<void> {
  */
 export async function cacheInvalidatePattern(pattern: string): Promise<void> {
   try {
-    let cursor: string | undefined = '0';
+    let cursor = '0';
     const keys: string[] = [];
 
     do {
-      const result = await client.scan(cursor ?? '0', { MATCH: pattern, COUNT: 1000 });
+      const result = await client.scan(cursor, { MATCH: pattern, COUNT: 1000 });
       keys.push(...result.keys);
       cursor = result.cursor;
     } while (cursor !== '0');
