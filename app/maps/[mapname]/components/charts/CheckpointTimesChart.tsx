@@ -72,7 +72,7 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
     const avgTimes: Array<number | null> = safeData.map(d => d.avgTime);
 
     // Add average finish time if available
-    if (safeFinishTime.avgTime !== null && safeFinishTime.avgTime !== undefined) {
+    if (safeFinishTime.avgTime !== null) {
       avgTimes.push(safeFinishTime.avgTime);
     } else {
       avgTimes.push(null);
@@ -85,7 +85,7 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
     const wrTimes = safeData.map(d => wrTimeMap.get(d.checkpoint) ?? null);
 
     // Add WR finish time if available
-    if (safeFinishTime.wrTime !== null && safeFinishTime.wrTime !== undefined) {
+    if (safeFinishTime.wrTime !== null) {
       wrTimes.push(safeFinishTime.wrTime);
     } else {
       wrTimes.push(null);

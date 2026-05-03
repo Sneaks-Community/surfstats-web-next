@@ -38,7 +38,7 @@ client.on('close', () => {
 });
 
 // Force connection on import
-(async () => {
+void (async () => {
   if (!client.isOpen) {
     try {
       await client.connect();

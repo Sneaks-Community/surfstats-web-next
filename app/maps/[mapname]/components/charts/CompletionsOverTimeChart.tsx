@@ -97,7 +97,7 @@ const hslToRgba = (hsl: string, opacity: number): string => {
 
 export default function CompletionsOverTimeChart({ data, bonusData }: CompletionsOverTimeChartProps) {
   const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
-  const safeBonusData = useMemo(() => bonusData || {}, [bonusData]);
+  const safeBonusData: BonusTimeSeriesData = useMemo(() => bonusData, [bonusData]);
 
   const formatDate = (dateStr: string): string => {
     // MySQL returns dates as 'YYYY-MM-01', parse manually to avoid timezone issues
@@ -158,7 +158,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
     const bonusColors = generateBonusColors(bonusNumbers.length);
     
     bonusNumbers.forEach((bonus, index) => {
-      const bonusSeries = safeBonusData[bonus] || [];
+      const bonusSeries = safeBonusData[bonus] ?? [];
       // Create an array aligned with labels, using null for missing dates
       const alignedData = labels.map(date => {
         const entry = bonusSeries.find(d => d.date === date);

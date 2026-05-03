@@ -122,6 +122,7 @@ interface PlayerProfileContentProps {
   steamid: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/require-await -- Server component pattern, data fetching done at route handler level
 export default async function PlayerProfileContent({
   data,
   incompleteData,
@@ -261,7 +262,7 @@ export default async function PlayerProfileContent({
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
         {/* Tier Distribution Radar - full width on mobile, 1st column on desktop */}
         <div className="lg:col-span-1 lg:row-span-1 h-[280px] min-h-[280px]">
-          {linearVsStagedPerTier && linearVsStagedPerTier.length > 0 ? (
+          {linearVsStagedPerTier.length > 0 ? (
             <TierDistributionChart data={linearVsStagedPerTier} />
           ) : (
             <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
@@ -276,7 +277,7 @@ export default async function PlayerProfileContent({
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:col-span-3">
           {/* WR Performance Chart */}
           <div className="h-[280px] lg:h-auto">
-            {wrPerformanceData && wrPerformanceData.length > 0 ? (
+            {wrPerformanceData.length > 0 ? (
               <WRPerformanceChart data={wrPerformanceData} />
             ) : (
               <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">

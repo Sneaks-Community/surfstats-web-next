@@ -71,6 +71,18 @@ type SortDirection = 'asc' | 'desc';
 
 const ITEMS_PER_PAGE = 20;
 
+// Sort icon component - extracted to avoid render-time creation
+const SortIcon = ({ field, sortField, sortDirection }: { field: SortField; sortField: SortField; sortDirection: SortDirection }) => {
+  if (sortField !== field) {
+    return <ArrowUpDown className="h-4 w-4 text-text-muted opacity-50" />;
+  }
+  return sortDirection === 'asc' ? (
+    <ArrowUp className="h-4 w-4 text-primary-500" />
+  ) : (
+    <ArrowDown className="h-4 w-4 text-primary-500" />
+  );
+};
+
 export default function PlayerRecordsTabs({
   maps,
   bonuses,
@@ -83,16 +95,16 @@ export default function PlayerRecordsTabs({
   const searchParams = useSearchParams();
 
   // Get initial state from URL
-  const initialTab = (searchParams.get('tab') as TabType) || 'maps';
-  const initialStatus = (searchParams.get('status') as StatusFilter) || 'finished';
-  const initialMapPage = parseInt(searchParams.get('mapPage') || '1', 10);
-  const initialBonusPage = parseInt(searchParams.get('bonusPage') || '1', 10);
-  const initialStagePage = parseInt(searchParams.get('stagePage') || '1', 10);
-  const initialMapSearch = searchParams.get('mapSearch') || '';
-  const initialBonusSearch = searchParams.get('bonusSearch') || '';
-  const initialStageSearch = searchParams.get('stageSearch') || '';
-  const initialSortField = (searchParams.get('sort') as SortField) || 'map';
-  const initialSortDir = (searchParams.get('dir') as SortDirection) || 'asc';
+  const initialTab = (searchParams.get('tab') as TabType | null) ?? 'maps';
+  const initialStatus = (searchParams.get('status') as StatusFilter | null) ?? 'finished';
+  const initialMapPage = parseInt(searchParams.get('mapPage') ?? '1', 10);
+  const initialBonusPage = parseInt(searchParams.get('bonusPage') ?? '1', 10);
+  const initialStagePage = parseInt(searchParams.get('stagePage') ?? '1', 10);
+  const initialMapSearch = searchParams.get('mapSearch') ?? '';
+  const initialBonusSearch = searchParams.get('bonusSearch') ?? '';
+  const initialStageSearch = searchParams.get('stageSearch') ?? '';
+  const initialSortField = (searchParams.get('sort') as SortField | null) ?? 'map';
+  const initialSortDir = (searchParams.get('dir') as SortDirection | null) ?? 'asc';
 
   // State
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
@@ -176,17 +188,6 @@ export default function PlayerRecordsTabs({
     setPages((prev) => ({ ...prev, [activeTab]: 1 }));
   };
 
-  // Sort icon component
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="h-4 w-4 text-text-muted opacity-50" />;
-    }
-    return sortDirection === 'asc' ? (
-      <ArrowUp className="h-4 w-4 text-primary-500" />
-    ) : (
-      <ArrowDown className="h-4 w-4 text-primary-500" />
-    );
-  };
 
   // Filter and sort records
   const filteredMaps = useMemo(() => {
@@ -209,11 +210,12 @@ export default function PlayerRecordsTabs({
         case 'time':
           comparison = a.runtimepro - b.runtimepro;
           break;
-        case 'wrDiff':
+        case 'wrDiff': {
           const aDiff = a.wr_time ? a.runtimepro - a.wr_time : Infinity;
           const bDiff = b.wr_time ? b.runtimepro - b.wr_time : Infinity;
           comparison = aDiff - bDiff;
           break;
+        }
         case 'date':
           comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
           break;
@@ -303,16 +305,18 @@ export default function PlayerRecordsTabs({
         case 'map':
           comparison = a.mapname.localeCompare(b.mapname);
           break;
-        case 'tier':
+        case 'tier': {
           const aTier = a.tier ?? 0;
           const bTier = b.tier ?? 0;
           comparison = aTier - bTier;
           break;
-        case 'wrTime':
+        }
+        case 'wrTime': {
           const aWR = a.wr_time ?? Infinity;
           const bWR = b.wr_time ?? Infinity;
           comparison = aWR - bWR;
           break;
+        }
         case 'mapType':
           comparison = a.mapType.localeCompare(b.mapType);
           break;
@@ -557,7 +561,7 @@ export default function PlayerRecordsTabs({
                     className="flex-1 min-w-0 flex items-center gap-1 hover:text-text transition-colors"
                   >
                     Map
-                    <SortIcon field="map" />
+                    <SortIcon field="map" sortField={sortField} sortDirection={sortDirection} />
                   </button>
                   {activeTab === 'maps' && (
                     <button
@@ -565,7 +569,7 @@ export default function PlayerRecordsTabs({
                       className="w-20 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
                     >
                       Tier
-                      <SortIcon field="tier" />
+                      <SortIcon field="tier" sortField={sortField} sortDirection={sortDirection} />
                     </button>
                   )}
                   {activeTab !== 'maps' && <div className="w-20" />}
@@ -574,14 +578,14 @@ export default function PlayerRecordsTabs({
                     className="w-16 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
                   >
                     Rank
-                    <SortIcon field="rank" />
+                    <SortIcon field="rank" sortField={sortField} sortDirection={sortDirection} />
                   </button>
                   <button
                     onClick={() => handleSort('time')}
                     className="w-24 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
                   >
                     Time
-                    <SortIcon field="time" />
+                    <SortIcon field="time" sortField={sortField} sortDirection={sortDirection} />
                   </button>
                   {activeTab === 'maps' && (
                     <button
@@ -589,7 +593,7 @@ export default function PlayerRecordsTabs({
                       className="w-20 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
                     >
                       WR Diff
-                      <SortIcon field="wrDiff" />
+                      <SortIcon field="wrDiff" sortField={sortField} sortDirection={sortDirection} />
                     </button>
                   )}
                   {activeTab !== 'maps' && <div className="w-20" />}
@@ -598,7 +602,7 @@ export default function PlayerRecordsTabs({
                     className="w-24 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
                   >
                     Date
-                    <SortIcon field="date" />
+                    <SortIcon field="date" sortField={sortField} sortDirection={sortDirection} />
                   </button>
                 </div>
 
@@ -609,14 +613,14 @@ export default function PlayerRecordsTabs({
                     className="flex items-center gap-1 hover:text-text transition-colors"
                   >
                     Map
-                    <SortIcon field="map" />
+                    <SortIcon field="map" sortField={sortField} sortDirection={sortDirection} />
                   </button>
                   <div className="flex items-center gap-2">
-                    {activeTab === 'maps' && <button onClick={() => handleSort('tier')} className="flex items-center gap-1 hover:text-text transition-colors">Tier<SortIcon field="tier" /></button>}
-                    <button onClick={() => handleSort('rank')} className="flex items-center gap-1 hover:text-text transition-colors">Rk<SortIcon field="rank" /></button>
-                    <button onClick={() => handleSort('time')} className="flex items-center gap-1 hover:text-text transition-colors">Time<SortIcon field="time" /></button>
-                    {activeTab === 'maps' && <button onClick={() => handleSort('wrDiff')} className="flex items-center gap-1 hover:text-text transition-colors">WR<SortIcon field="wrDiff" /></button>}
-                    <button onClick={() => handleSort('date')} className="flex items-center gap-1 hover:text-text transition-colors">Date<SortIcon field="date" /></button>
+                    {activeTab === 'maps' && <button onClick={() => handleSort('tier')} className="flex items-center gap-1 hover:text-text transition-colors">Tier<SortIcon field="tier" sortField={sortField} sortDirection={sortDirection} /></button>}
+                    <button onClick={() => handleSort('rank')} className="flex items-center gap-1 hover:text-text transition-colors">Rk<SortIcon field="rank" sortField={sortField} sortDirection={sortDirection} /></button>
+                    <button onClick={() => handleSort('time')} className="flex items-center gap-1 hover:text-text transition-colors">Time<SortIcon field="time" sortField={sortField} sortDirection={sortDirection} /></button>
+                    {activeTab === 'maps' && <button onClick={() => handleSort('wrDiff')} className="flex items-center gap-1 hover:text-text transition-colors">WR<SortIcon field="wrDiff" sortField={sortField} sortDirection={sortDirection} /></button>}
+                    <button onClick={() => handleSort('date')} className="flex items-center gap-1 hover:text-text transition-colors">Date<SortIcon field="date" sortField={sortField} sortDirection={sortDirection} /></button>
                   </div>
                 </div>
               </>
@@ -632,7 +636,7 @@ export default function PlayerRecordsTabs({
                     className="flex-1 min-w-0 flex items-center gap-1 hover:text-text transition-colors"
                   >
                     Map
-                    <SortIcon field="map" />
+                    <SortIcon field="map" sortField={sortField} sortDirection={sortDirection} />
                   </button>
                   {activeTab === 'maps' && (
                     <>
@@ -641,21 +645,21 @@ export default function PlayerRecordsTabs({
                         className="w-20 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
                       >
                         Tier
-                        <SortIcon field="tier" />
+                        <SortIcon field="tier" sortField={sortField} sortDirection={sortDirection} />
                       </button>
                       <button
                         onClick={() => handleSort('mapType')}
                         className="w-20 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
                       >
                         Type
-                        <SortIcon field="mapType" />
+                        <SortIcon field="mapType" sortField={sortField} sortDirection={sortDirection} />
                       </button>
                       <button
                         onClick={() => handleSort('wrTime')}
                         className="w-24 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
                       >
                         WR
-                        <SortIcon field="wrTime" />
+                        <SortIcon field="wrTime" sortField={sortField} sortDirection={sortDirection} />
                       </button>
                     </>
                   )}
@@ -669,18 +673,18 @@ export default function PlayerRecordsTabs({
                     className="flex items-center gap-1 hover:text-text transition-colors"
                   >
                     Map
-                    <SortIcon field="map" />
+                    <SortIcon field="map" sortField={sortField} sortDirection={sortDirection} />
                   </button>
                   {activeTab === 'maps' && (
                     <div className="flex items-center gap-2">
                       <button onClick={() => handleSort('tier')} className="flex items-center gap-1 hover:text-text transition-colors">
-                        Tier<SortIcon field="tier" />
+                        Tier<SortIcon field="tier" sortField={sortField} sortDirection={sortDirection} />
                       </button>
                       <button onClick={() => handleSort('mapType')} className="flex items-center gap-1 hover:text-text transition-colors">
-                        Type<SortIcon field="mapType" />
+                        Type<SortIcon field="mapType" sortField={sortField} sortDirection={sortDirection} />
                       </button>
                       <button onClick={() => handleSort('wrTime')} className="flex items-center gap-1 hover:text-text transition-colors">
-                        WR<SortIcon field="wrTime" />
+                        WR<SortIcon field="wrTime" sortField={sortField} sortDirection={sortDirection} />
                       </button>
                     </div>
                   )}

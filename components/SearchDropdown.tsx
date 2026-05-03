@@ -95,13 +95,15 @@ export function SearchDropdown({
     }
 
     if (query.length < minChars) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing results with query length
       setResults({ players: [], maps: [] });
+       
       setIsOpen(false);
       return;
     }
 
     debounceRef.current = setTimeout(() => {
-      performSearch(query);
+      void performSearch(query);
     }, debounceMs);
 
     return () => {

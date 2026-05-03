@@ -52,7 +52,7 @@ export default function MapChartGrid({ mapname }: MapChartGridProps) {
       }
     };
 
-    fetchStats();
+    void fetchStats();
   }, [mapname]);
 
   if (loading) {

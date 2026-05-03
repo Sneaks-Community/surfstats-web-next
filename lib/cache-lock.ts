@@ -48,6 +48,7 @@ export class CacheLock {
     }
 
     // Create new lock entry
+    // The Promise executor runs synchronously, so resolveFn and rejectFn are always assigned before use.
     let resolveFn: (value: unknown) => void;
     let rejectFn: (reason?: unknown) => void;
 
@@ -56,6 +57,7 @@ export class CacheLock {
       rejectFn = reject;
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Promise executor runs synchronously
     const lockEntry: CacheLockEntry = { promise, resolve: resolveFn!, reject: rejectFn! };
     this.locks.set(key, lockEntry);
 

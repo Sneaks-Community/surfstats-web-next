@@ -111,7 +111,7 @@ export default function PercentileBreakdownChart({ data }: PercentileBreakdownCh
           },
           label: (context) => {
             const value = context.parsed.x;
-            if (value === null || value === undefined) return 'N/A';
+            if (value === null) return 'N/A';
             const numValue = typeof value === 'number' ? value : Number(value);
             return `Time: ${formatTime(numValue)} (${numValue.toFixed(1)}s)`;
           },
@@ -165,6 +165,7 @@ export default function PercentileBreakdownChart({ data }: PercentileBreakdownCh
         </div>
       ) : (
         <div className="flex-1 min-h-[200px]">
+          {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- chartData is guaranteed to be non-null when hasData is true */}
           <Bar data={chartData!} options={options} />
         </div>
       )}

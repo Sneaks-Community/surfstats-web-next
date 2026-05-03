@@ -58,6 +58,30 @@ type TabType = 'map' | 'bonus' | 'stages';
 const ITEMS_PER_PAGE = 20;
 const MAX_STAGE_RECORDS = 100;
 
+// Sort icon component for map tab (client-side sorting) - extracted to avoid render-time creation
+const SortIcon = ({ field, sortField, sortDirection }: { field: SortField; sortField: SortField; sortDirection: SortDirection }) => {
+  if (sortField !== field) {
+    return <ArrowUpDown className="h-4 w-4 text-text-muted opacity-50" />;
+  }
+  return sortDirection === 'asc' ? (
+    <ArrowUp className="h-4 w-4 text-primary-500" />
+  ) : (
+    <ArrowDown className="h-4 w-4 text-primary-500" />
+  );
+};
+
+// Sort icon component for stages tab (server-side sorting) - extracted to avoid render-time creation
+const StageSortIcon = ({ field, sortField, sortDirection }: { field: SortField; sortField: SortField; sortDirection: SortDirection }) => {
+  if (sortField !== field) {
+    return <ArrowUpDown className="h-4 w-4 text-text-muted opacity-50" />;
+  }
+  return sortDirection === 'asc' ? (
+    <ArrowUp className="h-4 w-4 text-primary-500" />
+  ) : (
+    <ArrowDown className="h-4 w-4 text-primary-500" />
+  );
+};
+
 // Sort types
 type SortField = 'rank' | 'player' | 'time' | 'speed' | 'wrDiff' | 'date';
 type SortDirection = 'asc' | 'desc';
@@ -108,6 +132,7 @@ export default function MapRecordsTabs({
 
   // Reset state when map changes - only depends on mapname to avoid pagination issues
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing state with incoming records prop on map change
     setAllLeaderboardRecords(records);
     const initialLoadedPage = Math.ceil(records.length / ITEMS_PER_PAGE);
     setLoadedPage(initialLoadedPage);
@@ -117,6 +142,7 @@ export default function MapRecordsTabs({
       loadedPagesRef.current.add(i);
     }
     setHasMoreToLoad(totalRecords > records.length);
+    // eslint-disable-next-line react-hooks/immutability -- useState setters are stable across renders
     setLeaderboardPage(1);
     // Clear bonus cache when map changes
     bonusCacheRef.current = new Map();
@@ -128,17 +154,17 @@ export default function MapRecordsTabs({
   }, [mapname]);
 
   // Get initial state from URL
-  const initialTab = (searchParams.get('tab') as TabType) || 'map';
-  const initialPage = parseInt(searchParams.get('page') || '1', 10);
-  const initialBonus = parseInt(searchParams.get('bonus') || '1', 10);
-  const initialBonusPage = parseInt(searchParams.get('bonusPage') || '1', 10);
-  const initialStage = parseInt(searchParams.get('stage') || '1', 10);
-  const initialStagePage = parseInt(searchParams.get('stagePage') || '1', 10);
-  const initialSearch = searchParams.get('q') || '';
-  const initialBonusSearch = searchParams.get('bq') || '';
-  const initialStageSearch = searchParams.get('sq') || '';
-  const initialSortField = (searchParams.get('sort') as SortField) || 'rank';
-  const initialSortDir = (searchParams.get('dir') as SortDirection) || 'asc';
+  const initialTab = (searchParams.get('tab') as TabType | null) ?? 'map';
+  const initialPage = parseInt(searchParams.get('page') ?? '1', 10);
+  const initialBonus = parseInt(searchParams.get('bonus') ?? '1', 10);
+  const initialBonusPage = parseInt(searchParams.get('bonusPage') ?? '1', 10);
+  const initialStage = parseInt(searchParams.get('stage') ?? '1', 10);
+  const initialStagePage = parseInt(searchParams.get('stagePage') ?? '1', 10);
+  const initialSearch = searchParams.get('q') ?? '';
+  const initialBonusSearch = searchParams.get('bq') ?? '';
+  const initialStageSearch = searchParams.get('sq') ?? '';
+  const initialSortField = (searchParams.get('sort') as SortField | null) ?? 'rank';
+  const initialSortDir = (searchParams.get('dir') as SortDirection | null) ?? 'asc';
 
   // State - Map tab uses client-side sorting, Stages tab uses server-side sorting
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
@@ -195,7 +221,8 @@ export default function MapRecordsTabs({
   // Load stage records when selected stage changes (sort is handled client-side)
   useEffect(() => {
     if (activeTab === 'stages' && numStages > 1) {
-      loadStageRecords(selectedStage);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Triggering data load on tab/stage change
+      void loadStageRecords(selectedStage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedStage, numStages]);
@@ -246,7 +273,7 @@ export default function MapRecordsTabs({
   // Load bonus records when selected bonus changes
   useEffect(() => {
     if (activeTab === 'bonus' && numBonuses > 0) {
-      loadBonusRecords(selectedBonus, bonusPage);
+      void loadBonusRecords(selectedBonus, bonusPage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedBonus, bonusPage, numBonuses]);
@@ -377,29 +404,6 @@ export default function MapRecordsTabs({
     setStagePage(1);
   };
 
-  // Sort icon component for map tab (client-side sorting)
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="h-4 w-4 text-text-muted opacity-50" />;
-    }
-    return sortDirection === 'asc' ? (
-      <ArrowUp className="h-4 w-4 text-primary-500" />
-    ) : (
-      <ArrowDown className="h-4 w-4 text-primary-500" />
-    );
-  };
-
-  // Sort icon component for stages tab (server-side sorting)
-  const StageSortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
-      return <ArrowUpDown className="h-4 w-4 text-text-muted opacity-50" />;
-    }
-    return sortDirection === 'asc' ? (
-      <ArrowUp className="h-4 w-4 text-primary-500" />
-    ) : (
-      <ArrowDown className="h-4 w-4 text-primary-500" />
-    );
-  };
 
   // Filter records by search - use all loaded records (not just initial batch)
   const filteredRecords = useMemo(() => {
@@ -430,11 +434,12 @@ export default function MapRecordsTabs({
         case 'speed':
           comparison = a.startspeed - b.startspeed;
           break;
-        case 'wrDiff':
+        case 'wrDiff': {
           const aDiff = a.wr_time ? a.runtimepro - a.wr_time : Infinity;
           const bDiff = b.wr_time ? b.runtimepro - b.wr_time : Infinity;
           comparison = aDiff - bDiff;
           break;
+        }
         case 'date':
           comparison = new Date(b.date).getTime() - new Date(a.date).getTime();
           break;
@@ -485,11 +490,12 @@ export default function MapRecordsTabs({
         case 'speed':
           comparison = a.startspeed - b.startspeed;
           break;
-        case 'wrDiff':
+        case 'wrDiff': {
           const aDiff = a.wr_time ? a.runtime - a.wr_time : Infinity;
           const bDiff = b.wr_time ? b.runtime - b.wr_time : Infinity;
           comparison = aDiff - bDiff;
           break;
+        }
         case 'date':
           comparison = new Date(b.date).getTime() - new Date(a.date).getTime();
           break;
@@ -856,7 +862,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2">
                       Rank
-                      <SortIcon field="rank" />
+                      <SortIcon field="rank" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -866,7 +872,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2">
                       Player
-                      <SortIcon field="player" />
+                      <SortIcon field="player" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -876,7 +882,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Time
-                      <SortIcon field="time" />
+                      <SortIcon field="time" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -886,7 +892,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Diff
-                      <SortIcon field="wrDiff" />
+                      <SortIcon field="wrDiff" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -896,7 +902,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Start Speed
-                      <SortIcon field="speed" />
+                      <SortIcon field="speed" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -906,7 +912,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Date
-                      <SortIcon field="date" />
+                      <SortIcon field="date" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                 </tr>
@@ -956,7 +962,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2">
                       Rank
-                      <SortIcon field="rank" />
+                      <SortIcon field="rank" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -966,7 +972,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2">
                       Player
-                      <SortIcon field="player" />
+                      <SortIcon field="player" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -976,7 +982,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Time
-                      <SortIcon field="time" />
+                      <SortIcon field="time" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -986,7 +992,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Diff
-                      <SortIcon field="wrDiff" />
+                      <SortIcon field="wrDiff" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -996,7 +1002,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Start Speed
-                      <SortIcon field="speed" />
+                      <SortIcon field="speed" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -1006,7 +1012,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Date
-                      <SortIcon field="date" />
+                      <SortIcon field="date" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                 </tr>
@@ -1069,7 +1075,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2">
                       Rank
-                      <StageSortIcon field="rank" />
+                      <StageSortIcon field="rank" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -1079,7 +1085,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2">
                       Player
-                      <StageSortIcon field="player" />
+                      <StageSortIcon field="player" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -1089,7 +1095,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Time
-                      <StageSortIcon field="time" />
+                      <StageSortIcon field="time" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -1099,7 +1105,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Diff
-                      <StageSortIcon field="wrDiff" />
+                      <StageSortIcon field="wrDiff" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -1109,7 +1115,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Start Speed
-                      <StageSortIcon field="speed" />
+                      <StageSortIcon field="speed" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -1119,7 +1125,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Date
-                      <StageSortIcon field="date" />
+                      <StageSortIcon field="date" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                 </tr>
