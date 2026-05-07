@@ -1,5 +1,5 @@
 # Use the official Node.js Alpine image for a minimal footprint
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
