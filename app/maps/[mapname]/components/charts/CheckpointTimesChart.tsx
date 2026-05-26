@@ -188,8 +188,6 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
               if (label === 'Finish') {
                 return `WR: ${formatTime(value)}`;
               }
-              const checkpoint = safeData[context.dataIndex]?.checkpoint;
-              const _wrRecord = safeWRData.find(cp => cp.checkpoint === checkpoint);
               return `WR: ${formatTime(value)}`;
             }
             return formatTime(value);
@@ -228,7 +226,7 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
       mode: 'index' as const,
       intersect: false,
     },
-  }), [safeData, safeWRData, wrData]);
+  }), [wrData]);
 
   if (safeData.length === 0) {
     return (

@@ -96,21 +96,18 @@ function formatTimeDiff(time: number, wrTime: number | null): string {
 export default function MapRecordsTabs({
   records,
   totalRecords,
-  bonusRecords: _bonusRecords,
-  stageRecords: _stageRecords,
   mapname,
   numBonuses,
   numStages,
-  wr_time: _wr_time,
 }: MapRecordsTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   // State for loading additional records from API
   const [allLeaderboardRecords, setAllLeaderboardRecords] = useState<MapRecord[]>(records);
-  const [_isLoadingMore, _setIsLoadingMore] = useState(false);
-  const [_loadedPage, setLoadedPage] = useState(Math.ceil(records.length / ITEMS_PER_PAGE));
-  const [_hasMoreToLoad, setHasMoreToLoad] = useState(totalRecords > records.length);
+  // Refs for values that are set but never read as state
+  const loadedPageRef = useRef(Math.ceil(records.length / ITEMS_PER_PAGE));
+  const hasMoreToLoadRef = useRef(totalRecords > records.length);
   // Ref to track loaded pages as a Set (for arbitrary page navigation)
   const loadedPagesRef = useRef<Set<number>>(new Set());
 
@@ -120,13 +117,15 @@ export default function MapRecordsTabs({
 
   // State for stages loaded via API
   const [allStageRecords, setAllStageRecords] = useState<StageRecord[]>([]);
-  const [_stagesList, setStagesList] = useState<number[]>([]);
+  // Ref for stages list - set but not read in component
+  const stagesListRef = useRef<number[]>([]);
   const [totalStageRecords, setTotalStageRecords] = useState(0);
   const [isLoadingStages, setIsLoadingStages] = useState(false);
 
   // State for bonuses loaded via API
   const [allBonusRecords, setAllBonusRecords] = useState<BonusRecord[]>([]);
-  const [_bonusGroupsList, setBonusGroupsList] = useState<number[]>([]);
+  // Ref for bonus groups list - set but not read in component
+  const bonusGroupsListRef = useRef<number[]>([]);
   const [totalBonusRecords, setTotalBonusRecords] = useState(0);
   const [isLoadingBonuses, setIsLoadingBonuses] = useState(false);
 
@@ -135,13 +134,13 @@ export default function MapRecordsTabs({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing state with incoming records prop on map change
     setAllLeaderboardRecords(records);
     const initialLoadedPage = Math.ceil(records.length / ITEMS_PER_PAGE);
-    setLoadedPage(initialLoadedPage);
+    loadedPageRef.current = initialLoadedPage;
     // Initialize loadedPages Set with initial pages from server-rendered records
     loadedPagesRef.current = new Set();
     for (let i = 1; i <= initialLoadedPage; i++) {
       loadedPagesRef.current.add(i);
     }
-    setHasMoreToLoad(totalRecords > records.length);
+    hasMoreToLoadRef.current = totalRecords > records.length;
     // eslint-disable-next-line react-hooks/immutability -- useState setters are stable across renders
     setLeaderboardPage(1);
     // Clear bonus cache when map changes
@@ -203,7 +202,7 @@ export default function MapRecordsTabs({
         setAllStageRecords(data.stages);
         setTotalStageRecords(data.pagination.total);
         if (data.stagesList && data.stagesList.length > 0) {
-          setStagesList(data.stagesList);
+          stagesListRef.current = data.stagesList;
         }
       } else {
         setAllStageRecords([]);
@@ -253,7 +252,7 @@ export default function MapRecordsTabs({
         setAllBonusRecords(data.bonuses);
         setTotalBonusRecords(data.pagination.total);
         if (data.bonusGroupsList && data.bonusGroupsList.length > 0) {
-          setBonusGroupsList(data.bonusGroupsList);
+          bonusGroupsListRef.current = data.bonusGroupsList;
         }
       } else {
         bonusCacheRef.current.set(cacheKey, []);
@@ -331,8 +330,8 @@ export default function MapRecordsTabs({
               return [...prev, ...newRecords];
             });
             loadedPagesRef.current.add(page);
-            setLoadedPage(page);
-            setHasMoreToLoad(data.pagination.page < data.pagination.totalPages);
+            loadedPageRef.current = page;
+            hasMoreToLoadRef.current = data.pagination.page < data.pagination.totalPages;
           }
         } catch (error) {
           clientError(`Failed to load records: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -625,7 +624,7 @@ export default function MapRecordsTabs({
   );
 
   // Render bonus/stage record row
-  const renderCompletionRow = (record: BonusRecord | StageRecord, _timeKey: 'runtime') => (
+  const renderCompletionRow = (record: BonusRecord | StageRecord) => (
     <tr
       key={`${record.steamid}-${'zonegroup' in record ? record.zonegroup : record.stage}`}
       className="hover:bg-surface-hover/50 transition-colors"
@@ -1029,7 +1028,7 @@ export default function MapRecordsTabs({
                   </tr>
                 ) : (
                   <>
-                    {paginatedBonusRecords.map((record) => renderCompletionRow(record, 'runtime'))}
+                    {paginatedBonusRecords.map((record) => renderCompletionRow(record))}
                     {paginatedBonusRecords.length === 0 && (
                       <tr>
                         <td
@@ -1142,7 +1141,7 @@ export default function MapRecordsTabs({
                   </tr>
                 ) : (
                   <>
-                    {paginatedStageRecords.map((record) => renderCompletionRow(record, 'runtime'))}
+                    {paginatedStageRecords.map((record) => renderCompletionRow(record))}
                     {paginatedStageRecords.length === 0 && (
                       <tr>
                         <td

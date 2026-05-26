@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
 import { validateMapName } from '@/lib/validators';
 import logger from '@/lib/logger';
 import {
@@ -12,8 +11,6 @@ import {
   getPercentileTimesFromCache,
 } from '@/lib/valkey-map-stats-cache';
 import { getMapMetadataFromCache } from '@/lib/valkey-map-cache';
-
-const DEFAULT_DAYS = 365 * 9; // ~9 years to cover data since 2017
 
 interface StatsResponse {
   completionsOverTime: Array<{ date: string; count: number }>;
@@ -36,7 +33,7 @@ interface StatsResponse {
 }
 
 export async function GET(
-  request: NextRequest,
+  request: Request,
   { params }: { params: Promise<{ mapname: string }> }
 ) {
   const { mapname } = await params;
@@ -46,9 +43,6 @@ export async function GET(
   if (!validMapname) {
     return NextResponse.json({ error: 'Invalid map name' }, { status: 400 });
   }
-
-  const searchParams = request.nextUrl.searchParams;
-  const _days = Math.min(365, Math.max(1, parseInt(searchParams.get('days') || String(DEFAULT_DAYS), 10)));
 
   try {
     // Get map metadata (already cached with 1 hour TTL in lib/map-cache.ts)

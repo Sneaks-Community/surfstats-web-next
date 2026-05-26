@@ -102,7 +102,6 @@ export async function fetchServersFromGame(): Promise<ServerStatus[]> {
             })),
           };
         } catch (error: unknown) {
-          const _duration = Date.now() - serverStart;
           const err = error as { code?: string };
           const errorCode = err.code || 'UNKNOWN';
           logger.debug(`[ServerCache] Server ${config.name} offline: ${errorCode}`);

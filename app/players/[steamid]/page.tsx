@@ -266,8 +266,6 @@ export default async function PlayerProfilePage({
     );
   }
 
-  const { player: _player, maps: _maps, bonuses: _bonuses, stages: _stages } = data;
-  
   // Group 2: Parallel fetch for remaining data
   const [incompleteData, totals, steamAvatars, playtimeData, linearVsStagedPerTier, activityHeatmap] = await Promise.all([
     getIncompleteRecords(validSteamId),

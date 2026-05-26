@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
 import client from '@/lib/valkey';
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   const healthStatus: Record<string, string | boolean | number> = {
     status: 'ok',
     timestamp: new Date().toISOString(),

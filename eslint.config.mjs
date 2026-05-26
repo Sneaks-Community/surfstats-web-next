@@ -45,16 +45,7 @@ export default defineConfig(
     files: ["**/*.ts", "**/*.tsx"],
     rules: {
       "no-unused-vars": "off",
-      "@typescript-eslint/no-unused-vars": [
-        "warn",
-        {
-          vars: "all",
-          args: "after-used",
-          ignoreRestSiblings: true,
-          argsIgnorePattern: "^_",
-          varsIgnorePattern: "^_",
-        },
-      ],
+      "@typescript-eslint/no-unused-vars": "error",
 
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/consistent-type-imports": "warn",

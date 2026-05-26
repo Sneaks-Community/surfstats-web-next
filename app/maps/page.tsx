@@ -14,11 +14,6 @@ export const metadata: Metadata = {
   title: 'Maps',
 };
 
-interface _FilterOptions {
-  tier: number;
-  count: number;
-}
-
 export default async function MapsPage({
   searchParams,
 }: {
