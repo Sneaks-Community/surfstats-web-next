@@ -153,7 +153,6 @@ export async function getWRCheckpointTimesFromCache(
     }
 
     await cacheSet(key, checkpointData, STATS_CACHE_TTL);
-    logger.debug(`[Cache] SET ${key} with TTL ${STATS_CACHE_TTL}s`);
 
     return checkpointData;
   } catch (error: unknown) {
@@ -222,7 +221,6 @@ export async function getCheckpointStatsFromCache(mapname: string): Promise<Chec
     const result = processCheckpointData(checkpointRows, maxCheckpoint);
 
     await cacheSet(key, result, STATS_CACHE_TTL);
-    logger.debug(`[Cache] SET ${key} with TTL ${STATS_CACHE_TTL}s`);
 
     return result;
   } catch (error: unknown) {
@@ -279,7 +277,6 @@ export async function getBonusCompletionsOverTimeFromCache(
     }
 
     await cacheSet(key, bonusData, STATS_CACHE_TTL);
-    logger.debug(`[Cache] SET ${key} with TTL ${STATS_CACHE_TTL}s`);
 
     return bonusData;
   } catch (error: unknown) {
@@ -325,7 +322,6 @@ export async function getCompletionsOverTimeFromCache(mapname: string): Promise<
     }));
 
     await cacheSet(key, result, STATS_CACHE_TTL);
-    logger.debug(`[Cache] SET ${key} with TTL ${STATS_CACHE_TTL}s`);
 
     return result;
   } catch (error: unknown) {
@@ -379,7 +375,6 @@ export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<
     });
 
     await cacheSet(key, timeOnMapData, STATS_CACHE_TTL);
-    logger.debug(`[Cache] SET ${key} with TTL ${STATS_CACHE_TTL}s`);
 
     return timeOnMapData;
   } catch (error: unknown) {
@@ -426,7 +421,6 @@ export async function getFinishTimeDataFromCache(mapname: string): Promise<{ avg
     };
 
     await cacheSet(key, result, STATS_CACHE_TTL);
-    logger.debug(`[Cache] SET ${key} with TTL ${STATS_CACHE_TTL}s`);
 
     return result;
   } catch (error: unknown) {
@@ -487,7 +481,6 @@ export async function getPercentileTimesFromCache(
     if (totalCount === 0) {
       const result = { wrTime: null, p1Time: null, p10Time: null, medianTime: null, avgTime: null };
       await cacheSet(key, result, STATS_CACHE_TTL);
-      logger.debug(`[Cache] SET ${key} with TTL ${STATS_CACHE_TTL}s`);
       return result;
     }
 
@@ -527,7 +520,6 @@ export async function getPercentileTimesFromCache(
     };
 
     await cacheSet(key, result, STATS_CACHE_TTL);
-    logger.debug(`[Cache] SET ${key} with TTL ${STATS_CACHE_TTL}s`);
 
     return result;
   } catch (error: unknown) {
