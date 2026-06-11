@@ -9,3 +9,4 @@ plans/
 sql/
 *.tsbuildinfo
 docker-compose.yml
+.vscode/
