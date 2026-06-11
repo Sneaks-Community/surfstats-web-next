@@ -2,40 +2,66 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
-  build-and-test:
+
+  quality:
+    name: Lint, Build & Security Audit
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v6
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.3
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v6
-      with:
+      - name: Setup Node.js
+        uses: actions/setup-node@v6.4.0
+        with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-    - name: Install dependencies
-      run: npm ci
+      - name: Install dependencies
+        run: npm ci
 
-    - name: Security audit
-      run: npm audit --audit-level=high
+      - name: npm audit (fail on high vulnerabilities)
+        run: npm audit --audit-level=high
 
-    - name: Run Linter
-      run: npm run lint
+      - name: Lint
+        run: npm run lint
 
-    - name: Build Next.js app
-      run: npm run build
-      env:
-        # Provide dummy env vars so the build doesn't fail if it requires them at build time
-        STEAM_API_KEY: dummy_key
-        SERVERS_JSON: '[]'
+      - name: Build
+        run: npm run build
+        env:
+          # Provide dummy env vars so the build doesn't fail if it requires them at build time
+          STEAM_API_KEY: dummy_key
+          SERVERS_JSON: '[]'
+
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.1.0
+
+      - name: Build Docker image (production stage)
+        uses: docker/build-push-action@v7.2.0
+        with:
+          context: .
+          push: false
+          target: production
+          tags: surfstats-web-next:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
