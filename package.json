@@ -42,7 +42,7 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "tailwindcss": "4.3.0",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.59.3"
+    "typescript-eslint": "8.60.1"
   },
   "overrides": {
     "fast-xml-parser": "^5.5.12"
