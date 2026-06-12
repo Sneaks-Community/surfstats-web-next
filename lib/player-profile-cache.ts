@@ -245,18 +245,3 @@ export async function invalidatePlayerProfileCache(steamid: string): Promise<voi
   await cacheDelete(cacheKey);
   logger.debug(`[PlayerProfileCache] Invalidated cache for ${steamid}`);
 }
-
-/**
- * Get cache stats for monitoring
- */
-export function getPlayerProfileCacheStats(): {
-  key: string;
-  ttl: number;
-  description: string;
-} {
-  return {
-    key: PLAYER_PROFILE_KEY,
-    ttl: PLAYER_PROFILE_TTL,
-    description: 'Player profile data (basic info, maps, bonuses, stages)',
-  };
-}

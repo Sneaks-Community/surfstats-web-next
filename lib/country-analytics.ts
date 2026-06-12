@@ -46,44 +46,6 @@ export type CountrySortKey = 'rank' | 'country' | 'points' | 'players';
 export type SortOrder = 'asc' | 'desc';
 
 /**
- * Get all unique country names from the database
- * Used to build a mapping of actual country values in the data
- * Cached for 24 hours - country data changes very infrequently
- */
-const getDistinctCountriesInternal = async (): Promise<string[]> => {
-  try {
-    const [rows] = await pool.query<RowDataPacket[]>(
-      'SELECT DISTINCT country FROM ck_playerrank WHERE country IS NOT NULL AND country != ""'
-    );
-    return rows.map(r => r.country);
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    logger.error(`[CountryAnalytics] Failed to get distinct countries: ${errorMessage}`);
-    return [];
-  }
-};
-
-const DISTINCT_COUNTRIES_KEY = 'surfstats:countries:distinct';
-const DISTINCT_COUNTRIES_TTL = 86400; // 24 hours
-
-/**
- * Get distinct countries from Valkey cache
- */
-export async function getDistinctCountriesFromCache(): Promise<string[]> {
-  const cached = await cacheGet<string[]>(DISTINCT_COUNTRIES_KEY);
-
-  if (cached) {
-    return cached;
-  }
-
-  const countries = await getDistinctCountriesInternal();
-
-  await cacheSet(DISTINCT_COUNTRIES_KEY, countries, DISTINCT_COUNTRIES_TTL);
-
-  return countries;
-}
-
-/**
  * Internal function for getting countries ranking with aggregation
  *
  * Query optimization notes:

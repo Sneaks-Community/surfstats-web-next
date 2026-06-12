@@ -83,21 +83,3 @@ export function getTierTextColor(tier: number): string {
   
   return colors[tier] ?? 'text-red-400';
 }
-
-/**
- * Tier color constants for chart components
- * These hex colors match the Tailwind classes used in getTierColor()
- */
-export const TIER_COLORS: Record<number, string> = {
-  1: '#10b981', // emerald-500
-  2: '#84cc16', // lime-500
-  3: '#eab308', // yellow-500
-  4: '#f97316', // orange-500
-  5: '#ea580c', // orange-600
-  6: '#ef4444', // red-500
-};
-
-/**
- * Default color for tiers beyond the defined range (e.g., tier > 6)
- */
-export const DEFAULT_COLOR = '#a855f7'; // purple-500

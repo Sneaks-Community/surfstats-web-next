@@ -1,5 +1,5 @@
 import 'server-only';
-import { cacheGet, cacheSet, cacheInvalidatePattern } from './valkey-cache';
+import { cacheGet, cacheSet } from './valkey-cache';
 import { fetchRegistryData } from './registry-cache';
 import type { BonusGroup, StageGroup } from './registry-cache';
 import { cacheLock, shouldExpireEarly } from './cache-lock';
@@ -105,11 +105,4 @@ export async function getStagesByMapFromCache(mapname: string): Promise<number[]
     .filter((s) => s.map === mapname)
     .map((s) => s.stage)
     .sort((a, b) => a - b);
-}
-
-/**
- * Invalidate registry cache
- */
-export async function invalidateRegistryCache(): Promise<void> {
-  await cacheInvalidatePattern('surfstats:registry:*');
 }

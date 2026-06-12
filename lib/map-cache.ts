@@ -142,38 +142,6 @@ export async function getMapNames(): Promise<string[]> {
 }
 
 /**
- * Get total number of maps
- */
-export async function getTotalMapCount(): Promise<number> {
-  const allMetadata = await fetchAllMapMetadata();
-  return allMetadata.size;
-}
-
-/**
- * Get total number of bonuses across all maps
- */
-export async function getTotalBonusCount(): Promise<number> {
-  const allMetadata = await fetchAllMapMetadata();
-  let total = 0;
-  for (const map of allMetadata.values()) {
-    total += map.bonuses || 0;
-  }
-  return total;
-}
-
-/**
- * Get total number of stages across all maps
- */
-export async function getTotalStageCount(): Promise<number> {
-  const allMetadata = await fetchAllMapMetadata();
-  let total = 0;
-  for (const map of allMetadata.values()) {
-    total += map.stages || 0;
-  }
-  return total;
-}
-
-/**
  * Get totals for progress bars (maps, bonuses, stages)
  */
 export async function getTotals(): Promise<{
@@ -199,22 +167,6 @@ export async function getTotals(): Promise<{
 }
 
 /**
- * Get maps filtered by tier
- */
-export async function getMapsByTier(tier: number): Promise<MapMetadata[]> {
-  const allMetadata = await fetchAllMapMetadata();
-  const maps: MapMetadata[] = [];
-  
-  for (const map of allMetadata.values()) {
-    if (map.tier === tier) {
-      maps.push(map);
-    }
-  }
-  
-  return maps.sort((a, b) => a.mapname.localeCompare(b.mapname));
-}
-
-/**
  * Get tier distribution (count of maps per tier)
  */
 export async function getTierDistribution(): Promise<Map<number, number>> {
@@ -224,34 +176,6 @@ export async function getTierDistribution(): Promise<Map<number, number>> {
   for (const map of allMetadata.values()) {
     const count = distribution.get(map.tier) || 0;
     distribution.set(map.tier, count + 1);
-  }
-  
-  return distribution;
-}
-
-/**
- * Get tier distribution with linear vs staged map counts per tier
- * Linear maps: maps with 0 stages (bonuses only or no bonus/stage)
- * Staged maps: maps with >0 stages
- */
-export async function getTierDistributionWithStages(): Promise<Map<number, { linear: number; staged: number }>> {
-  const allMetadata = await fetchAllMapMetadata();
-  const distribution = new Map<number, { linear: number; staged: number }>();
-  
-  for (const map of allMetadata.values()) {
-    const tier = map.tier;
-    const stages = map.stages || 0;
-    const counts = distribution.get(tier) || { linear: 0, staged: 0 };
-    
-    if (stages === 0) {
-      // Linear map (no stages)
-      counts.linear++;
-    } else {
-      // Staged map (has stages)
-      counts.staged++;
-    }
-    
-    distribution.set(tier, counts);
   }
   
   return distribution;

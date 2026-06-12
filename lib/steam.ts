@@ -90,62 +90,6 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
 const STEAM_AVATAR_TTL = 604800; // 7 days
 
 /**
- * Get Steam avatar from Valkey cache
- */
-export async function getSteamAvatarFromCache(steamId: string): Promise<{ avatar: string; avatarmedium: string; avatarfull: string } | null> {
-  const cacheKey = `surfstats:steam:avatar:${steamId}`;
-  
-  const cached = await cacheGet<{ avatar: string; avatarmedium: string; avatarfull: string }>(cacheKey);
-  
-  if (cached) {
-    return cached;
-  }
-
-  const startTime = Date.now();
-  
-  try {
-    // Convert STEAM_1:0:12345 to SteamID64
-    const steamId64 = convertSteamIdTo64(steamId);
-    if (!steamId64) {
-      logger.warn(`[Steam] Invalid SteamID format: ${steamId}`);
-      return null;
-    }
-
-    logger.debug(`[Steam] Fetching avatar for ${steamId} (SteamID64: ${steamId64})`);
-    
-    // Call Steam API directly - no HTTP proxy needed
-    const players = await fetchSteamPlayerData([steamId64]);
-    
-    if (players.length === 0) {
-      const duration = Date.now() - startTime;
-      logger.warn(`[Steam] No player data found for SteamID ${steamId} (${duration}ms)`);
-      return null;
-    }
-
-    const player = players[0];
-    const duration = Date.now() - startTime;
-    logger.debug(`[Steam] Successfully fetched avatar for ${player.personaname || steamId} (${duration}ms)`);
-    
-    const avatarData = {
-      avatar: player.avatar || '',
-      avatarmedium: player.avatarmedium || '',
-      avatarfull: player.avatarfull || ''
-    };
-    
-    // Cache the result
-    await cacheSet(cacheKey, avatarData, STEAM_AVATAR_TTL);
-    
-    return avatarData;
-  } catch (error: unknown) {
-    const duration = Date.now() - startTime;
-    const err = error as { message?: string };
-    const errorMessage = err.message || 'Unknown error';
-    logger.error(`[Steam] Error fetching avatar for ${steamId} after ${duration}ms: ${errorMessage}`);
-    return null;
-  }
-}
-
-/**
  * Get Steam profiles from Valkey cache
  * @param steamIds - Array of SteamIDs to fetch avatars for
  * @returns Map of original SteamID to avatar data

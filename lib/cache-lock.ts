@@ -107,29 +107,3 @@ export const cacheLock = new CacheLock();
 export function shouldExpireEarly(probability = 0.1): boolean {
   return Math.random() < probability;
 }
-
-/**
- * Gets a cache key with probabilistic early expiration.
- * 
- * Returns null if the cache should be considered expired early,
- * forcing a database fetch and preventing synchronized expiration.
- * 
- * @param cachedValue - The cached value (null means cache miss)
- * @param probability - Probability of early expiration (0-1, default 0.1)
- * @returns The cached value or null if should expire early
- */
-export function getWithEarlyExpiration<T>(
-  cachedValue: T | null,
-  probability = 0.1
-): T | null {
-  if (cachedValue !== null) {
-    return cachedValue;
-  }
-  
-  // Cache miss - check if we should expire early
-  if (shouldExpireEarly(probability)) {
-    return null;
-  }
-  
-  return cachedValue;
-}

@@ -1,6 +1,6 @@
 import 'server-only';
-import { cacheGet, cacheSet, cacheInvalidatePattern } from './valkey-cache';
-import { fetchAllMapMetadata, getTotals as getMapTotals } from './map-cache';
+import { cacheGet, cacheSet } from './valkey-cache';
+import { fetchAllMapMetadata } from './map-cache';
 import type { MapMetadata } from './map-cache';
 import { cacheLock, shouldExpireEarly } from './cache-lock';
 import logger from './logger';
@@ -72,30 +72,6 @@ export async function getMapMetadataFromCache(mapname: string): Promise<MapMetad
 }
 
 /**
- * Get totals (maps, bonuses, stages) from Valkey cache
- */
-export async function getTotalsFromMapCache(): Promise<{
-  totalMaps: number;
-  totalBonuses: number;
-  totalStages: number;
-}> {
-  const cached = await cacheGet<{
-    totalMaps: number;
-    totalBonuses: number;
-    totalStages: number;
-  }>(`${MAP_METADATA_KEY}:totals`);
-
-  if (cached) {
-    return cached;
-  }
-
-  const totals = await getMapTotals();
-  await cacheSet(`${MAP_METADATA_KEY}:totals`, totals, MAP_METADATA_TTL);
-
-  return totals;
-}
-
-/**
  * Get tier distribution from Valkey cache.
  * Checks the tier distribution cache first, then falls back to deriving
  * from the cached full metadata (which handles its own caching/deduplication).
@@ -122,11 +98,4 @@ export async function getTierDistributionFromCache(): Promise<Map<number, number
   await cacheSet(`${MAP_METADATA_KEY}:tier_distribution`, Object.fromEntries(distribution), MAP_METADATA_TTL);
 
   return distribution;
-}
-
-/**
- * Invalidate map cache
- */
-export async function invalidateMapCache(): Promise<void> {
-  await cacheInvalidatePattern('surfstats:map:*');
 }
