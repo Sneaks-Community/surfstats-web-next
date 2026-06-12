@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import client from '@/lib/valkey';
 import { getErrorMessage } from '@/lib/errors';
+import logger from '@/lib/logger';
 
 export async function GET() {
   const healthStatus: Record<string, string | boolean | number> = {
@@ -19,7 +20,8 @@ export async function GET() {
       overallHealthy = false;
     }
   } catch (error) {
-    healthStatus.valkey = `error: ${getErrorMessage(error)}`;
+    logger.error(`[API Health] Valkey check failed: ${getErrorMessage(error)}`);
+    healthStatus.valkey = 'error';
     overallHealthy = false;
   }
 
@@ -29,7 +31,8 @@ export async function GET() {
     await pool.query('SELECT 1');
     healthStatus.database = 'connected';
   } catch (error) {
-    healthStatus.database = `error: ${getErrorMessage(error)}`;
+    logger.error(`[API Health] Database check failed: ${getErrorMessage(error)}`);
+    healthStatus.database = 'error';
     overallHealthy = false;
   }
 
