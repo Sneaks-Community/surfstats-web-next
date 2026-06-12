@@ -35,6 +35,37 @@ export function formatTime(seconds: number): string {
   return `${mins}:${secs.padStart(6, '0')}`;
 }
 
+export type SortDirection = 'asc' | 'desc';
+
+/**
+ * Clone a list and sort it with an ascending-order comparator, applying the
+ * sort direction. Keeps the "copy, sort, flip on desc" boilerplate in one place
+ * so call sites only supply the field comparator.
+ * @param records - Records to sort (not mutated)
+ * @param direction - 'asc' keeps the comparator order, 'desc' reverses it
+ * @param comparator - Returns the ascending comparison for two records
+ */
+export function sortRecords<T>(
+  records: readonly T[],
+  direction: SortDirection,
+  comparator: (a: T, b: T) => number
+): T[] {
+  const sorted = [...records];
+  sorted.sort((a, b) => (direction === 'asc' ? comparator(a, b) : -comparator(a, b)));
+  return sorted;
+}
+
+/**
+ * Case-insensitive substring match of a search query against one or more fields.
+ * @param query - Raw (un-lowercased) search query
+ * @param fields - Field values to test
+ * @returns true when the query is found in any field
+ */
+export function matchesQuery(query: string, ...fields: string[]): boolean {
+  const q = query.toLowerCase();
+  return fields.some((field) => field.toLowerCase().includes(q));
+}
+
 /**
  * Format playtime duration in seconds to days, hours, and minutes format
  * Used for displaying total time on server from player analytics

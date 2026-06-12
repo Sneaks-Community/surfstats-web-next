@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Map as MapIcon, Target, Layers, Search, X, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle, Circle } from 'lucide-react';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import Pagination from '@/components/Pagination';
-import { formatTime, formatDate } from '@/lib/utils';
+import { formatTime, formatDate, sortRecords, matchesQuery, type SortDirection } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import TierBadge from '@/components/TierBadge';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -67,7 +67,6 @@ interface PlayerRecordsTabsProps {
 type TabType = 'maps' | 'bonuses' | 'stages';
 type StatusFilter = 'finished' | 'incomplete';
 type SortField = 'map' | 'rank' | 'time' | 'wrDiff' | 'date' | 'tier' | 'wrTime' | 'mapType';
-type SortDirection = 'asc' | 'desc';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -191,186 +190,132 @@ export default function PlayerRecordsTabs({
 
   // Filter and sort records
   const filteredMaps = useMemo(() => {
-    const query = searchQueries.maps.toLowerCase();
-    let filtered = maps;
-    if (query) {
-      filtered = maps.filter((record) => record.mapname.toLowerCase().includes(query));
-    }
-    
-    // Sort
-    const sorted = [...filtered].sort((a, b) => {
-      let comparison = 0;
+    const query = searchQueries.maps;
+    const filtered = query
+      ? maps.filter((record) => matchesQuery(query, record.mapname))
+      : maps;
+
+    return sortRecords(filtered, sortDirection, (a, b) => {
       switch (sortField) {
         case 'map':
-          comparison = a.mapname.localeCompare(b.mapname);
-          break;
+          return a.mapname.localeCompare(b.mapname);
         case 'rank':
-          comparison = a.player_rank - b.player_rank;
-          break;
+          return a.player_rank - b.player_rank;
         case 'time':
-          comparison = a.runtimepro - b.runtimepro;
-          break;
+          return a.runtimepro - b.runtimepro;
         case 'wrDiff': {
           const aDiff = a.wr_time ? a.runtimepro - a.wr_time : Infinity;
           const bDiff = b.wr_time ? b.runtimepro - b.wr_time : Infinity;
-          comparison = aDiff - bDiff;
-          break;
+          return aDiff - bDiff;
         }
         case 'date':
-          comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
-          break;
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
         case 'tier':
-          comparison = a.tier - b.tier;
-          break;
+          return a.tier - b.tier;
+        default:
+          return 0;
       }
-      return sortDirection === 'asc' ? comparison : -comparison;
     });
-    return sorted;
   }, [maps, searchQueries.maps, sortField, sortDirection]);
 
   const filteredBonuses = useMemo(() => {
-    const query = searchQueries.bonuses.toLowerCase();
-    let filtered = bonuses;
-    if (query) {
-      filtered = bonuses.filter((record) => record.mapname.toLowerCase().includes(query));
-    }
-    
-    // Sort
-    const sorted = [...filtered].sort((a, b) => {
-      let comparison = 0;
+    const query = searchQueries.bonuses;
+    const filtered = query
+      ? bonuses.filter((record) => matchesQuery(query, record.mapname))
+      : bonuses;
+
+    return sortRecords(filtered, sortDirection, (a, b) => {
       switch (sortField) {
         case 'map':
-          comparison = a.mapname.localeCompare(b.mapname) || a.zonegroup - b.zonegroup;
-          break;
+          return a.mapname.localeCompare(b.mapname) || a.zonegroup - b.zonegroup;
         case 'rank':
-          comparison = a.player_rank - b.player_rank;
-          break;
+          return a.player_rank - b.player_rank;
         case 'time':
-          comparison = a.runtime - b.runtime;
-          break;
+          return a.runtime - b.runtime;
         case 'date':
-          comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
-          break;
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
         default:
-          comparison = a.mapname.localeCompare(b.mapname);
+          return a.mapname.localeCompare(b.mapname);
       }
-      return sortDirection === 'asc' ? comparison : -comparison;
     });
-    return sorted;
   }, [bonuses, searchQueries.bonuses, sortField, sortDirection]);
 
   const filteredStages = useMemo(() => {
-    const query = searchQueries.stages.toLowerCase();
-    let filtered = stages;
-    if (query) {
-      filtered = stages.filter((record) => record.map.toLowerCase().includes(query));
-    }
-    
-    // Sort
-    const sorted = [...filtered].sort((a, b) => {
-      let comparison = 0;
+    const query = searchQueries.stages;
+    const filtered = query
+      ? stages.filter((record) => matchesQuery(query, record.map))
+      : stages;
+
+    return sortRecords(filtered, sortDirection, (a, b) => {
       switch (sortField) {
         case 'map':
-          comparison = a.map.localeCompare(b.map) || a.stage - b.stage;
-          break;
+          return a.map.localeCompare(b.map) || a.stage - b.stage;
         case 'rank':
-          comparison = a.player_rank - b.player_rank;
-          break;
+          return a.player_rank - b.player_rank;
         case 'time':
-          comparison = a.runtime - b.runtime;
-          break;
+          return a.runtime - b.runtime;
         case 'date':
-          comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
-          break;
+          return new Date(a.date).getTime() - new Date(b.date).getTime();
         default:
-          comparison = a.map.localeCompare(b.map);
+          return a.map.localeCompare(b.map);
       }
-      return sortDirection === 'asc' ? comparison : -comparison;
     });
-    return sorted;
   }, [stages, searchQueries.stages, sortField, sortDirection]);
 
   // Filter and sort incomplete records based on search
   const filteredIncompleteMaps = useMemo(() => {
-    const query = searchQueries.maps.toLowerCase();
-    let filtered = incompleteMaps;
-    if (query) {
-      filtered = incompleteMaps.filter((record) => record.mapname.toLowerCase().includes(query));
-    }
-    
-    // Sort
-    const sorted = [...filtered].sort((a, b) => {
-      let comparison = 0;
+    const query = searchQueries.maps;
+    const filtered = query
+      ? incompleteMaps.filter((record) => matchesQuery(query, record.mapname))
+      : incompleteMaps;
+
+    return sortRecords(filtered, sortDirection, (a, b) => {
       switch (sortField) {
         case 'map':
-          comparison = a.mapname.localeCompare(b.mapname);
-          break;
+          return a.mapname.localeCompare(b.mapname);
         case 'tier': {
           const aTier = a.tier ?? 0;
           const bTier = b.tier ?? 0;
-          comparison = aTier - bTier;
-          break;
+          return aTier - bTier;
         }
         case 'wrTime': {
           const aWR = a.wr_time ?? Infinity;
           const bWR = b.wr_time ?? Infinity;
-          comparison = aWR - bWR;
-          break;
+          return aWR - bWR;
         }
         case 'mapType':
-          comparison = a.mapType.localeCompare(b.mapType);
-          break;
+          return a.mapType.localeCompare(b.mapType);
         default:
-          comparison = a.mapname.localeCompare(b.mapname);
+          return a.mapname.localeCompare(b.mapname);
       }
-      return sortDirection === 'asc' ? comparison : -comparison;
     });
-    return sorted;
   }, [incompleteMaps, searchQueries.maps, sortField, sortDirection]);
 
   const filteredIncompleteBonuses = useMemo(() => {
-    const query = searchQueries.bonuses.toLowerCase();
-    let filtered = incompleteBonuses;
-    if (query) {
-      filtered = incompleteBonuses.filter((record) => record.mapname.toLowerCase().includes(query));
-    }
-    
-    // Sort
-    const sorted = [...filtered].sort((a, b) => {
-      let comparison = 0;
-      switch (sortField) {
-        case 'map':
-          comparison = a.mapname.localeCompare(b.mapname) || a.zonegroup - b.zonegroup;
-          break;
-        default:
-          comparison = a.mapname.localeCompare(b.mapname) || a.zonegroup - b.zonegroup;
-      }
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-    return sorted;
-  }, [incompleteBonuses, searchQueries.bonuses, sortField, sortDirection]);
+    const query = searchQueries.bonuses;
+    const filtered = query
+      ? incompleteBonuses.filter((record) => matchesQuery(query, record.mapname))
+      : incompleteBonuses;
+
+    return sortRecords(
+      filtered,
+      sortDirection,
+      (a, b) => a.mapname.localeCompare(b.mapname) || a.zonegroup - b.zonegroup
+    );
+  }, [incompleteBonuses, searchQueries.bonuses, sortDirection]);
 
   const filteredIncompleteStages = useMemo(() => {
-    const query = searchQueries.stages.toLowerCase();
-    let filtered = incompleteStages;
-    if (query) {
-      filtered = incompleteStages.filter((record) => record.map.toLowerCase().includes(query));
-    }
-    
-    // Sort
-    const sorted = [...filtered].sort((a, b) => {
-      let comparison = 0;
-      switch (sortField) {
-        case 'map':
-          comparison = a.map.localeCompare(b.map) || a.stage - b.stage;
-          break;
-        default:
-          comparison = a.map.localeCompare(b.map) || a.stage - b.stage;
-      }
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-    return sorted;
-  }, [incompleteStages, searchQueries.stages, sortField, sortDirection]);
+    const query = searchQueries.stages;
+    const filtered = query
+      ? incompleteStages.filter((record) => matchesQuery(query, record.map))
+      : incompleteStages;
+
+    return sortRecords(
+      filtered,
+      sortDirection,
+      (a, b) => a.map.localeCompare(b.map) || a.stage - b.stage
+    );
+  }, [incompleteStages, searchQueries.stages, sortDirection]);
 
   // Get current page data based on status filter
   const getCurrentData = () => {

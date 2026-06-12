@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Trophy, Target, Layers, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
 import Link from 'next/link';
 import Pagination from '@/components/Pagination';
-import { formatTime, formatDate } from '@/lib/utils';
+import { formatTime, formatDate, sortRecords, matchesQuery, type SortDirection } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import { useDebounce } from '@/hooks/useDebounce';
 import { clientError } from '@/lib/client-logger';
@@ -58,7 +58,10 @@ type TabType = 'map' | 'bonus' | 'stages';
 const ITEMS_PER_PAGE = 20;
 const MAX_STAGE_RECORDS = 100;
 
-// Sort icon component for map tab (client-side sorting) - extracted to avoid render-time creation
+// Sort types
+type SortField = 'rank' | 'player' | 'time' | 'speed' | 'wrDiff' | 'date';
+
+// Sort icon component (shared by map, bonus, and stages tabs) - extracted to avoid render-time creation
 const SortIcon = ({ field, sortField, sortDirection }: { field: SortField; sortField: SortField; sortDirection: SortDirection }) => {
   if (sortField !== field) {
     return <ArrowUpDown className="h-4 w-4 text-text-muted opacity-50" />;
@@ -70,28 +73,87 @@ const SortIcon = ({ field, sortField, sortDirection }: { field: SortField; sortF
   );
 };
 
-// Sort icon component for stages tab (server-side sorting) - extracted to avoid render-time creation
-const StageSortIcon = ({ field, sortField, sortDirection }: { field: SortField; sortField: SortField; sortDirection: SortDirection }) => {
-  if (sortField !== field) {
-    return <ArrowUpDown className="h-4 w-4 text-text-muted opacity-50" />;
-  }
-  return sortDirection === 'asc' ? (
-    <ArrowUp className="h-4 w-4 text-primary-500" />
-  ) : (
-    <ArrowDown className="h-4 w-4 text-primary-500" />
-  );
-};
-
-// Sort types
-type SortField = 'rank' | 'player' | 'time' | 'speed' | 'wrDiff' | 'date';
-type SortDirection = 'asc' | 'desc';
-
 // Format time difference from WR
 function formatTimeDiff(time: number, wrTime: number | null): string {
   if (!wrTime || time === wrTime) return '-';
   const diff = time - wrTime;
   return `+${formatTime(diff)}`;
 }
+
+// Rank badge - medal styling for the top 3, muted otherwise
+const RankBadge = ({ rank }: { rank: number }) => (
+  <span
+    className={`inline-flex items-center justify-center h-8 w-8 rounded-full font-bold text-sm ${
+      rank === 1
+        ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30'
+        : rank === 2
+        ? 'bg-zinc-300/20 text-zinc-300 border border-zinc-300/30'
+        : rank === 3
+        ? 'bg-amber-700/20 text-amber-600 border border-amber-700/30'
+        : 'text-text-placeholder'
+    }`}
+  >
+    {rank}
+  </span>
+);
+
+// Shared record row for the map, bonus, and stages tables (caller supplies the key)
+const RecordRow = ({
+  rank,
+  steamid,
+  name,
+  time,
+  wr_time,
+  startspeed,
+  date,
+}: {
+  rank: number;
+  steamid: string;
+  name: string;
+  time: number;
+  wr_time: number | null;
+  startspeed: number;
+  date: string;
+}) => (
+  <tr className="hover:bg-surface-hover/50 transition-colors">
+    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
+      <RankBadge rank={rank} />
+    </td>
+    <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
+      <Link
+        href={`/players/${steamid}`}
+        className="text-primary hover:text-primary font-medium transition-colors text-base"
+        prefetch={false}
+      >
+        {validatePlayerName(name)}
+      </Link>
+    </td>
+    <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
+      <span className="font-mono text-lg font-medium text-text">
+        {formatTime(time)}
+      </span>
+    </td>
+    <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
+      <span className={`font-mono text-lg font-medium ${
+        rank === 1 ? 'text-green-400' : 'text-yellow-400'
+      }`}>
+        {formatTimeDiff(time, wr_time)}
+      </span>
+    </td>
+    <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
+      {startspeed !== -1 ? (
+        <span className="font-mono text-lg font-medium text-text">
+          {startspeed.toFixed(1)}
+        </span>
+      ) : (
+        <span className="text-text-muted">-</span>
+      )}
+    </td>
+    <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right text-sm text-text-muted">
+      {formatDate(date)}
+    </td>
+  </tr>
+);
 
 export default function MapRecordsTabs({
   records,
@@ -550,46 +612,35 @@ export default function MapRecordsTabs({
   // Filter records by search - use all loaded records (not just initial batch)
   const filteredRecords = useMemo(() => {
     if (!debouncedSearch) return allLeaderboardRecords;
-    const query = debouncedSearch.toLowerCase();
-    return allLeaderboardRecords.filter(
-      (r) =>
-        r.name.toLowerCase().includes(query) ||
-        r.steamid.toLowerCase().includes(query)
+    return allLeaderboardRecords.filter((r) =>
+      matchesQuery(debouncedSearch, r.name, r.steamid)
     );
   }, [allLeaderboardRecords, debouncedSearch]);
 
   // Sort records
-  const sortedRecords = useMemo(() => {
-    const sorted = [...filteredRecords];
-    sorted.sort((a, b) => {
-      let comparison = 0;
-      switch (sortField) {
-        case 'rank':
-          comparison = a.rank - b.rank;
-          break;
-        case 'player':
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case 'time':
-          comparison = a.runtimepro - b.runtimepro;
-          break;
-        case 'speed':
-          comparison = a.startspeed - b.startspeed;
-          break;
-        case 'wrDiff': {
-          const aDiff = a.wr_time ? a.runtimepro - a.wr_time : Infinity;
-          const bDiff = b.wr_time ? b.runtimepro - b.wr_time : Infinity;
-          comparison = aDiff - bDiff;
-          break;
+  const sortedRecords = useMemo(
+    () =>
+      sortRecords(filteredRecords, sortDirection, (a, b) => {
+        switch (sortField) {
+          case 'player':
+            return a.name.localeCompare(b.name);
+          case 'time':
+            return a.runtimepro - b.runtimepro;
+          case 'speed':
+            return a.startspeed - b.startspeed;
+          case 'wrDiff': {
+            const aDiff = a.wr_time ? a.runtimepro - a.wr_time : Infinity;
+            const bDiff = b.wr_time ? b.runtimepro - b.wr_time : Infinity;
+            return aDiff - bDiff;
+          }
+          case 'date':
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+          default:
+            return a.rank - b.rank;
         }
-        case 'date':
-          comparison = new Date(b.date).getTime() - new Date(a.date).getTime();
-          break;
-      }
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-    return sorted;
-  }, [filteredRecords, sortField, sortDirection]);
+      }),
+    [filteredRecords, sortField, sortDirection]
+  );
 
   // Paginated records
   // Search mode (≥3 chars): paginate over server-returned results — every match is reachable.
@@ -608,46 +659,35 @@ export default function MapRecordsTabs({
   // Filter bonus records by search
   const filteredBonusRecords = useMemo(() => {
     if (!debouncedBonusSearch) return allBonusRecords;
-    const query = debouncedBonusSearch.toLowerCase();
-    return allBonusRecords.filter(
-      (r) =>
-        r.name.toLowerCase().includes(query) ||
-        r.steamid.toLowerCase().includes(query)
+    return allBonusRecords.filter((r) =>
+      matchesQuery(debouncedBonusSearch, r.name, r.steamid)
     );
   }, [allBonusRecords, debouncedBonusSearch]);
 
   // Sort bonus records
-  const sortedBonusRecords = useMemo(() => {
-    const sorted = [...filteredBonusRecords];
-    sorted.sort((a, b) => {
-      let comparison = 0;
-      switch (sortField) {
-        case 'rank':
-          comparison = a.rank - b.rank;
-          break;
-        case 'player':
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case 'time':
-          comparison = a.runtime - b.runtime;
-          break;
-        case 'speed':
-          comparison = a.startspeed - b.startspeed;
-          break;
-        case 'wrDiff': {
-          const aDiff = a.wr_time ? a.runtime - a.wr_time : Infinity;
-          const bDiff = b.wr_time ? b.runtime - b.wr_time : Infinity;
-          comparison = aDiff - bDiff;
-          break;
+  const sortedBonusRecords = useMemo(
+    () =>
+      sortRecords(filteredBonusRecords, sortDirection, (a, b) => {
+        switch (sortField) {
+          case 'player':
+            return a.name.localeCompare(b.name);
+          case 'time':
+            return a.runtime - b.runtime;
+          case 'speed':
+            return a.startspeed - b.startspeed;
+          case 'wrDiff': {
+            const aDiff = a.wr_time ? a.runtime - a.wr_time : Infinity;
+            const bDiff = b.wr_time ? b.runtime - b.wr_time : Infinity;
+            return aDiff - bDiff;
+          }
+          case 'date':
+            return new Date(b.date).getTime() - new Date(a.date).getTime();
+          default:
+            return a.rank - b.rank;
         }
-        case 'date':
-          comparison = new Date(b.date).getTime() - new Date(a.date).getTime();
-          break;
-      }
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-    return sorted;
-  }, [filteredBonusRecords, sortField, sortDirection]);
+      }),
+    [filteredBonusRecords, sortField, sortDirection]
+  );
 
   // Paginated bonus records — same pattern as map tab above.
   const inBonusSearchMode = bonusSearchQuery.length >= 3;
@@ -663,31 +703,25 @@ export default function MapRecordsTabs({
 
   // Stage records are sorted by rank (runtime ASC) from the server
   // We sort client-side based on the selected sort field
-  const sortedStageRecords = useMemo(() => {
-    const sorted = [...allStageRecords];
-    sorted.sort((a, b) => {
-      let comparison = 0;
-      switch (sortField) {
-        case 'rank':
-        case 'time':
-          comparison = a.runtime - b.runtime;
-          break;
-        case 'player':
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case 'speed':
-          comparison = a.startspeed - b.startspeed;
-          break;
-        case 'date':
-          comparison = new Date(a.date).getTime() - new Date(b.date).getTime();
-          break;
-        default:
-          comparison = a.rank - b.rank;
-      }
-      return sortDirection === 'asc' ? comparison : -comparison;
-    });
-    return sorted;
-  }, [allStageRecords, sortField, sortDirection]);
+  const sortedStageRecords = useMemo(
+    () =>
+      sortRecords(allStageRecords, sortDirection, (a, b) => {
+        switch (sortField) {
+          case 'rank':
+          case 'time':
+            return a.runtime - b.runtime;
+          case 'player':
+            return a.name.localeCompare(b.name);
+          case 'speed':
+            return a.startspeed - b.startspeed;
+          case 'date':
+            return new Date(a.date).getTime() - new Date(b.date).getTime();
+          default:
+            return a.rank - b.rank;
+        }
+      }),
+    [allStageRecords, sortField, sortDirection]
+  );
 
   // Search mode: paginate server results (true global ranks).
   // Normal mode: slice loaded records, capped at MAX_STAGE_PAGES.
@@ -702,120 +736,6 @@ export default function MapRecordsTabs({
   const paginatedStageRecords = inStageSearchMode
     ? stageSearchApiResults.slice(stageSearchApiStart, stageSearchApiStart + ITEMS_PER_PAGE)
     : sortedStageRecords.slice(stageStartRow, stageStartRow + ITEMS_PER_PAGE);
-
-  // Render record row for Map tab
-  const renderRecordRow = (record: MapRecord) => (
-    <tr
-      key={record.steamid}
-      className="hover:bg-surface-hover/50 transition-colors"
-    >
-      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
-        <span
-          className={`inline-flex items-center justify-center h-8 w-8 rounded-full font-bold text-sm ${
-            record.rank === 1
-              ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30'
-              : record.rank === 2
-              ? 'bg-zinc-300/20 text-zinc-300 border border-zinc-300/30'
-              : record.rank === 3
-              ? 'bg-amber-700/20 text-amber-600 border border-amber-700/30'
-              : 'text-text-placeholder'
-          }`}
-        >
-          {record.rank}
-        </span>
-      </td>
-      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
-        <Link
-          href={`/players/${record.steamid}`}
-          className="text-primary hover:text-primary font-medium transition-colors text-base"
-          prefetch={false}
-        >
-          {validatePlayerName(record.name)}
-        </Link>
-      </td>
-      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
-        <span className="font-mono text-lg font-medium text-text">
-          {formatTime(record.runtimepro)}
-        </span>
-      </td>
-      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
-        <span className={`font-mono text-lg font-medium ${
-          record.rank === 1 ? 'text-green-400' : 'text-yellow-400'
-        }`}>
-          {formatTimeDiff(record.runtimepro, record.wr_time)}
-        </span>
-      </td>
-      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
-        {record.startspeed !== -1 ? (
-          <span className="font-mono text-lg font-medium text-text">
-            {record.startspeed.toFixed(1)}
-          </span>
-        ) : (
-          <span className="text-text-muted">-</span>
-        )}
-      </td>
-      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right text-sm text-text-muted">
-        {formatDate(record.date)}
-      </td>
-    </tr>
-  );
-
-  // Render bonus/stage record row
-  const renderCompletionRow = (record: BonusRecord | StageRecord) => (
-    <tr
-      key={`${record.steamid}-${'zonegroup' in record ? record.zonegroup : record.stage}`}
-      className="hover:bg-surface-hover/50 transition-colors"
-    >
-      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
-        <span
-          className={`inline-flex items-center justify-center h-8 w-8 rounded-full font-bold text-sm ${
-            record.rank === 1
-              ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30'
-              : record.rank === 2
-              ? 'bg-zinc-300/20 text-zinc-300 border border-zinc-300/30'
-              : record.rank === 3
-              ? 'bg-amber-700/20 text-amber-600 border border-amber-700/30'
-              : 'text-text-placeholder'
-          }`}
-        >
-          {record.rank}
-        </span>
-      </td>
-      <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
-        <Link
-          href={`/players/${record.steamid}`}
-          className="text-primary hover:text-primary font-medium transition-colors text-base"
-          prefetch={false}
-        >
-          {validatePlayerName(record.name)}
-        </Link>
-      </td>
-      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
-        <span className="font-mono text-lg font-medium text-text">
-          {formatTime(record.runtime)}
-        </span>
-      </td>
-      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
-        <span className={`font-mono text-lg font-medium ${
-          record.rank === 1 ? 'text-green-400' : 'text-yellow-400'
-        }`}>
-          {formatTimeDiff(record.runtime, record.wr_time)}
-        </span>
-      </td>
-      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right">
-        {record.startspeed !== -1 ? (
-          <span className="font-mono text-lg font-medium text-text">
-            {record.startspeed.toFixed(1)}
-          </span>
-        ) : (
-          <span className="text-text-muted">-</span>
-        )}
-      </td>
-      <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right text-sm text-text-muted">
-        {formatDate(record.date)}
-      </td>
-    </tr>
-  );
 
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden">
@@ -1071,7 +991,18 @@ export default function MapRecordsTabs({
                   </tr>
                 ) : (
                   <>
-                    {paginatedRecords.map(renderRecordRow)}
+                    {paginatedRecords.map((record) => (
+                      <RecordRow
+                        key={record.steamid}
+                        rank={record.rank}
+                        steamid={record.steamid}
+                        name={record.name}
+                        time={record.runtimepro}
+                        wr_time={record.wr_time}
+                        startspeed={record.startspeed}
+                        date={record.date}
+                      />
+                    ))}
                     {paginatedRecords.length === 0 && (
                       <tr>
                         <td colSpan={6} className="px-2 sm:px-4 py-8 text-center text-text-muted">
@@ -1194,7 +1125,18 @@ export default function MapRecordsTabs({
                   </tr>
                 ) : (
                   <>
-                    {paginatedBonusRecords.map((record) => renderCompletionRow(record))}
+                    {paginatedBonusRecords.map((record) => (
+                      <RecordRow
+                        key={`${record.steamid}-${record.zonegroup}`}
+                        rank={record.rank}
+                        steamid={record.steamid}
+                        name={record.name}
+                        time={record.runtime}
+                        wr_time={record.wr_time}
+                        startspeed={record.startspeed}
+                        date={record.date}
+                      />
+                    ))}
                     {paginatedBonusRecords.length === 0 && (
                       <tr>
                         <td colSpan={6} className="px-2 sm:px-4 py-8 text-center text-text-muted">
@@ -1237,7 +1179,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2">
                       Rank
-                      <StageSortIcon field="rank" sortField={sortField} sortDirection={sortDirection} />
+                      <SortIcon field="rank" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -1247,7 +1189,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2">
                       Player
-                      <StageSortIcon field="player" sortField={sortField} sortDirection={sortDirection} />
+                      <SortIcon field="player" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -1257,7 +1199,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Time
-                      <StageSortIcon field="time" sortField={sortField} sortDirection={sortDirection} />
+                      <SortIcon field="time" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -1267,7 +1209,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Diff
-                      <StageSortIcon field="wrDiff" sortField={sortField} sortDirection={sortDirection} />
+                      <SortIcon field="wrDiff" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -1277,7 +1219,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Start Speed
-                      <StageSortIcon field="speed" sortField={sortField} sortDirection={sortDirection} />
+                      <SortIcon field="speed" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                   <th
@@ -1287,7 +1229,7 @@ export default function MapRecordsTabs({
                   >
                     <div className="flex items-center gap-2 justify-end">
                       Date
-                      <StageSortIcon field="date" sortField={sortField} sortDirection={sortDirection} />
+                      <SortIcon field="date" sortField={sortField} sortDirection={sortDirection} />
                     </div>
                   </th>
                 </tr>
@@ -1312,7 +1254,18 @@ export default function MapRecordsTabs({
                   </tr>
                 ) : (
                   <>
-                    {paginatedStageRecords.map((record) => renderCompletionRow(record))}
+                    {paginatedStageRecords.map((record) => (
+                      <RecordRow
+                        key={`${record.steamid}-${record.stage}`}
+                        rank={record.rank}
+                        steamid={record.steamid}
+                        name={record.name}
+                        time={record.runtime}
+                        wr_time={record.wr_time}
+                        startspeed={record.startspeed}
+                        date={record.date}
+                      />
+                    ))}
                     {paginatedStageRecords.length === 0 && (
                       <tr>
                         <td colSpan={6} className="px-2 sm:px-4 py-8 text-center text-text-muted">
