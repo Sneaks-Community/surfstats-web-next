@@ -129,6 +129,21 @@ export default function MapRecordsTabs({
   const [totalBonusRecords, setTotalBonusRecords] = useState(0);
   const [isLoadingBonuses, setIsLoadingBonuses] = useState(false);
 
+  // Server-side search state — map tab
+  const [searchApiResults, setSearchApiResults] = useState<MapRecord[]>([]);
+  const [isSearchingApi, setIsSearchingApi] = useState(false);
+  const [searchApiPage, setSearchApiPage] = useState(1);
+
+  // Server-side search state — bonus tab
+  const [bonusSearchApiResults, setBonusSearchApiResults] = useState<BonusRecord[]>([]);
+  const [isBonusSearchingApi, setIsBonusSearchingApi] = useState(false);
+  const [bonusSearchApiPage, setBonusSearchApiPage] = useState(1);
+
+  // Server-side search state — stages tab
+  const [stageSearchApiResults, setStageSearchApiResults] = useState<StageRecord[]>([]);
+  const [isStageSearchingApi, setIsStageSearchingApi] = useState(false);
+  const [stageSearchApiPage, setStageSearchApiPage] = useState(1);
+
   // Reset state when map changes - only depends on mapname to avoid pagination issues
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing state with incoming records prop on map change
@@ -149,6 +164,16 @@ export default function MapRecordsTabs({
     setAllBonusRecords([]);
     setTotalStageRecords(0);
     setTotalBonusRecords(0);
+    // Clear server-side search state
+    setSearchApiResults([]);
+    setIsSearchingApi(false);
+    setSearchApiPage(1);
+    setBonusSearchApiResults([]);
+    setIsBonusSearchingApi(false);
+    setBonusSearchApiPage(1);
+    setStageSearchApiResults([]);
+    setIsStageSearchingApi(false);
+    setStageSearchApiPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapname]);
 
@@ -178,10 +203,10 @@ export default function MapRecordsTabs({
   const [sortField, setSortField] = useState<SortField>(initialSortField);
   const [sortDirection, setSortDirection] = useState<SortDirection>(initialSortDir);
 
-  // Debounced search for URL updates
-  const debouncedSearch = useDebounce(searchQuery, 300);
-  const debouncedBonusSearch = useDebounce(bonusSearchQuery, 300);
-  const debouncedStageSearch = useDebounce(stageSearchQuery, 300);
+  // 400 ms debounce for all API-backed searches (map, bonus, and stages tabs)
+  const debouncedSearch = useDebounce(searchQuery, 400);
+  const debouncedBonusSearch = useDebounce(bonusSearchQuery, 400);
+  const debouncedStageSearch = useDebounce(stageSearchQuery, 400);
 
   // Function to load stage records from API - returns all 100 records for client-side pagination
   const MAX_STAGE_PAGES = Math.ceil(MAX_STAGE_RECORDS / ITEMS_PER_PAGE);
@@ -277,6 +302,93 @@ export default function MapRecordsTabs({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedBonus, bonusPage, numBonuses]);
 
+  // Server-side search — map tab
+  // Fires after 400 ms of silence; only when query is ≥ 3 characters
+  useEffect(() => {
+    if (debouncedSearch.length < 3) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Clearing stale results when query drops below threshold
+      setSearchApiResults([]);
+      setIsSearchingApi(false);
+      return;
+    }
+    const controller = new AbortController();
+    setIsSearchingApi(true);
+    fetch(`/api/maps/${mapname}/records?q=${encodeURIComponent(debouncedSearch)}`, {
+      signal: controller.signal,
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        setSearchApiResults(data.records ?? []);
+        setSearchApiPage(1);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          clientError(`[MapRecordsTabs] Search failed: ${err.message}`);
+          setSearchApiResults([]);
+        }
+      })
+      .finally(() => setIsSearchingApi(false));
+    return () => controller.abort();
+  }, [debouncedSearch, mapname]);
+
+  // Server-side search — bonus tab
+  useEffect(() => {
+    if (debouncedBonusSearch.length < 3) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Clearing stale results when query drops below threshold
+      setBonusSearchApiResults([]);
+      setIsBonusSearchingApi(false);
+      return;
+    }
+    const controller = new AbortController();
+    setIsBonusSearchingApi(true);
+    fetch(
+      `/api/maps/${mapname}/bonuses?bonus=${selectedBonus}&q=${encodeURIComponent(debouncedBonusSearch)}`,
+      { signal: controller.signal }
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        setBonusSearchApiResults(data.records ?? []);
+        setBonusSearchApiPage(1);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          clientError(`[MapRecordsTabs] Bonus search failed: ${err.message}`);
+          setBonusSearchApiResults([]);
+        }
+      })
+      .finally(() => setIsBonusSearchingApi(false));
+    return () => controller.abort();
+  }, [debouncedBonusSearch, mapname, selectedBonus]);
+
+  // Server-side search — stages tab
+  useEffect(() => {
+    if (debouncedStageSearch.length < 3) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Clearing stale results when query drops below threshold
+      setStageSearchApiResults([]);
+      setIsStageSearchingApi(false);
+      return;
+    }
+    const controller = new AbortController();
+    setIsStageSearchingApi(true);
+    fetch(
+      `/api/maps/${mapname}/stages?stage=${selectedStage}&q=${encodeURIComponent(debouncedStageSearch)}`,
+      { signal: controller.signal }
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        setStageSearchApiResults(data.stages ?? []);
+        setStageSearchApiPage(1);
+      })
+      .catch((err: unknown) => {
+        if (err instanceof Error && err.name !== 'AbortError') {
+          clientError(`[MapRecordsTabs] Stage search failed: ${err.message}`);
+          setStageSearchApiResults([]);
+        }
+      })
+      .finally(() => setIsStageSearchingApi(false));
+    return () => controller.abort();
+  }, [debouncedStageSearch, mapname, selectedStage]);
+
   // Update URL when state changes
   useEffect(() => {
     const params = new URLSearchParams();
@@ -349,36 +461,67 @@ export default function MapRecordsTabs({
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
     setLeaderboardPage(1);
+    setSearchApiPage(1);
+    if (value.length >= 3) {
+      // Show spinner immediately; the debounced effect fires the actual request after 400 ms
+      setIsSearchingApi(true);
+    } else {
+      setIsSearchingApi(false);
+      setSearchApiResults([]);
+    }
   };
 
   // Handle bonus search change
   const handleBonusSearchChange = (value: string) => {
     setBonusSearchQuery(value);
     setBonusPage(1);
+    setBonusSearchApiPage(1);
+    if (value.length >= 3) {
+      setIsBonusSearchingApi(true);
+    } else {
+      setIsBonusSearchingApi(false);
+      setBonusSearchApiResults([]);
+    }
   };
 
   // Handle stage search change
   const handleStageSearchChange = (value: string) => {
     setStageSearchQuery(value);
     setStagePage(1);
+    setStageSearchApiPage(1);
+    if (value.length >= 3) {
+      setIsStageSearchingApi(true);
+    } else {
+      setIsStageSearchingApi(false);
+      setStageSearchApiResults([]);
+    }
   };
 
   // Clear search
   const clearSearch = () => {
     setSearchQuery('');
     setLeaderboardPage(1);
+    setSearchApiResults([]);
+    setIsSearchingApi(false);
+    setSearchApiPage(1);
   };
 
   // Clear bonus search
   const clearBonusSearch = () => {
     setBonusSearchQuery('');
     setBonusPage(1);
+    setBonusSearchApiResults([]);
+    setIsBonusSearchingApi(false);
+    setBonusSearchApiPage(1);
   };
 
   // Clear stage search
   const clearStageSearch = () => {
     setStageSearchQuery('');
     setStagePage(1);
+    setStageSearchApiResults([]);
+    setIsStageSearchingApi(false);
+    setStageSearchApiPage(1);
   };
 
   // Handle sort for map tab (client-side sorting)
@@ -449,16 +592,18 @@ export default function MapRecordsTabs({
   }, [filteredRecords, sortField, sortDirection]);
 
   // Paginated records
-  const totalPages = Math.ceil((searchQuery ? sortedRecords.length : totalRecords) / ITEMS_PER_PAGE);
-  
-  // Calculate rank range for the requested page (not array indices, since pages may be loaded non-sequentially)
-  const startRank = (leaderboardPage - 1) * ITEMS_PER_PAGE + 1;
-  const endRank = leaderboardPage * ITEMS_PER_PAGE;
-  
-  // Filter records by rank range instead of array slice
-  const paginatedRecords = sortedRecords.filter(
-    (r) => r.rank >= startRank && r.rank <= endRank
-  );
+  // Search mode (≥3 chars): paginate over server-returned results — every match is reachable.
+  // Normal mode: rank-window filtering handles non-sequential page loading correctly.
+  const inSearchMode = searchQuery.length >= 3;
+  const searchApiStart = (searchApiPage - 1) * ITEMS_PER_PAGE;
+  const leaderboardStart = (leaderboardPage - 1) * ITEMS_PER_PAGE;
+  const leaderboardEnd = leaderboardPage * ITEMS_PER_PAGE;
+  const totalPages = inSearchMode
+    ? Math.ceil(searchApiResults.length / ITEMS_PER_PAGE)
+    : Math.ceil(totalRecords / ITEMS_PER_PAGE);
+  const paginatedRecords = inSearchMode
+    ? searchApiResults.slice(searchApiStart, searchApiStart + ITEMS_PER_PAGE)
+    : sortedRecords.filter((r) => r.rank >= leaderboardStart + 1 && r.rank <= leaderboardEnd);
 
   // Filter bonus records by search
   const filteredBonusRecords = useMemo(() => {
@@ -504,13 +649,17 @@ export default function MapRecordsTabs({
     return sorted;
   }, [filteredBonusRecords, sortField, sortDirection]);
 
-  // Paginated bonus records - use rank-based filtering for non-sequential page loading
-  const totalBonusPages = Math.ceil((bonusSearchQuery ? sortedBonusRecords.length : totalBonusRecords) / ITEMS_PER_PAGE);
-  const bonusStartRank = (bonusPage - 1) * ITEMS_PER_PAGE + 1;
-  const bonusEndRank = bonusPage * ITEMS_PER_PAGE;
-  const paginatedBonusRecords = sortedBonusRecords.filter(
-    (r) => r.rank >= bonusStartRank && r.rank <= bonusEndRank
-  );
+  // Paginated bonus records — same pattern as map tab above.
+  const inBonusSearchMode = bonusSearchQuery.length >= 3;
+  const bonusSearchApiStart = (bonusSearchApiPage - 1) * ITEMS_PER_PAGE;
+  const bonusStart = (bonusPage - 1) * ITEMS_PER_PAGE;
+  const bonusEnd = bonusPage * ITEMS_PER_PAGE;
+  const totalBonusPages = inBonusSearchMode
+    ? Math.ceil(bonusSearchApiResults.length / ITEMS_PER_PAGE)
+    : Math.ceil(totalBonusRecords / ITEMS_PER_PAGE);
+  const paginatedBonusRecords = inBonusSearchMode
+    ? bonusSearchApiResults.slice(bonusSearchApiStart, bonusSearchApiStart + ITEMS_PER_PAGE)
+    : sortedBonusRecords.filter((r) => r.rank >= bonusStart + 1 && r.rank <= bonusEnd);
 
   // Stage records are sorted by rank (runtime ASC) from the server
   // We sort client-side based on the selected sort field
@@ -540,31 +689,19 @@ export default function MapRecordsTabs({
     return sorted;
   }, [allStageRecords, sortField, sortDirection]);
 
-  // Paginated stage records - use row-based filtering for non-sequential page loading
-  // With DENSE_RANK, multiple players can have the same rank, so we use ROW_NUMBER for pagination
-  // Cap total pages at MAX_STAGE_PAGES (5) to respect 100 record limit
-  const totalStagePages = Math.min(
-    Math.ceil((stageSearchQuery ? sortedStageRecords.length : totalStageRecords) / ITEMS_PER_PAGE),
-    MAX_STAGE_PAGES
-  );
-  
-  // Calculate row-based pagination (not rank-based)
+  // Search mode: paginate server results (true global ranks).
+  // Normal mode: slice loaded records, capped at MAX_STAGE_PAGES.
+  const inStageSearchMode = stageSearchQuery.length >= 3;
+  const stageSearchApiStart = (stageSearchApiPage - 1) * ITEMS_PER_PAGE;
   const stageStartRow = (stagePage - 1) * ITEMS_PER_PAGE;
-  const stageEndRow = stagePage * ITEMS_PER_PAGE;
-  
-  let paginatedStageRecords: StageRecord[];
-  if (stageSearchQuery) {
-    // When searching, filter and paginate the sorted results
-    const filtered = sortedStageRecords.filter(
-      (r) =>
-        r.name.toLowerCase().includes(stageSearchQuery.toLowerCase()) ||
-        r.steamid.toLowerCase().includes(stageSearchQuery.toLowerCase())
-    );
-    paginatedStageRecords = filtered.slice(stageStartRow, stageEndRow);
-  } else {
-    // When not searching, use row-based filtering
-    paginatedStageRecords = sortedStageRecords.slice(stageStartRow, stageEndRow);
-  }
+
+  const totalStagePages = inStageSearchMode
+    ? Math.ceil(stageSearchApiResults.length / ITEMS_PER_PAGE)
+    : Math.min(Math.ceil(totalStageRecords / ITEMS_PER_PAGE), MAX_STAGE_PAGES);
+
+  const paginatedStageRecords = inStageSearchMode
+    ? stageSearchApiResults.slice(stageSearchApiStart, stageSearchApiStart + ITEMS_PER_PAGE)
+    : sortedStageRecords.slice(stageStartRow, stageStartRow + ITEMS_PER_PAGE);
 
   // Render record row for Map tab
   const renderRecordRow = (record: MapRecord) => (
@@ -917,18 +1054,32 @@ export default function MapRecordsTabs({
                 </tr>
               </thead>
               <tbody className="bg-surface divide-y divide-border">
-                {paginatedRecords.map(renderRecordRow)}
-                {paginatedRecords.length === 0 && (
+                {searchQuery.length > 0 && searchQuery.length < 3 ? (
                   <tr>
-                    <td
-                      colSpan={6}
-                      className="px-2 sm:px-4 py-8 text-center text-text-muted"
-                    >
-                      {debouncedSearch
-                        ? 'No players found matching your search.'
-                        : 'No completions yet.'}
+                    <td colSpan={6} className="px-2 sm:px-4 py-8 text-center text-text-muted">
+                      Type at least 3 characters to search all players.
                     </td>
                   </tr>
+                ) : isSearchingApi ? (
+                  <tr>
+                    <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+                        <span className="text-text-muted text-sm font-medium">Searching all completions...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  <>
+                    {paginatedRecords.map(renderRecordRow)}
+                    {paginatedRecords.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-2 sm:px-4 py-8 text-center text-text-muted">
+                          {inSearchMode ? 'No players found matching your search.' : 'No completions yet.'}
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )}
               </tbody>
             </table>
@@ -938,9 +1089,9 @@ export default function MapRecordsTabs({
           {totalPages > 1 && (
             <div className="px-3 sm:px-6 border-t border-border">
               <Pagination
-                currentPage={leaderboardPage}
+                currentPage={inSearchMode ? searchApiPage : leaderboardPage}
                 totalPages={totalPages}
-                onPageChange={handlePageChange}
+                onPageChange={inSearchMode ? (p) => setSearchApiPage(p) : handlePageChange}
               />
             </div>
           )}
@@ -1017,7 +1168,22 @@ export default function MapRecordsTabs({
                 </tr>
               </thead>
               <tbody className="bg-surface divide-y divide-border">
-                {isLoadingBonuses ? (
+                {bonusSearchQuery.length > 0 && bonusSearchQuery.length < 3 ? (
+                  <tr>
+                    <td colSpan={6} className="px-2 sm:px-4 py-8 text-center text-text-muted">
+                      Type at least 3 characters to search all players.
+                    </td>
+                  </tr>
+                ) : isBonusSearchingApi ? (
+                  <tr>
+                    <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+                        <span className="text-text-muted text-sm font-medium">Searching all completions...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : isLoadingBonuses ? (
                   <tr>
                     <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
                       <div className="flex flex-col items-center justify-center gap-3">
@@ -1031,11 +1197,8 @@ export default function MapRecordsTabs({
                     {paginatedBonusRecords.map((record) => renderCompletionRow(record))}
                     {paginatedBonusRecords.length === 0 && (
                       <tr>
-                        <td
-                          colSpan={6}
-                          className="px-2 sm:px-4 py-8 text-center text-text-muted"
-                        >
-                          {debouncedBonusSearch
+                        <td colSpan={6} className="px-2 sm:px-4 py-8 text-center text-text-muted">
+                          {inBonusSearchMode
                             ? 'No players found matching your search.'
                             : `No bonus completions for Bonus ${selectedBonus}.`}
                         </td>
@@ -1051,9 +1214,9 @@ export default function MapRecordsTabs({
           {totalBonusPages > 1 && (
             <div className="px-3 sm:px-6 border-t border-border">
               <Pagination
-                currentPage={bonusPage}
+                currentPage={inBonusSearchMode ? bonusSearchApiPage : bonusPage}
                 totalPages={totalBonusPages}
-                onPageChange={handlePageChange}
+                onPageChange={inBonusSearchMode ? (p) => setBonusSearchApiPage(p) : handlePageChange}
               />
             </div>
           )}
@@ -1130,12 +1293,20 @@ export default function MapRecordsTabs({
                 </tr>
               </thead>
               <tbody className="bg-surface divide-y divide-border">
-                {isLoadingStages ? (
+                {stageSearchQuery.length > 0 && stageSearchQuery.length < 3 ? (
+                  <tr>
+                    <td colSpan={6} className="px-2 sm:px-4 py-8 text-center text-text-muted">
+                      Type at least 3 characters to search all players.
+                    </td>
+                  </tr>
+                ) : isLoadingStages || isStageSearchingApi ? (
                   <tr>
                     <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
                       <div className="flex flex-col items-center justify-center gap-3">
                         <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent"></div>
-                        <span className="text-text-muted text-sm font-medium">Loading stage completions...</span>
+                        <span className="text-text-muted text-sm font-medium">
+                          {isStageSearchingApi ? 'Searching all completions...' : 'Loading stage completions...'}
+                        </span>
                       </div>
                     </td>
                   </tr>
@@ -1144,13 +1315,8 @@ export default function MapRecordsTabs({
                     {paginatedStageRecords.map((record) => renderCompletionRow(record))}
                     {paginatedStageRecords.length === 0 && (
                       <tr>
-                        <td
-                          colSpan={6}
-                          className="px-2 sm:px-4 py-8 text-center text-text-muted"
-                        >
-                          {debouncedStageSearch
-                            ? 'No players found matching your search.'
-                            : `No stage completions for Stage ${selectedStage}.`}
+                        <td colSpan={6} className="px-2 sm:px-4 py-8 text-center text-text-muted">
+                          {inStageSearchMode ? 'No players found matching your search.' : `No stage completions for Stage ${selectedStage}.`}
                         </td>
                       </tr>
                     )}
@@ -1164,9 +1330,9 @@ export default function MapRecordsTabs({
           {totalStagePages > 1 && (
             <div className="px-3 sm:px-6 border-t border-border">
               <Pagination
-                currentPage={stagePage}
+                currentPage={inStageSearchMode ? stageSearchApiPage : stagePage}
                 totalPages={totalStagePages}
-                onPageChange={handlePageChange}
+                onPageChange={inStageSearchMode ? (p) => setStageSearchApiPage(p) : handlePageChange}
               />
             </div>
           )}

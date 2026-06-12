@@ -512,3 +512,174 @@ export async function getBonusRecordsFromCache(
     };
   }
 }
+
+const SEARCH_CACHE_TTL = 60; // 1 minute — short TTL since query results vary
+const SEARCH_MAX_RESULTS = 100;
+
+/**
+ * Search leaderboard records by player name or SteamID across ALL completions for a map.
+ * Bypasses pagination so results are never limited to already-loaded pages.
+ */
+export async function searchLeaderboardRecordsFromCache(
+  mapname: string,
+  query: string
+): Promise<{ records: MapRecord[]; wr_time: number | null }> {
+  const validMapname = validateMapName(mapname);
+  if (!validMapname) {
+    return { records: [], wr_time: null };
+  }
+
+  const likePattern = `%${query}%`;
+  const key = `surfstats:map:${validMapname}:search:${query}`;
+
+  const cached = await cacheGet<{ records: MapRecord[]; wr_time: number | null }>(key);
+  if (cached) return cached;
+
+  try {
+    const [wrRows] = await withTimeout(
+      pool.query<RowDataPacket[]>(
+        `SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?`,
+        [validMapname]
+      ),
+      QUERY_TIMEOUT_MS,
+      'Query timeout exceeded'
+    );
+    const wr_time: number | null = wrRows[0]?.wr_time ?? null;
+
+    const [rows] = await withTimeout(
+      pool.query<MapRecord[]>(
+        `SELECT ranked.steamid, ranked.name, ranked.runtimepro, ranked.date, ranked.startspeed,
+                ranked.rank, ? AS wr_time
+         FROM (
+           SELECT steamid, name, runtimepro, date, startspeed,
+                  ROW_NUMBER() OVER (ORDER BY runtimepro ASC) AS rank
+           FROM ck_playertimes
+           WHERE mapname = ?
+         ) ranked
+         WHERE ranked.name LIKE ? OR ranked.steamid LIKE ?
+         ORDER BY ranked.runtimepro ASC
+         LIMIT ?`,
+        [wr_time, validMapname, likePattern, likePattern, SEARCH_MAX_RESULTS]
+      ),
+      QUERY_TIMEOUT_MS,
+      'Query timeout exceeded'
+    );
+
+    const result = { records: rows, wr_time };
+    await cacheSet(key, result, SEARCH_CACHE_TTL);
+    return result;
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.error(`[Cache] Search failed for ${validMapname} query "${query}": ${err.message || 'Unknown error'}`);
+    return { records: [], wr_time: null };
+  }
+}
+
+/**
+ * Search stage records by player name or SteamID. Ranks are computed globally
+ * (DENSE_RANK over all stage completions) before the LIKE filter is applied.
+ */
+export async function searchStageRecordsFromCache(
+  mapname: string,
+  stage: number,
+  query: string
+): Promise<{ stages: StageRecord[] }> {
+  const validMapname = validateMapName(mapname);
+  if (!validMapname) return { stages: [] };
+
+  const likePattern = `%${query}%`;
+  const key = `surfstats:map:${validMapname}:stage:${stage}:search:${query}`;
+
+  const cached = await cacheGet<{ stages: StageRecord[] }>(key);
+  if (cached) return cached;
+
+  try {
+    const [wrRows] = await withTimeout(
+      pool.query<RowDataPacket[]>(
+        `SELECT MIN(runtime) AS wr_time FROM ck_stages WHERE map = ? AND stage = ?`,
+        [validMapname, stage]
+      ),
+      QUERY_TIMEOUT_MS,
+      'Query timeout exceeded'
+    );
+    const wr_time: number | null = wrRows[0]?.wr_time ?? null;
+
+    const [rows] = await withTimeout(
+      pool.query<StageRecord[]>(
+        `SELECT ranked.steamid, ranked.name, ranked.stage, ranked.runtime, ranked.date, ranked.startspeed,
+                ranked.rank, ? AS wr_time
+         FROM (
+           SELECT s.steamid, pr.name, s.stage, s.runtime, s.date, s.startspeed,
+                  DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) AS rank
+           FROM ck_stages s
+           LEFT JOIN ck_playerrank pr ON s.steamid = pr.steamid
+           WHERE s.map = ? AND s.stage = ?
+         ) ranked
+         WHERE ranked.name LIKE ? OR ranked.steamid LIKE ?
+         ORDER BY ranked.rank ASC, ranked.date ASC
+         LIMIT ?`,
+        [wr_time, validMapname, stage, likePattern, likePattern, SEARCH_MAX_RESULTS]
+      ),
+      QUERY_TIMEOUT_MS,
+      'Query timeout exceeded'
+    );
+
+    const result = { stages: rows };
+    await cacheSet(key, result, SEARCH_CACHE_TTL);
+    return result;
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.error(`[Cache] Stage search failed for ${validMapname} stage ${stage} query "${query}": ${err.message || 'Unknown error'}`);
+    return { stages: [] };
+  }
+}
+
+/**
+ * Search bonus records by player name or SteamID for a specific bonus zone.
+ */
+export async function searchBonusRecordsFromCache(
+  mapname: string,
+  bonus: number,
+  query: string
+): Promise<{ records: BonusRecord[] }> {
+  const validMapname = validateMapName(mapname);
+  if (!validMapname) {
+    return { records: [] };
+  }
+
+  const likePattern = `%${query}%`;
+  const key = `surfstats:map:${validMapname}:bonus:${bonus}:search:${query}`;
+
+  const cached = await cacheGet<{ records: BonusRecord[] }>(key);
+  if (cached) return cached;
+
+  try {
+    const [rows] = await withTimeout(
+      pool.query<BonusRecord[]>(
+        `SELECT ranked.steamid, ranked.name, ranked.zonegroup, ranked.runtime, ranked.date, ranked.startspeed,
+                ranked.rank,
+                (SELECT MIN(runtime) FROM ck_bonus WHERE mapname = ? AND zonegroup = ranked.zonegroup) AS wr_time
+         FROM (
+           SELECT b.steamid, b.name, b.zonegroup, b.runtime, b.date, b.startspeed,
+                  ROW_NUMBER() OVER (ORDER BY b.runtime ASC) AS rank
+           FROM ck_bonus b
+           WHERE b.mapname = ? AND b.zonegroup = ?
+         ) ranked
+         WHERE ranked.name LIKE ? OR ranked.steamid LIKE ?
+         ORDER BY ranked.runtime ASC
+         LIMIT ?`,
+        [validMapname, validMapname, bonus, likePattern, likePattern, SEARCH_MAX_RESULTS]
+      ),
+      QUERY_TIMEOUT_MS,
+      'Query timeout exceeded'
+    );
+
+    const result = { records: rows };
+    await cacheSet(key, result, SEARCH_CACHE_TTL);
+    return result;
+  } catch (error: unknown) {
+    const err = error as { message?: string };
+    logger.error(`[Cache] Bonus search failed for ${validMapname} bonus ${bonus} query "${query}": ${err.message || 'Unknown error'}`);
+    return { records: [] };
+  }
+}

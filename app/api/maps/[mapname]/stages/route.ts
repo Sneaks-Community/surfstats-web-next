@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { validateMapName } from '@/lib/validators';
+import { validateMapName, validateSearchQuery } from '@/lib/validators';
 import logger from '@/lib/logger';
-import { getStageRecordsFromCache } from '@/lib/valkey-map-records-cache';
+import { getStageRecordsFromCache, searchStageRecordsFromCache } from '@/lib/valkey-map-records-cache';
 import { getStagesByMapFromCache } from '@/lib/valkey-registry-cache';
 
 const DEFAULT_PAGE_SIZE = 100;
@@ -22,6 +22,26 @@ export async function GET(
 
   const searchParams = request.nextUrl.searchParams;
   const stage = parseInt(searchParams.get('stage') || '1', 10);
+  const rawQuery = searchParams.get('q');
+
+  // Search mode: return all matching records (up to 100) with true global ranks
+  if (rawQuery !== null) {
+    const query = validateSearchQuery(rawQuery);
+    if (!query || query.length < 3) {
+      return NextResponse.json({ error: 'Search query must be at least 3 characters' }, { status: 400 });
+    }
+    try {
+      const { stages } = await searchStageRecordsFromCache(validMapname, stage, query);
+      return NextResponse.json({ stages, total: stages.length }, {
+        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30' },
+      });
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      logger.error(`[API] Stage search failed for ${validMapname}: ${err.message || 'Unknown error'}`);
+      return NextResponse.json({ error: 'Search failed' }, { status: 500 });
+    }
+  }
+
   const sortField = searchParams.get('sortField') || 'rank';
   const sortOrder = searchParams.get('sortOrder') || 'ASC';
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
