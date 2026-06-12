@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { validateMapName } from '@/lib/validators';
 import logger from '@/lib/logger';
+import { resolveMapnameParam, apiError } from '@/lib/api-utils';
 import {
   getWRCheckpointTimesFromCache,
   getCheckpointStatsFromCache,
@@ -37,12 +37,8 @@ export async function GET(
   { params }: { params: Promise<{ mapname: string }> }
 ) {
   const { mapname } = await params;
-  const decodedMapname = decodeURIComponent(mapname);
-  const validMapname = validateMapName(decodedMapname);
-
-  if (!validMapname) {
-    return NextResponse.json({ error: 'Invalid map name' }, { status: 400 });
-  }
+  const validMapname = resolveMapnameParam(mapname);
+  if (validMapname instanceof NextResponse) return validMapname;
 
   try {
     // Get map metadata (already cached with 1 hour TTL in lib/map-cache.ts)
@@ -101,11 +97,6 @@ export async function GET(
       percentileTimes,
     } as StatsResponse);
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[API Stats] Failed to fetch stats for ${validMapname}: ${err.message || 'Unknown error'}`);
-    return NextResponse.json(
-      { error: 'Failed to fetch map statistics' },
-      { status: 500 }
-    );
+    return apiError(`[API Stats] Failed to fetch stats for ${validMapname}`, error, 'Failed to fetch map statistics');
   }
 }

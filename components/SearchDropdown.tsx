@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { Search, User, Map } from 'lucide-react';
 import { useMapImagesUrl } from '@/lib/MapImagesUrlContext';
 import { clientError } from '@/lib/client-logger';
+import { getErrorMessage, isAbortError } from '@/lib/errors';
 
 interface PlayerResult {
   steamid: string;
@@ -78,10 +79,10 @@ export function SearchDropdown({
       setSelectedIndex(-1);
     } catch (error) {
       // Ignore abort errors - they're expected when a new search cancels this one
-      if (error instanceof Error && error.name === 'AbortError') {
+      if (isAbortError(error)) {
         return;
       }
-      clientError(`Search error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      clientError(`Search error: ${getErrorMessage(error)}`);
       setResults({ players: [], maps: [] });
     } finally {
       setIsLoading(false);

@@ -5,6 +5,7 @@ import { getStatsFromCache, getLatestCompletionsFromCache } from '@/lib/cache';
 import logger from '@/lib/logger';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import MapImage from '@/components/MapImage';
+import { getErrorMessage } from '@/lib/errors';
 
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
@@ -16,8 +17,7 @@ async function getStats() {
     logger.debug('[Home] Stats loaded successfully');
     return stats;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[Home] Failed to load stats: ${errorMessage}`);
     logger.error('[Home] Dashboard will display without stats data');
     return null;
@@ -31,8 +31,7 @@ async function getLatestCompletions() {
     logger.debug('[Home] Latest completions loaded successfully');
     return completions;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[Home] Failed to load latest completions: ${errorMessage}`);
     logger.error('[Home] Dashboard will display without completions data');
     return [];

@@ -3,6 +3,7 @@ import { getServersFromCache, type ServerStatus } from '@/lib/valkey-server-cach
 import ServerCard from './ServerCard';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
+import { getErrorMessage } from '@/lib/errors';
 
 // Force dynamic rendering to ensure fresh data on each request
 export const dynamic = 'force-dynamic';
@@ -18,8 +19,7 @@ export default async function ServersPage() {
     servers = await getServersFromCache();
     logger.debug(`[Servers] Loaded ${servers.length} servers`);
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[Servers] Failed to load servers: ${errorMessage}`);
     logger.error('[Servers] Server list will be empty');
   }

@@ -2,6 +2,7 @@ import 'server-only';
 import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
+import { getErrorMessage } from './errors';
 
 // Types for bonus and stage registries
 export interface BonusGroup {
@@ -66,9 +67,8 @@ export async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stag
     return { bonuses, stages, playerCount };
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
-    const err = error as { message?: string };
     logger.error(`[RegistryCache] Failed to fetch registry data after ${duration}ms`);
-    logger.error(`[RegistryCache] Error: ${err.message || 'Unknown error'}`);
+    logger.error(`[RegistryCache] Error: ${getErrorMessage(error)}`);
     throw error;
   }
 }

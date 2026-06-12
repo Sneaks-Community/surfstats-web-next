@@ -6,6 +6,7 @@ import type { RowDataPacket } from 'mysql2';
 import { getMapMetadataFromCache } from './valkey-map-cache';
 import { validateMapName } from './validators';
 import logger from './logger';
+import { getErrorMessage } from './errors';
 
 const STATS_CACHE_TTL = 43200; // 12 hours
 
@@ -156,8 +157,7 @@ export async function getWRCheckpointTimesFromCache(
 
     return checkpointData;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.warn(`[Cache] Failed to fetch WR checkpoint times for ${mapname}: ${err.message || 'Unknown error'}`);
+    logger.warn(`[Cache] Failed to fetch WR checkpoint times for ${mapname}: ${getErrorMessage(error)}`);
     return undefined;
   }
 }
@@ -224,8 +224,7 @@ export async function getCheckpointStatsFromCache(mapname: string): Promise<Chec
 
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.warn(`[Cache] Failed to fetch checkpoint stats for ${mapname}: ${err.message || 'Unknown error'}`);
+    logger.warn(`[Cache] Failed to fetch checkpoint stats for ${mapname}: ${getErrorMessage(error)}`);
     return { checkpointAvgTimes: [] };
   }
 }
@@ -280,8 +279,7 @@ export async function getBonusCompletionsOverTimeFromCache(
 
     return bonusData;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.warn(`[Cache] Failed to fetch bonus completions over time for ${mapname}: ${err.message || 'Unknown error'}`);
+    logger.warn(`[Cache] Failed to fetch bonus completions over time for ${mapname}: ${getErrorMessage(error)}`);
     return {};
   }
 }
@@ -325,8 +323,7 @@ export async function getCompletionsOverTimeFromCache(mapname: string): Promise<
 
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.warn(`[Cache] Failed to fetch completions over time for ${mapname}: ${err.message || 'Unknown error'}`);
+    logger.warn(`[Cache] Failed to fetch completions over time for ${mapname}: ${getErrorMessage(error)}`);
     return [];
   }
 }
@@ -378,8 +375,7 @@ export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<
 
     return timeOnMapData;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.warn(`[Cache] Failed to fetch time on map data for ${mapname}: ${err.message || 'Unknown error'}`);
+    logger.warn(`[Cache] Failed to fetch time on map data for ${mapname}: ${getErrorMessage(error)}`);
     return [];
   }
 }
@@ -424,8 +420,7 @@ export async function getFinishTimeDataFromCache(mapname: string): Promise<{ avg
 
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.warn(`[Cache] Failed to fetch finish time data for ${mapname}: ${err.message || 'Unknown error'}`);
+    logger.warn(`[Cache] Failed to fetch finish time data for ${mapname}: ${getErrorMessage(error)}`);
     return { avgTime: null, wrTime: null };
   }
 }
@@ -523,8 +518,7 @@ export async function getPercentileTimesFromCache(
 
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.warn(`[Cache] Failed to fetch percentile times for ${mapname}: ${err.message || 'Unknown error'}`);
+    logger.warn(`[Cache] Failed to fetch percentile times for ${mapname}: ${getErrorMessage(error)}`);
     return null;
   }
 }

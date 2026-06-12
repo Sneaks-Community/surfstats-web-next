@@ -5,6 +5,7 @@ import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
 import { validateSearchQuery } from '@/lib/validators';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import logger from '@/lib/logger';
+import { getErrorMessage } from '@/lib/errors';
 
 const MAX_PLAYERS = 3;
 const MAX_MAPS = 3;
@@ -51,7 +52,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ players, maps });
   } catch (error) {
-    logger.error(`[API/search] Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.error(`[API/search] Error: ${getErrorMessage(error)}`);
     return NextResponse.json(
       { error: 'Search failed' },
       { status: 500 }

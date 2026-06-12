@@ -2,6 +2,7 @@ import 'server-only';
 import { fetchServersFromGame } from './cache';
 import { cacheSet } from './valkey-cache';
 import logger from './logger';
+import { getErrorMessage } from './errors';
 
 const SERVER_CACHE_KEY = 'surfstats:server:all';
 const SERVER_CACHE_TTL = 30; // 30 seconds
@@ -22,7 +23,7 @@ export function startServerBackgroundRefresh(): void {
 
   // Immediate initial fetch so data is available right away
   refreshServers().catch((err: unknown) => {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = getErrorMessage(err);
     logger.error(`[ServerRefresh] Initial refresh failed: ${message}`);
   });
 
@@ -38,8 +39,7 @@ async function refreshServers(): Promise<void> {
     await cacheSet(SERVER_CACHE_KEY, servers, SERVER_CACHE_TTL);
     logger.debug(`[ServerRefresh] Cached ${servers.length} servers with TTL ${SERVER_CACHE_TTL}s`);
   } catch (error) {
-    const err = error as { message?: string };
-    logger.error(`[ServerRefresh] Background refresh failed: ${err.message || 'Unknown error'}`);
+    logger.error(`[ServerRefresh] Background refresh failed: ${getErrorMessage(error)}`);
   }
 }
 

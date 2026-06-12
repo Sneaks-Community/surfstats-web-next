@@ -5,6 +5,7 @@ import logger from '@/lib/logger';
 import { getPlayerCountFromCache } from '@/lib/valkey-registry-cache';
 import { validateSearchQuery } from './validators';
 import { cacheGet, cacheSet } from './valkey-cache';
+import { getErrorMessage } from './errors';
 
 /**
  * Player rank data from database
@@ -132,7 +133,7 @@ async function fetchPlayersInternal(
     return { players: rows, total, totalPages: Math.ceil(total / limit) };
   } catch (error: unknown) {
     const err = error as { message?: string; code?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[PlayerCache] Failed to fetch players: ${errorMessage}`);
     logger.error(`[PlayerCache] Error code: ${err.code || 'N/A'}`);
     return { players: [], total: 0, totalPages: 0 };
@@ -197,7 +198,7 @@ async function searchPlayersInternal(query: string): Promise<PlayerSearchResult[
     }));
   } catch (error: unknown) {
     const err = error as { message?: string; code?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[PlayerCache] Failed to search players: ${errorMessage}`);
     logger.error(`[PlayerCache] Error code: ${err.code || 'N/A'}`);
     return [];
@@ -247,7 +248,7 @@ async function getPlayerNameInternal(steamid: string): Promise<PlayerNameResult>
     return { name: rows[0].name };
   } catch (error: unknown) {
     const err = error as { message?: string; code?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[PlayerCache] Failed to fetch player name for ${steamid}: ${errorMessage}`);
     logger.error(`[PlayerCache] Error code: ${err.code || 'N/A'}`);
     return { name: '' };

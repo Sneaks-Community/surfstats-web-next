@@ -5,6 +5,7 @@ import { GameDig } from 'gamedig';
 import logger from '@/lib/logger';
 import { cacheGet, cacheSet } from './valkey-cache';
 import { cacheLock, shouldExpireEarly } from './cache-lock';
+import { getErrorMessage } from './errors';
 
 // Types
 interface ServerConfig {
@@ -54,9 +55,8 @@ export async function fetchServersFromGame(): Promise<ServerStatus[]> {
     try {
       configs = JSON.parse(serversJson);
     } catch (parseError: unknown) {
-      const err = parseError as { message?: string };
       logger.error('[ServerCache] Failed to parse SERVERS_JSON environment variable');
-      logger.error(`[ServerCache] JSON parse error: ${err.message || 'Unknown error'}`);
+      logger.error(`[ServerCache] JSON parse error: ${getErrorMessage(parseError)}`);
       return [];
     }
 
@@ -122,9 +122,8 @@ export async function fetchServersFromGame(): Promise<ServerStatus[]> {
     return statuses;
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
-    const err = error as { message?: string };
     logger.error(`[ServerCache] Failed to fetch server statuses after ${duration}ms`);
-    logger.error(`[ServerCache] Error: ${err.message || 'Unknown error'}`);
+    logger.error(`[ServerCache] Error: ${getErrorMessage(error)}`);
     return [];
   }
 }
@@ -196,8 +195,7 @@ const getStatsInternal = async (): Promise<{
       recentRecords: recentRecords as RecentRecords[],
     };
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[StatsCache] Failed to fetch stats: ${err.message}`);
+    logger.error(`[StatsCache] Failed to fetch stats: ${getErrorMessage(error)}`);
     return {
       stats: {
         playerCount: 0,
@@ -382,8 +380,7 @@ const getLatestCompletionsInternal = async (): Promise<
 
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[CompletionsCache] Failed to fetch completions: ${err.message}`);
+    logger.error(`[CompletionsCache] Failed to fetch completions: ${getErrorMessage(error)}`);
     return [];
   }
 };
@@ -469,8 +466,7 @@ const fetchTotalsInternal = async () => {
     logger.debug(`[TotalsCache] Fetched totals in ${duration}ms`);
     return totals;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[TotalsCache] Failed to fetch totals: ${err.message}`);
+    logger.error(`[TotalsCache] Failed to fetch totals: ${getErrorMessage(error)}`);
     return { totalMaps: 0, totalBonuses: 0, totalStages: 0 };
   }
 };
@@ -528,9 +524,8 @@ export async function prewarmCaches(): Promise<void> {
       `[Cache] Stats pre-warmed successfully (${rows.length} stats, ${recentRecords.length} records, ${duration}ms)`
     );
   } catch (error: unknown) {
-    const err = error as { message?: string };
     logger.error('[Cache] Stats cache pre-warm failed');
-    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
+    logger.error(`[Cache] Error: ${getErrorMessage(error)}`);
   }
 
   // Pre-warm totals - use direct database call
@@ -543,9 +538,8 @@ export async function prewarmCaches(): Promise<void> {
       `[Cache] Totals pre-warmed successfully (maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}, ${duration}ms)`
     );
   } catch (error: unknown) {
-    const err = error as { message?: string };
     logger.error('[Cache] Totals cache pre-warm failed');
-    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
+    logger.error(`[Cache] Error: ${getErrorMessage(error)}`);
   }
 
   // Pre-warm servers cache via Valkey
@@ -555,9 +549,8 @@ export async function prewarmCaches(): Promise<void> {
     await getServersFromCache();
     logger.info(`[Cache] Servers cache pre-warmed successfully (${Date.now() - startTime}ms)`);
   } catch (error: unknown) {
-    const err = error as { message?: string };
     logger.error('[Cache] Servers cache pre-warm failed');
-    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
+    logger.error(`[Cache] Error: ${getErrorMessage(error)}`);
   }
 
   // Pre-warm map metadata cache (1-hour TTL)
@@ -567,9 +560,8 @@ export async function prewarmCaches(): Promise<void> {
     await getAllMapMetadataFromCache();
     logger.info(`[Cache] Map metadata cache pre-warmed successfully (${Date.now() - startTime}ms)`);
   } catch (error: unknown) {
-    const err = error as { message?: string };
     logger.error('[Cache] Map metadata cache pre-warm failed');
-    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
+    logger.error(`[Cache] Error: ${getErrorMessage(error)}`);
   }
 
   // Pre-warm bonus/stage registry cache (1-hour TTL)
@@ -579,8 +571,7 @@ export async function prewarmCaches(): Promise<void> {
     await Promise.all([getAllBonusGroupsFromCache(), getAllStagesFromCache()]);
     logger.info(`[Cache] Registry cache pre-warmed successfully (${Date.now() - startTime}ms)`);
   } catch (error: unknown) {
-    const err = error as { message?: string };
     logger.error('[Cache] Registry cache pre-warm failed');
-    logger.error(`[Cache] Error: ${err.message || 'Unknown error'}`);
+    logger.error(`[Cache] Error: ${getErrorMessage(error)}`);
   }
 }

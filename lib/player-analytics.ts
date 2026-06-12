@@ -5,6 +5,7 @@ import type { RowDataPacket } from 'mysql2';
 import { convertSteamId2ToSteamId3Numeric } from '@/lib/steam';
 import logger from '@/lib/logger';
 import { cacheGet, cacheSet } from './valkey-cache';
+import { getErrorMessage } from './errors';
 
 // Check if analytics database is configured (env vars are set)
 const isAnalyticsConfigured = !!(
@@ -63,8 +64,7 @@ async function getPlayerTimeOnServerInternal(steamId: string): Promise<PlayerTim
     };
   } catch (error: unknown) {
     // Log error but don't throw - analytics is optional
-    const err = error as { message?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[Analytics] Failed to fetch time data for ${steamId}: ${errorMessage}`);
     return null;
   }
@@ -164,8 +164,7 @@ export async function getPlayersTimeOnServer(steamIds: string[]): Promise<Map<st
       }
     }
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[Analytics] Failed to fetch batch time data: ${errorMessage}`);
     
     // Return empty results for all SteamIDs on error
@@ -266,8 +265,7 @@ async function getPerformanceTrendInternal(steamId: string): Promise<Performance
 
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[Analytics] Failed to fetch performance trend for ${steamId}: ${errorMessage}`);
     return null;
   }
@@ -391,8 +389,7 @@ async function getPlayerActivityHeatmapInternal(
 
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[Analytics] Failed to fetch activity heatmap for ${steamId}: ${errorMessage}`);
     return null;
   }

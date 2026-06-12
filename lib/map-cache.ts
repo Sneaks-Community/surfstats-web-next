@@ -3,6 +3,7 @@ import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
 import { withTimeout } from '@/lib/timeout';
+import { getErrorMessage } from './errors';
 
 // Types for map metadata
 export interface MapMetadata {
@@ -111,16 +112,15 @@ export async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
     return metadataMap;
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
-    const err = error as { message?: string };
     
     // Handle timeout specifically
-    if (err.message === 'Query timeout exceeded') {
+    if (getErrorMessage(error) === 'Query timeout exceeded') {
       logger.error(`[MapCache] Query timeout after ${duration}ms`);
       throw new Error(`Map metadata query exceeded ${QUERY_TIMEOUT_MS / 1000} second timeout`);
     }
     
     logger.error(`[MapCache] Failed to fetch map metadata after ${duration}ms`);
-    logger.error(`[MapCache] Error: ${err.message || 'Unknown error'}`);
+    logger.error(`[MapCache] Error: ${getErrorMessage(error)}`);
     throw error;
   }
 }

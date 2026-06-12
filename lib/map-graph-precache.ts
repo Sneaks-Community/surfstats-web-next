@@ -11,6 +11,7 @@ import {
   getPercentileTimesFromCache,
 } from './valkey-map-stats-cache';
 import { getAllMapMetadataFromCache } from './valkey-map-cache';
+import { getErrorMessage } from './errors';
 
 // Configuration
 const BATCH_SIZE = 20;
@@ -83,8 +84,7 @@ async function precacheMapGraphs(mapname: string): Promise<void> {
 
     logger.debug(`[MapGraphPrecache] Cached graphs for ${mapname}`);
   } catch (error) {
-    const err = error as { message?: string };
-    logger.warn(`[MapGraphPrecache] Failed to cache graphs for ${mapname}: ${err.message}`);
+    logger.warn(`[MapGraphPrecache] Failed to cache graphs for ${mapname}: ${getErrorMessage(error)}`);
   }
 }
 
@@ -165,8 +165,7 @@ export function startMapGraphPrecache(): void {
 
       logger.info(`[MapGraphPrecache] Background refresh started for ${mapNames.length} maps`);
     } catch (error) {
-      const err = error as { message?: string };
-      logger.error(`[MapGraphPrecache] Failed to start precache: ${err.message}`);
+      logger.error(`[MapGraphPrecache] Failed to start precache: ${getErrorMessage(error)}`);
     }
   })();
 }

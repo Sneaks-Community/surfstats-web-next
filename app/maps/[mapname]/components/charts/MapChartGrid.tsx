@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { getErrorMessage } from '@/lib/errors';
 import CompletionsOverTimeChart from './CompletionsOverTimeChart';
 import TimeOnMapChart from './TimeOnMapChart';
 import CheckpointTimesChart from './CheckpointTimesChart';
@@ -46,7 +47,7 @@ export default function MapChartGrid({ mapname }: MapChartGridProps) {
         const statsData = await response.json();
         setData(statsData);
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error');
+        setError(getErrorMessage(err));
       } finally {
         setLoading(false);
       }

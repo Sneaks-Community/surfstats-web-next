@@ -8,7 +8,7 @@ import { isValidCountryCode, getPrimaryCountryName } from '@/lib/countries';
 import CountryBadge from '@/components/CountryBadge';
 import Pagination from '@/components/Pagination';
 import SortableTableHeader from '@/components/SortableTableHeader';
-import { formatDate } from '@/lib/utils';
+import { formatDate, parseIntParam } from '@/lib/utils';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
@@ -47,7 +47,7 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
   }
   
   const countryCode = countrycode.toUpperCase();
-  const page = parseInt(pageParam || '1', 10);
+  const page = parseIntParam(pageParam);
   
   // Validate and parse sort parameters
   // Default sort is by points descending (top players first)

@@ -2,6 +2,7 @@ import 'server-only';
 import mysql from 'mysql2/promise';
 import logger from '@/lib/logger';
 import { wrapPoolQuery } from '@/lib/db-query-logger';
+import { getErrorMessage } from './errors';
 
 // Track whether the analytics database connection is actually working
 let analyticsConnectionHealthy = false;
@@ -66,7 +67,7 @@ async function initializeAnalyticsDatabase() {
   } catch (error: unknown) {
     // Log but don't throw - analytics database is optional
     analyticsConnectionHealthy = false;
-    logger.warn(`[Analytics DB] Database connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    logger.warn(`[Analytics DB] Database connection failed: ${getErrorMessage(error)}`);
     logger.warn('[Analytics DB] Analytics features will be disabled');
   }
 }

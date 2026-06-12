@@ -1,6 +1,7 @@
 import 'server-only';
 import logger from '@/lib/logger';
 import { cacheGet, cacheSet } from './valkey-cache';
+import { getErrorMessage } from './errors';
 
 /**
  * Steam API interface types
@@ -73,7 +74,7 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
     const duration = Date.now() - startTime;
     const err = error as { code?: string; message?: string };
     const errorCode = err.code || 'UNKNOWN';
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     
     if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
       logger.error(`[Steam API] Network error - unable to reach Steam API servers (${errorCode})`);
@@ -174,8 +175,7 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
     return result;
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
-    const err = error as { message?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[Steam] Failed to fetch profiles after ${duration}ms: ${errorMessage}`);
     return result;
   }

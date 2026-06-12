@@ -1,7 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { validateMapName, validateSearchQuery } from '@/lib/validators';
-import logger from '@/lib/logger';
+import { validateSearchQuery } from '@/lib/validators';
+import { resolveMapnameParam, parsePageParams, apiError, SEARCH_CACHE_CONTROL } from '@/lib/api-utils';
+import { parseIntParam } from '@/lib/utils';
 import { getBonusRecordsFromCache, searchBonusRecordsFromCache } from '@/lib/valkey-map-records-cache';
 import { getBonusGroupsByMapFromCache } from '@/lib/valkey-registry-cache';
 
@@ -13,15 +14,11 @@ export async function GET(
   { params }: { params: Promise<{ mapname: string }> }
 ) {
   const { mapname } = await params;
-  const decodedMapname = decodeURIComponent(mapname);
-  const validMapname = validateMapName(decodedMapname);
-
-  if (!validMapname) {
-    return NextResponse.json({ error: 'Invalid map name' }, { status: 400 });
-  }
+  const validMapname = resolveMapnameParam(mapname);
+  if (validMapname instanceof NextResponse) return validMapname;
 
   const searchParams = request.nextUrl.searchParams;
-  const bonus = Math.max(1, parseInt(searchParams.get('bonus') || '1', 10));
+  const bonus = parseIntParam(searchParams.get('bonus'), { fallback: 1, min: 1 });
   const rawQuery = searchParams.get('q');
 
   // Search mode: return all matching records (up to 100) for this bonus zone
@@ -34,21 +31,15 @@ export async function GET(
     try {
       const { records } = await searchBonusRecordsFromCache(validMapname, bonus, query);
       return NextResponse.json({ records, total: records.length }, {
-        headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=30' },
+        headers: { 'Cache-Control': SEARCH_CACHE_CONTROL },
       });
     } catch (error: unknown) {
-      const err = error as { message?: string };
-      logger.error(`[API] Bonus search failed for ${validMapname}: ${err.message || 'Unknown error'}`);
-      return NextResponse.json({ error: 'Search failed' }, { status: 500 });
+      return apiError(`[API] Bonus search failed for ${validMapname}`, error, 'Search failed');
     }
   }
 
   // Pagination mode
-  const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10));
-  const pageSize = Math.min(
-    MAX_PAGE_SIZE,
-    Math.max(1, parseInt(searchParams.get('pageSize') || String(DEFAULT_PAGE_SIZE), 10))
-  );
+  const { page, pageSize } = parsePageParams(searchParams, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
 
   try {
     const data = await getBonusRecordsFromCache(validMapname, bonus, page, pageSize);
@@ -59,11 +50,6 @@ export async function GET(
       bonusGroupsList,
     });
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[API] Failed to fetch bonus records for ${validMapname}: ${err.message || 'Unknown error'}`);
-    return NextResponse.json(
-      { error: 'Failed to fetch bonus records' },
-      { status: 500 }
-    );
+    return apiError(`[API] Failed to fetch bonus records for ${validMapname}`, error, 'Failed to fetch bonus records');
   }
 }

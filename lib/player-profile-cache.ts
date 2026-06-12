@@ -11,6 +11,7 @@ import type { RowDataPacket } from 'mysql2';
 import { cacheGet, cacheSet, cacheDelete } from './valkey-cache';
 import { cacheLock, shouldExpireEarly } from './cache-lock';
 import logger from './logger';
+import { getErrorMessage } from './errors';
 
 const PLAYER_PROFILE_KEY = 'surfstats:player:profile';
 const PLAYER_PROFILE_TTL = 300; // 5 minutes
@@ -174,8 +175,7 @@ async function getPlayerProfileInternal(steamid: string): Promise<CachedPlayerPr
       }>,
     };
   } catch (error: unknown) {
-    const err = error as { message?: string; code?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[PlayerProfileCache] Failed to fetch profile for ${steamid}: ${errorMessage}`);
     return null;
   }

@@ -5,10 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Trophy, Target, Layers, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
 import Link from 'next/link';
 import Pagination from '@/components/Pagination';
-import { formatTime, formatDate, sortRecords, matchesQuery, type SortDirection } from '@/lib/utils';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
+import { formatTime, formatDate, sortRecords, matchesQuery, parseIntParam, type SortDirection } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import { useDebounce } from '@/hooks/useDebounce';
 import { clientError } from '@/lib/client-logger';
+import { getErrorMessage, isAbortError } from '@/lib/errors';
 
 interface MapRecord {
   steamid: string;
@@ -241,11 +243,11 @@ export default function MapRecordsTabs({
 
   // Get initial state from URL
   const initialTab = (searchParams.get('tab') as TabType | null) ?? 'map';
-  const initialPage = parseInt(searchParams.get('page') ?? '1', 10);
-  const initialBonus = parseInt(searchParams.get('bonus') ?? '1', 10);
-  const initialBonusPage = parseInt(searchParams.get('bonusPage') ?? '1', 10);
-  const initialStage = parseInt(searchParams.get('stage') ?? '1', 10);
-  const initialStagePage = parseInt(searchParams.get('stagePage') ?? '1', 10);
+  const initialPage = parseIntParam(searchParams.get('page'));
+  const initialBonus = parseIntParam(searchParams.get('bonus'));
+  const initialBonusPage = parseIntParam(searchParams.get('bonusPage'));
+  const initialStage = parseIntParam(searchParams.get('stage'));
+  const initialStagePage = parseIntParam(searchParams.get('stagePage'));
   const initialSearch = searchParams.get('q') ?? '';
   const initialBonusSearch = searchParams.get('bq') ?? '';
   const initialStageSearch = searchParams.get('sq') ?? '';
@@ -296,7 +298,7 @@ export default function MapRecordsTabs({
         setTotalStageRecords(0);
       }
     } catch (error) {
-      clientError(`Failed to load stage records: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      clientError(`Failed to load stage records: ${getErrorMessage(error)}`);
       setAllStageRecords([]);
       setTotalStageRecords(0);
     } finally {
@@ -347,7 +349,7 @@ export default function MapRecordsTabs({
         setTotalBonusRecords(0);
       }
     } catch (error) {
-      clientError(`Failed to load bonus records: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      clientError(`Failed to load bonus records: ${getErrorMessage(error)}`);
       bonusCacheRef.current.set(cacheKey, []);
       setAllBonusRecords([]);
       setTotalBonusRecords(0);
@@ -384,8 +386,8 @@ export default function MapRecordsTabs({
         setSearchApiPage(1);
       })
       .catch((err: unknown) => {
-        if (err instanceof Error && err.name !== 'AbortError') {
-          clientError(`[MapRecordsTabs] Search failed: ${err.message}`);
+        if (!isAbortError(err)) {
+          clientError(`[MapRecordsTabs] Search failed: ${getErrorMessage(err)}`);
           setSearchApiResults([]);
         }
       })
@@ -413,8 +415,8 @@ export default function MapRecordsTabs({
         setBonusSearchApiPage(1);
       })
       .catch((err: unknown) => {
-        if (err instanceof Error && err.name !== 'AbortError') {
-          clientError(`[MapRecordsTabs] Bonus search failed: ${err.message}`);
+        if (!isAbortError(err)) {
+          clientError(`[MapRecordsTabs] Bonus search failed: ${getErrorMessage(err)}`);
           setBonusSearchApiResults([]);
         }
       })
@@ -442,8 +444,8 @@ export default function MapRecordsTabs({
         setStageSearchApiPage(1);
       })
       .catch((err: unknown) => {
-        if (err instanceof Error && err.name !== 'AbortError') {
-          clientError(`[MapRecordsTabs] Stage search failed: ${err.message}`);
+        if (!isAbortError(err)) {
+          clientError(`[MapRecordsTabs] Stage search failed: ${getErrorMessage(err)}`);
           setStageSearchApiResults([]);
         }
       })
@@ -508,7 +510,7 @@ export default function MapRecordsTabs({
             hasMoreToLoadRef.current = data.pagination.page < data.pagination.totalPages;
           }
         } catch (error) {
-          clientError(`Failed to load records: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          clientError(`Failed to load records: ${getErrorMessage(error)}`);
         }
       }
       setLeaderboardPage(page);
@@ -984,7 +986,7 @@ export default function MapRecordsTabs({
                   <tr>
                     <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
                       <div className="flex flex-col items-center justify-center gap-3">
-                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+                        <LoadingSpinner />
                         <span className="text-text-muted text-sm font-medium">Searching all completions...</span>
                       </div>
                     </td>
@@ -1109,7 +1111,7 @@ export default function MapRecordsTabs({
                   <tr>
                     <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
                       <div className="flex flex-col items-center justify-center gap-3">
-                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent" />
+                        <LoadingSpinner />
                         <span className="text-text-muted text-sm font-medium">Searching all completions...</span>
                       </div>
                     </td>
@@ -1118,7 +1120,7 @@ export default function MapRecordsTabs({
                   <tr>
                     <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
                       <div className="flex flex-col items-center justify-center gap-3">
-                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent"></div>
+                        <LoadingSpinner />
                         <span className="text-text-muted text-sm font-medium">Loading bonus completions...</span>
                       </div>
                     </td>
@@ -1245,7 +1247,7 @@ export default function MapRecordsTabs({
                   <tr>
                     <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
                       <div className="flex flex-col items-center justify-center gap-3">
-                        <div className="animate-spin rounded-full h-8 w-8 border-2 border-primary-500 border-t-transparent"></div>
+                        <LoadingSpinner />
                         <span className="text-text-muted text-sm font-medium">
                           {isStageSearchingApi ? 'Searching all completions...' : 'Loading stage completions...'}
                         </span>

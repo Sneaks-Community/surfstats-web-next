@@ -5,6 +5,7 @@ import type { RowDataPacket } from 'mysql2';
 import { validateMapName } from './validators';
 import { withTimeout } from './timeout';
 import logger from './logger';
+import { getErrorMessage } from './errors';
 
 const RECORDS_CACHE_TTL = 300; // 5 minutes
 const RECORDS_COUNTS_TTL = 300; // 5 minutes
@@ -112,8 +113,7 @@ export async function getRecordCountsAndWRFromCache(mapname: string): Promise<{ 
 
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[Cache] Failed to fetch counts and WR for ${validMapname}: ${err.message || 'Unknown error'}`);
+    logger.error(`[Cache] Failed to fetch counts and WR for ${validMapname}: ${getErrorMessage(error)}`);
     return { counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
   }
 }
@@ -177,8 +177,7 @@ export async function getLeaderboardRecordsFromCache(
 
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[Cache] Failed to fetch leaderboard records for ${validMapname}: ${err.message || 'Unknown error'}`);
+    logger.error(`[Cache] Failed to fetch leaderboard records for ${validMapname}: ${getErrorMessage(error)}`);
     return { records: [], wr_time: null };
   }
 }
@@ -235,8 +234,7 @@ export async function getMapRecordsFromCache(
 
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[Cache] Failed to fetch map records for ${validMapname}: ${err.message || 'Unknown error'}`);
+    logger.error(`[Cache] Failed to fetch map records for ${validMapname}: ${getErrorMessage(error)}`);
     return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
   }
 }
@@ -378,8 +376,7 @@ export async function getStageRecordsFromCache(
 
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[Cache] Failed to fetch stage records for ${validMapname}: ${err.message || 'Unknown error'}`);
+    logger.error(`[Cache] Failed to fetch stage records for ${validMapname}: ${getErrorMessage(error)}`);
     return {
       stages: [],
       stagesList: [],
@@ -496,8 +493,7 @@ export async function getBonusRecordsFromCache(
 
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[Cache] Failed to fetch bonus records for ${validMapname}: ${err.message || 'Unknown error'}`);
+    logger.error(`[Cache] Failed to fetch bonus records for ${validMapname}: ${getErrorMessage(error)}`);
     return {
       bonuses: [],
       bonusGroupsList: [],
@@ -569,8 +565,7 @@ export async function searchLeaderboardRecordsFromCache(
     await cacheSet(key, result, SEARCH_CACHE_TTL);
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[Cache] Search failed for ${validMapname} query "${query}": ${err.message || 'Unknown error'}`);
+    logger.error(`[Cache] Search failed for ${validMapname} query "${query}": ${getErrorMessage(error)}`);
     return { records: [], wr_time: null };
   }
 }
@@ -628,8 +623,7 @@ export async function searchStageRecordsFromCache(
     await cacheSet(key, result, SEARCH_CACHE_TTL);
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[Cache] Stage search failed for ${validMapname} stage ${stage} query "${query}": ${err.message || 'Unknown error'}`);
+    logger.error(`[Cache] Stage search failed for ${validMapname} stage ${stage} query "${query}": ${getErrorMessage(error)}`);
     return { stages: [] };
   }
 }
@@ -678,8 +672,7 @@ export async function searchBonusRecordsFromCache(
     await cacheSet(key, result, SEARCH_CACHE_TTL);
     return result;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[Cache] Bonus search failed for ${validMapname} bonus ${bonus} query "${query}": ${err.message || 'Unknown error'}`);
+    logger.error(`[Cache] Bonus search failed for ${validMapname} bonus ${bonus} query "${query}": ${getErrorMessage(error)}`);
     return { records: [] };
   }
 }

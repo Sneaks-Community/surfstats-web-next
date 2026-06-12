@@ -38,6 +38,23 @@ export function formatTime(seconds: number): string {
 export type SortDirection = 'asc' | 'desc';
 
 /**
+ * Parse an integer from a URL search param (or any nullable string), guarding
+ * against NaN and clamping to a range. Use for page/index params so malformed
+ * input (`?page=abc`, `?page=-5`, huge values) falls back/clamps instead of
+ * producing NaN or negative offsets.
+ * @param value - Raw param value (e.g. searchParams.get('page'))
+ * @param options - fallback (default 1), min (default 1), max (default MAX_SAFE_INTEGER)
+ */
+export function parseIntParam(
+  value: string | null | undefined,
+  { fallback = 1, min = 1, max = Number.MAX_SAFE_INTEGER }: { fallback?: number; min?: number; max?: number } = {}
+): number {
+  const n = parseInt(value ?? String(fallback), 10);
+  if (Number.isNaN(n)) return fallback;
+  return Math.min(max, Math.max(min, n));
+}
+
+/**
  * Clone a list and sort it with an ascending-order comparator, applying the
  * sort direction. Keeps the "copy, sort, flip on desc" boilerplate in one place
  * so call sites only supply the field comparator.

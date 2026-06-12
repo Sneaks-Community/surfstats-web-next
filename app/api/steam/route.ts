@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import { validateSteamId } from '@/lib/validators';
 import logger from '@/lib/logger';
+import { getErrorMessage } from '@/lib/errors';
 
 interface SteamPlayer {
   steamid: string;
@@ -104,9 +105,8 @@ export async function GET(request: NextRequest) {
     
     return NextResponse.json({ players });
   } catch (error: unknown) {
-    const err = error as { message?: string };
     const duration = Date.now() - startTime;
-    logger.error(`[Steam API] Error fetching data after ${duration}ms: ${err.message || 'Unknown error'}`);
+    logger.error(`[Steam API] Error fetching data after ${duration}ms: ${getErrorMessage(error)}`);
     
     return NextResponse.json({ error: 'Failed to fetch Steam data' }, { status: 500 });
   }

@@ -4,6 +4,7 @@ import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
 import { getCountryNamesFromCode, getCountryCodeFromName } from '@/lib/countries';
 import { cacheGet, cacheSet } from './valkey-cache';
+import { getErrorMessage } from './errors';
 
 /**
  * Country ranking data from database (raw query result)
@@ -141,7 +142,7 @@ const getCountriesRankingInternal = async (
       totalPages: Math.ceil(total / limit),
     };
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[CountryAnalytics] Failed to fetch countries ranking: ${errorMessage}`);
     return { countries: [], total: 0, totalPages: 0 };
   }
@@ -266,7 +267,7 @@ export async function getCountryPlayers(
       countryName,
     };
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[CountryAnalytics] Failed to fetch players for country ${countryCode}: ${errorMessage}`);
     return { players: [], total: 0, totalPages: 0, countryName: countryCode };
   }
@@ -322,7 +323,7 @@ const getCountriesStatsInternal = async (): Promise<{ totalCountries: number; to
       totalPlayers: rows[0]?.total_players || 0,
     };
   } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[CountryAnalytics] Failed to fetch countries stats: ${errorMessage}`);
     return { totalCountries: 0, totalPlayers: 0 };
   }

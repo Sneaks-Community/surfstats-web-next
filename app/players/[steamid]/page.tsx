@@ -9,6 +9,7 @@ import { getPlayerNameFromCache } from '@/lib/player-cache';
 import { getPlayerProfileFromCache } from '@/lib/player-profile-cache';
 import logger from '@/lib/logger';
 import PlayerProfileContent from './components/PlayerProfileContent';
+import { getErrorMessage } from '@/lib/errors';
 
 
 /**
@@ -40,7 +41,7 @@ async function getPlayerData(steamid: string) {
     return null;
   } catch (error: unknown) {
     const err = error as { message?: string; code?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[Player] Failed to fetch profile for ${steamid}: ${errorMessage}`);
     logger.error(`[Player] Error code: ${err.code || 'N/A'}`);
     return null;
@@ -133,7 +134,7 @@ async function getIncompleteRecords(steamid: string) {
     return { incompleteMaps, incompleteBonuses, incompleteStages };
   } catch (error: unknown) {
     const err = error as { message?: string; code?: string };
-    const errorMessage = err.message || 'Unknown error';
+    const errorMessage = getErrorMessage(error);
     logger.error(`[Player] Failed to fetch incomplete records for ${steamid}: ${errorMessage}`);
     logger.error(`[Player] Error code: ${err.code || 'N/A'}`);
     return { incompleteMaps: [], incompleteBonuses: [], incompleteStages: [] };
@@ -186,8 +187,7 @@ async function getLinearVsStagedPerTier(steamid: string): Promise<Array<{ tier: 
     
     return distribution;
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[Player] Failed to fetch linear vs staged per tier: ${err.message || 'Unknown error'}`);
+    logger.error(`[Player] Failed to fetch linear vs staged per tier: ${getErrorMessage(error)}`);
     // Return empty array with all tiers at 0
     const emptyArray: Array<{ tier: number; linear: number; staged: number }> = [];
     for (let tier = 1; tier <= 10; tier++) {
@@ -221,8 +221,7 @@ export async function generateMetadata({ params }: { params: Promise<{ steamid: 
       title: `${name} - Player Profile`,
     };
   } catch (error: unknown) {
-    const err = error as { message?: string };
-    logger.error(`[Player] Failed to generate metadata for ${validSteamId}: ${err.message || 'Unknown error'}`);
+    logger.error(`[Player] Failed to generate metadata for ${validSteamId}: ${getErrorMessage(error)}`);
     return {
       title: 'Player Profile',
     };

@@ -5,9 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { Map as MapIcon, Target, Layers, Search, X, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle, Circle } from 'lucide-react';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import Pagination from '@/components/Pagination';
-import { formatTime, formatDate, sortRecords, matchesQuery, type SortDirection } from '@/lib/utils';
+import { formatTime, formatDate, sortRecords, matchesQuery, parseIntParam, type SortDirection } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import TierBadge from '@/components/TierBadge';
+import { ZoneGroupBadge, StageBadge } from '@/components/RecordBadges';
 import { useDebounce } from '@/hooks/useDebounce';
 
 // Types for records
@@ -96,9 +97,9 @@ export default function PlayerRecordsTabs({
   // Get initial state from URL
   const initialTab = (searchParams.get('tab') as TabType | null) ?? 'maps';
   const initialStatus = (searchParams.get('status') as StatusFilter | null) ?? 'finished';
-  const initialMapPage = parseInt(searchParams.get('mapPage') ?? '1', 10);
-  const initialBonusPage = parseInt(searchParams.get('bonusPage') ?? '1', 10);
-  const initialStagePage = parseInt(searchParams.get('stagePage') ?? '1', 10);
+  const initialMapPage = parseIntParam(searchParams.get('mapPage'));
+  const initialBonusPage = parseIntParam(searchParams.get('bonusPage'));
+  const initialStagePage = parseIntParam(searchParams.get('stagePage'));
   const initialMapSearch = searchParams.get('mapSearch') ?? '';
   const initialBonusSearch = searchParams.get('bonusSearch') ?? '';
   const initialStageSearch = searchParams.get('stageSearch') ?? '';
@@ -693,9 +694,7 @@ export default function PlayerRecordsTabs({
                       <MapLinkWithPreview mapname={record.mapname}>
                         {validatePlayerName(record.mapname)}
                       </MapLinkWithPreview>
-                      <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">
-                        B{record.zonegroup}
-                      </span>
+                      <ZoneGroupBadge zonegroup={record.zonegroup} />
                     </div>
                     <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
                       <div className="sm:w-16 text-left sm:text-right">
@@ -723,9 +722,7 @@ export default function PlayerRecordsTabs({
                       <MapLinkWithPreview mapname={record.map}>
                         {validatePlayerName(record.map)}
                       </MapLinkWithPreview>
-                      <span className="text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">
-                        S{record.stage}
-                      </span>
+                      <StageBadge stage={record.stage} />
                     </div>
                     <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm">
                       <div className="sm:w-16 text-left sm:text-right">
@@ -791,9 +788,7 @@ export default function PlayerRecordsTabs({
                       <MapLinkWithPreview mapname={record.mapname}>
                         {validatePlayerName(record.mapname)}
                       </MapLinkWithPreview>
-                      <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">
-                        B{record.zonegroup}
-                      </span>
+                      <ZoneGroupBadge zonegroup={record.zonegroup} />
                     </div>
                     <div className="flex items-center gap-4 sm:gap-4">
                       <div className="sm:w-20" />
@@ -818,9 +813,7 @@ export default function PlayerRecordsTabs({
                       <MapLinkWithPreview mapname={record.map}>
                         {validatePlayerName(record.map)}
                       </MapLinkWithPreview>
-                      <span className="text-xs bg-orange-500/20 text-orange-400 px-1.5 py-0.5 rounded">
-                        S{record.stage}
-                      </span>
+                      <StageBadge stage={record.stage} />
                     </div>
                     <div className="sm:w-20" />
                     <div className="sm:w-16" />

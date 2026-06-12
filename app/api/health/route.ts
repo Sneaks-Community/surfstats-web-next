@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import client from '@/lib/valkey';
+import { getErrorMessage } from '@/lib/errors';
 
 export async function GET() {
   const healthStatus: Record<string, string | boolean | number> = {
@@ -18,8 +19,7 @@ export async function GET() {
       overallHealthy = false;
     }
   } catch (error) {
-    const err = error as { message?: string };
-    healthStatus.valkey = `error: ${err.message || 'Unknown error'}`;
+    healthStatus.valkey = `error: ${getErrorMessage(error)}`;
     overallHealthy = false;
   }
 
@@ -29,8 +29,7 @@ export async function GET() {
     await pool.query('SELECT 1');
     healthStatus.database = 'connected';
   } catch (error) {
-    const err = error as { message?: string };
-    healthStatus.database = `error: ${err.message || 'Unknown error'}`;
+    healthStatus.database = `error: ${getErrorMessage(error)}`;
     overallHealthy = false;
   }
 

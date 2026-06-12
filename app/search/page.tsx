@@ -9,6 +9,7 @@ import { searchPlayersFromCache } from '@/lib/player-cache';
 import type { PlayerSearchResult } from '@/lib/player-cache';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
+import { getErrorMessage } from '@/lib/errors';
 
 export const metadata: Metadata = {
   title: 'Search',
@@ -48,7 +49,7 @@ export default async function SearchPage({
       logger.debug(`[Search] Results for "${query}": ${players.length} players, ${maps.length} maps (cached)`);
     } catch (error: unknown) {
       const err = error as { message?: string; code?: string };
-      const errorMessage = err.message || 'Unknown error';
+      const errorMessage = getErrorMessage(error);
       logger.error(`[Search] Query failed for "${query}": ${errorMessage}`);
       logger.error(`[Search] Error code: ${err.code || 'N/A'}`);
     }
