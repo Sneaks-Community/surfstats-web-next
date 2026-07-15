@@ -160,7 +160,7 @@ export async function getLeaderboardRecordsFromCache(
       pool.query<MapRecord[]>(`
         SELECT
           steamid, name, runtimepro, date, startspeed,
-          ROW_NUMBER() OVER (ORDER BY runtimepro ASC) as rank,
+          ROW_NUMBER() OVER (ORDER BY runtimepro ASC) as \`rank\`,
           ? as wr_time
         FROM ck_playertimes
         WHERE mapname = ?
@@ -288,10 +288,10 @@ export async function getStageRecordsFromCache(
       ),
       withTimeout(
         pool.query<RowDataPacket[]>(`
-          SELECT COUNT(DISTINCT rank) as total FROM (
+          SELECT COUNT(DISTINCT \`rank\`) as total FROM (
             SELECT
               s.steamid,
-              DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) as rank
+              DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) as \`rank\`
             FROM ck_stages s
             WHERE s.map = ? AND s.stage = ?
           ) AS ranked
@@ -309,7 +309,7 @@ export async function getStageRecordsFromCache(
     const [stageRows] = await withTimeout(
       pool.query<StageRecord[]>(`
         SELECT
-          steamid, name, stage, runtime, date, startspeed, rank, wr_time
+          steamid, name, stage, runtime, date, startspeed, \`rank\`, wr_time
         FROM (
           SELECT
             s.steamid,
@@ -318,14 +318,14 @@ export async function getStageRecordsFromCache(
             s.runtime,
             s.date,
             s.startspeed,
-            DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) as rank,
+            DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) as \`rank\`,
             ? as wr_time
           FROM ck_stages s
           LEFT JOIN ck_playerrank pr ON s.steamid = pr.steamid
           WHERE s.map = ? AND s.stage = ?
         ) AS ranked_data
-        WHERE rank <= ?
-        ORDER BY rank ASC, date ASC
+        WHERE \`rank\` <= ?
+        ORDER BY \`rank\` ASC, date ASC
       `, [wrTime, validMapname, stage, MAX_STAGE_RECORDS]),
       QUERY_TIMEOUT_MS,
       'Query timeout exceeded'
@@ -441,7 +441,7 @@ export async function getBonusRecordsFromCache(
       pool.query<BonusRecord[]>(`
         SELECT
           b.steamid, b.name, b.zonegroup, b.runtime, b.date, b.startspeed,
-          ROW_NUMBER() OVER (ORDER BY b.runtime ASC) as rank,
+          ROW_NUMBER() OVER (ORDER BY b.runtime ASC) as \`rank\`,
           (SELECT MIN(runtime) FROM ck_bonus WHERE mapname = b.mapname AND zonegroup = b.zonegroup) as wr_time
         FROM ck_bonus b
         WHERE b.mapname = ? AND b.zonegroup = ?
@@ -522,10 +522,10 @@ export async function searchLeaderboardRecordsFromCache(
     const [rows] = await withTimeout(
       pool.query<MapRecord[]>(
         `SELECT ranked.steamid, ranked.name, ranked.runtimepro, ranked.date, ranked.startspeed,
-                ranked.rank, ? AS wr_time
+                ranked.\`rank\`, ? AS wr_time
          FROM (
            SELECT steamid, name, runtimepro, date, startspeed,
-                  ROW_NUMBER() OVER (ORDER BY runtimepro ASC) AS rank
+                  ROW_NUMBER() OVER (ORDER BY runtimepro ASC) AS \`rank\`
            FROM ck_playertimes
            WHERE mapname = ?
          ) ranked
@@ -579,16 +579,16 @@ export async function searchStageRecordsFromCache(
     const [rows] = await withTimeout(
       pool.query<StageRecord[]>(
         `SELECT ranked.steamid, ranked.name, ranked.stage, ranked.runtime, ranked.date, ranked.startspeed,
-                ranked.rank, ? AS wr_time
+                ranked.\`rank\`, ? AS wr_time
          FROM (
            SELECT s.steamid, pr.name, s.stage, s.runtime, s.date, s.startspeed,
-                  DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) AS rank
+                  DENSE_RANK() OVER (ORDER BY s.runtime ASC, s.date ASC) AS \`rank\`
            FROM ck_stages s
            LEFT JOIN ck_playerrank pr ON s.steamid = pr.steamid
            WHERE s.map = ? AND s.stage = ?
          ) ranked
          WHERE ranked.name LIKE ? OR ranked.steamid LIKE ?
-         ORDER BY ranked.rank ASC, ranked.date ASC
+         ORDER BY ranked.\`rank\` ASC, ranked.date ASC
          LIMIT ?`,
         [wr_time, validMapname, stage, likePattern, likePattern, SEARCH_MAX_RESULTS]
       ),
@@ -628,11 +628,11 @@ export async function searchBonusRecordsFromCache(
     const [rows] = await withTimeout(
       pool.query<BonusRecord[]>(
         `SELECT ranked.steamid, ranked.name, ranked.zonegroup, ranked.runtime, ranked.date, ranked.startspeed,
-                ranked.rank,
+                ranked.\`rank\`,
                 (SELECT MIN(runtime) FROM ck_bonus WHERE mapname = ? AND zonegroup = ranked.zonegroup) AS wr_time
          FROM (
            SELECT b.steamid, b.name, b.zonegroup, b.runtime, b.date, b.startspeed,
-                  ROW_NUMBER() OVER (ORDER BY b.runtime ASC) AS rank
+                  ROW_NUMBER() OVER (ORDER BY b.runtime ASC) AS \`rank\`
            FROM ck_bonus b
            WHERE b.mapname = ? AND b.zonegroup = ?
          ) ranked

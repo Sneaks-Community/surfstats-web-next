@@ -73,11 +73,11 @@ async function fetchPlayersInternal(
       query = `
         SELECT
           ranked.steamid, ranked.name, ranked.country, ranked.points,
-          COALESCE(completions.map_count, 0) as finishedmaps, ranked.lastseen, ranked.rank
+          COALESCE(completions.map_count, 0) as finishedmaps, ranked.lastseen, ranked.\`rank\`
         FROM (
           SELECT
             steamid, name, country, points, lastseen,
-            RANK() OVER (ORDER BY points DESC) as rank
+            RANK() OVER (ORDER BY points DESC) as \`rank\`
           FROM ck_playerrank
           WHERE name LIKE ? OR steamid LIKE ?
         ) ranked
@@ -95,11 +95,11 @@ async function fetchPlayersInternal(
       query = `
         SELECT
           ranked.steamid, ranked.name, ranked.country, ranked.points,
-          COALESCE(completions.map_count, 0) as finishedmaps, ranked.lastseen, ranked.rank
+          COALESCE(completions.map_count, 0) as finishedmaps, ranked.lastseen, ranked.\`rank\`
         FROM (
           SELECT
             steamid, name, country, points, lastseen,
-            RANK() OVER (ORDER BY points DESC) as rank
+            RANK() OVER (ORDER BY points DESC) as \`rank\`
           FROM ck_playerrank
         ) ranked
         LEFT JOIN (

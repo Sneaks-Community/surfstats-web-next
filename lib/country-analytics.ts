@@ -227,7 +227,7 @@ export async function getCountryPlayers(
     const playersQuery = `
       SELECT
         steamid, name, country, points, finishedmaps, lastseen,
-        RANK() OVER (ORDER BY points DESC) as rank
+        RANK() OVER (ORDER BY points DESC) as \`rank\`
       FROM ck_playerrank
       WHERE ${whereClause}
       ORDER BY ${orderByClause}
@@ -270,7 +270,7 @@ export async function getCountryPlayers(
  */
 function getPlayerOrderByClause(sort: PlayerSortKey, order: SortOrder): string {
   const columnMap: Record<PlayerSortKey, string> = {
-    rank: 'rank',
+    rank: '`rank`',
     player: 'name',
     points: 'points',
     maps: 'finishedmaps',
