@@ -396,7 +396,7 @@ export default function MapRecordsTabs({
     if (searchQuery.length >= 3) return;
     if (allLeaderboardLoadedRef.current) return;
 
-    let cancelled = false;
+    const controller = new AbortController();
     void (async () => {
       setIsLoadingAllLeaderboard(true);
       try {
@@ -404,24 +404,21 @@ export default function MapRecordsTabs({
         const apiPages = Math.max(1, Math.ceil(totalRecords / LOAD_PAGE_SIZE));
         const merged = new Map<string, MapRecord>();
         for (let p = 1; p <= apiPages; p++) {
-          const response = await fetch(`/api/maps/${mapname}/records?page=${p}&pageSize=${LOAD_PAGE_SIZE}`);
+          const response = await fetch(`/api/maps/${mapname}/records?page=${p}&pageSize=${LOAD_PAGE_SIZE}`, { signal: controller.signal });
           const data = await response.json();
           if (Array.isArray(data.records)) {
             for (const r of data.records as MapRecord[]) merged.set(r.steamid + r.date, r);
           }
         }
-        if (!cancelled) {
-          setAllLeaderboardRecords(Array.from(merged.values()));
-          allLeaderboardLoadedRef.current = true;
-        }
+        setAllLeaderboardRecords(Array.from(merged.values()));
+        allLeaderboardLoadedRef.current = true;
       } catch (error) {
-        if (!cancelled) clientError(`Failed to load all records for sorting: ${getErrorMessage(error)}`);
+        if (!isAbortError(error)) clientError(`Failed to load all records for sorting: ${getErrorMessage(error)}`);
       } finally {
-        if (!cancelled) setIsLoadingAllLeaderboard(false);
+        if (!controller.signal.aborted) setIsLoadingAllLeaderboard(false);
       }
     })();
-    return () => { cancelled = true; };
-     
+    return () => controller.abort();
   }, [activeTab, sortField, searchQuery, mapname, totalRecords]);
 
   // same load-all path for the bonus tab (per-bonus).
@@ -431,7 +428,7 @@ export default function MapRecordsTabs({
     if (bonusSearchQuery.length >= 3) return;
     if (allBonusLoadedRef.current.has(selectedBonus)) return;
 
-    let cancelled = false;
+    const controller = new AbortController();
     void (async () => {
       setIsLoadingAllBonus(true);
       try {
@@ -439,7 +436,7 @@ export default function MapRecordsTabs({
         const merged = new Map<string, BonusRecord>();
         let total = Infinity;
         for (let p = 1; (p - 1) * LOAD_PAGE_SIZE < total; p++) {
-          const response = await fetch(`/api/maps/${mapname}/bonuses?bonus=${selectedBonus}&page=${p}&pageSize=${LOAD_PAGE_SIZE}`);
+          const response = await fetch(`/api/maps/${mapname}/bonuses?bonus=${selectedBonus}&page=${p}&pageSize=${LOAD_PAGE_SIZE}`, { signal: controller.signal });
           const data = await response.json();
           total = data.pagination?.total ?? 0;
           if (Array.isArray(data.bonuses) && data.bonuses.length > 0) {
@@ -448,19 +445,16 @@ export default function MapRecordsTabs({
             break;
           }
         }
-        if (!cancelled) {
-          setAllBonusRecords(Array.from(merged.values()));
-          setTotalBonusRecords(merged.size);
-          allBonusLoadedRef.current.add(selectedBonus);
-        }
+        setAllBonusRecords(Array.from(merged.values()));
+        setTotalBonusRecords(merged.size);
+        allBonusLoadedRef.current.add(selectedBonus);
       } catch (error) {
-        if (!cancelled) clientError(`Failed to load all bonus records for sorting: ${getErrorMessage(error)}`);
+        if (!isAbortError(error)) clientError(`Failed to load all bonus records for sorting: ${getErrorMessage(error)}`);
       } finally {
-        if (!cancelled) setIsLoadingAllBonus(false);
+        if (!controller.signal.aborted) setIsLoadingAllBonus(false);
       }
     })();
-    return () => { cancelled = true; };
-     
+    return () => controller.abort();
   }, [activeTab, sortField, bonusSearchQuery, selectedBonus, mapname]);
 
   // Server-side search — map tab

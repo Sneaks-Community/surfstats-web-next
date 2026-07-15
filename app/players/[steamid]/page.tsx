@@ -12,6 +12,9 @@ import logger from '@/lib/logger';
 import PlayerProfileContent from './components/PlayerProfileContent';
 import { getErrorMessage } from '@/lib/errors';
 
+// Highest tier the Tier Distribution radar will render. Defaults to 10.
+const MAX_ALLOWED_TIER = parseInt(process.env.MAX_TIER || '10', 10) || 10;
+
 
 /**
  * Get player profile data with caching
@@ -283,15 +286,17 @@ export default async function PlayerProfilePage({
   ]);
 
   // The tier ceiling is a property of the server's map pool, not the player.
-  // Derive it from the server-wide tier distribution so the chart shows exactly
-  // the tiers this server supports. Fall back to the player's own highest
-  // completed tier as a floor, so a stale distribution cache can never drop a
-  // tier the player has actually completed.
-  const maxTier = Math.max(
-    1,
+  // Derive it from the server-wide tier distribution (falling back to the
+  // player's own completed tiers) so the chart shows exactly the tiers this
+  // server supports. Ignore any tier above MAX_ALLOWED_TIER (default 10, the
+  // ckSurf tier ceiling; override via the MAX_TIER env var): higher values are
+  // placeholder/junk data (e.g. a tier-69 stub map) that would otherwise blow
+  // the radar up to dozens of empty axes.
+  const candidateTiers = [
     ...tierDistribution.keys(),
     ...linearVsStagedRaw.map(r => r.tier),
-  );
+  ].filter(t => t >= 1 && t <= MAX_ALLOWED_TIER);
+  const maxTier = candidateTiers.length > 0 ? Math.max(...candidateTiers) : 1;
   const linearVsStagedPerTier = padTierDistribution(linearVsStagedRaw, maxTier);
 
   // Compute WR performance data from maps

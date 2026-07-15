@@ -40,6 +40,8 @@ const optionalSchema = z.object({
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
     .optional(),
   MAP_IMAGES_URL: z.url('MAP_IMAGES_URL must be a valid URL').optional(),
+  // Highest tier shown on the player Tier Distribution radar.
+  MAX_TIER: z.coerce.number().int().positive().optional(),
 });
 
 let validated = false;
