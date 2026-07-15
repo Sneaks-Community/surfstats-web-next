@@ -234,16 +234,51 @@ export async function getStatsFromCache(): Promise<{
     country: string | null;
   }>;
 }> {
-  // Fetch both stats and recent records in parallel
-  const [stats, recentRecords] = await Promise.all([
-    getDashboardStatsFromCache(),
-    getRecentRecordsFromCache(),
+  const [cachedStats, cachedRecords] = await Promise.all([
+    cacheGet<DashboardStats>(DASHBOARD_STATS_KEY),
+    cacheGet<RecentRecords[]>(DASHBOARD_RECENT_RECORDS_KEY),
   ]);
 
-  return {
-    ...stats,
-    recentRecords,
-  };
+  // Both cached: nothing to fetch.
+  if (cachedStats && cachedRecords) {
+    return { ...cachedStats, recentRecords: cachedRecords };
+  }
+
+  // Cold load (both missing): getStatsInternal() returns both datasets in one
+  // pass, so fetch once and populate both keys instead of letting each helper
+  // run getStatsInternal() independently (which would run all 4 queries).
+  if (!cachedStats && !cachedRecords) {
+    const { stats, recentRecords } = await cacheLock.acquire(
+      DASHBOARD_STATS_KEY,
+      async () => {
+        // Double-check after acquiring the lock.
+        const [rs, rr] = await Promise.all([
+          cacheGet<DashboardStats>(DASHBOARD_STATS_KEY),
+          cacheGet<RecentRecords[]>(DASHBOARD_RECENT_RECORDS_KEY),
+        ]);
+        if (rs && rr) {
+          return { stats: rs, recentRecords: rr };
+        }
+
+        const fresh = await getStatsInternal();
+        await Promise.all([
+          cacheSet(DASHBOARD_STATS_KEY, fresh.stats, DASHBOARD_STATS_TTL),
+          cacheSet(DASHBOARD_RECENT_RECORDS_KEY, fresh.recentRecords, DASHBOARD_RECENT_RECORDS_TTL),
+        ]);
+        return fresh;
+      }
+    );
+
+    return { ...stats, recentRecords };
+  }
+
+  // Exactly one key missing (their TTLs differ): refresh only the missing one.
+  const [stats, recentRecords] = await Promise.all([
+    cachedStats ?? getDashboardStatsFromCache(),
+    cachedRecords ?? getRecentRecordsFromCache(),
+  ]);
+
+  return { ...stats, recentRecords };
 }
 
 /**
