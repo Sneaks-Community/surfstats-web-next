@@ -45,6 +45,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  poweredByHeader: false,
   typescript: {
     ignoreBuildErrors: false,
   },
