@@ -7,7 +7,7 @@ import { getBonusRecordsFromCache, searchBonusRecordsFromCache } from '@/lib/val
 import { getBonusGroupsByMapFromCache } from '@/lib/valkey-registry-cache';
 
 const DEFAULT_PAGE_SIZE = 100;
-const MAX_PAGE_SIZE = 500;
+const MAX_PAGE_SIZE = 100;
 
 export async function GET(
   request: NextRequest,

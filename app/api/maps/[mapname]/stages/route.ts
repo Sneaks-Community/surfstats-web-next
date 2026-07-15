@@ -7,7 +7,7 @@ import { getStageRecordsFromCache, searchStageRecordsFromCache } from '@/lib/val
 import { getStagesByMapFromCache } from '@/lib/valkey-registry-cache';
 
 const DEFAULT_PAGE_SIZE = 100;
-const MAX_PAGE_SIZE = 500;
+const MAX_PAGE_SIZE = 100;
 
 export async function GET(
   request: NextRequest,

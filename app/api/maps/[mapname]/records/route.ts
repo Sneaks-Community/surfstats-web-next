@@ -9,7 +9,7 @@ import {
 } from '@/lib/valkey-map-records-cache';
 
 const DEFAULT_PAGE_SIZE = 100;
-const MAX_PAGE_SIZE = 500;
+const MAX_PAGE_SIZE = 100;
 
 export async function GET(
   request: NextRequest,
