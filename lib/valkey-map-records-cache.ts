@@ -183,7 +183,8 @@ export async function getLeaderboardRecordsFromCache(
 }
 
 /**
- * Get map records (leaderboard, counts, WR time) from cache
+ * Get map records (leaderboard, counts, WR time) by composing the two
+ * underlying sub-caches (counts+WR and the paginated leaderboard).
  */
 export async function getMapRecordsFromCache(
   mapname: string,
@@ -201,38 +202,18 @@ export async function getMapRecordsFromCache(
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
   }
-  const key = `surfstats:map:${validMapname}:records:${page}:${pageSize}`;
-
-  const cached = await cacheGet<{
-    leaderboard: MapRecord[];
-    bonuses: BonusRecord[];
-    stages: StageRecord[];
-    counts: RecordCounts;
-    wr_time: number | null;
-  }>(key);
-  if (cached) {
-    logger.debug(`[Cache] Hit: ${key}`);
-    return cached;
-  }
-
-  logger.debug(`[Cache] Miss: ${key}`);
 
   try {
     const { counts, wr_time } = await getRecordCountsAndWRFromCache(validMapname);
     const { records: leaderboard } = await getLeaderboardRecordsFromCache(validMapname, page, pageSize, wr_time);
 
-    const result = {
+    return {
       leaderboard,
       bonuses: [],
       stages: [],
       counts,
       wr_time,
     };
-
-    await cacheSet(key, result, RECORDS_CACHE_TTL);
-    logger.debug(`[Cache] SET ${key} with TTL ${RECORDS_CACHE_TTL}s`);
-
-    return result;
   } catch (error: unknown) {
     logger.error(`[Cache] Failed to fetch map records for ${validMapname}: ${getErrorMessage(error)}`);
     return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
