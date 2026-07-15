@@ -39,8 +39,11 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
 
   // Transform data for the radar chart
   const chartData = useMemo(() => {
-    // Get all tiers 1-6
-    const tiers = Array.from({ length: 6 }, (_, i) => i + 1);
+    // Derive the tier axes from the data, which the server pads to its full tier
+    // range (up to 6, 10, etc. depending on the server's map pool). This keeps
+    // the radar and the L/S summary in agreement and avoids both dropped high
+    // tiers and blank trailing axes.
+    const tiers = Array.from(new Set(safeData.map(d => d.tier))).sort((a, b) => a - b);
 
     // Build Map for O(1) lookups - computed directly within outer useMemo
     const dataMap = new Map<number, { linear: number; staged: number }>();

@@ -5,6 +5,7 @@ import { getSteamProfilesFromCache } from '@/lib/steam';
 import { validateSteamId } from '@/lib/validators';
 import { getTotalsFromCache } from '@/lib/cache';
 import { getPlayerTimeOnServerFromCache, getActivityHeatmapFromCache } from '@/lib/player-analytics';
+import { getTierDistributionFromCache } from '@/lib/valkey-map-cache';
 import { getPlayerNameFromCache } from '@/lib/player-cache';
 import { getPlayerProfileFromCache } from '@/lib/player-profile-cache';
 import logger from '@/lib/logger';
@@ -141,9 +142,17 @@ async function getIncompleteRecords(steamid: string) {
   }
 }
 
-async function getLinearVsStagedPerTier(steamid: string): Promise<Array<{ tier: number; linear: number; staged: number }>> {
+interface TierDistributionRow { tier: number; linear: number; staged: number }
+
+/**
+ * Fetch the player's linear/staged completion counts per tier, returning only
+ * the tiers the player has actually completed (no padding). Zero-filling across
+ * the server's full tier range is applied separately by `padTierDistribution`,
+ * which is driven by the server's real tier ceiling rather than a hardcoded max.
+ */
+async function getLinearVsStagedPerTier(steamid: string): Promise<TierDistributionRow[]> {
   logger.debug(`[Player] Fetching linear vs staged per tier for: ${steamid}`);
-  
+
   try {
     const [rows] = await pool.query<RowDataPacket[]>(`
       SELECT
@@ -158,43 +167,40 @@ async function getLinearVsStagedPerTier(steamid: string): Promise<Array<{ tier: 
       GROUP BY m.tier
       ORDER BY m.tier ASC
     `, [steamid]);
-    
+
     logger.debug(`[Player] Raw query results for ${steamid}: ${JSON.stringify(rows)}`);
-    
-    // Initialize all tiers 1-10 with zeros
-    const distribution: Array<{ tier: number; linear: number; staged: number }> = [];
-    for (let tier = 1; tier <= 10; tier++) {
-      distribution.push({ tier, linear: 0, staged: 0 });
-    }
-    
-    // Merge query results into the distribution array
-    for (const row of rows) {
-      const tier = Number(row.tier);
-      const tierEntry = distribution.find(d => d.tier === tier);
-      if (tierEntry) {
-        // MySQL returns numbers as strings, so we need to convert them
-        const linearVal = Number(row.linear) || 0;
-        const stagedVal = Number(row.staged) || 0;
-        tierEntry.linear = linearVal;
-        tierEntry.staged = stagedVal;
-        logger.debug(`[Player] Merged tier ${tier}: linear=${linearVal}, staged=${stagedVal}`);
-      }
-    }
-    
-    const totalLinear = distribution.reduce((sum, d) => sum + d.linear, 0);
-    const totalStaged = distribution.reduce((sum, d) => sum + d.staged, 0);
-    logger.debug(`[Player] Total for ${steamid}: linear=${totalLinear}, staged=${totalStaged}`);
-    
-    return distribution;
+
+    // MySQL returns numbers as strings, so convert them here.
+    return rows.map(row => ({
+      tier: Number(row.tier),
+      linear: Number(row.linear) || 0,
+      staged: Number(row.staged) || 0,
+    }));
   } catch (error: unknown) {
     logger.error(`[Player] Failed to fetch linear vs staged per tier: ${getErrorMessage(error)}`);
-    // Return empty array with all tiers at 0
-    const emptyArray: Array<{ tier: number; linear: number; staged: number }> = [];
-    for (let tier = 1; tier <= 10; tier++) {
-      emptyArray.push({ tier, linear: 0, staged: 0 });
-    }
-    return emptyArray;
+    return [];
   }
+}
+
+/**
+ * Zero-fill the player's per-tier completions across the full tier range
+ * `1..maxTier`, so the radar chart shows every tier the server supports (with
+ * un-completed tiers at zero) and never silently drops a tier. `maxTier` comes
+ * from the server's actual map pool, so a server with tiers up to 6 renders
+ * 1-6 and a server with tiers up to 10 renders 1-10 — no blank trailing axes.
+ *
+ * When the player has no completions at all, returns an empty array so the
+ * chart renders its "No completions" empty state instead of an all-zero radar.
+ */
+function padTierDistribution(rows: TierDistributionRow[], maxTier: number): TierDistributionRow[] {
+  if (rows.length === 0) return [];
+
+  const byTier = new Map(rows.map(r => [r.tier, r]));
+  const distribution: TierDistributionRow[] = [];
+  for (let tier = 1; tier <= maxTier; tier++) {
+    distribution.push(byTier.get(tier) ?? { tier, linear: 0, staged: 0 });
+  }
+  return distribution;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ steamid: string }> }) {
@@ -266,14 +272,27 @@ export default async function PlayerProfilePage({
   }
 
   // Group 2: Parallel fetch for remaining data
-  const [incompleteData, totals, steamAvatars, playtimeData, linearVsStagedPerTier, activityHeatmap] = await Promise.all([
+  const [incompleteData, totals, steamAvatars, playtimeData, linearVsStagedRaw, activityHeatmap, tierDistribution] = await Promise.all([
     getIncompleteRecords(validSteamId),
     getTotalsFromCache(),
     getSteamProfilesFromCache([decodedSteamId]),
     getPlayerTimeOnServerFromCache(validSteamId),
     getLinearVsStagedPerTier(validSteamId),
     getActivityHeatmapFromCache(validSteamId),
+    getTierDistributionFromCache(),
   ]);
+
+  // The tier ceiling is a property of the server's map pool, not the player.
+  // Derive it from the server-wide tier distribution so the chart shows exactly
+  // the tiers this server supports. Fall back to the player's own highest
+  // completed tier as a floor, so a stale distribution cache can never drop a
+  // tier the player has actually completed.
+  const maxTier = Math.max(
+    1,
+    ...tierDistribution.keys(),
+    ...linearVsStagedRaw.map(r => r.tier),
+  );
+  const linearVsStagedPerTier = padTierDistribution(linearVsStagedRaw, maxTier);
 
   // Compute WR performance data from maps
   const wrPerformanceData = (data.maps as Array<{

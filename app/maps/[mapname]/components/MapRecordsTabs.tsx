@@ -203,6 +203,11 @@ export default function MapRecordsTabs({
   const [totalBonusRecords, setTotalBonusRecords] = useState(0);
   const [isLoadingBonuses, setIsLoadingBonuses] = useState(false);
 
+  const allLeaderboardLoadedRef = useRef<boolean>(totalRecords <= records.length);
+  const [isLoadingAllLeaderboard, setIsLoadingAllLeaderboard] = useState(false);
+  const allBonusLoadedRef = useRef<Set<number>>(new Set());
+  const [isLoadingAllBonus, setIsLoadingAllBonus] = useState(false);
+
   // Server-side search state — map tab
   const [searchApiResults, setSearchApiResults] = useState<MapRecord[]>([]);
   const [isSearchingApi, setIsSearchingApi] = useState(false);
@@ -230,6 +235,8 @@ export default function MapRecordsTabs({
       loadedPagesRef.current.add(i);
     }
     hasMoreToLoadRef.current = totalRecords > records.length;
+    allLeaderboardLoadedRef.current = totalRecords <= records.length;
+    allBonusLoadedRef.current = new Set();
     // eslint-disable-next-line react-hooks/immutability -- useState setters are stable across renders
     setLeaderboardPage(1);
     // Clear bonus cache when map changes
@@ -348,6 +355,8 @@ export default function MapRecordsTabs({
       if (data.bonuses && data.bonuses.length > 0) {
         // Store in client-side cache
         bonusCacheRef.current.set(cacheKey, data.bonuses);
+        // This is a single rank-window page — the full set is no longer loaded.
+        allBonusLoadedRef.current.delete(bonus);
         setAllBonusRecords(data.bonuses);
         setTotalBonusRecords(data.pagination.total);
         if (data.bonusGroupsList && data.bonusGroupsList.length > 0) {
@@ -368,13 +377,91 @@ export default function MapRecordsTabs({
     }
   };
 
-  // Load bonus records when selected bonus changes
+  // Load bonus records when selected bonus changes.
+  // Skip while a non-rank sort is active — that uses the load-all path below,
+  // which needs the full set rather than a single rank-window page.
   useEffect(() => {
     if (activeTab === 'bonus' && numBonuses > 0) {
+      if (sortField !== 'rank') return;
       void loadBonusRecords(selectedBonus, bonusPage);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, selectedBonus, bonusPage, numBonuses]);
+  }, [activeTab, selectedBonus, bonusPage, numBonuses, sortField]);
+
+  // When a non-rank sort is active on the map tab, load the full
+  // leaderboard once so pagination pages through the globally-sorted order.
+  useEffect(() => {
+    if (activeTab !== 'map') return;
+    if (sortField === 'rank') return;
+    if (searchQuery.length >= 3) return;
+    if (allLeaderboardLoadedRef.current) return;
+
+    let cancelled = false;
+    void (async () => {
+      setIsLoadingAllLeaderboard(true);
+      try {
+        const LOAD_PAGE_SIZE = 100;
+        const apiPages = Math.max(1, Math.ceil(totalRecords / LOAD_PAGE_SIZE));
+        const merged = new Map<string, MapRecord>();
+        for (let p = 1; p <= apiPages; p++) {
+          const response = await fetch(`/api/maps/${mapname}/records?page=${p}&pageSize=${LOAD_PAGE_SIZE}`);
+          const data = await response.json();
+          if (Array.isArray(data.records)) {
+            for (const r of data.records as MapRecord[]) merged.set(r.steamid + r.date, r);
+          }
+        }
+        if (!cancelled) {
+          setAllLeaderboardRecords(Array.from(merged.values()));
+          allLeaderboardLoadedRef.current = true;
+        }
+      } catch (error) {
+        if (!cancelled) clientError(`Failed to load all records for sorting: ${getErrorMessage(error)}`);
+      } finally {
+        if (!cancelled) setIsLoadingAllLeaderboard(false);
+      }
+    })();
+    return () => { cancelled = true; };
+     
+  }, [activeTab, sortField, searchQuery, mapname, totalRecords]);
+
+  // same load-all path for the bonus tab (per-bonus).
+  useEffect(() => {
+    if (activeTab !== 'bonus') return;
+    if (sortField === 'rank') return;
+    if (bonusSearchQuery.length >= 3) return;
+    if (allBonusLoadedRef.current.has(selectedBonus)) return;
+
+    let cancelled = false;
+    void (async () => {
+      setIsLoadingAllBonus(true);
+      try {
+        const LOAD_PAGE_SIZE = 100;
+        const merged = new Map<string, BonusRecord>();
+        let total = Infinity;
+        for (let p = 1; (p - 1) * LOAD_PAGE_SIZE < total; p++) {
+          const response = await fetch(`/api/maps/${mapname}/bonuses?bonus=${selectedBonus}&page=${p}&pageSize=${LOAD_PAGE_SIZE}`);
+          const data = await response.json();
+          total = data.pagination?.total ?? 0;
+          if (Array.isArray(data.bonuses) && data.bonuses.length > 0) {
+            for (const r of data.bonuses as BonusRecord[]) merged.set(`${r.steamid}-${r.zonegroup}`, r);
+          } else {
+            break;
+          }
+        }
+        if (!cancelled) {
+          setAllBonusRecords(Array.from(merged.values()));
+          setTotalBonusRecords(merged.size);
+          allBonusLoadedRef.current.add(selectedBonus);
+        }
+      } catch (error) {
+        if (!cancelled) clientError(`Failed to load all bonus records for sorting: ${getErrorMessage(error)}`);
+      } finally {
+        if (!cancelled) setIsLoadingAllBonus(false);
+      }
+    })();
+    return () => { cancelled = true; };
+     
+  }, [activeTab, sortField, bonusSearchQuery, selectedBonus, mapname]);
 
   // Server-side search — map tab
   // Fires after 400 ms of silence; only when query is ≥ 3 characters
@@ -495,6 +582,11 @@ export default function MapRecordsTabs({
   // Handle page change - with auto-loading for map tab
   const handlePageChange = async (page: number) => {
     if (activeTab === 'map') {
+      // Full set already loaded (non-rank sort path) — just change the page.
+      if (allLeaderboardLoadedRef.current) {
+        setLeaderboardPage(page);
+        return;
+      }
       // Check if this page has already been loaded
       if (!loadedPagesRef.current.has(page)) {
         try {
@@ -593,7 +685,7 @@ export default function MapRecordsTabs({
     setStageSearchApiPage(1);
   };
 
-  // Handle sort for map tab (client-side sorting)
+  // Handle sort for the map and bonus tabs (client-side sorting)
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -601,7 +693,10 @@ export default function MapRecordsTabs({
       setSortField(field);
       setSortDirection('asc');
     }
+    // Reset to the first page — under a non-rank sort the pages follow the
+    // sorted order, so a stale high page could fall outside the result set.
     setLeaderboardPage(1);
+    setBonusPage(1);
   };
 
   // Handle sort for stages tab (server-side sorting)
@@ -651,7 +746,9 @@ export default function MapRecordsTabs({
 
   // Paginated records
   // Search mode (≥3 chars): paginate over server-returned results — every match is reachable.
-  // Normal mode: rank-window filtering handles non-sequential page loading correctly.
+  // Rank sort: rank-window filtering handles non-sequential lazy page loading.
+  // Non-rank sort: the full set is loaded (see load-all effect), so slice the
+  //   globally-sorted array — pages follow the sorted order, not the rank window.
   const inSearchMode = searchQuery.length >= 3;
   const searchApiStart = (searchApiPage - 1) * ITEMS_PER_PAGE;
   const leaderboardStart = (leaderboardPage - 1) * ITEMS_PER_PAGE;
@@ -661,7 +758,9 @@ export default function MapRecordsTabs({
     : Math.ceil(totalRecords / ITEMS_PER_PAGE);
   const paginatedRecords = inSearchMode
     ? searchApiResults.slice(searchApiStart, searchApiStart + ITEMS_PER_PAGE)
-    : sortedRecords.filter((r) => r.rank >= leaderboardStart + 1 && r.rank <= leaderboardEnd);
+    : sortField === 'rank'
+      ? sortedRecords.filter((r) => r.rank >= leaderboardStart + 1 && r.rank <= leaderboardEnd)
+      : sortedRecords.slice(leaderboardStart, leaderboardStart + ITEMS_PER_PAGE);
 
   // Filter bonus records by search
   const filteredBonusRecords = useMemo(() => {
@@ -706,7 +805,9 @@ export default function MapRecordsTabs({
     : Math.ceil(totalBonusRecords / ITEMS_PER_PAGE);
   const paginatedBonusRecords = inBonusSearchMode
     ? bonusSearchApiResults.slice(bonusSearchApiStart, bonusSearchApiStart + ITEMS_PER_PAGE)
-    : sortedBonusRecords.filter((r) => r.rank >= bonusStart + 1 && r.rank <= bonusEnd);
+    : sortField === 'rank'
+      ? sortedBonusRecords.filter((r) => r.rank >= bonusStart + 1 && r.rank <= bonusEnd)
+      : sortedBonusRecords.slice(bonusStart, bonusStart + ITEMS_PER_PAGE);
 
   // Stage records are sorted by rank (runtime ASC) from the server
   // We sort client-side based on the selected sort field
@@ -891,6 +992,15 @@ export default function MapRecordsTabs({
                       </div>
                     </td>
                   </tr>
+                ) : isLoadingAllLeaderboard ? (
+                  <tr>
+                    <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center gap-3">
+                        <LoadingSpinner />
+                        <span className="text-text-muted text-sm font-medium">Sorting all completions...</span>
+                      </div>
+                    </td>
+                  </tr>
                 ) : (
                   <>
                     {paginatedRecords.map((record) => (
@@ -953,7 +1063,7 @@ export default function MapRecordsTabs({
                       </div>
                     </td>
                   </tr>
-                ) : isLoadingBonuses ? (
+                ) : isLoadingBonuses || isLoadingAllBonus ? (
                   <tr>
                     <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
                       <div className="flex flex-col items-center justify-center gap-3">
