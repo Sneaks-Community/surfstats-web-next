@@ -110,6 +110,23 @@ export function formatPlaytime(seconds: number): string {
 export function formatPlaytimeToggle(seconds: number): string {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  
+
   return `${hours.toLocaleString()}h ${minutes}m`;
+}
+
+/**
+ * Build a map thumbnail image URL
+ *
+ * Sanitizes the name to the allowed map-name charset (`[a-zA-Z0-9_-]`, matching
+ * `mapNameSchema`) before interpolating it, replacing any other character with
+ * `_`. It guarantees every call site builds the URL the same way so stray
+ * characters can't produce malformed or unexpected URLs.
+ *
+ * @param baseUrl - The `MAP_IMAGES_URL` base (may be an empty string)
+ * @param map - The map name (may be null/undefined)
+ * @returns The sanitized `${baseUrl}${map}.jpg` URL
+ */
+export function mapImageUrl(baseUrl: string, map: string | null | undefined): string {
+  const safeMap = (map ?? '').replace(/[^a-zA-Z0-9_-]/g, '_');
+  return `${baseUrl}${safeMap}.jpg`;
 }

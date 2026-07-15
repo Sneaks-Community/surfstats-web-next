@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Users, Map as MapIcon, Trophy, Clock, Activity } from 'lucide-react';
-import { formatTime, formatDate } from '@/lib/utils';
+import { formatTime, formatDate, mapImageUrl } from '@/lib/utils';
 import { getStatsFromCache, getLatestCompletionsFromCache } from '@/lib/cache';
 import logger from '@/lib/logger';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
@@ -108,7 +108,7 @@ export default async function Home() {
                   <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-surface-hover/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <MapImage
-                        src={`${mapImagesUrl}${record.map}.jpg`}
+                        src={mapImageUrl(mapImagesUrl, record.map)}
                         alt={`${record.map} thumbnail`}
                         unoptimized
                         width={64}
@@ -156,7 +156,7 @@ export default async function Home() {
                   <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-surface-hover/50 transition-colors">
                     <div className="flex items-center gap-3">
                       <MapImage
-                        src={`${mapImagesUrl}${completion.map}.jpg`}
+                        src={mapImageUrl(mapImagesUrl, completion.map)}
                         alt={`${completion.map} thumbnail`}
                         unoptimized
                         width={64}

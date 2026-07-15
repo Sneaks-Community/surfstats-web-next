@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Map as MapIcon, Users, Layers, Target, Download } from 'lucide-react';
 import MapImage from '@/components/MapImage';
 import { validateMapName, validatePlayerName } from '@/lib/validators';
+import { mapImageUrl } from '@/lib/utils';
 import logger from '@/lib/logger';
 import MapRecordsTabs from './components/MapRecordsTabs';
 import TierBadge from '@/components/TierBadge';
@@ -88,7 +89,7 @@ export default async function MapProfilePage({
       <div className="bg-surface border border-border rounded-xl overflow-hidden relative">
         <div className="absolute inset-0 z-0 opacity-60">
           <MapImage
-            src={`${mapImagesUrl}${map.mapname}.jpg`}
+            src={mapImageUrl(mapImagesUrl, map.mapname)}
             alt={map.mapname}
             unoptimized
             fill
@@ -101,7 +102,7 @@ export default async function MapProfilePage({
         <div className="relative z-10 p-4 sm:p-6 flex flex-col md:flex-row gap-3 items-center md:items-end">
           <div className="relative h-48 w-full md:w-72 rounded-xl overflow-hidden border-4 border-border bg-surface-hover flex-shrink-0 shadow-2xl">
             <MapImage
-              src={`${mapImagesUrl}${map.mapname}.jpg`}
+              src={mapImageUrl(mapImagesUrl, map.mapname)}
               alt={map.mapname}
               unoptimized
               fill

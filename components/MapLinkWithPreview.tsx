@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import MapImage from './MapImage';
 import { useMapImagesUrl } from '@/lib/MapImagesUrlContext';
+import { mapImageUrl } from '@/lib/utils';
 
 interface MapLinkWithPreviewProps {
   mapname: string;
@@ -126,7 +127,7 @@ export default function MapLinkWithPreview({
   const thumbnail = isVisible && typeof document !== 'undefined' ? createPortal(
     <div style={thumbnailStyle}>
       <MapImage
-        src={`${mapImagesUrl}${mapname}.jpg`}
+        src={mapImageUrl(mapImagesUrl, mapname)}
         alt={mapname}
         unoptimized
         fill

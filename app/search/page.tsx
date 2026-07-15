@@ -3,6 +3,7 @@ import { Search as SearchIcon, Map as MapIcon, Users, ChevronRight } from 'lucid
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTierTextColor } from '@/lib/tierColors';
+import { mapImageUrl } from '@/lib/utils';
 import { validateSearchQuery, validatePlayerName } from '@/lib/validators';
 import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
 import { searchPlayersFromCache } from '@/lib/player-cache';
@@ -153,7 +154,7 @@ export default async function SearchPage({
                     <div className="flex items-center gap-4">
                       <div className="relative h-12 w-16 rounded overflow-hidden bg-surface-hover flex-shrink-0">
                         <MapImage
-                          src={`${mapImagesUrl}${map.mapname}.jpg`}
+                          src={mapImageUrl(mapImagesUrl, map.mapname)}
                           alt={map.mapname}
                           unoptimized
                           fill

@@ -5,6 +5,7 @@ import { Server, Users, ChevronDown, Clock } from 'lucide-react';
 import Link from 'next/link';
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
+import { mapImageUrl } from '@/lib/utils';
 import type { ServerStatus, Player } from '@/lib/cache';
 
 function formatTime(seconds?: number) {
@@ -117,7 +118,7 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
               <Link href={`/maps/${server.map}`} className="relative h-24 w-40 rounded-lg overflow-hidden border border-border/50 bg-surface-hover flex-shrink-0 hover:border-primary/50 transition-colors">
                 <MapImage
-                  src={`${mapImagesUrl}${server.map}.jpg`}
+                  src={mapImageUrl(mapImagesUrl, server.map)}
                   alt={server.map ?? 'Unknown Map'}
                   unoptimized
                   fill

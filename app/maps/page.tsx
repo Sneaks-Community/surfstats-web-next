@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import MapImage from '@/components/MapImage';
 import MapFilters from '@/components/MapFilters';
 import { getTierColor } from '@/lib/tierColors';
+import { mapImageUrl } from '@/lib/utils';
 import Pagination from '@/components/Pagination';
 import { type MapMetadata } from '@/lib/map-cache';
 import { getAllMapMetadataFromCache, getTierDistributionFromCache } from '@/lib/valkey-map-cache';
@@ -121,7 +122,7 @@ export default async function MapsPage({
             <Link href={`/maps/${map.mapname}`} key={map.mapname} className="group block bg-surface border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-colors">
               <div className="relative h-48 bg-surface-hover w-full overflow-hidden">
                 <MapImage
-                  src={`${mapImagesUrl}${map.mapname}.jpg`}
+                  src={mapImageUrl(mapImagesUrl, map.mapname)}
                   alt={map.mapname}
                   unoptimized
                   fill

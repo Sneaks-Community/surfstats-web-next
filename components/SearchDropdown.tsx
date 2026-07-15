@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Search, User, Map } from 'lucide-react';
 import { useMapImagesUrl } from '@/lib/MapImagesUrlContext';
+import { mapImageUrl } from '@/lib/utils';
 import { clientError } from '@/lib/client-logger';
 import { getErrorMessage, isAbortError } from '@/lib/errors';
 
@@ -283,7 +284,7 @@ export function SearchDropdown({
               </div>
               {results.maps.map((map, index) => {
                 const itemIndex = results.players.length + index;
-                const mapImageUrl = `${mapImagesUrl}${map.mapname.replace(/[^a-zA-Z0-9_]/g, '_')}.jpg`;
+                const imageSrc = mapImageUrl(mapImagesUrl, map.mapname);
                 return (
                   <Link
                     key={map.mapname}
@@ -298,7 +299,7 @@ export function SearchDropdown({
                   >
                     <div className="w-6 h-6 rounded bg-zinc-800 overflow-hidden shrink-0 relative">
                       <Image
-                        src={mapImageUrl}
+                        src={imageSrc}
                         alt=""
                         fill
                         sizes="24px"
