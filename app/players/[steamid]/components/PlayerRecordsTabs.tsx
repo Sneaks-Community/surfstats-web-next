@@ -2,9 +2,11 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Map as MapIcon, Target, Layers, Search, X, ArrowUpDown, ArrowUp, ArrowDown, CheckCircle, Circle } from 'lucide-react';
+import { Map as MapIcon, Target, Layers, CheckCircle, Circle } from 'lucide-react';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import Pagination from '@/components/Pagination';
+import SortIcon from '@/components/SortIcon';
+import RecordSearchInput from '@/components/RecordSearchInput';
 import { formatTime, formatDate, sortRecords, matchesQuery, parseIntParam, type SortDirection } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import TierBadge from '@/components/TierBadge';
@@ -70,18 +72,6 @@ type StatusFilter = 'finished' | 'incomplete';
 type SortField = 'map' | 'rank' | 'time' | 'wrDiff' | 'date' | 'tier' | 'wrTime' | 'mapType';
 
 const ITEMS_PER_PAGE = 20;
-
-// Sort icon component - extracted to avoid render-time creation
-const SortIcon = ({ field, sortField, sortDirection }: { field: SortField; sortField: SortField; sortDirection: SortDirection }) => {
-  if (sortField !== field) {
-    return <ArrowUpDown className="h-4 w-4 text-text-muted opacity-50" />;
-  }
-  return sortDirection === 'asc' ? (
-    <ArrowUp className="h-4 w-4 text-primary-500" />
-  ) : (
-    <ArrowDown className="h-4 w-4 text-primary-500" />
-  );
-};
 
 export default function PlayerRecordsTabs({
   maps,
@@ -474,24 +464,13 @@ export default function PlayerRecordsTabs({
 
       {/* Search Bar */}
       <div className="p-2 border-b border-border">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-          <input
-            type="text"
-            value={currentSearchQuery}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            placeholder={`Search ${activeTab}...`}
-            className="w-full pl-10 pr-10 py-2 bg-surface-hover border border-border rounded-lg text-text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          />
-          {currentSearchQuery && (
-            <button
-              onClick={clearSearch}
-              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-surface-active transition-colors"
-            >
-              <X className="h-4 w-4 text-text-muted" />
-            </button>
-          )}
-        </div>
+        <RecordSearchInput
+          variant="full"
+          value={currentSearchQuery}
+          onChange={handleSearchChange}
+          onClear={clearSearch}
+          placeholder={`Search ${activeTab}...`}
+        />
       </div>
 
       {/* Records List */}

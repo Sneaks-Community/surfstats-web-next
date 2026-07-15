@@ -2,10 +2,12 @@
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Trophy, Target, Layers, Search, ArrowUpDown, ArrowUp, ArrowDown, X } from 'lucide-react';
+import { Trophy, Target, Layers } from 'lucide-react';
 import Link from 'next/link';
 import Pagination from '@/components/Pagination';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
+import SortableTh from '@/components/SortableTh';
+import RecordSearchInput from '@/components/RecordSearchInput';
 import { formatTime, formatDate, sortRecords, matchesQuery, parseIntParam, type SortDirection } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import { useDebounce } from '@/hooks/useDebounce';
@@ -60,17 +62,28 @@ const MAX_STAGE_RECORDS = 100;
 // Sort types
 type SortField = 'rank' | 'player' | 'time' | 'speed' | 'wrDiff' | 'date';
 
-// Sort icon component (shared by map, bonus, and stages tabs) - extracted to avoid render-time creation
-const SortIcon = ({ field, sortField, sortDirection }: { field: SortField; sortField: SortField; sortDirection: SortDirection }) => {
-  if (sortField !== field) {
-    return <ArrowUpDown className="h-4 w-4 text-text-muted opacity-50" />;
-  }
-  return sortDirection === 'asc' ? (
-    <ArrowUp className="h-4 w-4 text-primary-500" />
-  ) : (
-    <ArrowDown className="h-4 w-4 text-primary-500" />
-  );
-};
+// Shared leaderboard header row for the map, bonus, and stages tables — the
+// three tabs render identical columns and differ only in the sort handler.
+const LeaderboardHeaderRow = ({
+  onSort,
+  sortField,
+  sortDirection,
+}: {
+  onSort: (field: SortField) => void;
+  sortField: SortField;
+  sortDirection: SortDirection;
+}) => (
+  <thead className="bg-surface/50">
+    <tr>
+      <SortableTh label="Rank" field="rank" className="w-24" onSort={onSort} sortField={sortField} sortDirection={sortDirection} />
+      <SortableTh label="Player" field="player" onSort={onSort} sortField={sortField} sortDirection={sortDirection} />
+      <SortableTh label="Time" field="time" align="right" onSort={onSort} sortField={sortField} sortDirection={sortDirection} />
+      <SortableTh label="Diff" field="wrDiff" align="right" onSort={onSort} sortField={sortField} sortDirection={sortDirection} />
+      <SortableTh label="Start Speed" field="speed" align="right" onSort={onSort} sortField={sortField} sortDirection={sortDirection} />
+      <SortableTh label="Date" field="date" align="right" onSort={onSort} sortField={sortField} sortDirection={sortDirection} />
+    </tr>
+  </thead>
+);
 
 // Format time difference from WR
 function formatTimeDiff(time: number, wrTime: number | null): string {
@@ -779,74 +792,32 @@ export default function MapRecordsTabs({
 
           {/* Search for Map tab */}
           {activeTab === 'map' && (
-            <div className="relative flex-1 max-w-xs">
-              <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                <Search className="h-3.5 w-3.5 text-text-placeholder" />
-              </div>
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => handleSearchChange(e.target.value)}
-                className="block w-full pl-10 pr-8 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text placeholder-text-placeholder focus:outline-none focus:bg-surface focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
-                placeholder="Search players..."
-              />
-              {searchQuery && (
-                <button
-                  onClick={clearSearch}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-placeholder hover:text-text"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            <RecordSearchInput
+              value={searchQuery}
+              onChange={handleSearchChange}
+              onClear={clearSearch}
+              placeholder="Search players..."
+            />
           )}
 
           {/* Search for Bonus tab */}
           {activeTab === 'bonus' && (
-            <div className="relative flex-1 max-w-xs">
-              <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                <Search className="h-3.5 w-3.5 text-text-placeholder" />
-              </div>
-              <input
-                type="text"
-                value={bonusSearchQuery}
-                onChange={(e) => handleBonusSearchChange(e.target.value)}
-                className="block w-full pl-10 pr-8 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text placeholder-text-placeholder focus:outline-none focus:bg-surface focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
-                placeholder="Search players..."
-              />
-              {bonusSearchQuery && (
-                <button
-                  onClick={clearBonusSearch}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-placeholder hover:text-text"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            <RecordSearchInput
+              value={bonusSearchQuery}
+              onChange={handleBonusSearchChange}
+              onClear={clearBonusSearch}
+              placeholder="Search players..."
+            />
           )}
 
           {/* Search for Stages tab */}
           {activeTab === 'stages' && (
-            <div className="relative flex-1 max-w-xs">
-              <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                <Search className="h-3.5 w-3.5 text-text-placeholder" />
-              </div>
-              <input
-                type="text"
-                value={stageSearchQuery}
-                onChange={(e) => handleStageSearchChange(e.target.value)}
-                className="block w-full pl-10 pr-8 py-2 border border-border rounded-md leading-5 bg-background-secondary text-text placeholder-text-placeholder focus:outline-none focus:bg-surface focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
-                placeholder="Search players..."
-              />
-              {stageSearchQuery && (
-                <button
-                  onClick={clearStageSearch}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-text-placeholder hover:text-text"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            <RecordSearchInput
+              value={stageSearchQuery}
+              onChange={handleStageSearchChange}
+              onClear={clearStageSearch}
+              placeholder="Search players..."
+            />
           )}
         </div>
 
@@ -903,70 +874,7 @@ export default function MapRecordsTabs({
         <>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border">
-              <thead className="bg-surface/50">
-                <tr>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider w-24 cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('rank')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Rank
-                      <SortIcon field="rank" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('player')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Player
-                      <SortIcon field="player" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('time')}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Time
-                      <SortIcon field="time" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('wrDiff')}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Diff
-                      <SortIcon field="wrDiff" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('speed')}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Start Speed
-                      <SortIcon field="speed" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('date')}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Date
-                      <SortIcon field="date" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                </tr>
-              </thead>
+              <LeaderboardHeaderRow onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
               <tbody className="bg-surface divide-y divide-border">
                 {searchQuery.length > 0 && searchQuery.length < 3 ? (
                   <tr>
@@ -1028,70 +936,7 @@ export default function MapRecordsTabs({
         <>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border">
-              <thead className="bg-surface/50">
-                <tr>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider w-24 cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('rank')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Rank
-                      <SortIcon field="rank" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('player')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Player
-                      <SortIcon field="player" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('time')}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Time
-                      <SortIcon field="time" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('wrDiff')}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Diff
-                      <SortIcon field="wrDiff" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('speed')}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Start Speed
-                      <SortIcon field="speed" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleSort('date')}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Date
-                      <SortIcon field="date" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                </tr>
-              </thead>
+              <LeaderboardHeaderRow onSort={handleSort} sortField={sortField} sortDirection={sortDirection} />
               <tbody className="bg-surface divide-y divide-border">
                 {bonusSearchQuery.length > 0 && bonusSearchQuery.length < 3 ? (
                   <tr>
@@ -1164,70 +1009,7 @@ export default function MapRecordsTabs({
         <>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-border">
-              <thead className="bg-surface/50">
-                <tr>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider w-24 cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleStageSort('rank')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Rank
-                      <SortIcon field="rank" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleStageSort('player')}
-                  >
-                    <div className="flex items-center gap-2">
-                      Player
-                      <SortIcon field="player" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleStageSort('time')}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Time
-                      <SortIcon field="time" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleStageSort('wrDiff')}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Diff
-                      <SortIcon field="wrDiff" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleStageSort('speed')}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Start Speed
-                      <SortIcon field="speed" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                  <th
-                    scope="col"
-                    className="px-2 sm:px-4 py-2 text-right text-xs font-medium text-text-muted uppercase tracking-wider cursor-pointer hover:bg-surface-hover/50 transition-colors"
-                    onClick={() => handleStageSort('date')}
-                  >
-                    <div className="flex items-center gap-2 justify-end">
-                      Date
-                      <SortIcon field="date" sortField={sortField} sortDirection={sortDirection} />
-                    </div>
-                  </th>
-                </tr>
-              </thead>
+              <LeaderboardHeaderRow onSort={handleStageSort} sortField={sortField} sortDirection={sortDirection} />
               <tbody className="bg-surface divide-y divide-border">
                 {stageSearchQuery.length > 0 && stageSearchQuery.length < 3 ? (
                   <tr>
