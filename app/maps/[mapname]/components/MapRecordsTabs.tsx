@@ -462,15 +462,10 @@ export default function MapRecordsTabs({
     if (searchQuery) params.set('q', searchQuery);
     if (bonusSearchQuery) params.set('bq', bonusSearchQuery);
     if (stageSearchQuery) params.set('sq', stageSearchQuery);
-    // Stages tab: sorting is done server-side
-    if (activeTab === 'stages') {
-      if (sortField !== 'rank') params.set('sort', sortField);
-      if (sortDirection !== 'asc') params.set('order', sortDirection);
-    } else {
-      // Map tab uses client-side sorting
-      if (sortField !== 'rank') params.set('sort', sortField);
-      if (sortDirection !== 'asc') params.set('dir', sortDirection);
-    }
+    // Sort state is shared across tabs and always written as sort/dir so it
+    // round-trips through the URL initializer above (which only reads `dir`).
+    if (sortField !== 'rank') params.set('sort', sortField);
+    if (sortDirection !== 'asc') params.set('dir', sortDirection);
 
     router.replace(`?${params.toString()}`, { scroll: false });
     // eslint-disable-next-line react-hooks/exhaustive-deps
