@@ -1,6 +1,6 @@
 import type { RowDataPacket } from 'mysql2';
 import Link from 'next/link';
-import { getSteamProfileUrl } from '@/lib/steam';
+import { getSteamProfileUrl, type SteamAvatarSet } from '@/lib/steam';
 import { Trophy, Activity, Clock } from 'lucide-react';
 import Image from 'next/image';
 import { formatDate } from '@/lib/utils';
@@ -95,7 +95,7 @@ interface PlayerProfileContentProps {
     totalBonuses: number;
     totalStages: number;
   };
-  steamAvatars: Map<string, { avatar: string; avatarmedium: string; avatarfull: string }> | null;
+  steamAvatars: Map<string, SteamAvatarSet> | null;
   playtimeData: {
     totalSeconds: number;
   } | null;

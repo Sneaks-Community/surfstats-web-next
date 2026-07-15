@@ -28,6 +28,13 @@ interface SteamWrapperResponse {
   response?: SteamAPIResponse;
 }
 
+/** The three avatar sizes returned to callers for a Steam profile. */
+export interface SteamAvatarSet {
+  avatar: string;
+  avatarmedium: string;
+  avatarfull: string;
+}
+
 /**
  * Fetch player data directly from Steam API
  * This is the core function that makes the actual Steam API call
@@ -95,8 +102,8 @@ const STEAM_AVATAR_TTL = 604800; // 7 days
  * @param steamIds - Array of SteamIDs to fetch avatars for
  * @returns Map of original SteamID to avatar data
  */
-export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map<string, { avatar: string; avatarmedium: string; avatarfull: string }>> {
-  const result = new Map<string, { avatar: string; avatarmedium: string; avatarfull: string }>();
+export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map<string, SteamAvatarSet>> {
+  const result = new Map<string, SteamAvatarSet>();
   
   if (steamIds.length === 0) {
     return result;
@@ -129,7 +136,7 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
     const uncachedSteamIds: string[] = [];
     for (const steamId of steamIds) {
       const cacheKey = `surfstats:steam:avatar:${steamId}`;
-      const cached = await cacheGet<{ avatar: string; avatarmedium: string; avatarfull: string }>(cacheKey);
+      const cached = await cacheGet<SteamAvatarSet>(cacheKey);
       if (cached) {
         result.set(steamId, cached);
       } else {
