@@ -7,10 +7,6 @@ import { formatDate } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import CountryBadge from '@/components/CountryBadge';
 import { countryNameToCode } from '@/lib/countries';
-// Unused imports - kept for potential future use
-// import { getTotalsCached } from '@/lib/cache';
-// import { getPlayerTimeOnServer } from '@/lib/player-analytics';
-// import { getAllMapMetadata } from '@/lib/map-cache';
 import TierDistributionChart from './TierDistributionChart';
 import PlayerRecordsTabs from './PlayerRecordsTabs';
 import ProgressBar from '@/components/ProgressBar';

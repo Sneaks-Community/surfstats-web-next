@@ -8,7 +8,6 @@
 import 'server-only';
 import pool from './db';
 import type { RowDataPacket } from 'mysql2';
-import { cacheDelete } from './valkey-cache';
 import { cachedFetch } from './cached-fetch';
 import logger from './logger';
 import { getErrorMessage } from './errors';
@@ -207,15 +206,3 @@ export async function getPlayerProfileFromCache(steamid: string): Promise<Cached
   );
 }
 
-/**
- * Invalidate player profile cache
- * Called when a player completes a map/bonus/stage
- * 
- * @param steamid - The player's SteamID
- */
-export async function invalidatePlayerProfileCache(steamid: string): Promise<void> {
-  const cacheKey = `${PLAYER_PROFILE_KEY}:${steamid}`;
-  // Delete the cache key directly instead of setting with 0 TTL
-  await cacheDelete(cacheKey);
-  logger.debug(`[PlayerProfileCache] Invalidated cache for ${steamid}`);
-}

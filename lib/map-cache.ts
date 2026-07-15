@@ -126,22 +126,6 @@ export async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
 }
 
 /**
- * Get metadata for a single map from database
- */
-export async function getMapMetadataFromDb(mapname: string): Promise<MapMetadata | null> {
-  const allMetadata = await fetchAllMapMetadata();
-  return allMetadata.get(mapname) || null;
-}
-
-/**
- * Get all map names as an array
- */
-export async function getMapNames(): Promise<string[]> {
-  const allMetadata = await fetchAllMapMetadata();
-  return Array.from(allMetadata.keys());
-}
-
-/**
  * Get totals for progress bars (maps, bonuses, stages)
  */
 export async function getTotals(): Promise<{
@@ -164,19 +148,4 @@ export async function getTotals(): Promise<{
     totalBonuses,
     totalStages,
   };
-}
-
-/**
- * Get tier distribution (count of maps per tier)
- */
-export async function getTierDistribution(): Promise<Map<number, number>> {
-  const allMetadata = await fetchAllMapMetadata();
-  const distribution = new Map<number, number>();
-  
-  for (const map of allMetadata.values()) {
-    const count = distribution.get(map.tier) || 0;
-    distribution.set(map.tier, count + 1);
-  }
-  
-  return distribution;
 }

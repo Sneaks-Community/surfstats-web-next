@@ -1,5 +1,4 @@
 import 'server-only';
-import { cacheInvalidatePattern } from './valkey-cache';
 import { cachedFetch } from './cached-fetch';
 import { fetchServersFromGame } from './cache';
 import type { ServerStatus } from './cache';
@@ -16,11 +15,4 @@ const SERVER_CACHE_TTL = 30; // 30 seconds
  */
 export async function getServersFromCache(): Promise<ServerStatus[]> {
   return cachedFetch(SERVER_CACHE_KEY, SERVER_CACHE_TTL, fetchServersFromGame, { lock: true });
-}
-
-/**
- * Invalidate server cache
- */
-export async function invalidateServerCache(): Promise<void> {
-  await cacheInvalidatePattern('surfstats:server:*');
 }

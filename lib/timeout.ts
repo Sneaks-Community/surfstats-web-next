@@ -47,13 +47,3 @@ export async function withTimeout<T>(
     }
   }
 }
-
-/**
- * Creates a timeout promise that can be used with Promise.race
- * 
- * @param ms - Timeout in milliseconds
- * @param message - Error message if timeout occurs
- * @returns A promise that rejects after the specified time
- * 
- * @deprecated Use `withTimeout` instead for better cleanup
- */

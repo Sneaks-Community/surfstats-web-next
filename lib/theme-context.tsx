@@ -1,13 +1,12 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 
 export type Theme = 'light' | 'dark' | 'system';
 
 interface ThemeContextValue {
   theme: Theme;
   setTheme: (theme: Theme) => void;
-  resolvedTheme: 'light' | 'dark';
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
@@ -51,11 +50,6 @@ export function ThemeProvider({
     return defaultTheme;
   });
 
-  // Compute resolved theme from theme setting
-  const resolvedTheme = useMemo(() => {
-    return theme === 'system' ? getSystemTheme() : theme;
-  }, [theme]);
-
   // Apply theme to DOM whenever it changes
   useEffect(() => {
     const root = document.documentElement;
@@ -90,7 +84,7 @@ export function ThemeProvider({
   }, []);
 
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, resolvedTheme }}>
+    <ThemeContext.Provider value={{ theme, setTheme }}>
       {children}
     </ThemeContext.Provider>
   );

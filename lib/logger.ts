@@ -33,19 +33,4 @@ export const logger = pino({
   timestamp: pino.stdTimeFunctions.isoTime,
 });
 
-/**
- * Child logger factory for creating context-specific loggers
- * Use this to add request-specific or module-specific context
- *
- * @param bindings - Key-value pairs to include in all child logger messages
- * @returns A child logger instance
- *
- * @example
- * const requestLogger = logger.child({ requestId: '123' });
- * requestLogger.info('Processing request');
- */
-export const createChildLogger = (bindings: Record<string, unknown>) => {
-  return logger.child(bindings);
-};
-
 export default logger;

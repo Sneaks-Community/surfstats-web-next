@@ -306,13 +306,6 @@ export async function getRecentRecordsFromCache(): Promise<RecentRecords[]> {
   );
 }
 
-/**
- * Invalidate recent records cache (called when new completion occurs)
- */
-export async function invalidateRecentRecordsCache(): Promise<void> {
-  await cacheSet(DASHBOARD_RECENT_RECORDS_KEY, [], 0); // Set with 0 TTL to expire immediately
-}
-
 // =========================
 // LATEST COMPLETIONS CACHE
 // =========================

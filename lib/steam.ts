@@ -215,18 +215,6 @@ export function convertSteamId2ToSteamId3Numeric(steamId: string): number | null
 }
 
 /**
- * Convert SteamID3 numeric (Y component in [U:1:Y]) to SteamID2 format
- * @param steamId3Numeric - SteamID3 numeric value
- * @returns SteamID2 format string (e.g., STEAM_1:0:95515509)
- */
-export function convertSteamId3NumericToSteamId2(steamId3Numeric: number): string {
-  const z = Math.floor(steamId3Numeric / 2);
-  const y = steamId3Numeric % 2;
-
-  return `STEAM_1:${y}:${z}`;
-}
-
-/**
  * Generates a Steam community profile URL from a SteamID
  * @param steamId - Can be either STEAM_1:0:12345 format or already a SteamID64
  * @returns The Steam profile URL or null if the steamId is invalid

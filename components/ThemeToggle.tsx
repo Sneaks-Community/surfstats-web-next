@@ -14,7 +14,7 @@ const themeOptions = [
  * Theme toggle component with dropdown
  * Allows users to switch between light, dark, and system themes
  */
-export function ThemeToggle({ compact = false }: { compact?: boolean }) {
+export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -50,7 +50,7 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-surface border border-border hover:bg-surface-hover transition-colors ${compact ? 'text-sm' : ''}`}
+        className="flex items-center gap-1.5 px-2 py-1.5 rounded-md bg-surface border border-border hover:bg-surface-hover transition-colors text-sm"
         aria-label="Select theme"
         aria-expanded={isOpen}
         aria-haspopup="listbox"
@@ -102,5 +102,5 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
  * Compact theme toggle for mobile/navigation
  */
 export function ThemeToggleCompact() {
-  return <ThemeToggle compact />;
+  return <ThemeToggle />;
 }

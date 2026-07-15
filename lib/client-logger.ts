@@ -17,24 +17,3 @@ export function clientError(message: string, error?: unknown): void {
     console.error(`[Client] ${message}`, error || '');
   }
 }
-
-/**
- * Log a debug message in development mode only
- * @param message - The debug message to log
- */
-export function clientDebug(message: string): void {
-  if (isDevelopment) {
-    console.debug(`[Client] ${message}`);
-  }
-}
-
-/**
- * Log an info message in development mode only
- * @param message - The info message to log
- */
-export function clientInfo(message: string): void {
-  if (isDevelopment) {
-    // eslint-disable-next-line no-console
-    console.info(`[Client] ${message}`);
-  }
-}
