@@ -481,3 +481,94 @@ export async function getPercentileTimesFromCache(
     }
   );
 }
+
+/**
+ * Aggregated chart data for a map's stats grid.
+ *
+ * Shared by the map page (server-rendered → passed as props to MapChartGrid)
+ * and the `/api/maps/[mapname]/stats` route, so both compose the same shape
+ * from the same underlying cached sub-fetches.
+ */
+export interface MapChartData {
+  completionsOverTime: Array<{ date: string; count: number }>;
+  timeOnMapData: Array<{ date: string; totalDuration: number }>;
+  checkpointAvgTimes: Array<{ checkpoint: number; avgTime: number; sampleSize: number }>;
+  wrCheckpointTimes?: Array<{ checkpoint: number; time: number }>;
+  finishTime?: { avgTime: number | null; wrTime: number | null };
+  bonusCompletionsOverTime: Record<number, Array<{ date: string; count: number }>>;
+  isStageMap: boolean;
+  percentileTimes: {
+    wrTime: number | null;
+    p1Time: number | null;
+    p10Time: number | null;
+    medianTime: number | null;
+    avgTime: number | null;
+  } | null;
+}
+
+/**
+ * Compose the full chart-data payload for a map from its cached sub-fetches.
+ * Returns empty series (but the correct `isStageMap`) for maps with no completions.
+ */
+export async function getMapChartDataFromCache(mapname: string): Promise<MapChartData> {
+  const validMapname = validateMapName(mapname);
+  if (!validMapname) {
+    return {
+      completionsOverTime: [],
+      timeOnMapData: [],
+      checkpointAvgTimes: [],
+      bonusCompletionsOverTime: {},
+      isStageMap: false,
+      percentileTimes: null,
+    };
+  }
+
+  // Map metadata (cached, 1h TTL) — includes completions count, checkpoints, stages.
+  const mapMetadata = await getMapMetadataFromCache(validMapname);
+  const totalCompletions = mapMetadata?.completions || 0;
+  const checkpoints = mapMetadata?.checkpoints || 0;
+  const stages = mapMetadata?.stages || 0;
+  // For staged maps, stages double as checkpoints (stored in ck_checkpoints).
+  const maxCheckpoint = checkpoints > 0 ? checkpoints : stages;
+  const isStageMap = stages > 0;
+
+  if (totalCompletions === 0) {
+    return {
+      completionsOverTime: [],
+      timeOnMapData: [],
+      checkpointAvgTimes: [],
+      bonusCompletionsOverTime: {},
+      isStageMap,
+      percentileTimes: null,
+    };
+  }
+
+  const [
+    completionsOverTime,
+    timeOnMapData,
+    { checkpointAvgTimes },
+    wrCheckpointTimes,
+    finishTime,
+    bonusCompletionsOverTime,
+    percentileTimes,
+  ] = await Promise.all([
+    getCompletionsOverTimeFromCache(validMapname),
+    getTimeOnMapDataFromCache(validMapname),
+    getCheckpointStatsFromCache(validMapname),
+    getWRCheckpointTimesFromCache(validMapname, maxCheckpoint),
+    getFinishTimeDataFromCache(validMapname),
+    getBonusCompletionsOverTimeFromCache(validMapname),
+    getPercentileTimesFromCache(validMapname),
+  ]);
+
+  return {
+    completionsOverTime,
+    timeOnMapData,
+    checkpointAvgTimes,
+    wrCheckpointTimes,
+    finishTime,
+    bonusCompletionsOverTime,
+    isStageMap,
+    percentileTimes,
+  };
+}

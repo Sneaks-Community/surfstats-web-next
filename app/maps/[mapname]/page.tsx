@@ -10,6 +10,7 @@ import TierBadge from '@/components/TierBadge';
 import MapChartGrid from './components/charts/MapChartGrid';
 import { getMapMetadataFromCache } from '@/lib/valkey-map-cache';
 import { getMapRecordsFromCache } from '@/lib/valkey-map-records-cache';
+import { getMapChartDataFromCache } from '@/lib/valkey-map-stats-cache';
 
 // Default page size - keeps cache entry under 2MB (each record ~200 bytes, 100 records ~20KB)
 const DEFAULT_PAGE_SIZE = 100;
@@ -56,9 +57,10 @@ export default async function MapProfilePage({
     );
   }
   
-  const [map, recordsData] = await Promise.all([
+  const [map, recordsData, chartData] = await Promise.all([
     getMapMetadataFromCache(validMapname),
-    getMapRecordsFromCache(validMapname, 1, DEFAULT_PAGE_SIZE)
+    getMapRecordsFromCache(validMapname, 1, DEFAULT_PAGE_SIZE),
+    getMapChartDataFromCache(validMapname)
   ]);
   
   logger.debug(`[Map Page] Map data for ${validMapname}: stages=${map?.stages}, checkpoints=${map?.checkpoints}`);
@@ -177,7 +179,7 @@ export default async function MapProfilePage({
       </div>
 
       {/* Chart Grid */}
-      <MapChartGrid mapname={validMapname} />
+      <MapChartGrid data={chartData} />
 
       {/* Leaderboard with Tabs */}
       <MapRecordsTabs

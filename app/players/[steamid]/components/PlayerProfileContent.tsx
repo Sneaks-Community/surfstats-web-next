@@ -7,11 +7,11 @@ import { formatDate } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import CountryBadge from '@/components/CountryBadge';
 import { countryNameToCode } from '@/lib/countries';
-import TierDistributionChart from './TierDistributionChart';
+import TierDistributionChart from './LazyTierDistributionChart';
 import PlayerRecordsTabs from './PlayerRecordsTabs';
 import ProgressBar from '@/components/ProgressBar';
 import PlayerTimeDisplay from './PlayerTimeDisplay';
-import WRPerformanceChart from './WRPerformanceChart';
+import WRPerformanceChart from './LazyWRPerformanceChart';
 import ActivityHeatmapChart from './ActivityHeatmapChart';
 
 // Type definitions for player records
