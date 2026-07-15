@@ -4,8 +4,13 @@ import { Navigation } from '@/components/navigation';
 import { MapImagesUrlProvider } from '@/lib/MapImagesUrlContext';
 import { ThemeProvider } from '@/lib/theme-context';
 import { generateThemeStyles } from '@/lib/theme-config';
+import { validateEnv } from '@/lib/env';
 import { startServerBackgroundRefresh } from '@/lib/server-background-refresh';
 import { startMapGraphPrecache } from '@/lib/map-graph-precache';
+
+// Validate environment configuration at startup (fail fast on missing required
+// vars; warn on unset optional features).
+validateEnv();
 
 // Start background server refresh on server startup
 startServerBackgroundRefresh();
