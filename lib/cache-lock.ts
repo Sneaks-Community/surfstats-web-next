@@ -98,11 +98,13 @@ export const cacheLock = new CacheLock();
 /**
  * Probabilistic early expiration helper.
  * 
- * Randomly expires a subset of cache entries to prevent synchronized
- * cache expiration storms (cache stampede).
+ * Returns true with the given probability. Driven by `cachedFetch`'s
+ * early-refresh logic: as a hot key nears expiry, callers pass a
+ * rising probability so that some request refreshes the entry in the
+ * background *before* it expires, avoiding a synchronized-miss stampede.
  * 
- * @param probability - Probability of early expiration (0-1, default 0.1 = 10%)
- * @returns true if should expire early, false otherwise
+ * @param probability - Probability of returning true (0-1, default 0.1 = 10%)
+ * @returns true if the entry should be refreshed early, false otherwise
  */
 export function shouldExpireEarly(probability = 0.1): boolean {
   return Math.random() < probability;
