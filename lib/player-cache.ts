@@ -154,8 +154,13 @@ export async function getPlayersFromCache(
   total: number;
   totalPages: number;
 }> {
-  const cacheKey = `${PLAYERS_LIST_KEY}:${page}:${search}`;
-  
+  // Normalize inputs before they reach the cache key so malformed/unbounded
+  // values can't spawn arbitrary distinct redis keys
+  const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
+  const safeSearch = validateSearchQuery(search);
+
+  const cacheKey = `${PLAYERS_LIST_KEY}:${safePage}:${safeSearch}`;
+
   const cached = await cacheGet<{
     players: PlayerRank[];
     total: number;
@@ -166,7 +171,7 @@ export async function getPlayersFromCache(
     return cached;
   }
 
-  const result = await fetchPlayersInternal(page, search);
+  const result = await fetchPlayersInternal(safePage, safeSearch);
 
   await cacheSet(cacheKey, result, PLAYERS_LIST_TTL);
 
