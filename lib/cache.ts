@@ -4,7 +4,8 @@ import type { RowDataPacket } from 'mysql2';
 import { GameDig } from 'gamedig';
 import logger from '@/lib/logger';
 import { cacheGet, cacheSet } from './valkey-cache';
-import { cacheLock, shouldExpireEarly } from './cache-lock';
+import { cacheLock } from './cache-lock';
+import { cachedFetch } from './cached-fetch';
 import { getErrorMessage } from './errors';
 
 // Types
@@ -285,60 +286,24 @@ export async function getStatsFromCache(): Promise<{
  * Get static dashboard stats from Valkey cache
  */
 export async function getDashboardStatsFromCache(): Promise<DashboardStats> {
-  const cached = await cacheGet<DashboardStats>(DASHBOARD_STATS_KEY);
-
-  if (cached) {
-    return cached;
-  }
-
-  // Probabilistic early expiration
-  if (shouldExpireEarly(0.1)) {
-    logger.debug(`[StatsCache] Early expiration triggered for stats`);
-  }
-
-  return cacheLock.acquire(DASHBOARD_STATS_KEY, async () => {
-    // Double-check after acquiring lock
-    const rechecked = await cacheGet<DashboardStats>(DASHBOARD_STATS_KEY);
-    if (rechecked) {
-      return rechecked;
-    }
-
-    const { stats } = await getStatsInternal();
-
-    await cacheSet(DASHBOARD_STATS_KEY, stats, DASHBOARD_STATS_TTL);
-
-    return stats;
-  });
+  return cachedFetch(
+    DASHBOARD_STATS_KEY,
+    DASHBOARD_STATS_TTL,
+    async () => (await getStatsInternal()).stats,
+    { lock: true }
+  );
 }
 
 /**
  * Get recent records from Valkey cache with shorter TTL
  */
 export async function getRecentRecordsFromCache(): Promise<RecentRecords[]> {
-  const cached = await cacheGet<RecentRecords[]>(DASHBOARD_RECENT_RECORDS_KEY);
-
-  if (cached) {
-    return cached;
-  }
-
-  // Probabilistic early expiration
-  if (shouldExpireEarly(0.15)) {
-    logger.debug(`[StatsCache] Early expiration triggered for recent records`);
-  }
-
-  return cacheLock.acquire(DASHBOARD_RECENT_RECORDS_KEY, async () => {
-    // Double-check after acquiring lock
-    const rechecked = await cacheGet<RecentRecords[]>(DASHBOARD_RECENT_RECORDS_KEY);
-    if (rechecked) {
-      return rechecked;
-    }
-
-    const { recentRecords } = await getStatsInternal();
-
-    await cacheSet(DASHBOARD_RECENT_RECORDS_KEY, recentRecords, DASHBOARD_RECENT_RECORDS_TTL);
-
-    return recentRecords;
-  });
+  return cachedFetch(
+    DASHBOARD_RECENT_RECORDS_KEY,
+    DASHBOARD_RECENT_RECORDS_TTL,
+    async () => (await getStatsInternal()).recentRecords,
+    { lock: true }
+  );
 }
 
 /**
@@ -443,47 +408,8 @@ export async function getLatestCompletionsFromCache(): Promise<
     bonus: number | null;
   }>
 > {
-  const cached = await cacheGet<Array<{
-    steamid: string;
-    name: string;
-    runtime: number;
-    map: string;
-    date: string;
-    type: string;
-    bonus: number | null;
-  }>>(LATEST_COMPLETIONS_KEY);
-
-  if (cached) {
-    return cached;
-  }
-
-  // Probabilistic early expiration to prevent cache stampede
-  if (shouldExpireEarly(0.1)) {
-    logger.debug(`[CompletionsCache] Early expiration triggered`);
-  }
-
-  // Use cache lock to prevent concurrent database queries
-  return cacheLock.acquire(LATEST_COMPLETIONS_KEY, async () => {
-    // Double-check cache after acquiring lock
-    const rechecked = await cacheGet<Array<{
-      steamid: string;
-      name: string;
-      runtime: number;
-      map: string;
-      date: string;
-      type: string;
-      bonus: number | null;
-    }>>(LATEST_COMPLETIONS_KEY);
-    
-    if (rechecked) {
-      return rechecked;
-    }
-
-    const completions = await getLatestCompletionsInternal();
-
-    await cacheSet(LATEST_COMPLETIONS_KEY, completions, LATEST_COMPLETIONS_TTL);
-
-    return completions;
+  return cachedFetch(LATEST_COMPLETIONS_KEY, LATEST_COMPLETIONS_TTL, getLatestCompletionsInternal, {
+    lock: true,
   });
 }
 
@@ -517,21 +443,7 @@ export async function getTotalsFromCache(): Promise<{
   totalBonuses: number;
   totalStages: number;
 }> {
-  const cached = await cacheGet<{
-    totalMaps: number;
-    totalBonuses: number;
-    totalStages: number;
-  }>(TOTALS_KEY);
-
-  if (cached) {
-    return cached;
-  }
-
-  const totals = await fetchTotalsInternal();
-
-  await cacheSet(TOTALS_KEY, totals, TOTALS_TTL);
-
-  return totals;
+  return cachedFetch(TOTALS_KEY, TOTALS_TTL, fetchTotalsInternal);
 }
 
 // ============================================================

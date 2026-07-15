@@ -8,8 +8,8 @@
 import 'server-only';
 import pool from './db';
 import type { RowDataPacket } from 'mysql2';
-import { cacheGet, cacheSet, cacheDelete } from './valkey-cache';
-import { cacheLock, shouldExpireEarly } from './cache-lock';
+import { cacheDelete } from './valkey-cache';
+import { cachedFetch } from './cached-fetch';
 import logger from './logger';
 import { getErrorMessage } from './errors';
 
@@ -197,40 +197,14 @@ async function getPlayerProfileInternal(steamid: string): Promise<CachedPlayerPr
  * @returns Cached player profile or null if player not found
  */
 export async function getPlayerProfileFromCache(steamid: string): Promise<CachedPlayerProfile | null> {
-  const cacheKey = `${PLAYER_PROFILE_KEY}:${steamid}`;
-
-  const cached = await cacheGet<CachedPlayerProfile>(cacheKey);
-
-  if (cached) {
-    logger.debug(`[PlayerProfileCache] Cache hit for ${steamid}`);
-    return cached;
-  }
-
-  logger.debug(`[PlayerProfileCache] Cache miss for ${steamid}`);
-
-  // Probabilistic early expiration to prevent cache stampede
-  if (shouldExpireEarly(0.1)) {
-    logger.debug(`[PlayerProfileCache] Early expiration triggered for ${steamid}`);
-  }
-
-  // Use cache lock to prevent concurrent database queries
-  return cacheLock.acquire(cacheKey, async () => {
-    // Double-check cache after acquiring lock
-    const rechecked = await cacheGet<CachedPlayerProfile>(cacheKey);
-    if (rechecked) {
-      logger.debug(`[PlayerProfileCache] Cache hit after lock for ${steamid}`);
-      return rechecked;
-    }
-
-    const profile = await getPlayerProfileInternal(steamid);
-
-    if (profile) {
-      await cacheSet(cacheKey, profile, PLAYER_PROFILE_TTL);
-      logger.debug(`[PlayerProfileCache] Cached profile for ${steamid} with TTL ${PLAYER_PROFILE_TTL}s`);
-    }
-
-    return profile;
-  });
+  // A null profile (player not found / query error) is never cached, so
+  // subsequent requests keep retrying rather than caching the absence.
+  return cachedFetch(
+    `${PLAYER_PROFILE_KEY}:${steamid}`,
+    PLAYER_PROFILE_TTL,
+    () => getPlayerProfileInternal(steamid),
+    { lock: true }
+  );
 }
 
 /**

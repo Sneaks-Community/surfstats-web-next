@@ -3,7 +3,7 @@ import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
 import { getCountryNamesFromCode, getCountryCodeFromName } from '@/lib/countries';
-import { cacheGet, cacheSet } from './valkey-cache';
+import { cachedFetch } from './cached-fetch';
 import { getErrorMessage } from './errors';
 
 /**
@@ -174,18 +174,10 @@ export async function getCountriesRankingFromCache(
   limit = 50
 ): Promise<{ countries: CountryRank[]; total: number; totalPages: number }> {
   const cacheKey = `${COUNTRIES_RANKING_KEY}:${sort}:${order}:${page}:${limit}`;
-  
-  const cached = await cacheGet<{ countries: CountryRank[]; total: number; totalPages: number }>(cacheKey);
 
-  if (cached) {
-    return cached;
-  }
-
-  const result = await getCountriesRankingInternal(sort, order, page, limit);
-
-  await cacheSet(cacheKey, result, COUNTRIES_RANKING_TTL);
-
-  return result;
+  return cachedFetch(cacheKey, COUNTRIES_RANKING_TTL, () =>
+    getCountriesRankingInternal(sort, order, page, limit)
+  );
 }
 
 /**
@@ -337,15 +329,5 @@ const COUNTRIES_STATS_TTL = 86400; // 24 hours
  * Used for displaying total countries count
  */
 export async function getCountriesStatsFromCache(): Promise<{ totalCountries: number; totalPlayers: number }> {
-  const cached = await cacheGet<{ totalCountries: number; totalPlayers: number }>(COUNTRIES_STATS_KEY);
-
-  if (cached) {
-    return cached;
-  }
-
-  const stats = await getCountriesStatsInternal();
-
-  await cacheSet(COUNTRIES_STATS_KEY, stats, COUNTRIES_STATS_TTL);
-
-  return stats;
+  return cachedFetch(COUNTRIES_STATS_KEY, COUNTRIES_STATS_TTL, getCountriesStatsInternal);
 }

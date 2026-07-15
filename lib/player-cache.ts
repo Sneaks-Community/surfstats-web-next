@@ -4,7 +4,7 @@ import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
 import { getPlayerCountFromCache } from '@/lib/valkey-registry-cache';
 import { validateSearchQuery } from './validators';
-import { cacheGet, cacheSet } from './valkey-cache';
+import { cachedFetch } from './cached-fetch';
 import { getErrorMessage } from './errors';
 
 /**
@@ -161,21 +161,7 @@ export async function getPlayersFromCache(
 
   const cacheKey = `${PLAYERS_LIST_KEY}:${safePage}:${safeSearch}`;
 
-  const cached = await cacheGet<{
-    players: PlayerRank[];
-    total: number;
-    totalPages: number;
-  }>(cacheKey);
-
-  if (cached) {
-    return cached;
-  }
-
-  const result = await fetchPlayersInternal(safePage, safeSearch);
-
-  await cacheSet(cacheKey, result, PLAYERS_LIST_TTL);
-
-  return result;
+  return cachedFetch(cacheKey, PLAYERS_LIST_TTL, () => fetchPlayersInternal(safePage, safeSearch));
 }
 
 /**
@@ -219,18 +205,8 @@ const PLAYER_SEARCH_TTL = 3600; // 1 hour
  */
 export async function searchPlayersFromCache(query: string): Promise<PlayerSearchResult[]> {
   const cacheKey = `${PLAYER_SEARCH_KEY}:${query}`;
-  
-  const cached = await cacheGet<PlayerSearchResult[]>(cacheKey);
 
-  if (cached) {
-    return cached;
-  }
-
-  const results = await searchPlayersInternal(query);
-
-  await cacheSet(cacheKey, results, PLAYER_SEARCH_TTL);
-
-  return results;
+  return cachedFetch(cacheKey, PLAYER_SEARCH_TTL, () => searchPlayersInternal(query));
 }
 
 /**
@@ -269,16 +245,6 @@ const PLAYER_NAME_TTL = 86400; // 24 hours
  */
 export async function getPlayerNameFromCache(steamid: string): Promise<{ name: string }> {
   const cacheKey = `${PLAYER_NAME_KEY}:${steamid}`;
-  
-  const cached = await cacheGet<{ name: string }>(cacheKey);
 
-  if (cached) {
-    return cached;
-  }
-
-  const result = await getPlayerNameInternal(steamid);
-
-  await cacheSet(cacheKey, result, PLAYER_NAME_TTL);
-
-  return result;
+  return cachedFetch(cacheKey, PLAYER_NAME_TTL, () => getPlayerNameInternal(steamid));
 }

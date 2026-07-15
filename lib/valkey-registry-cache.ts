@@ -1,9 +1,7 @@
 import 'server-only';
-import { cacheGet, cacheSet } from './valkey-cache';
+import { cachedFetch } from './cached-fetch';
 import { fetchRegistryData } from './registry-cache';
 import type { BonusGroup, StageGroup } from './registry-cache';
-import { cacheLock, shouldExpireEarly } from './cache-lock';
-import logger from './logger';
 
 const REGISTRY_DATA_KEY = 'surfstats:registry:data';
 const REGISTRY_CACHE_TTL = 3600; // 1 hour
@@ -18,47 +16,7 @@ export async function getAllRegistryDataFromCache(): Promise<{
   stages: StageGroup[];
   playerCount: number;
 }> {
-  const cached = await cacheGet<{
-    bonuses: BonusGroup[];
-    stages: StageGroup[];
-    playerCount: number;
-  }>(REGISTRY_DATA_KEY);
-
-  if (cached) {
-    logger.debug('[RegistryCache] Valkey cache hit for registry data');
-    return cached;
-  }
-
-  // Probabilistic early expiration to prevent synchronized cache expiration
-  if (shouldExpireEarly(0.1)) {
-    logger.debug('[RegistryCache] Early expiration triggered for registry data');
-  }
-
-  // Use cache lock to prevent concurrent database queries
-  return cacheLock.acquire(REGISTRY_DATA_KEY, async () => {
-    // Double-check cache after acquiring lock
-    const rechecked = await cacheGet<{
-      bonuses: BonusGroup[];
-      stages: StageGroup[];
-      playerCount: number;
-    }>(REGISTRY_DATA_KEY);
-    if (rechecked) {
-      logger.debug('[RegistryCache] Cache hit after lock acquisition');
-      return rechecked;
-    }
-
-    logger.debug('[RegistryCache] Cache miss, fetching from database...');
-
-    // Fetch from database
-    const data = await fetchRegistryData();
-
-    // Cache the result
-    await cacheSet(REGISTRY_DATA_KEY, data, REGISTRY_CACHE_TTL);
-
-    logger.debug(`[RegistryCache] Cached ${data.bonuses.length} bonuses, ${data.stages.length} stages, ${data.playerCount} players`);
-
-    return data;
-  });
+  return cachedFetch(REGISTRY_DATA_KEY, REGISTRY_CACHE_TTL, fetchRegistryData, { lock: true });
 }
 
 /**

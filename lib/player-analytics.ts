@@ -4,7 +4,7 @@ import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import { convertSteamId2ToSteamId3Numeric } from '@/lib/steam';
 import logger from '@/lib/logger';
-import { cacheGet, cacheSet } from './valkey-cache';
+import { cachedFetch } from './cached-fetch';
 import { getErrorMessage } from './errors';
 
 // Check if analytics database is configured (env vars are set)
@@ -81,20 +81,9 @@ export async function getPlayerTimeOnServerFromCache(
   steamId: string
 ): Promise<PlayerTimeResult | null> {
   const cacheKey = `${PLAYER_TIME_KEY}:${steamId}`;
-  
-  const cached = await cacheGet<PlayerTimeResult>(cacheKey);
 
-  if (cached) {
-    return cached;
-  }
-
-  const result = await getPlayerTimeOnServerInternal(steamId);
-
-  if (result) {
-    await cacheSet(cacheKey, result, PLAYER_TIME_TTL);
-  }
-
-  return result;
+  // A null result (analytics unavailable / invalid id / error) is not cached.
+  return cachedFetch(cacheKey, PLAYER_TIME_TTL, () => getPlayerTimeOnServerInternal(steamId));
 }
 
 /**
@@ -285,20 +274,9 @@ export async function getPerformanceTrendFromCache(
   steamId: string
 ): Promise<PerformanceTrendResult[] | null> {
   const cacheKey = `${PERFORMANCE_TREND_KEY}:${steamId}`;
-  
-  const cached = await cacheGet<PerformanceTrendResult[]>(cacheKey);
-  
-  if (cached !== null) {
-    return cached;
-  }
-  
-  const result = await getPerformanceTrendInternal(steamId);
-  
-  if (result !== null) {
-    await cacheSet(cacheKey, result, PERFORMANCE_TREND_TTL);
-  }
-  
-  return result;
+
+  // A null result (query error) is not cached.
+  return cachedFetch(cacheKey, PERFORMANCE_TREND_TTL, () => getPerformanceTrendInternal(steamId));
 }
 
 // Activity Heatmap Data Interface
@@ -410,17 +388,6 @@ export async function getActivityHeatmapFromCache(
 ): Promise<HeatmapDataPoint[] | null> {
   const cacheKey = `${ACTIVITY_HEATMAP_KEY}:${steamId}`;
 
-  const cached = await cacheGet<HeatmapDataPoint[]>(cacheKey);
-
-  if (cached !== null) {
-    return cached;
-  }
-
-  const result = await getPlayerActivityHeatmapInternal(steamId);
-
-  if (result !== null) {
-    await cacheSet(cacheKey, result, ACTIVITY_HEATMAP_TTL);
-  }
-
-  return result;
+  // A null result (analytics unavailable / invalid id / error) is not cached.
+  return cachedFetch(cacheKey, ACTIVITY_HEATMAP_TTL, () => getPlayerActivityHeatmapInternal(steamId));
 }
