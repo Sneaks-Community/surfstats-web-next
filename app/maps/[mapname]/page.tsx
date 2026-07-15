@@ -78,11 +78,8 @@ export default async function MapProfilePage({
   }
   
   const leaderboard = recordsData.leaderboard;
-  const bonuses = recordsData.bonuses;
-  const stages = recordsData.stages;
   const total = recordsData.counts.leaderboardTotal;
-  const wr_time = recordsData.wr_time;
-  
+
   const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
 
   return (
@@ -185,12 +182,9 @@ export default async function MapProfilePage({
       <MapRecordsTabs
         records={leaderboard}
         totalRecords={total}
-        bonusRecords={bonuses}
-        stageRecords={stages}
         mapname={map.mapname}
         numBonuses={map.bonuses}
         numStages={map.stages}
-        wr_time={wr_time}
       />
     </div>
   );

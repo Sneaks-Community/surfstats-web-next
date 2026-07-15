@@ -47,12 +47,9 @@ interface StageRecord {
 interface MapRecordsTabsProps {
   records: MapRecord[];
   totalRecords: number;
-  bonusRecords: BonusRecord[];
-  stageRecords: StageRecord[];
   mapname: string;
   numBonuses: number;
   numStages: number;
-  wr_time: number | null;
 }
 
 type TabType = 'map' | 'bonus' | 'stages';

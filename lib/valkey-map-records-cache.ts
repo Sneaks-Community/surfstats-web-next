@@ -192,15 +192,13 @@ export async function getMapRecordsFromCache(
   pageSize = 100
 ): Promise<{
   leaderboard: MapRecord[];
-  bonuses: BonusRecord[];
-  stages: StageRecord[];
   counts: RecordCounts;
   wr_time: number | null;
 }> {
   const validMapname = validateMapName(mapname);
   if (!validMapname) {
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
+    return { leaderboard: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
   }
 
   try {
@@ -209,14 +207,12 @@ export async function getMapRecordsFromCache(
 
     return {
       leaderboard,
-      bonuses: [],
-      stages: [],
       counts,
       wr_time,
     };
   } catch (error: unknown) {
     logger.error(`[Cache] Failed to fetch map records for ${validMapname}: ${getErrorMessage(error)}`);
-    return { leaderboard: [], bonuses: [], stages: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
+    return { leaderboard: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
   }
 }
 
