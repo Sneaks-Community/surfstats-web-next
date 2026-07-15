@@ -23,6 +23,9 @@ const MAX_CONCURRENT = 5;
 // Refresh timers per map (for background refresh)
 const refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
+// Guards startMapGraphPrecache against re-running if the module re-initializes.
+let precacheStarted = false;
+
 /**
  * Result type for all 8 graph data points of a single map.
  */
@@ -136,6 +139,12 @@ async function processBatch(mapNames: string[]): Promise<void> {
  * - Non-blocking: server is ready immediately
  */
 export function startMapGraphPrecache(): void {
+  if (precacheStarted) {
+    logger.debug('[MapGraphPrecache] Precache already started');
+    return;
+  }
+  precacheStarted = true;
+
   logger.info('[MapGraphPrecache] Starting map graph precache...');
 
   // Fire and forget - don't block server readiness
