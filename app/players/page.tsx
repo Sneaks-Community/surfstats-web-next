@@ -4,7 +4,7 @@ import { Search } from 'lucide-react';
 import { cache } from 'react';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import Pagination from '@/components/Pagination';
-import { formatDate } from '@/lib/utils';
+import { formatDate, parseIntParam } from '@/lib/utils';
 import { getPlayersFromCache } from '@/lib/player-cache';
 import { validateSearchQuery } from '@/lib/validators';
 import type { Metadata } from 'next';
@@ -23,7 +23,7 @@ export default async function PlayersPage({
 }) {
   const params = await searchParams;
   const q = validateSearchQuery(params.q);
-  const page = parseInt(params.page || '1', 10);
+  const page = parseIntParam(params.page);
   
   // Fetch players first to get steam IDs
   const { players, total, totalPages } = await getPlayersFromCache(page, q);
