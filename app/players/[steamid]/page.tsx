@@ -7,7 +7,7 @@ import { getTotalsFromCache } from '@/lib/cache';
 import { getPlayerTimeOnServerFromCache, getActivityHeatmapFromCache } from '@/lib/player-analytics';
 import { getTierDistributionFromCache } from '@/lib/valkey-map-cache';
 import { getPlayerNameFromCache } from '@/lib/player-cache';
-import { getPlayerProfileFromCache } from '@/lib/player-profile-cache';
+import { getPlayerProfileFromCache, getPlayerOverviewFromCache } from '@/lib/player-profile-cache';
 import logger from '@/lib/logger';
 import PlayerProfileContent from './components/PlayerProfileContent';
 import { getErrorMessage } from '@/lib/errors';
@@ -275,7 +275,8 @@ export default async function PlayerProfilePage({
   }
 
   // Group 2: Parallel fetch for remaining data
-  const [incompleteData, totals, steamAvatars, playtimeData, linearVsStagedRaw, activityHeatmap, tierDistribution] = await Promise.all([
+  const [overviewData, incompleteData, totals, steamAvatars, playtimeData, linearVsStagedRaw, activityHeatmap, tierDistribution] = await Promise.all([
+    getPlayerOverviewFromCache(validSteamId),
     getIncompleteRecords(validSteamId),
     getTotalsFromCache(),
     getSteamProfilesFromCache([decodedSteamId]),
@@ -284,6 +285,18 @@ export default async function PlayerProfilePage({
     getActivityHeatmapFromCache(validSteamId),
     getTierDistributionFromCache(),
   ]);
+
+  // Drive the header/stat cards from the cheap overview query. If it somehow
+  // fails while the (eager) profile is present, fall back to deriving the same
+  // shape from the full lists so the page still renders identically.
+  const overview = overviewData ?? {
+    player: data.player,
+    counts: {
+      maps: data.maps.length,
+      bonuses: data.bonuses.length,
+      stages: data.stages.length,
+    },
+  };
 
   // The tier ceiling is a property of the server's map pool, not the player.
   // Derive it from the server-wide tier distribution (falling back to the
@@ -319,6 +332,7 @@ export default async function PlayerProfilePage({
   return (
     <div className="space-y-4">
       <PlayerProfileContent
+        overview={overview}
         data={data}
         incompleteData={incompleteData}
         totals={totals}

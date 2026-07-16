@@ -8,6 +8,7 @@ import { validatePlayerName } from '@/lib/validators';
 import CountryBadge from '@/components/CountryBadge';
 import { countryNameToCode } from '@/lib/countries';
 import TierDistributionChart from './LazyTierDistributionChart';
+import PlayerPageTabs from './PlayerPageTabs';
 import PlayerRecordsTabs from './PlayerRecordsTabs';
 import ProgressBar from '@/components/ProgressBar';
 import PlayerTimeDisplay from './PlayerTimeDisplay';
@@ -41,6 +42,24 @@ interface StageRecord {
 }
 
 interface PlayerProfileContentProps {
+  // Cheap overview: identity + global rank + completion counts, sourced from
+  // getPlayerOverviewFromCache. Drives the profile header, stat cards, and
+  // progress bars (no dependence on the expensive full lists).
+  overview: {
+    player: {
+      steamid: string;
+      name: string;
+      country: string;
+      points: number;
+      lastseen: string;
+      rank: number;
+    };
+    counts: {
+      maps: number;
+      bonuses: number;
+      stages: number;
+    };
+  };
   data: {
     player: RowDataPacket | {
       steamid: string;
@@ -120,6 +139,7 @@ interface PlayerProfileContentProps {
 
 // eslint-disable-next-line @typescript-eslint/require-await -- Server component pattern, data fetching done at route handler level
 export default async function PlayerProfileContent({
+  overview,
   data,
   incompleteData,
   totals,
@@ -130,13 +150,17 @@ export default async function PlayerProfileContent({
   activityHeatmap,
   steamid,
 }: PlayerProfileContentProps) {
-  const { player, maps, bonuses, stages } = data;
+  const { maps, bonuses, stages } = data;
+  // Identity + stats come from the cheap overview query, not the expensive
+  // full lists. `counts` replaces the old `maps.length`/`bonuses.length`/etc.
+  const player = overview.player;
+  const counts = overview.counts;
 
-  return (
-    <div className="space-y-4">
-      {/* Profile Header */}
-      <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <div className="h-20 bg-gradient-to-r from-primary-900 to-background-secondary"></div>
+  // Profile header (identity + stat cards + progress bars). Always visible,
+  // above the Overview | Times tabs, so the player stays on screen on both tabs.
+  const profileHeader = (
+    <div className="bg-surface border border-border rounded-xl overflow-hidden">
+      <div className="h-20 bg-gradient-to-r from-primary-900 to-background-secondary"></div>
         <div className="px-4 sm:px-6 pb-4 relative">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end -mt-8 sm:-mt-10 mb-4">
             {(() => {
@@ -233,7 +257,7 @@ export default async function PlayerProfileContent({
             </div>
             <div className="bg-surface border border-border rounded-xl p-3 flex flex-col items-center justify-center">
               <Activity className="w-8 h-8 text-blue-500 mb-2" />
-              <span className="text-2xl font-bold text-text">{maps.length.toLocaleString()}</span>
+              <span className="text-2xl font-bold text-text">{counts.maps.toLocaleString()}</span>
               <span className="text-xs text-text-muted">Maps Completed</span>
             </div>
             <div className="bg-surface border border-border rounded-xl p-3 flex flex-col items-center justify-center">
@@ -246,16 +270,18 @@ export default async function PlayerProfileContent({
             ) : null}
             {/* Progress Bars - Stacked vertically in a single container to the right of Time Played */}
             <div className="bg-surface border border-border rounded-xl p-3 col-span-2 md:col-start-5 md:row-start-1 flex flex-col justify-center space-y-3">
-              <ProgressBar label="Map" current={maps.length} total={totals.totalMaps} color="blue" />
-              <ProgressBar label="Bonus" current={bonuses.length} total={totals.totalBonuses} color="purple" />
-              <ProgressBar label="Stage" current={stages.length} total={totals.totalStages} color="orange" />
+              <ProgressBar label="Map" current={counts.maps} total={totals.totalMaps} color="blue" />
+              <ProgressBar label="Bonus" current={counts.bonuses} total={totals.totalBonuses} color="purple" />
+              <ProgressBar label="Stage" current={counts.stages} total={totals.totalStages} color="orange" />
             </div>
           </div>
         </div>
       </div>
+  );
 
-      {/* Stats Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
+  // Analytical charts — shown under the Overview tab.
+  const overviewSection = (
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
         {/* Tier Distribution Radar - full width on mobile, 1st column on desktop */}
         <div className="lg:col-span-1 lg:row-span-1 h-[280px] min-h-[280px]">
           {linearVsStagedPerTier.length > 0 ? (
@@ -299,17 +325,26 @@ export default async function PlayerProfileContent({
           </div>
         </div>
       </div>
+  );
 
-      {/* Records Section - Tabbed Interface */}
-      <PlayerRecordsTabs
-        maps={maps as MapRecord[]}
-        bonuses={bonuses as BonusRecord[]}
-        stages={stages as StageRecord[]}
-        incompleteMaps={incompleteData.incompleteMaps}
-        incompleteBonuses={incompleteData.incompleteBonuses}
-        incompleteStages={incompleteData.incompleteStages}
-        steamid={steamid}
-      />
+  // Records Section — gated behind the top-level Times tab. Still props-fed /
+  // eager in this commit; a later commit converts it to fetch-on-activation.
+  const timesSection = (
+    <PlayerRecordsTabs
+      maps={maps as MapRecord[]}
+      bonuses={bonuses as BonusRecord[]}
+      stages={stages as StageRecord[]}
+      incompleteMaps={incompleteData.incompleteMaps}
+      incompleteBonuses={incompleteData.incompleteBonuses}
+      incompleteStages={incompleteData.incompleteStages}
+      steamid={steamid}
+    />
+  );
+
+  return (
+    <div className="space-y-4">
+      {profileHeader}
+      <PlayerPageTabs overview={overviewSection} times={timesSection} />
     </div>
   );
 }
