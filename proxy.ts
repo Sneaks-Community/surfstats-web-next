@@ -3,31 +3,51 @@ import type { NextRequest } from 'next/server';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { isTrustedRequest } from '@/lib/origin-guard';
 import { isCacheReady } from '@/lib/valkey';
+import { cacheUnavailableHtml } from '@/lib/cache-unavailable-page';
 
-// Proxy always runs on the Node.js runtime, so it can reuse the existing
-// node-redis Valkey client (unavailable on the Edge runtime).
+// Runs on the Node.js runtime so it can reuse the node-redis Valkey client
+// (unavailable on Edge). Matches all routes except Next internals and static
+// files (anything with a dot), so the cache-readiness gate covers pages too.
 export const config = {
-  matcher: '/api/:path*',
+  matcher: ['/((?!_next/static|_next/image|.*\\..*).*)'],
 };
 
 export async function proxy(request: NextRequest) {
-  // Keep the health endpoint always reachable for container/orchestrator probes.
-  if (request.nextUrl.pathname === '/api/health') {
+  const { pathname } = request.nextUrl;
+  const isApi = pathname.startsWith('/api/');
+
+  // Health endpoint reports status itself; never gate it.
+  if (pathname === '/api/health') {
     return NextResponse.next();
   }
 
-  // Lock the API to the site itself (and any allow-listed origins). Cheap and
-  // runs before rate limiting so cross-origin/naive scrapers never touch Valkey.
-  if (!isTrustedRequest(request)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  // Cache is a required layer for every route: without it we serve a graceful
+  // "temporarily unavailable" rather than run uncached DB queries on every hit.
+  if (!isCacheReady()) {
+    if (isApi) {
+      return NextResponse.json(
+        { error: 'Service temporarily unavailable' },
+        { status: 503, headers: { 'Retry-After': '5' } }
+      );
+    }
+    return new NextResponse(cacheUnavailableHtml(), {
+      status: 503,
+      headers: {
+        'content-type': 'text/html; charset=utf-8',
+        'Retry-After': '5',
+        'X-Robots-Tag': 'noindex',
+      },
+    });
   }
 
-  // Cache is a required layer; without it we don't serve uncached DB queries.
-  if (!isCacheReady()) {
-    return NextResponse.json(
-      { error: 'Service temporarily unavailable' },
-      { status: 503, headers: { 'Retry-After': '5' } }
-    );
+  // The remaining protections apply to the API only.
+  if (!isApi) {
+    return NextResponse.next();
+  }
+
+  // Lock the API to the site itself (and any allow-listed origins).
+  if (!isTrustedRequest(request)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const result = await checkRateLimit(request);
