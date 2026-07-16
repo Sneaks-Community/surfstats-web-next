@@ -147,6 +147,7 @@ export async function getWRCheckpointTimesFromCache(
       return checkpointData;
     },
     {
+      lock: true,
       onError: (error) => {
         logger.warn(`[Cache] Failed to fetch WR checkpoint times for ${mapname}: ${getErrorMessage(error)}`);
         return undefined;
@@ -207,6 +208,7 @@ export async function getCheckpointStatsFromCache(mapname: string): Promise<Chec
       return processCheckpointData(checkpointRows, maxCheckpoint);
     },
     {
+      lock: true,
       onError: (error) => {
         logger.warn(`[Cache] Failed to fetch checkpoint stats for ${mapname}: ${getErrorMessage(error)}`);
         return { checkpointAvgTimes: [] };
@@ -259,6 +261,7 @@ export async function getBonusCompletionsOverTimeFromCache(
       return bonusData;
     },
     {
+      lock: true,
       onError: (error) => {
         logger.warn(`[Cache] Failed to fetch bonus completions over time for ${mapname}: ${getErrorMessage(error)}`);
         return {};
@@ -298,6 +301,7 @@ export async function getCompletionsOverTimeFromCache(mapname: string): Promise<
       }));
     },
     {
+      lock: true,
       onError: (error) => {
         logger.warn(`[Cache] Failed to fetch completions over time for ${mapname}: ${getErrorMessage(error)}`);
         return [];
@@ -343,6 +347,7 @@ export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<
       });
     },
     {
+      lock: true,
       onError: (error) => {
         logger.warn(`[Cache] Failed to fetch time on map data for ${mapname}: ${getErrorMessage(error)}`);
         return [];
@@ -383,6 +388,7 @@ export async function getFinishTimeDataFromCache(mapname: string): Promise<{ avg
       };
     },
     {
+      lock: true,
       onError: (error) => {
         logger.warn(`[Cache] Failed to fetch finish time data for ${mapname}: ${getErrorMessage(error)}`);
         return { avgTime: null, wrTime: null };
@@ -474,6 +480,7 @@ export async function getPercentileTimesFromCache(
       };
     },
     {
+      lock: true,
       onError: (error) => {
         logger.warn(`[Cache] Failed to fetch percentile times for ${mapname}: ${getErrorMessage(error)}`);
         return null;
