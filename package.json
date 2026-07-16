@@ -11,7 +11,8 @@
     "start": "next start",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "clean": "next clean"
+    "clean": "next clean",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
