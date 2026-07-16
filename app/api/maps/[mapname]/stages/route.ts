@@ -27,11 +27,19 @@ export async function GET(
   const stage = parseIntParam(searchParams.get('stage'), { fallback: 1, min: 1 });
   const rawQuery = searchParams.get('q');
 
+  // Only stages with records exist in the registry; reject others up front so
+  // invalid values can't trigger the heavy DENSE_RANK query.
+  const stagesList = await getStagesByMapFromCache(validMapname);
+  const stageExists = stagesList.includes(stage);
+
   // Search mode: return all matching records (up to 100) with true global ranks
   if (rawQuery !== null) {
     const query = validateSearchQuery(rawQuery);
     if (!query || query.length < 3) {
       return NextResponse.json({ error: 'Search query must be at least 3 characters' }, { status: 400 });
+    }
+    if (!stageExists) {
+      return NextResponse.json({ stages: [], total: 0 }, { headers: { 'Cache-Control': SEARCH_CACHE_CONTROL } });
     }
     try {
       const { stages } = await searchStageRecordsFromCache(validMapname, stage, query);
@@ -49,6 +57,14 @@ export async function GET(
   const { page, pageSize } = parsePageParams(searchParams, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
   const offset = (page - 1) * pageSize;
 
+  if (!stageExists) {
+    return NextResponse.json({
+      stages: [],
+      stagesList,
+      pagination: { stage, page, pageSize, offset, total: 0, totalPages: 0 },
+    });
+  }
+
   try {
     const data = await getStageRecordsFromCache(
       validMapname,
@@ -58,9 +74,6 @@ export async function GET(
       pageSize,
       offset
     );
-
-    // Get stages list from Valkey cache
-    const stagesList = await getStagesByMapFromCache(validMapname);
 
     return NextResponse.json({
       ...data,

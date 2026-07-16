@@ -502,8 +502,9 @@ export async function searchLeaderboardRecordsFromCache(
     return { records: [], wr_time: null };
   }
 
-  const likePattern = `%${query}%`;
-  const key = `surfstats:map:${validMapname}:search:${query}`;
+  const normalizedQuery = query.toLowerCase();
+  const likePattern = `%${normalizedQuery}%`;
+  const key = `surfstats:map:${validMapname}:search:${normalizedQuery}`;
 
   const cached = await cacheGet<{ records: MapRecord[]; wr_time: number | null }>(key);
   if (cached) return cached;
@@ -559,8 +560,9 @@ export async function searchStageRecordsFromCache(
   const validMapname = validateMapName(mapname);
   if (!validMapname) return { stages: [] };
 
-  const likePattern = `%${query}%`;
-  const key = `surfstats:map:${validMapname}:stage:${stage}:search:${query}`;
+  const normalizedQuery = query.toLowerCase();
+  const likePattern = `%${normalizedQuery}%`;
+  const key = `surfstats:map:${validMapname}:stage:${stage}:search:${normalizedQuery}`;
 
   const cached = await cacheGet<{ stages: StageRecord[] }>(key);
   if (cached) return cached;
@@ -618,8 +620,9 @@ export async function searchBonusRecordsFromCache(
     return { records: [] };
   }
 
-  const likePattern = `%${query}%`;
-  const key = `surfstats:map:${validMapname}:bonus:${bonus}:search:${query}`;
+  const normalizedQuery = query.toLowerCase();
+  const likePattern = `%${normalizedQuery}%`;
+  const key = `surfstats:map:${validMapname}:bonus:${bonus}:search:${normalizedQuery}`;
 
   const cached = await cacheGet<{ records: BonusRecord[] }>(key);
   if (cached) return cached;

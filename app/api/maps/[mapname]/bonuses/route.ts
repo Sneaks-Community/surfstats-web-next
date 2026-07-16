@@ -21,11 +21,18 @@ export async function GET(
   const bonus = parseIntParam(searchParams.get('bonus'), { fallback: 1, min: 1 });
   const rawQuery = searchParams.get('q');
 
+  // Reject bonus zones that don't exist for this map before any heavy query.
+  const bonusGroupsList = await getBonusGroupsByMapFromCache(validMapname);
+  const bonusExists = bonusGroupsList.includes(bonus);
+
   // Search mode: return all matching records (up to 100) for this bonus zone
   if (rawQuery !== null) {
     const query = validateSearchQuery(rawQuery);
     if (!query || query.length < 3) {
       return NextResponse.json({ error: 'Search query must be at least 3 characters' }, { status: 400 });
+    }
+    if (!bonusExists) {
+      return NextResponse.json({ records: [], total: 0 }, { headers: { 'Cache-Control': SEARCH_CACHE_CONTROL } });
     }
 
     try {
@@ -41,9 +48,16 @@ export async function GET(
   // Pagination mode
   const { page, pageSize } = parsePageParams(searchParams, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
 
+  if (!bonusExists) {
+    return NextResponse.json({
+      bonuses: [],
+      bonusGroupsList,
+      pagination: { bonus, page, pageSize, offset: (page - 1) * pageSize, total: 0, totalPages: 0 },
+    });
+  }
+
   try {
     const data = await getBonusRecordsFromCache(validMapname, bonus, page, pageSize);
-    const bonusGroupsList = await getBonusGroupsByMapFromCache(validMapname);
 
     return NextResponse.json({
       ...data,

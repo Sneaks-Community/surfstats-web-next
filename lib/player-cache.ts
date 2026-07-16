@@ -204,9 +204,10 @@ const PLAYER_SEARCH_TTL = 3600; // 1 hour
  * Used by the search page to find players matching a query
  */
 export async function searchPlayersFromCache(query: string): Promise<PlayerSearchResult[]> {
-  const cacheKey = `${PLAYER_SEARCH_KEY}:${query}`;
+  const normalizedQuery = query.toLowerCase();
+  const cacheKey = `${PLAYER_SEARCH_KEY}:${normalizedQuery}`;
 
-  return cachedFetch(cacheKey, PLAYER_SEARCH_TTL, () => searchPlayersInternal(query));
+  return cachedFetch(cacheKey, PLAYER_SEARCH_TTL, () => searchPlayersInternal(normalizedQuery));
 }
 
 /**
