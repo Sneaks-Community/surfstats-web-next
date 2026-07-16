@@ -9,6 +9,13 @@ import { getErrorMessage } from './errors';
 export const SEARCH_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=30';
 
 /**
+ * Cache-Control for the paginated record/stage/bonus endpoints. Lets a shared
+ * cache/CDN absorb repeated identical page requests (aligns with the 5-min
+ * server-side cache); browsers still revalidate.
+ */
+export const RECORDS_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
+
+/**
  * Decode and validate a `mapname` route param.
  * @returns the validated mapname, or a 400 `NextResponse` the caller should return as-is.
  *   Usage: `const m = resolveMapnameParam(raw); if (m instanceof NextResponse) return m;`

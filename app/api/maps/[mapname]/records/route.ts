@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { validateSearchQuery } from '@/lib/validators';
-import { resolveMapnameParam, parsePageParams, apiError, SEARCH_CACHE_CONTROL } from '@/lib/api-utils';
+import { resolveMapnameParam, parsePageParams, apiError, SEARCH_CACHE_CONTROL, RECORDS_CACHE_CONTROL } from '@/lib/api-utils';
 import {
   getRecordCountsAndWRFromCache,
   getLeaderboardRecordsFromCache,
@@ -59,6 +59,8 @@ export async function GET(
         totalPages,
       },
       wr_time,
+    }, {
+      headers: { 'Cache-Control': RECORDS_CACHE_CONTROL },
     });
   } catch (error: unknown) {
     return apiError(`[API] Failed to fetch records for ${validMapname}`, error, 'Failed to fetch records');
