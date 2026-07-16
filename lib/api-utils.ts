@@ -1,7 +1,7 @@
 import 'server-only';
 import { NextResponse } from 'next/server';
 import logger from './logger';
-import { validateMapName } from './validators';
+import { validateMapName, validateSteamId } from './validators';
 import { parseIntParam } from './utils';
 import { getErrorMessage } from './errors';
 
@@ -24,6 +24,22 @@ export function resolveMapnameParam(raw: string): string | NextResponse {
   const valid = validateMapName(decodeURIComponent(raw));
   if (!valid) {
     return NextResponse.json({ error: 'Invalid map name' }, { status: 400 });
+  }
+  return valid;
+}
+
+/**
+ * Decode and validate a `steamid` route param.
+ * @returns the validated SteamID, or a 400 `NextResponse` the caller should return as-is.
+ *   Usage: `const s = resolveSteamIdParam(raw); if (s instanceof NextResponse) return s;`
+ *
+ * Unlike the player page (which falls back to the raw value), the API rejects
+ * an invalid SteamID outright so a malformed id never reaches a cache/DB query.
+ */
+export function resolveSteamIdParam(raw: string): string | NextResponse {
+  const valid = validateSteamId(decodeURIComponent(raw));
+  if (!valid) {
+    return NextResponse.json({ error: 'Invalid SteamID' }, { status: 400 });
   }
   return valid;
 }
