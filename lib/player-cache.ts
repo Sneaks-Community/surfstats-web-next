@@ -161,7 +161,7 @@ export async function getPlayersFromCache(
 
   const cacheKey = `${PLAYERS_LIST_KEY}:${safePage}:${safeSearch}`;
 
-  return cachedFetch(cacheKey, PLAYERS_LIST_TTL, () => fetchPlayersInternal(safePage, safeSearch), { lock: true });
+  return cachedFetch(cacheKey, PLAYERS_LIST_TTL, () => fetchPlayersInternal(safePage, safeSearch), { lock: true, expensive: true });
 }
 
 /**
@@ -207,7 +207,7 @@ export async function searchPlayersFromCache(query: string): Promise<PlayerSearc
   const normalizedQuery = query.toLowerCase();
   const cacheKey = `${PLAYER_SEARCH_KEY}:${normalizedQuery}`;
 
-  return cachedFetch(cacheKey, PLAYER_SEARCH_TTL, () => searchPlayersInternal(normalizedQuery), { lock: true });
+  return cachedFetch(cacheKey, PLAYER_SEARCH_TTL, () => searchPlayersInternal(normalizedQuery), { lock: true, expensive: true });
 }
 
 /**

@@ -1,6 +1,7 @@
 import 'server-only';
 import { cacheGetWithTtl, cacheSet } from './valkey-cache';
 import { cacheLock, shouldExpireEarly } from './cache-lock';
+import { withExpensiveQueryLimit } from './db-semaphore';
 import logger from './logger';
 
 /**
@@ -23,6 +24,12 @@ export interface CachedFetchOptions<T> {
    * scans, GameDig queries) that would otherwise stampede on a hot-key miss.
    */
   lock?: boolean;
+  /**
+   * Run `fetchFn` under the global expensive-query concurrency cap
+   * ({@link withExpensiveQueryLimit}) so a burst of misses can't exhaust the DB
+   * pool. Use for heavy window-function/scan queries.
+   */
+  expensive?: boolean;
   /**
    * Called if `fetchFn` throws. Return a fallback value to hand back to the
    * caller. The fallback is intentionally NOT cached, so a transient failure
@@ -135,7 +142,7 @@ export async function cachedFetch<T>(
       }
     }
 
-    const value = await fetchFn();
+    const value = await (options.expensive ? withExpensiveQueryLimit(fetchFn) : fetchFn());
 
     // Guard is meaningful at call sites where T is nullable (e.g. player
     // profiles resolve to null, WR checkpoints to undefined); the generic T

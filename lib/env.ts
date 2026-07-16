@@ -36,6 +36,7 @@ const optionalSchema = z.object({
   ANALYTICS_MYSQL_PORT: z.coerce.number().int().positive().optional(),
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().optional(),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().optional(),
+  DB_MAX_CONCURRENT_EXPENSIVE: z.coerce.number().int().positive().optional(),
   LOG_LEVEL: z
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
     .optional(),

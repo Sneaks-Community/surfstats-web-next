@@ -143,6 +143,7 @@ export async function getRecordCountsAndWRFromCache(mapname: string): Promise<Co
     },
     {
       lock: true,
+      expensive: true,
       onError: (error) => {
         logger.error(`[Cache] Failed to fetch counts and WR for ${validMapname}: ${getErrorMessage(error)}`);
         return empty;
@@ -203,6 +204,7 @@ export async function getLeaderboardRecordsFromCache(
     },
     {
       lock: true,
+      expensive: true,
       onError: (error) => {
         logger.error(`[Cache] Failed to fetch leaderboard records for ${validMapname}: ${getErrorMessage(error)}`);
         return { records: [], wr_time: null };
@@ -349,6 +351,7 @@ export async function getStageRecordsFromCache(
     },
     {
       lock: true,
+      expensive: true,
       onError: (error) => {
         logger.error(`[Cache] Failed to fetch stage records for ${validMapname}: ${getErrorMessage(error)}`);
         return { stages: [], stagesList: [], pagination: emptyPagination };
@@ -418,6 +421,7 @@ export async function getBonusRecordsFromCache(
     },
     {
       lock: true,
+      expensive: true,
       onError: (error) => {
         logger.error(`[Cache] Failed to fetch bonus records for ${validMapname}: ${getErrorMessage(error)}`);
         return { bonuses: [], bonusGroupsList: [], pagination: emptyPagination };
@@ -483,6 +487,7 @@ export async function searchLeaderboardRecordsFromCache(
     },
     {
       lock: true,
+      expensive: true,
       onError: (error) => {
         logger.error(`[Cache] Search failed for ${validMapname} query "${query}": ${getErrorMessage(error)}`);
         return { records: [], wr_time: null };
@@ -545,6 +550,7 @@ export async function searchStageRecordsFromCache(
     },
     {
       lock: true,
+      expensive: true,
       onError: (error) => {
         logger.error(`[Cache] Stage search failed for ${validMapname} stage ${stage} query "${query}": ${getErrorMessage(error)}`);
         return { stages: [] };
@@ -598,6 +604,7 @@ export async function searchBonusRecordsFromCache(
     },
     {
       lock: true,
+      expensive: true,
       onError: (error) => {
         logger.error(`[Cache] Bonus search failed for ${validMapname} bonus ${bonus} query "${query}": ${getErrorMessage(error)}`);
         return { records: [] };
