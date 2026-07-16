@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { isTrustedRequest } from '@/lib/origin-guard';
+import { isCacheReady } from '@/lib/valkey';
 
 // Proxy always runs on the Node.js runtime, so it can reuse the existing
 // node-redis Valkey client (unavailable on the Edge runtime).
@@ -19,6 +20,14 @@ export async function proxy(request: NextRequest) {
   // runs before rate limiting so cross-origin/naive scrapers never touch Valkey.
   if (!isTrustedRequest(request)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
+  // Cache is a required layer; without it we don't serve uncached DB queries.
+  if (!isCacheReady()) {
+    return NextResponse.json(
+      { error: 'Service temporarily unavailable' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
   }
 
   const result = await checkRateLimit(request);

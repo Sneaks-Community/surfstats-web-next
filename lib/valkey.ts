@@ -49,4 +49,9 @@ void (async () => {
   }
 })();
 
+/** Whether the Valkey client is connected and ready to serve commands. */
+export function isCacheReady(): boolean {
+  return client.isReady;
+}
+
 export default client;
