@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { checkRateLimit } from '@/lib/rate-limit';
+import { isTrustedRequest } from '@/lib/origin-guard';
 
 // Proxy always runs on the Node.js runtime, so it can reuse the existing
 // node-redis Valkey client (unavailable on the Edge runtime).
@@ -12,6 +13,12 @@ export async function proxy(request: NextRequest) {
   // Keep the health endpoint always reachable for container/orchestrator probes.
   if (request.nextUrl.pathname === '/api/health') {
     return NextResponse.next();
+  }
+
+  // Lock the API to the site itself (and any allow-listed origins). Cheap and
+  // runs before rate limiting so cross-origin/naive scrapers never touch Valkey.
+  if (!isTrustedRequest(request)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const result = await checkRateLimit(request);

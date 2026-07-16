@@ -37,6 +37,8 @@ const optionalSchema = z.object({
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().optional(),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().optional(),
   DB_MAX_CONCURRENT_EXPENSIVE: z.coerce.number().int().positive().optional(),
+  // Comma-separated extra origins allowed to call the API (own origin always allowed).
+  ALLOWED_ORIGINS: z.string().optional(),
   LOG_LEVEL: z
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
     .optional(),
