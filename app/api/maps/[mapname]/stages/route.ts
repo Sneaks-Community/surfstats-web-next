@@ -9,6 +9,12 @@ import { getStagesByMapFromCache } from '@/lib/valkey-registry-cache';
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 100;
 
+// sortField/sortOrder only feed the cache key (SQL is always rank-ordered).
+// Restrict to a known set so arbitrary values can't mint unbounded cache keys.
+const ALLOWED_SORT_FIELDS = new Set(['rank', 'player', 'time', 'wrDiff', 'speed', 'date']);
+const DEFAULT_SORT_FIELD = 'rank';
+const DEFAULT_SORT_ORDER = 'ASC';
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ mapname: string }> }
@@ -37,8 +43,9 @@ export async function GET(
     }
   }
 
-  const sortField = searchParams.get('sortField') || 'rank';
-  const sortOrder = searchParams.get('sortOrder') || 'ASC';
+  const rawSortField = searchParams.get('sortField');
+  const sortField = rawSortField && ALLOWED_SORT_FIELDS.has(rawSortField) ? rawSortField : DEFAULT_SORT_FIELD;
+  const sortOrder = searchParams.get('sortOrder')?.toUpperCase() === 'DESC' ? 'DESC' : DEFAULT_SORT_ORDER;
   const { page, pageSize } = parsePageParams(searchParams, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
   const offset = (page - 1) * pageSize;
 

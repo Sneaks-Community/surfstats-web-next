@@ -21,16 +21,21 @@ export function resolveMapnameParam(raw: string): string | NextResponse {
   return valid;
 }
 
+/** Absolute backstop on `page`; routes with a known row count clamp tighter. */
+export const MAX_PAGE = 10000;
+
 /**
  * Parse and clamp `page`/`pageSize` search params. NaN/negative/oversized inputs
- * fall back or clamp rather than producing invalid offsets.
+ * fall back or clamp rather than producing invalid offsets. `page` is capped at
+ * `maxPage` (default {@link MAX_PAGE}).
  */
 export function parsePageParams(
   searchParams: URLSearchParams,
   defaultPageSize: number,
-  maxPageSize: number
+  maxPageSize: number,
+  maxPage: number = MAX_PAGE
 ): { page: number; pageSize: number } {
-  const page = parseIntParam(searchParams.get('page'), { fallback: 1, min: 1 });
+  const page = parseIntParam(searchParams.get('page'), { fallback: 1, min: 1, max: maxPage });
   const pageSize = parseIntParam(searchParams.get('pageSize'), {
     fallback: defaultPageSize,
     min: 1,

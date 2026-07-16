@@ -44,16 +44,19 @@ export async function GET(
 
   try {
     const { counts, wr_time } = await getRecordCountsAndWRFromCache(validMapname);
-    const { records } = await getLeaderboardRecordsFromCache(validMapname, page, pageSize, wr_time);
+    // Clamp page to the real page count: bounds cache keys and OFFSET size.
+    const totalPages = Math.max(1, Math.ceil(counts.leaderboardTotal / pageSize));
+    const clampedPage = Math.min(page, totalPages);
+    const { records } = await getLeaderboardRecordsFromCache(validMapname, clampedPage, pageSize, wr_time);
 
     return NextResponse.json({
       records,
       pagination: {
-        page,
+        page: clampedPage,
         pageSize,
-        offset: (page - 1) * pageSize,
+        offset: (clampedPage - 1) * pageSize,
         total: counts.leaderboardTotal,
-        totalPages: Math.ceil(counts.leaderboardTotal / pageSize),
+        totalPages,
       },
       wr_time,
     });
