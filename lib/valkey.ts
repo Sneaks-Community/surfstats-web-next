@@ -37,8 +37,11 @@ client.on('close', () => {
   logger.warn('[Valkey] Connection closed');
 });
 
-// Force connection on import
-void (async () => {
+// Force connection on import. Kept as a module-level promise so callers can
+// await the initial attempt instead of racing it — otherwise the very first
+// request after startup sees isReady === false and gets a 503 before the
+// handshake has had a chance to complete.
+const initialConnect: Promise<void> = (async () => {
   if (!client.isOpen) {
     try {
       await client.connect();
@@ -51,6 +54,19 @@ void (async () => {
 
 /** Whether the Valkey client is connected and ready to serve commands. */
 export function isCacheReady(): boolean {
+  return client.isReady;
+}
+
+/**
+ * Await the initial connection attempt, then report readiness. Use this on
+ * request paths that would otherwise reject before startup finishes; the
+ * attempt is bounded by VALKEY_CONNECT_TIMEOUT. Steady-state reconnects are
+ * handled internally by node-redis, so this only matters for the first hit.
+ */
+export async function waitForCacheReady(): Promise<boolean> {
+  if (!client.isReady) {
+    await initialConnect;
+  }
   return client.isReady;
 }
 

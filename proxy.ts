@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { isTrustedRequest } from '@/lib/origin-guard';
-import { isCacheReady } from '@/lib/valkey';
+import { waitForCacheReady } from '@/lib/valkey';
 import { cacheUnavailableHtml } from '@/lib/cache-unavailable-page';
 
 // Runs on the Node.js runtime so it can reuse the node-redis Valkey client
@@ -23,7 +23,7 @@ export async function proxy(request: NextRequest) {
 
   // Cache is a required layer for every route: without it we serve a graceful
   // "temporarily unavailable" rather than run uncached DB queries on every hit.
-  if (!isCacheReady()) {
+  if (!(await waitForCacheReady())) {
     if (isApi) {
       return NextResponse.json(
         { error: 'Service temporarily unavailable' },
