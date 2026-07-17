@@ -132,9 +132,13 @@ export default function ActivityHeatmapChart({ data }: ActivityHeatmapChartProps
                 <div key={day} className="flex flex-1">
                   {Array.from({ length: 24 }, (_, hour) => {
                     const count = heatmapGrid.grid[day][hour];
+                    const label = `${DAY_FULL_NAMES[day]} ${formatHour(hour)}: ${count} ${count === 1 ? 'connection' : 'connections'}`;
                     return (
                       <div
                         key={hour}
+                        role="img"
+                        title={label}
+                        aria-label={label}
                         className="flex-1 transition-opacity hover:opacity-80 cursor-default"
                         style={{
                           backgroundColor: getCellColor(count, heatmapGrid.maxCount),
