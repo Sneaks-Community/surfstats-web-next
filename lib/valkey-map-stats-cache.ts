@@ -209,6 +209,7 @@ export async function getCheckpointStatsFromCache(mapname: string): Promise<Chec
     },
     {
       lock: true,
+      expensive: true,
       onError: (error) => {
         logger.warn(`[Cache] Failed to fetch checkpoint stats for ${mapname}: ${getErrorMessage(error)}`);
         return { checkpointAvgTimes: [] };
@@ -348,6 +349,7 @@ export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<
     },
     {
       lock: true,
+      expensive: true,
       onError: (error) => {
         logger.warn(`[Cache] Failed to fetch time on map data for ${mapname}: ${getErrorMessage(error)}`);
         return [];

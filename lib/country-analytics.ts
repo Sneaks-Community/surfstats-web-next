@@ -176,7 +176,8 @@ export async function getCountriesRankingFromCache(
   const cacheKey = `${COUNTRIES_RANKING_KEY}:${sort}:${order}:${page}:${limit}`;
 
   return cachedFetch(cacheKey, COUNTRIES_RANKING_TTL, () =>
-    getCountriesRankingInternal(sort, order, page, limit)
+    getCountriesRankingInternal(sort, order, page, limit),
+    { expensive: true }
   );
 }
 
@@ -365,5 +366,7 @@ const COUNTRIES_STATS_TTL = 86400; // 24 hours
  * Used for displaying total countries count
  */
 export async function getCountriesStatsFromCache(): Promise<{ totalCountries: number; totalPlayers: number }> {
-  return cachedFetch(COUNTRIES_STATS_KEY, COUNTRIES_STATS_TTL, getCountriesStatsInternal);
+  return cachedFetch(COUNTRIES_STATS_KEY, COUNTRIES_STATS_TTL, getCountriesStatsInternal, {
+    expensive: true,
+  });
 }
