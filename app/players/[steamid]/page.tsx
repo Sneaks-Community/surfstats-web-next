@@ -7,7 +7,7 @@ import { getTotalsFromCache } from '@/lib/cache';
 import { getPlayerTimeOnServerFromCache, getActivityHeatmapFromCache } from '@/lib/player-analytics';
 import { getTierDistributionFromCache } from '@/lib/valkey-map-cache';
 import { getPlayerNameFromCache } from '@/lib/player-cache';
-import { getPlayerProfileFromCache, getPlayerOverviewFromCache } from '@/lib/player-profile-cache';
+import { getPlayerOverviewFromCache, getPlayerWrPerformanceFromCache } from '@/lib/player-profile-cache';
 import logger from '@/lib/logger';
 import PlayerProfileContent from './components/PlayerProfileContent';
 import { getErrorMessage } from '@/lib/errors';
@@ -15,135 +15,6 @@ import { getErrorMessage } from '@/lib/errors';
 // Highest tier the Tier Distribution radar will render. Defaults to 10.
 const MAX_ALLOWED_TIER = parseInt(process.env.MAX_TIER || '10', 10) || 10;
 
-
-/**
- * Get player profile data with caching
- * Uses the new player profile cache for improved performance
- */
-async function getPlayerData(steamid: string) {
-  logger.debug(`[Player] Fetching profile data for: ${steamid}`);
-  
-  try {
-    // Get player name from cached function (Next.js will deduplicate with generateMetadata)
-    const { name } = await getPlayerNameFromCache(steamid);
-    
-    if (!name) {
-      logger.warn(`[Player] No player found with SteamID: ${steamid}`);
-      return null;
-    }
-
-    // Use cached player profile function
-    const cachedProfile = await getPlayerProfileFromCache(steamid);
-    
-    if (cachedProfile) {
-      logger.debug(`[Player] Profile loaded from cache for ${cachedProfile.player.name} (${steamid}): ${cachedProfile.maps.length} maps, ${cachedProfile.bonuses.length} bonuses, ${cachedProfile.stages.length} stages`);
-      return cachedProfile;
-    }
-
-    // Fallback to direct database query if cache miss and internal fetch failed
-    logger.warn(`[Player] Profile cache miss and internal fetch failed for ${steamid}, returning null`);
-    return null;
-  } catch (error: unknown) {
-    const err = error as { message?: string; code?: string };
-    const errorMessage = getErrorMessage(error);
-    logger.error(`[Player] Failed to fetch profile for ${steamid}: ${errorMessage}`);
-    logger.error(`[Player] Error code: ${err.code || 'N/A'}`);
-    return null;
-  }
-}
-
-async function getIncompleteRecords(steamid: string) {
-  logger.debug(`[Player] Fetching incomplete records for: ${steamid}`);
-  
-  try {
-    const { getAllMapMetadataFromCache } = await import('@/lib/valkey-map-cache');
-    
-    // Fetch all incomplete records in parallel using optimized anti-join queries
-    const [incompleteMaps, incompleteBonuses, incompleteStages] = await Promise.all([
-      // Incomplete maps
-      (async () => {
-        const [rows] = await pool.query<RowDataPacket[]>(`
-          SELECT
-            m.mapname,
-            COALESCE(m.tier, 1) as tier,
-            wr.min_runtime as wr_time
-          FROM ck_maptier m
-          LEFT JOIN ck_playertimes pt ON m.mapname = pt.mapname AND pt.steamid = ?
-          LEFT JOIN (
-            SELECT mapname, MIN(runtimepro) as min_runtime
-            FROM ck_playertimes
-            GROUP BY mapname
-          ) wr ON m.mapname = wr.mapname
-          WHERE pt.mapname IS NULL
-          ORDER BY m.tier ASC, m.mapname ASC
-        `, [steamid]);
-        
-        const allMapMetadata = await getAllMapMetadataFromCache();
-        return rows.map(r => {
-          const mapMetadata = allMapMetadata.get(r.mapname);
-          const mapType: 'linear' | 'staged' = mapMetadata && mapMetadata.stages > 1 ? 'staged' : 'linear';
-          return {
-            mapname: r.mapname,
-            tier: r.tier,
-            wr_time: r.wr_time,
-            mapType,
-          };
-        });
-      })(),
-      // Incomplete bonuses
-      (async () => {
-        const [rows] = await pool.query<RowDataPacket[]>(`
-          SELECT
-            z.mapname,
-            z.zonegroup,
-            wr.min_runtime as wr_time
-          FROM ck_zones z
-          LEFT JOIN ck_bonus br ON z.mapname = br.mapname AND z.zonegroup = br.zonegroup AND br.steamid = ?
-          LEFT JOIN (
-            SELECT mapname, zonegroup, MIN(runtime) as min_runtime
-            FROM ck_bonus
-            GROUP BY mapname, zonegroup
-          ) wr ON z.mapname = wr.mapname AND z.zonegroup = wr.zonegroup
-          WHERE z.zonetype = 2 AND z.zonegroup > 0 AND br.mapname IS NULL
-          ORDER BY z.mapname ASC, z.zonegroup ASC
-        `, [steamid]);
-        
-        return rows.map(r => ({
-          mapname: r.mapname,
-          zonegroup: r.zonegroup,
-          wr_time: r.wr_time,
-        }));
-      })(),
-      // Incomplete stages
-      (async () => {
-        const [rows] = await pool.query<RowDataPacket[]>(`
-          SELECT
-            z.mapname as map,
-            z.zonetypeid as stage
-          FROM ck_zones z
-          LEFT JOIN ck_stages sr ON z.mapname = sr.map AND z.zonetypeid = sr.stage AND sr.steamid = ?
-          WHERE z.zonetype = 3 AND z.zonegroup = 0 AND z.zonetypeid > 0 AND sr.map IS NULL
-          ORDER BY z.mapname ASC, z.zonetypeid ASC
-        `, [steamid]);
-        
-        return rows.map(r => ({
-          map: r.map,
-          stage: r.stage,
-        }));
-      })(),
-    ]);
-
-    logger.debug(`[Player] Incomplete records for ${steamid}: ${incompleteMaps.length} maps, ${incompleteBonuses.length} bonuses, ${incompleteStages.length} stages`);
-
-    return { incompleteMaps, incompleteBonuses, incompleteStages };
-  } catch (error: unknown) {
-    const err = error as { message?: string; code?: string };
-    const errorMessage = getErrorMessage(error);
-    logger.error(`[Player] Failed to fetch incomplete records for ${steamid}: ${errorMessage}`);
-    logger.error(`[Player] Error code: ${err.code || 'N/A'}`);
-    return { incompleteMaps: [], incompleteBonuses: [], incompleteStages: [] };
-  }
-}
 
 interface TierDistributionRow { tier: number; linear: number; staged: number }
 
@@ -259,10 +130,9 @@ export default async function PlayerProfilePage({
     );
   }
   
-  // Group 1: Player data (required for early exit if not found)
-  const data = await getPlayerData(validSteamId);
-  
-  if (!data) {
+  const overview = await getPlayerOverviewFromCache(validSteamId);
+
+  if (!overview) {
     return (
       <div className="text-center py-20 bg-surface border border-border rounded-xl">
         <h1 className="text-2xl font-bold text-text mb-2">Player Not Found</h1>
@@ -274,29 +144,15 @@ export default async function PlayerProfilePage({
     );
   }
 
-  // Group 2: Parallel fetch for remaining data
-  const [overviewData, incompleteData, totals, steamAvatars, playtimeData, linearVsStagedRaw, activityHeatmap, tierDistribution] = await Promise.all([
-    getPlayerOverviewFromCache(validSteamId),
-    getIncompleteRecords(validSteamId),
+  const [totals, steamAvatars, playtimeData, linearVsStagedRaw, activityHeatmap, tierDistribution, wrPerformanceData] = await Promise.all([
     getTotalsFromCache(),
     getSteamProfilesFromCache([decodedSteamId]),
     getPlayerTimeOnServerFromCache(validSteamId),
     getLinearVsStagedPerTier(validSteamId),
     getActivityHeatmapFromCache(validSteamId),
     getTierDistributionFromCache(),
+    getPlayerWrPerformanceFromCache(validSteamId),
   ]);
-
-  // Drive the header/stat cards from the cheap overview query. If it somehow
-  // fails while the (eager) profile is present, fall back to deriving the same
-  // shape from the full lists so the page still renders identically.
-  const overview = overviewData ?? {
-    player: data.player,
-    counts: {
-      maps: data.maps.length,
-      bonuses: data.bonuses.length,
-      stages: data.stages.length,
-    },
-  };
 
   // The tier ceiling is a property of the server's map pool, not the player.
   // Derive it from the server-wide tier distribution (falling back to the
@@ -312,29 +168,10 @@ export default async function PlayerProfilePage({
   const maxTier = candidateTiers.length > 0 ? Math.max(...candidateTiers) : 1;
   const linearVsStagedPerTier = padTierDistribution(linearVsStagedRaw, maxTier);
 
-  // Compute WR performance data from maps
-  const wrPerformanceData = (data.maps as Array<{
-    mapname: string;
-    runtimepro: number;
-    date: string;
-    tier: number;
-    wr_time: number | null;
-    player_rank: number;
-  }>)
-    .filter(m => m.wr_time != null && m.runtimepro > 0)
-    .map(m => ({
-      mapname: m.mapname,
-      wrPercentage: ((m.wr_time ?? 0) / m.runtimepro) * 100,
-      tier: m.tier,
-      date: m.date,
-    }));
-
   return (
     <div className="space-y-4">
       <PlayerProfileContent
         overview={overview}
-        data={data}
-        incompleteData={incompleteData}
         totals={totals}
         steamAvatars={steamAvatars}
         playtimeData={playtimeData}

@@ -1,4 +1,3 @@
-import type { RowDataPacket } from 'mysql2';
 import Link from 'next/link';
 import { getSteamProfileUrl, type SteamAvatarSet } from '@/lib/steam';
 import { Trophy, Activity, Clock } from 'lucide-react';
@@ -14,32 +13,6 @@ import ProgressBar from '@/components/ProgressBar';
 import PlayerTimeDisplay from './PlayerTimeDisplay';
 import WRPerformanceChart from './LazyWRPerformanceChart';
 import ActivityHeatmapChart from './ActivityHeatmapChart';
-
-// Type definitions for player records
-interface MapRecord {
-  mapname: string;
-  runtimepro: number;
-  date: string;
-  wr_time: number | null;
-  player_rank: number;
-  tier: number;
-}
-
-interface BonusRecord {
-  mapname: string;
-  zonegroup: number;
-  runtime: number;
-  date: string;
-  player_rank: number;
-}
-
-interface StageRecord {
-  map: string;
-  stage: number;
-  runtime: number;
-  date: string;
-  player_rank: number;
-}
 
 interface PlayerProfileContentProps {
   // Cheap overview: identity + global rank + completion counts, sourced from
@@ -59,55 +32,6 @@ interface PlayerProfileContentProps {
       bonuses: number;
       stages: number;
     };
-  };
-  data: {
-    player: RowDataPacket | {
-      steamid: string;
-      name: string;
-      country: string;
-      points: number;
-      lastseen: string;
-      rank: number;
-    };
-    maps: RowDataPacket[] | Array<{
-      mapname: string;
-      runtimepro: number;
-      date: string;
-      tier: number;
-      wr_time: number | null;
-      player_rank: number;
-    }>;
-    bonuses: RowDataPacket[] | Array<{
-      mapname: string;
-      zonegroup: number;
-      runtime: number;
-      date: string;
-      player_rank: number;
-    }>;
-    stages: RowDataPacket[] | Array<{
-      map: string;
-      stage: number;
-      runtime: number;
-      date: string;
-      player_rank: number;
-    }>;
-  };
-  incompleteData: {
-    incompleteMaps: Array<{
-      mapname: string;
-      tier: number | null;
-      wr_time: number | null;
-      mapType: 'linear' | 'staged';
-    }>;
-    incompleteBonuses: Array<{
-      mapname: string;
-      zonegroup: number;
-      wr_time: number | null;
-    }>;
-    incompleteStages: Array<{
-      map: string;
-      stage: number;
-    }>;
   };
   totals: {
     totalMaps: number;
@@ -140,8 +64,6 @@ interface PlayerProfileContentProps {
 // eslint-disable-next-line @typescript-eslint/require-await -- Server component pattern, data fetching done at route handler level
 export default async function PlayerProfileContent({
   overview,
-  data,
-  incompleteData,
   totals,
   steamAvatars,
   playtimeData,
@@ -150,7 +72,6 @@ export default async function PlayerProfileContent({
   activityHeatmap,
   steamid,
 }: PlayerProfileContentProps) {
-  const { maps, bonuses, stages } = data;
   // Identity + stats come from the cheap overview query, not the expensive
   // full lists. `counts` replaces the old `maps.length`/`bonuses.length`/etc.
   const player = overview.player;
@@ -279,67 +200,55 @@ export default async function PlayerProfileContent({
       </div>
   );
 
-  // Analytical charts — shown under the Overview tab.
+  // Analytic charts shown under the Overview tab.
   const overviewSection = (
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-        {/* Tier Distribution Radar - full width on mobile, 1st column on desktop */}
-        <div className="lg:col-span-1 lg:row-span-1 h-[280px] min-h-[280px]">
-          {linearVsStagedPerTier.length > 0 ? (
-            <TierDistributionChart data={linearVsStagedPerTier} />
+      {/* Tier Distribution Radar */}
+      <div className="lg:col-span-1 h-[280px] min-h-[280px]">
+        {linearVsStagedPerTier.length > 0 ? (
+          <TierDistributionChart data={linearVsStagedPerTier} />
+        ) : (
+          <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
+            <h3 className="text-sm font-semibold text-text mb-2">Tier Distribution</h3>
+            <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
+              No data available
+            </div>
+          </div>
+        )}
+      </div>
+      {/* Completion Percentile + Activity Heatmap */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:col-span-3">
+        <div className="h-[280px] lg:h-auto">
+          {wrPerformanceData.length > 0 ? (
+            <WRPerformanceChart data={wrPerformanceData} />
           ) : (
             <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-              <h3 className="text-sm font-semibold text-text mb-2">Tier Distribution</h3>
+              <h3 className="text-sm font-semibold text-text mb-2">Completion Percentile</h3>
               <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-                No data available
+                No completions
               </div>
             </div>
           )}
         </div>
-        {/* WR Performance + Activity Heatmap */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:col-span-3">
-          {/* WR Performance Chart */}
-          <div className="h-[280px] lg:h-auto">
-            {wrPerformanceData.length > 0 ? (
-              <WRPerformanceChart data={wrPerformanceData} />
-            ) : (
-              <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-                <h3 className="text-sm font-semibold text-text mb-2">WR Performance</h3>
-                <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-                  No completions
-                </div>
+        <div className="h-[280px] lg:h-auto">
+          {activityHeatmap && activityHeatmap.length > 0 ? (
+            <ActivityHeatmapChart data={activityHeatmap} />
+          ) : (
+            <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
+              <h3 className="text-sm font-semibold text-text mb-2">Activity Heatmap</h3>
+              <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
+                No connection data
               </div>
-            )}
-          </div>
-          {/* Activity Heatmap */}
-          <div className="h-[280px] lg:h-auto">
-            {activityHeatmap && activityHeatmap.length > 0 ? (
-              <ActivityHeatmapChart data={activityHeatmap} />
-            ) : (
-              <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-                <h3 className="text-sm font-semibold text-text mb-2">Activity Heatmap</h3>
-                <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-                  No connection data
-                </div>
-              </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
+    </div>
   );
 
-  // Records Section — gated behind the top-level Times tab. Still props-fed /
-  // eager in this commit; a later commit converts it to fetch-on-activation.
-  const timesSection = (
-    <PlayerRecordsTabs
-      maps={maps as MapRecord[]}
-      bonuses={bonuses as BonusRecord[]}
-      stages={stages as StageRecord[]}
-      incompleteMaps={incompleteData.incompleteMaps}
-      incompleteBonuses={incompleteData.incompleteBonuses}
-      incompleteStages={incompleteData.incompleteStages}
-      steamid={steamid}
-    />
-  );
+  // Records Section — gated behind the top-level Times tab. Fetches its full
+  // lists on activation (no fetch on the initial render / for crawlers).
+  const timesSection = <PlayerRecordsTabs steamid={steamid} />;
 
   return (
     <div className="space-y-4">

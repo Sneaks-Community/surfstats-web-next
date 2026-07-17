@@ -16,6 +16,7 @@ import { getErrorMessage } from './errors';
 
 const PLAYER_PROFILE_KEY = 'surfstats:player:profile';
 const PLAYER_OVERVIEW_KEY = 'surfstats:player:overview';
+const PLAYER_WR_PERF_KEY = 'surfstats:player:wrperf';
 const PLAYER_MAP_TIMES_KEY = 'surfstats:player:maptimes';
 const PLAYER_BONUS_TIMES_KEY = 'surfstats:player:bonustimes';
 const PLAYER_STAGE_TIMES_KEY = 'surfstats:player:stagetimes';
@@ -72,6 +73,14 @@ export interface PlayerCompletionCounts {
   maps: number;
   bonuses: number;
   stages: number;
+}
+
+/** One point per completed map for the Completion Percentile chart. */
+export interface PlayerWrPerformancePoint {
+  mapname: string;
+  wrPercentage: number;
+  tier: number;
+  date: string;
 }
 
 /**
@@ -345,6 +354,73 @@ export async function getPlayerOverviewFromCache(steamid: string): Promise<Playe
       onError: (error) => {
         logger.error(`[PlayerProfileCache] Failed to fetch overview for ${validSteamId}: ${getErrorMessage(error)}`);
         return null;
+      },
+    }
+  );
+}
+
+/**
+ * Data for the Completion Percentile chart: one `{ mapname, wrPercentage, tier,
+ * date }` point per completed map.
+ *
+ * Deliberately cheap so it can render in the always-visible Overview (incl.
+ * crawler hits): a player-bounded `WHERE steamid = ?` scan with **no** correlated
+ * rank subquery, and the per-map WR time + tier come from the already-cached map
+ * metadata — so it also avoids the full-table `MIN(...) GROUP BY`. WR here is the
+ * same `MIN(runtimepro)` per map that the full map-times query uses, so the
+ * plotted values match.
+ *
+ * @param steamid - The player's SteamID
+ * @returns One point per completed map that has a WR time (empty on invalid id / error)
+ */
+export async function getPlayerWrPerformanceFromCache(steamid: string): Promise<PlayerWrPerformancePoint[]> {
+  const validSteamId = validateSteamId(steamid);
+  if (!validSteamId) {
+    logger.warn(`[PlayerProfileCache] Invalid SteamID for WR performance: ${steamid}`);
+    return [];
+  }
+
+  return cachedFetch<PlayerWrPerformancePoint[]>(
+    `${PLAYER_WR_PERF_KEY}:${validSteamId}`,
+    PLAYER_PROFILE_TTL,
+    async () => {
+      const { getAllMapMetadataFromCache } = await import('@/lib/valkey-map-cache');
+
+      const [rows] = await withTimeout(
+        pool.query<RowDataPacket[]>(`
+          SELECT pt.mapname, pt.runtimepro, pt.date
+          FROM ck_playertimes pt
+          WHERE pt.steamid = ?
+          ORDER BY pt.mapname ASC
+        `, [validSteamId]),
+        QUERY_TIMEOUT_MS,
+        'Query timeout exceeded'
+      );
+
+      const allMapMetadata = await getAllMapMetadataFromCache();
+
+      const points: PlayerWrPerformancePoint[] = [];
+      for (const row of rows) {
+        const metadata = allMapMetadata.get(row.mapname);
+        const wrTime = metadata?.wr_time ?? null;
+        const runtime = Number(row.runtimepro);
+        // Match the old client-side filter: needs a WR and a positive run time.
+        if (wrTime == null || !(runtime > 0)) continue;
+        points.push({
+          mapname: row.mapname,
+          wrPercentage: (wrTime / runtime) * 100,
+          tier: metadata?.tier ?? 1,
+          date: row.date,
+        });
+      }
+
+      return points;
+    },
+    {
+      lock: true,
+      onError: (error) => {
+        logger.error(`[PlayerProfileCache] Failed to fetch WR performance for ${validSteamId}: ${getErrorMessage(error)}`);
+        return [];
       },
     }
   );

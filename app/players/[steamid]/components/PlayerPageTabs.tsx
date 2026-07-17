@@ -25,6 +25,15 @@ type TopTab = 'overview' | 'times';
  */
 export default function PlayerPageTabs({ overview, times }: PlayerPageTabsProps) {
   const [activeTab, setActiveTab] = useState<TopTab>('overview');
+  // Times mounts on its first activation and then stays mounted (CSS-toggled),
+  // so switching back and forth doesn't refetch. It is never mounted until the
+  // user clicks Times.
+  const [timesActivated, setTimesActivated] = useState(false);
+
+  const selectTab = (tab: TopTab) => {
+    if (tab === 'times') setTimesActivated(true);
+    setActiveTab(tab);
+  };
 
   const tabs = [
     { id: 'overview' as TopTab, label: 'Overview', icon: LayoutDashboard },
@@ -41,7 +50,7 @@ export default function PlayerPageTabs({ overview, times }: PlayerPageTabsProps)
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => selectTab(tab.id)}
                 className={`flex-1 px-4 py-3 flex items-center justify-center gap-2 transition-colors relative ${
                   isActive
                     ? 'bg-surface-hover text-text'
@@ -57,7 +66,10 @@ export default function PlayerPageTabs({ overview, times }: PlayerPageTabsProps)
         </div>
       </div>
 
-      {activeTab === 'overview' ? overview : times}
+      <div className={activeTab === 'overview' ? undefined : 'hidden'}>{overview}</div>
+      {timesActivated && (
+        <div className={activeTab === 'times' ? undefined : 'hidden'}>{times}</div>
+      )}
     </div>
   );
 }

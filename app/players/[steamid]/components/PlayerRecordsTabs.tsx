@@ -7,11 +7,14 @@ import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import Pagination from '@/components/Pagination';
 import SortIcon from '@/components/SortIcon';
 import RecordSearchInput from '@/components/RecordSearchInput';
+import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { formatTime, formatDate, sortRecords, matchesQuery, parseIntParam, type SortDirection } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import TierBadge from '@/components/TierBadge';
 import { ZoneGroupBadge, StageBadge } from '@/components/RecordBadges';
 import { useDebounce } from '@/hooks/useDebounce';
+import { clientError } from '@/lib/client-logger';
+import { getErrorMessage, isAbortError } from '@/lib/errors';
 
 // Types for records
 interface MapRecord {
@@ -58,13 +61,22 @@ interface IncompleteStageRecord {
 }
 
 interface PlayerRecordsTabsProps {
-  maps: MapRecord[];
-  bonuses: BonusRecord[];
-  stages: StageRecord[];
-  incompleteMaps: IncompleteMapRecord[];
-  incompleteBonuses: IncompleteBonusRecord[];
-  incompleteStages: IncompleteStageRecord[];
   steamid: string;
+}
+
+// Each player-times route returns the full per-section list + the not-yet-done
+// list. Held in state once fetched (state doubles as the client-side cache).
+interface MapsSection {
+  records: MapRecord[];
+  incomplete: IncompleteMapRecord[];
+}
+interface BonusesSection {
+  records: BonusRecord[];
+  incomplete: IncompleteBonusRecord[];
+}
+interface StagesSection {
+  records: StageRecord[];
+  incomplete: IncompleteStageRecord[];
 }
 
 type TabType = 'maps' | 'bonuses' | 'stages';
@@ -73,16 +85,28 @@ type SortField = 'map' | 'rank' | 'time' | 'wrDiff' | 'date' | 'tier' | 'wrTime'
 
 const ITEMS_PER_PAGE = 20;
 
-export default function PlayerRecordsTabs({
-  maps,
-  bonuses,
-  stages,
-  incompleteMaps,
-  incompleteBonuses,
-  incompleteStages,
-}: PlayerRecordsTabsProps) {
+export default function PlayerRecordsTabs({ steamid }: PlayerRecordsTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+
+  // Per-section data, fetched on tab activation. Null = not loaded yet.
+  const [mapsData, setMapsData] = useState<MapsSection | null>(null);
+  const [bonusesData, setBonusesData] = useState<BonusesSection | null>(null);
+  const [stagesData, setStagesData] = useState<StagesSection | null>(null);
+  const [isLoadingMaps, setIsLoadingMaps] = useState(false);
+  const [isLoadingBonuses, setIsLoadingBonuses] = useState(false);
+  const [isLoadingStages, setIsLoadingStages] = useState(false);
+
+  // Derived arrays default to empty until their section loads, so all the
+  // client-side filter/sort/pagination below is unchanged from when these
+  // arrived as props. Memoized so the empty-fallback keeps a stable reference
+  // (otherwise the downstream useMemos would recompute every render).
+  const maps = useMemo(() => mapsData?.records ?? [], [mapsData]);
+  const incompleteMaps = useMemo(() => mapsData?.incomplete ?? [], [mapsData]);
+  const bonuses = useMemo(() => bonusesData?.records ?? [], [bonusesData]);
+  const incompleteBonuses = useMemo(() => bonusesData?.incomplete ?? [], [bonusesData]);
+  const stages = useMemo(() => stagesData?.records ?? [], [stagesData]);
+  const incompleteStages = useMemo(() => stagesData?.incomplete ?? [], [stagesData]);
 
   // Get initial state from URL
   const initialTab = (searchParams.get('tab') as TabType | null) ?? 'maps';
@@ -114,6 +138,56 @@ export default function PlayerRecordsTabs({
 
   // Debounced search for URL updates
   const debouncedSearch = useDebounce(searchQueries[activeTab], 300);
+
+  // Fetch the active section's full list on activation. Nothing fetches on the
+  // initial page render: this component only mounts once the user opens the
+  // top-level Times tab (PlayerPageTabs conditionally mounts it), so a crawler
+  // that renders only the default Overview never triggers these queries.
+  // A loaded section stays in state, which doubles as the client cache,
+  // re-selecting a tab never refetches.
+  useEffect(() => {
+    const alreadyLoaded =
+      (activeTab === 'maps' && mapsData !== null) ||
+      (activeTab === 'bonuses' && bonusesData !== null) ||
+      (activeTab === 'stages' && stagesData !== null);
+    if (alreadyLoaded) return;
+
+    const controller = new AbortController();
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Spinner on activation; request resolves asynchronously
+    if (activeTab === 'maps') setIsLoadingMaps(true);
+    else if (activeTab === 'bonuses') setIsLoadingBonuses(true);
+    else setIsLoadingStages(true);
+
+    void (async () => {
+      try {
+        const res = await fetch(`/api/players/${encodeURIComponent(steamid)}/${activeTab}`, {
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        const section = { records: data.records ?? [], incomplete: data.incomplete ?? [] };
+        if (activeTab === 'maps') setMapsData(section);
+        else if (activeTab === 'bonuses') setBonusesData(section);
+        else setStagesData(section);
+      } catch (err: unknown) {
+        if (!isAbortError(err)) {
+          clientError(`[PlayerRecordsTabs] Failed to load ${activeTab}: ${getErrorMessage(err)}`);
+          const empty = { records: [], incomplete: [] };
+          if (activeTab === 'maps') setMapsData(empty);
+          else if (activeTab === 'bonuses') setBonusesData(empty);
+          else setStagesData(empty);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoadingMaps(false);
+          setIsLoadingBonuses(false);
+          setIsLoadingStages(false);
+        }
+      }
+    })();
+
+    return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, steamid]);
 
   // Update URL when state changes
   useEffect(() => {
@@ -401,6 +475,11 @@ export default function PlayerRecordsTabs({
 
   const currentSearchQuery = searchQueries[activeTab];
 
+  const isActiveLoading =
+    (activeTab === 'maps' && isLoadingMaps) ||
+    (activeTab === 'bonuses' && isLoadingBonuses) ||
+    (activeTab === 'stages' && isLoadingStages);
+
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden">
       {/* Tab Bar */}
@@ -475,7 +554,12 @@ export default function PlayerRecordsTabs({
 
       {/* Records List */}
       <div className="min-h-[400px]">
-        {paginatedRecords.length > 0 ? (
+        {isActiveLoading ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-20">
+            <LoadingSpinner />
+            <span className="text-text-muted text-sm font-medium">Loading {activeTab}...</span>
+          </div>
+        ) : paginatedRecords.length > 0 ? (
           <>
             {/* Desktop Sortable Headers - only for finished records */}
             {statusFilter === 'finished' && (
