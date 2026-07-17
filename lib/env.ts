@@ -39,6 +39,9 @@ const optionalSchema = z.object({
   DB_MAX_CONCURRENT_EXPENSIVE: z.coerce.number().int().positive().optional(),
   // Comma-separated extra origins allowed to call the API (own origin always allowed).
   ALLOWED_ORIGINS: z.string().optional(),
+  // Canonical public base URL (e.g. https://stats.example.com). Used for
+  // robots.txt / sitemap.xml absolute URLs; falls back to the request host.
+  NEXT_PUBLIC_SITE_URL: z.url('NEXT_PUBLIC_SITE_URL must be a valid URL').optional(),
   LOG_LEVEL: z
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
     .optional(),
