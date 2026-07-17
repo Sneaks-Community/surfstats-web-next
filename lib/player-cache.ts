@@ -64,28 +64,26 @@ async function fetchPlayersInternal(
     // Use window function for rank calculation (much more efficient than correlated subquery)
     // RANK() OVER (ORDER BY points DESC) calculates rank based on points
     // This is O(n log n) instead of O(n²) for the correlated subquery
-    // Count finishedmaps from ck_playertimes directly to ensure accuracy
+    //
+    // finishedmaps is read straight from the ck_playerrank column (maintained by
+    // the ckSurf game server). We intentionally do NOT count ck_playertimes here:
+    // aggregating that table for the map count cost ~5.5s per uncached page.
     let query: string;
     const params: Array<string | number> = [];
-    
+
     if (sanitizedSearch) {
       // For search, we need to use a subquery to filter first, then calculate rank
       query = `
         SELECT
           ranked.steamid, ranked.name, ranked.country, ranked.points,
-          COALESCE(completions.map_count, 0) as finishedmaps, ranked.lastseen, ranked.\`rank\`
+          ranked.finishedmaps, ranked.lastseen, ranked.\`rank\`
         FROM (
           SELECT
-            steamid, name, country, points, lastseen,
+            steamid, name, country, points, finishedmaps, lastseen,
             RANK() OVER (ORDER BY points DESC) as \`rank\`
           FROM ck_playerrank
           WHERE name LIKE ? OR steamid LIKE ?
         ) ranked
-        LEFT JOIN (
-          SELECT steamid, COUNT(DISTINCT mapname) as map_count
-          FROM ck_playertimes
-          GROUP BY steamid
-        ) completions ON ranked.steamid = completions.steamid
         ORDER BY ranked.points DESC
         LIMIT ? OFFSET ?
       `;
@@ -95,18 +93,13 @@ async function fetchPlayersInternal(
       query = `
         SELECT
           ranked.steamid, ranked.name, ranked.country, ranked.points,
-          COALESCE(completions.map_count, 0) as finishedmaps, ranked.lastseen, ranked.\`rank\`
+          ranked.finishedmaps, ranked.lastseen, ranked.\`rank\`
         FROM (
           SELECT
-            steamid, name, country, points, lastseen,
+            steamid, name, country, points, finishedmaps, lastseen,
             RANK() OVER (ORDER BY points DESC) as \`rank\`
           FROM ck_playerrank
         ) ranked
-        LEFT JOIN (
-          SELECT steamid, COUNT(DISTINCT mapname) as map_count
-          FROM ck_playertimes
-          GROUP BY steamid
-        ) completions ON ranked.steamid = completions.steamid
         ORDER BY ranked.points DESC
         LIMIT ? OFFSET ?
       `;

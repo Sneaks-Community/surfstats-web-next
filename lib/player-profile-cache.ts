@@ -168,7 +168,7 @@ export async function getPlayerOverviewFromCache(steamid: string): Promise<Playe
       const [countRows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT
-            (SELECT COUNT(*) FROM ck_playertimes WHERE steamid = ?) as maps,
+            (SELECT finishedmaps FROM ck_playerrank WHERE steamid = ?) as maps,
             (SELECT COUNT(*) FROM ck_bonus WHERE steamid = ?) as bonuses,
             (SELECT COUNT(*) FROM ck_stages WHERE steamid = ?) as stages
         `, [validSteamId, validSteamId, validSteamId]),
