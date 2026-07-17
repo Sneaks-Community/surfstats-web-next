@@ -3,17 +3,10 @@ import { cacheGetWithTtl, cacheSet } from './valkey-cache';
 import { cacheLock, shouldExpireEarly } from './cache-lock';
 import { withExpensiveQueryLimit } from './db-semaphore';
 import { isCacheReady } from './valkey';
+import { CacheUnavailableError } from './errors';
 import logger from './logger';
 
-/**
- * Thrown when Valkey is unreachable. The cache is a required layer.
- */
-export class CacheUnavailableError extends Error {
-  constructor() {
-    super('Cache unavailable');
-    this.name = 'CacheUnavailableError';
-  }
-}
+export { CacheUnavailableError };
 
 /**
  * Fraction of the TTL, measured from the end, during which a hit becomes
@@ -135,8 +128,10 @@ export async function cachedFetch<T>(
   fetchFn: () => Promise<T>,
   options: CachedFetchOptions<T> = {}
 ): Promise<T> {
-  // Fail closed when the cache is down: never fall through to the DB on every
-  // request (that would overload MySQL). Callers turn this into a 503.
+  // Fail closed when the cache is down rather than hammer the DB. Thrown before
+  // the try/catch, so `onError` deliberately doesn't swallow it. The proxy gate
+  // serves the 503 for normal requests; this backstops the post-gate race
+  // (API: `apiError` → 503; page render → Next 500) and timer paths.
   if (!isCacheReady()) {
     throw new CacheUnavailableError();
   }

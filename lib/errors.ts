@@ -25,3 +25,14 @@ export function getErrorMessage(error: unknown): string {
 export function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
+
+/**
+ * Thrown by `cachedFetch` when Valkey is unreachable; `apiError` turns it into
+ * a 503. Lives here so both can import it without the cache module graph.
+ */
+export class CacheUnavailableError extends Error {
+  constructor() {
+    super('Cache unavailable');
+    this.name = 'CacheUnavailableError';
+  }
+}

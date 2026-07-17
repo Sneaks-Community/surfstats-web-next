@@ -4,8 +4,7 @@ import { searchPlayersFromCache } from '@/lib/player-cache';
 import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
 import { validateSearchQuery } from '@/lib/validators';
 import { getSteamProfilesFromCache } from '@/lib/steam';
-import logger from '@/lib/logger';
-import { getErrorMessage } from '@/lib/errors';
+import { apiError } from '@/lib/api-utils';
 
 const MAX_PLAYERS = 3;
 const MAX_MAPS = 3;
@@ -52,10 +51,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ players, maps });
   } catch (error) {
-    logger.error(`[API/search] Error: ${getErrorMessage(error)}`);
-    return NextResponse.json(
-      { error: 'Search failed' },
-      { status: 500 }
-    );
+    return apiError('[API/search] Error', error, 'Search failed');
   }
 }

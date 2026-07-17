@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import logger from './logger';
 import { validateMapName, validateSteamId } from './validators';
 import { parseIntParam } from './utils';
-import { getErrorMessage } from './errors';
+import { getErrorMessage, CacheUnavailableError } from './errors';
 
 /** Cache-Control header used by the map search endpoints. */
 export const SEARCH_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=30';
@@ -78,5 +78,12 @@ export function apiError(
   status = 500
 ): NextResponse {
   logger.error(`${logLabel}: ${getErrorMessage(error)}`);
+  // Cache down: mirror the proxy's 503 for the post-gate race.
+  if (error instanceof CacheUnavailableError) {
+    return NextResponse.json(
+      { error: 'Service temporarily unavailable' },
+      { status: 503, headers: { 'Retry-After': '5' } }
+    );
+  }
   return NextResponse.json({ error: clientMessage }, { status });
 }
