@@ -186,7 +186,7 @@ export async function getCountriesRankingFromCache(
 export type PlayerSortKey = 'rank' | 'player' | 'points' | 'maps' | 'lastseen';
 
 /**
- * Get players from a specific country
+ * Internal function for getting players from a specific country
  *
  * Query optimization notes:
  * - Uses RANK() window function for player ranking within country
@@ -195,13 +195,13 @@ export type PlayerSortKey = 'rank' | 'player' | 'points' | 'maps' | 'lastseen';
  * - Handles multiple country name variations for the same ISO code
  * - Supports sorting by different columns
  */
-export async function getCountryPlayers(
+const getCountryPlayersInternal = async (
   countryCode: string,
   page = 1,
   limit = 20,
   sort: PlayerSortKey = 'rank',
   order: SortOrder = 'desc'
-): Promise<{ players: CountryPlayer[]; total: number; totalPages: number; countryName: string }> {
+): Promise<{ players: CountryPlayer[]; total: number; totalPages: number; countryName: string }> => {
   logger.debug(`[CountryAnalytics] Fetching players for country: ${countryCode} (page: ${page}, sort: ${sort}, order: ${order})`);
   
   try {
@@ -263,6 +263,42 @@ export async function getCountryPlayers(
     logger.error(`[CountryAnalytics] Failed to fetch players for country ${countryCode}: ${errorMessage}`);
     return { players: [], total: 0, totalPages: 0, countryName: countryCode };
   }
+};
+
+const COUNTRIES_PLAYERS_KEY = 'surfstats:countries:players';
+const COUNTRIES_PLAYERS_TTL = 86400; // 24 hours — matches country ranking/stats
+
+/**
+ * Get players from a specific country from Valkey cache.
+ *
+ * Wraps {@link getCountryPlayersInternal} in the shared cache-aside layer, keyed
+ * on every parameter so each country/page/sort/order combination caches
+ * independently. The RANK() window query is heavy, so it runs under the
+ * expensive-query semaphore + single-flight lock. Cached for 24 hours to match
+ * the sibling country ranking/stats caches (same slow-moving `ck_playerrank`).
+ */
+export async function getCountryPlayers(
+  countryCode: string,
+  page = 1,
+  limit = 20,
+  sort: PlayerSortKey = 'rank',
+  order: SortOrder = 'desc'
+): Promise<{ players: CountryPlayer[]; total: number; totalPages: number; countryName: string }> {
+  const cacheKey = `${COUNTRIES_PLAYERS_KEY}:${countryCode}:${sort}:${order}:${page}:${limit}`;
+
+  return cachedFetch(
+    cacheKey,
+    COUNTRIES_PLAYERS_TTL,
+    () => getCountryPlayersInternal(countryCode, page, limit, sort, order),
+    {
+      lock: true,
+      expensive: true,
+      onError: (error) => {
+        logger.error(`[CountryAnalytics] Failed to fetch players for country ${countryCode}: ${getErrorMessage(error)}`);
+        return { players: [], total: 0, totalPages: 0, countryName: countryCode };
+      },
+    }
+  );
 }
 
 /**

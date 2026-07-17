@@ -1,5 +1,3 @@
-import pool from '@/lib/db';
-import type { RowDataPacket } from 'mysql2';
 import Link from 'next/link';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import { validateSteamId } from '@/lib/validators';
@@ -7,54 +5,14 @@ import { getTotalsFromCache } from '@/lib/cache';
 import { getPlayerTimeOnServerFromCache, getActivityHeatmapFromCache } from '@/lib/player-analytics';
 import { getTierDistributionFromCache } from '@/lib/valkey-map-cache';
 import { getPlayerNameFromCache } from '@/lib/player-cache';
-import { getPlayerOverviewFromCache, getPlayerWrPerformanceFromCache } from '@/lib/player-profile-cache';
+import { getPlayerOverviewFromCache, getPlayerWrPerformanceFromCache, getLinearVsStagedPerTierFromCache } from '@/lib/player-profile-cache';
+import type { TierDistributionRow } from '@/lib/player-profile-cache';
 import logger from '@/lib/logger';
 import PlayerProfileContent from './components/PlayerProfileContent';
 import { getErrorMessage } from '@/lib/errors';
 
 // Highest tier the Tier Distribution radar will render. Defaults to 10.
 const MAX_ALLOWED_TIER = parseInt(process.env.MAX_TIER || '10', 10) || 10;
-
-
-interface TierDistributionRow { tier: number; linear: number; staged: number }
-
-/**
- * Fetch the player's linear/staged completion counts per tier, returning only
- * the tiers the player has actually completed (no padding). Zero-filling across
- * the server's full tier range is applied separately by `padTierDistribution`,
- * which is driven by the server's real tier ceiling rather than a hardcoded max.
- */
-async function getLinearVsStagedPerTier(steamid: string): Promise<TierDistributionRow[]> {
-  logger.debug(`[Player] Fetching linear vs staged per tier for: ${steamid}`);
-
-  try {
-    const [rows] = await pool.query<RowDataPacket[]>(`
-      SELECT
-        COALESCE(m.tier, 1) as \`tier\`,
-        COALESCE(SUM(CASE WHEN staged_map.mapname IS NULL THEN 1 ELSE 0 END), 0) as \`linear\`,
-        COALESCE(SUM(CASE WHEN staged_map.mapname IS NOT NULL THEN 1 ELSE 0 END), 0) as \`staged\`
-      FROM ck_maptier m
-      INNER JOIN ck_playertimes pt ON m.mapname = pt.mapname AND pt.steamid = ?
-      LEFT JOIN (
-        SELECT DISTINCT mapname FROM ck_zones WHERE zonetype = 3
-      ) staged_map ON m.mapname = staged_map.mapname
-      GROUP BY m.tier
-      ORDER BY m.tier ASC
-    `, [steamid]);
-
-    logger.debug(`[Player] Raw query results for ${steamid}: ${JSON.stringify(rows)}`);
-
-    // MySQL returns numbers as strings, so convert them here.
-    return rows.map(row => ({
-      tier: Number(row.tier),
-      linear: Number(row.linear) || 0,
-      staged: Number(row.staged) || 0,
-    }));
-  } catch (error: unknown) {
-    logger.error(`[Player] Failed to fetch linear vs staged per tier: ${getErrorMessage(error)}`);
-    return [];
-  }
-}
 
 /**
  * Zero-fill the player's per-tier completions across the full tier range
@@ -148,7 +106,7 @@ export default async function PlayerProfilePage({
     getTotalsFromCache(),
     getSteamProfilesFromCache([decodedSteamId]),
     getPlayerTimeOnServerFromCache(validSteamId),
-    getLinearVsStagedPerTier(validSteamId),
+    getLinearVsStagedPerTierFromCache(validSteamId),
     getActivityHeatmapFromCache(validSteamId),
     getTierDistributionFromCache(),
     getPlayerWrPerformanceFromCache(validSteamId),
