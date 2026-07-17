@@ -11,7 +11,7 @@ const REGISTRY_CACHE_TTL = 3600; // 1 hour
  * Falls back to database if cache miss
  * Uses CacheLock to prevent cache stampede when multiple requests miss simultaneously
  */
-export async function getAllRegistryDataFromCache(): Promise<{
+async function getAllRegistryDataFromCache(): Promise<{
   bonuses: BonusGroup[];
   stages: StageGroup[];
   playerCount: number;
