@@ -42,8 +42,10 @@ export async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stag
         GROUP BY map, stage
         ORDER BY map ASC, stage ASC
       `),
+      // Only ranked players (points > 0) — this count drives the players-list
+      // pagination total, which excludes 0-point players.
       pool.query<RowDataPacket[]>(`
-        SELECT COUNT(*) as total FROM ck_playerrank
+        SELECT COUNT(*) as total FROM ck_playerrank WHERE points > 0
       `),
     ]);
     

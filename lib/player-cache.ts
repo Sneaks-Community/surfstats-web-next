@@ -83,7 +83,7 @@ async function fetchPlayersInternal(
             steamid, name, country, points, finishedmaps, lastseen,
             RANK() OVER (ORDER BY points DESC) as \`rank\`
           FROM ck_playerrank
-          WHERE name LIKE ? OR steamid LIKE ?
+          WHERE points > 0 AND (name LIKE ? OR steamid LIKE ?)
         ) ranked
         ORDER BY ranked.points DESC
         LIMIT ? OFFSET ?
@@ -100,6 +100,7 @@ async function fetchPlayersInternal(
             steamid, name, country, points, finishedmaps, lastseen,
             RANK() OVER (ORDER BY points DESC) as \`rank\`
           FROM ck_playerrank
+          WHERE points > 0
         ) ranked
         ORDER BY ranked.points DESC
         LIMIT ? OFFSET ?
@@ -113,7 +114,7 @@ async function fetchPlayersInternal(
     let total: number;
     if (sanitizedSearch) {
       // For search, we need to count matching records
-      const countQuery = `SELECT COUNT(*) as total FROM ck_playerrank WHERE name LIKE ? OR steamid LIKE ?`;
+      const countQuery = `SELECT COUNT(*) as total FROM ck_playerrank WHERE points > 0 AND (name LIKE ? OR steamid LIKE ?)`;
       const countParams = [`%${sanitizedSearch}%`, `%${sanitizedSearch}%`];
       const [countRows] = await pool.query<RowDataPacket[]>(countQuery, countParams);
       total = countRows[0].total;
@@ -176,6 +177,7 @@ export async function warmPlayersListCache(pageCount: number): Promise<void> {
   const [rows] = await pool.query<PlayerRank[]>(
     `SELECT steamid, name, country, points, finishedmaps, lastseen
      FROM ck_playerrank
+     WHERE points > 0
      ORDER BY points DESC
      LIMIT ?`,
     [k]
