@@ -162,6 +162,7 @@ export function generateThemeStyles(): string {
   return `
 /* Dark theme (default) */
 :root, .dark {
+  color-scheme: dark;
   --color-primary: ${primaryDark[500]};
   --color-primary-50: ${primaryDark[50]};
   --color-primary-100: ${primaryDark[100]};
@@ -207,6 +208,7 @@ export function generateThemeStyles(): string {
 
 /* Light theme */
 .light {
+  color-scheme: light;
   --color-primary: ${primaryLight[500]};
   --color-primary-50: ${primaryLight[50]};
   --color-primary-100: ${primaryLight[100]};
@@ -248,6 +250,12 @@ export function generateThemeStyles(): string {
   --color-text: ${bgLight[900]};
   --color-text-muted: ${bgLight[600]};
   --color-text-placeholder: ${bgLight[400]};
+}
+
+/* Paint the base background from this inline <style> so a hard
+   reload doesn't flash white before the external stylesheet  */
+html {
+  background-color: var(--color-background);
 }
 `;
 }
