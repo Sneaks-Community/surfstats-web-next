@@ -110,6 +110,18 @@
   100% { background-position: 40px 0; }
 }
 
+/* Delayed reveal for loading skeletons — stays invisible for a short window so
+   fast (cached) navigations swap in real content before the skeleton is ever
+   seen, then fades in for genuinely slow loads. The reduced-motion rule below
+   collapses the fade to an instant appearance while preserving the delay. */
+@keyframes skeleton-reveal {
+  to { opacity: 1; }
+}
+.skeleton-reveal {
+  opacity: 0;
+  animation: skeleton-reveal 150ms ease-in 150ms forwards;
+}
+
 /* Respect prefers-reduced-motion for accessibility */
 @media (prefers-reduced-motion: reduce) {
   *,
