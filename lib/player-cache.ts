@@ -5,6 +5,7 @@ import logger from '@/lib/logger';
 import { getPlayerCountFromCache } from '@/lib/valkey-registry-cache';
 import { validateSearchQuery } from './validators';
 import { cachedFetch } from './cached-fetch';
+import { cacheSet } from './valkey-cache';
 import { getErrorMessage } from './errors';
 
 /**
@@ -155,6 +156,53 @@ export async function getPlayersFromCache(
   const cacheKey = `${PLAYERS_LIST_KEY}:${safePage}:${safeSearch}`;
 
   return cachedFetch(cacheKey, PLAYERS_LIST_TTL, () => fetchPlayersInternal(safePage, safeSearch), { lock: true, expensive: true });
+}
+
+/**
+ * Proactively populate the cache for the first `pageCount` pages of the default
+ * (no-search) players listing, so the pages people actually browse are always a
+ * cache hit instead of triggering the full-table rank query on a miss.
+ *
+ * Runs one indexed `ORDER BY points DESC LIMIT k` query for the top
+ * `pageCount * PAGE_SIZE` players (no `RANK()` window over the whole table) and
+ * assigns rank in JS. Because the slice starts at the very top, positional rank
+ * is exact RANK() (ties share a rank, gaps after) — identical to the on-demand
+ * query. Called on an interval by the players-list background refresh.
+ */
+export async function warmPlayersListCache(pageCount: number): Promise<void> {
+  const pageSize = 20;
+  const k = Math.max(1, pageCount) * pageSize;
+
+  const [rows] = await pool.query<PlayerRank[]>(
+    `SELECT steamid, name, country, points, finishedmaps, lastseen
+     FROM ck_playerrank
+     ORDER BY points DESC
+     LIMIT ?`,
+    [k]
+  );
+
+  // Assign RANK() (ties share a rank; next distinct value jumps to its position).
+  let rank = 0;
+  let prevPoints: number | null = null;
+  const ranked: PlayerRank[] = rows.map((row, i) => {
+    if (row.points !== prevPoints) {
+      rank = i + 1;
+      prevPoints = row.points;
+    }
+    return { ...row, rank };
+  });
+
+  const total = await getPlayerCountFromCache();
+  const totalPages = Math.ceil(total / pageSize);
+
+  for (let page = 1; page <= pageCount; page++) {
+    const players = ranked.slice((page - 1) * pageSize, page * pageSize);
+    if (players.length === 0) break; // fewer players than requested pages
+    // Key must match getPlayersFromCache's empty-search key exactly.
+    await cacheSet(`${PLAYERS_LIST_KEY}:${page}:`, { players, total, totalPages }, PLAYERS_LIST_TTL);
+  }
+
+  logger.debug(`[PlayerCache] Warmed ${Math.min(pageCount, Math.ceil(ranked.length / pageSize))} players-list page(s) from top ${ranked.length} players`);
 }
 
 /**

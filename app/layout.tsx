@@ -8,6 +8,7 @@ import { validateEnv } from '@/lib/env';
 import { getSiteUrl } from '@/lib/site-url';
 import { startServerBackgroundRefresh } from '@/lib/server-background-refresh';
 import { startMapGraphPrecache } from '@/lib/map-graph-precache';
+import { startPlayersListBackgroundRefresh } from '@/lib/players-list-background-refresh';
 
 // Validate environment configuration at startup (fail fast on missing required
 // vars; warn on unset optional features).
@@ -18,6 +19,9 @@ startServerBackgroundRefresh();
 
 // Start map graph precache at server startup (fire-and-forget, non-blocking)
 startMapGraphPrecache();
+
+// Keep the most-browsed players-list pages warm so they're always a cache hit
+startPlayersListBackgroundRefresh();
 
 // Force dynamic rendering to read environment variables at runtime, not build time
 export const dynamic = 'force-dynamic';
