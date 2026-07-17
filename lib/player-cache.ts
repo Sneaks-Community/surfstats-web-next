@@ -73,7 +73,10 @@ async function fetchPlayersInternal(
     const params: Array<string | number> = [];
 
     if (sanitizedSearch) {
-      // For search, we need to use a subquery to filter first, then calculate rank
+      // Rank over the whole points>0 table FIRST, then filter by name/steamid in
+      // an outer WHERE. Window functions run after the inner WHERE, so filtering
+      // inside the subquery would rank only the matches (giving a positional
+      // 1,2,3...) instead of each player's true global rank.
       query = `
         SELECT
           ranked.steamid, ranked.name, ranked.country, ranked.points,
@@ -83,8 +86,9 @@ async function fetchPlayersInternal(
             steamid, name, country, points, finishedmaps, lastseen,
             RANK() OVER (ORDER BY points DESC) as \`rank\`
           FROM ck_playerrank
-          WHERE points > 0 AND (name LIKE ? OR steamid LIKE ?)
+          WHERE points > 0
         ) ranked
+        WHERE ranked.name LIKE ? OR ranked.steamid LIKE ?
         ORDER BY ranked.points DESC
         LIMIT ? OFFSET ?
       `;
