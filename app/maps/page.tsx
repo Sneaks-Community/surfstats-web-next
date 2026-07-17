@@ -121,7 +121,7 @@ export default async function MapsPage({
       {/* Pagination navigates through the provider, which shows the skeleton
           instantly. loading.tsx only covers the initial route load. */}
       <NavigationPendingProvider>
-        <PendingContent fallback={<SkeletonScreen label="Loading maps..."><MapsGridSkeleton /></SkeletonScreen>}>
+        <PendingContent className="space-y-6" fallback={<SkeletonScreen label="Loading maps..."><MapsGridSkeleton count={paginatedMaps.length || limit} /></SkeletonScreen>}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {paginatedMaps.map((map) => {
               const tierColor = getTierColor(map.tier);

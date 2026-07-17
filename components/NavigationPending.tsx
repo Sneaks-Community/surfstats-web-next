@@ -4,10 +4,19 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
   useTransition,
   type ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
+
+// `useLayoutEffect` warns during SSR; fall back to `useEffect` on the server
+// (where it's a no-op anyway) and use the layout variant in the browser so the
+// reserved height is applied synchronously, before the browser can repaint.
+const useIsomorphicLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
 
 interface NavigationPendingContextValue {
   /** True from the moment a navigation is triggered until the new content commits. */
@@ -57,14 +66,51 @@ export function useNavigationPending(): NavigationPendingContextValue | null {
  * Renders `fallback` while a navigation triggered through the provider is in
  * flight, otherwise renders `children`. Placed around a list/grid it swaps in a
  * skeleton the instant the user paginates, instead of waiting for the server.
+ *
+ * While pending, the wrapper is pinned to the height the real content had just
+ * before the swap. Skeletons are almost always shorter than the content they
+ * replace (fewer/relaxed rows, no pagination footer, …); without this the
+ * document would shrink mid-navigation, the browser would clamp the scroll
+ * offset to the new (smaller) max height, and the user would be yanked toward
+ * the top even though the navigation itself preserves scroll. Reserving the
+ * height keeps them exactly where they were.
  */
 export function PendingContent({
   children,
   fallback,
+  className,
 }: {
   children: ReactNode;
   fallback: ReactNode;
+  /** Applied to the wrapper element (e.g. spacing utilities the children rely on). */
+  className?: string;
 }) {
   const nav = useNavigationPending();
-  return <>{nav?.isPending ? fallback : children}</>;
+  const isPending = nav?.isPending ?? false;
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const lastHeight = useRef<number>(0);
+  const [reservedHeight, setReservedHeight] = useState<number | undefined>(undefined);
+
+  // On entering the pending state, pin the wrapper to the height the real
+  // content had on its last settled render; on leaving it, remeasure and drop
+  // the reservation. Runs before paint so the browser never sees the shorter
+  // skeleton and never clamps the scroll offset.
+  useIsomorphicLayoutEffect(() => {
+    if (isPending) {
+      setReservedHeight(lastHeight.current || undefined);
+    } else {
+      if (wrapperRef.current) lastHeight.current = wrapperRef.current.offsetHeight;
+      setReservedHeight(undefined);
+    }
+  }, [isPending]);
+
+  return (
+    <div
+      ref={wrapperRef}
+      className={className}
+      style={isPending && reservedHeight ? { minHeight: reservedHeight } : undefined}
+    >
+      {isPending ? fallback : children}
+    </div>
+  );
 }
