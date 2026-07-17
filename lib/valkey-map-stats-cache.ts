@@ -494,9 +494,8 @@ export async function getPercentileTimesFromCache(
 /**
  * Aggregated chart data for a map's stats grid.
  *
- * Shared by the map page (server-rendered → passed as props to MapChartGrid)
- * and the `/api/maps/[mapname]/stats` route, so both compose the same shape
- * from the same underlying cached sub-fetches.
+ * Composed by the map page (server-rendered → passed as props to MapChartGrid)
+ * from the underlying cached sub-fetches.
  */
 export interface MapChartData {
   completionsOverTime: Array<{ date: string; count: number }>;
