@@ -34,6 +34,8 @@ const requiredSchema = z.object({
 const optionalSchema = z.object({
   MYSQL_PORT: z.coerce.number().int().positive().optional(),
   ANALYTICS_MYSQL_PORT: z.coerce.number().int().positive().optional(),
+  // How often to re-check the analytics DB connection (ms). 0 disables re-checks.
+  ANALYTICS_HEALTHCHECK_INTERVAL_MS: z.coerce.number().int().nonnegative().optional(),
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().optional(),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().optional(),
   DB_MAX_CONCURRENT_EXPENSIVE: z.coerce.number().int().positive().optional(),

@@ -47,33 +47,100 @@ analyticsPool.on('enqueue', () => {
 // Wrap the pool with slow query logging using the shared utility
 wrapPoolQuery(analyticsPool, { prefix: 'Analytics DB', slowThresholdMs: 1000 });
 
-// Initialize database connection and pre-warm caches at server startup
-async function initializeAnalyticsDatabase() {
-  // Skip if not configured
+// How often to re-check the analytics connection health, in milliseconds.
+// Configurable via ANALYTICS_HEALTHCHECK_INTERVAL_MS (clamped to a 10s minimum so
+// a typo can't hammer the DB). Set it to 0 (or a negative value) to disable
+// periodic re-checks and only probe once at startup.
+function resolveHealthCheckIntervalMs(): number {
+  const raw = process.env.ANALYTICS_HEALTHCHECK_INTERVAL_MS;
+  if (raw === undefined || raw.trim() === '') {
+    return 60_000; // default: 1 minute
+  }
+  const parsed = parseInt(raw, 10);
+  if (Number.isNaN(parsed)) {
+    return 60_000;
+  }
+  if (parsed <= 0) {
+    return 0; // disabled
+  }
+  return Math.max(10_000, parsed);
+}
+
+const HEALTHCHECK_INTERVAL_MS = resolveHealthCheckIntervalMs();
+
+let healthCheckTimer: ReturnType<typeof setInterval> | null = null;
+// Tracks the last state we logged so a steady connection doesn't spam the log —
+// we only emit on the first probe and on each subsequent up<->down transition.
+let lastLoggedHealthy: boolean | null = null;
+
+// Probe the analytics connection and update the health flag. Never throws -
+// analytics is optional, so a failed probe just flips the feature off until it
+// recovers on a later probe.
+async function checkAnalyticsConnection(): Promise<void> {
+  try {
+    const connection = await analyticsPool.getConnection();
+    await connection.ping();
+    connection.release();
+    analyticsConnectionHealthy = true;
+    if (lastLoggedHealthy !== true) {
+      logger.info('[Analytics DB] Database connection is healthy - analytics features enabled');
+      lastLoggedHealthy = true;
+    }
+  } catch (error: unknown) {
+    analyticsConnectionHealthy = false;
+    if (lastLoggedHealthy !== false) {
+      logger.warn(
+        `[Analytics DB] Database connection unavailable: ${getErrorMessage(error)} - analytics features disabled until it recovers`
+      );
+      lastLoggedHealthy = false;
+    }
+  }
+}
+
+// Start the analytics health monitor: one immediate probe at startup, then a
+// periodic re-probe on the configured interval. Idempotent - safe to call more
+// than once.
+function startAnalyticsHealthCheck(): void {
+  // Skip entirely if not configured
   if (!isAnalyticsConfigured) {
     logger.info('[Analytics DB] Not configured - analytics features disabled');
     return;
   }
 
+  if (healthCheckTimer) {
+    logger.debug('[Analytics DB] Health check already running');
+    return;
+  }
+
   logger.info('[Analytics DB] Initializing database connection...');
 
-  try {
-    // Test connection with a simple query
-    const connection = await analyticsPool.getConnection();
-    await connection.ping();
-    connection.release();
-    analyticsConnectionHealthy = true;
-    logger.info('[Analytics DB] Database connection established successfully');
-  } catch (error: unknown) {
-    // Log but don't throw - analytics database is optional
-    analyticsConnectionHealthy = false;
-    logger.warn(`[Analytics DB] Database connection failed: ${getErrorMessage(error)}`);
-    logger.warn('[Analytics DB] Analytics features will be disabled');
+  // Immediate probe so isAnalyticsAvailable() is accurate right away
+  checkAnalyticsConnection(); // eslint-disable-line @typescript-eslint/no-floating-promises
+
+  if (HEALTHCHECK_INTERVAL_MS <= 0) {
+    logger.info('[Analytics DB] Periodic health re-check disabled (ANALYTICS_HEALTHCHECK_INTERVAL_MS<=0)');
+    return;
   }
+
+  healthCheckTimer = setInterval(() => {
+    checkAnalyticsConnection(); // eslint-disable-line @typescript-eslint/no-floating-promises
+  }, HEALTHCHECK_INTERVAL_MS);
+  logger.info(`[Analytics DB] Periodic health re-check enabled (every ${HEALTHCHECK_INTERVAL_MS}ms)`);
 }
 
-// Initialize on module load
-initializeAnalyticsDatabase(); // eslint-disable-line @typescript-eslint/no-floating-promises
+// Start monitoring on module load
+startAnalyticsHealthCheck();
+
+// Graceful shutdown cleanup
+if (typeof window === 'undefined') {
+  process.on('SIGTERM', () => {
+    if (healthCheckTimer) {
+      clearInterval(healthCheckTimer);
+      healthCheckTimer = null;
+      logger.info('[Analytics DB] Health check stopped');
+    }
+  });
+}
 
 export default analyticsPool;
 

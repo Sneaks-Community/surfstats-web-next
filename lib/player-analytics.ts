@@ -1,17 +1,10 @@
 import 'server-only';
-import analyticsPool from '@/lib/db-analytics';
+import analyticsPool, { isAnalyticsAvailable } from '@/lib/db-analytics';
 import type { RowDataPacket } from 'mysql2';
 import { convertSteamId2ToSteamId3Numeric } from '@/lib/steam';
 import logger from '@/lib/logger';
 import { cachedFetch } from './cached-fetch';
 import { getErrorMessage } from './errors';
-
-// Check if analytics database is configured (env vars are set)
-const isAnalyticsConfigured = !!(
-  process.env.ANALYTICS_MYSQL_HOST ||
-  process.env.ANALYTICS_MYSQL_DATABASE ||
-  (process.env.MYSQL_HOST && process.env.MYSQL_DATABASE)
-);
 
 interface PlayerTimeData extends RowDataPacket {
   total_duration: number | null;
@@ -29,8 +22,9 @@ interface PlayerTimeResult {
  * @returns Object with totalSeconds and connectionCount, or null if unavailable
  */
 async function getPlayerTimeOnServerInternal(steamId: string): Promise<PlayerTimeResult | null> {
-  // Return null if analytics is not configured - box will be hidden
-  if (!isAnalyticsConfigured) {
+  // Return null if analytics is unavailable (not configured, or the startup
+  // connection check failed) - box will be hidden
+  if (!isAnalyticsAvailable()) {
     return null;
   }
 
@@ -105,8 +99,9 @@ interface HeatmapDataPoint {
 async function getPlayerActivityHeatmapInternal(
   steamId: string
 ): Promise<HeatmapDataPoint[] | null> {
-  // Return null if analytics is not configured
-  if (!isAnalyticsConfigured) {
+  // Return null if analytics is unavailable (not configured, or the startup
+  // connection check failed)
+  if (!isAnalyticsAvailable()) {
     return null;
   }
 
