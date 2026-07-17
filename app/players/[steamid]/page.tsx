@@ -55,8 +55,18 @@ export async function generateMetadata({ params }: { params: Promise<{ steamid: 
       };
     }
 
+    const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats';
+    const description = `View ${name}'s CS:GO surf statistics, records, rankings, and completions on ${siteName}.`;
+
     return {
       title: `${name} - Player Profile`,
+      description,
+      openGraph: {
+        type: 'profile',
+        siteName,
+        title: `${name} - Player Profile - ${siteName}`,
+        description,
+      },
     };
   } catch (error: unknown) {
     logger.error(`[Player] Failed to generate metadata for ${validSteamId}: ${getErrorMessage(error)}`);

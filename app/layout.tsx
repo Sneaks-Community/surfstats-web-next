@@ -5,6 +5,7 @@ import { MapImagesUrlProvider } from '@/lib/MapImagesUrlContext';
 import { ThemeProvider } from '@/lib/theme-context';
 import { generateThemeStyles } from '@/lib/theme-config';
 import { validateEnv } from '@/lib/env';
+import { getSiteUrl } from '@/lib/site-url';
 import { startServerBackgroundRefresh } from '@/lib/server-background-refresh';
 import { startMapGraphPrecache } from '@/lib/map-graph-precache';
 
@@ -21,13 +22,35 @@ startMapGraphPrecache();
 // Force dynamic rendering to read environment variables at runtime, not build time
 export const dynamic = 'force-dynamic';
 
-export const metadata: Metadata = {
-  title: {
-    default: process.env.NEXT_PUBLIC_SITE_TITLE || 'SurfStats - CS:GO Surf Community',
-    template: `%s - ${process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats'}`,
-  },
-  description: process.env.NEXT_PUBLIC_SITE_DESCRIPTION || 'Statistics, leaderboards, and server information for our CS:GO surf community.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const siteUrl = await getSiteUrl();
+  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats';
+  const title = process.env.NEXT_PUBLIC_SITE_TITLE || 'SurfStats - CS:GO Surf Community';
+  const description =
+    process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
+    'Statistics, leaderboards, and server information for our CS:GO surf community.';
+
+  return {
+    metadataBase: new URL(siteUrl),
+    title: {
+      default: title,
+      template: `%s - ${siteName}`,
+    },
+    description,
+    openGraph: {
+      type: 'website',
+      siteName,
+      title,
+      description,
+      url: siteUrl,
+    },
+    twitter: {
+      card: 'summary',
+      title,
+      description,
+    },
+  };
+}
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
   const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';

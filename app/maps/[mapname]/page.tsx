@@ -25,13 +25,27 @@ export async function generateMetadata({ params }: { params: Promise<{ mapname: 
   }
   
   const map = await getMapMetadataFromCache(validMapname);
-  
+
   if (!map) {
     return { title: 'Map Not Found' };
   }
-  
+
+  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats';
+  const description =
+    `Leaderboards, world records, and completion stats for the CS:GO surf map ${map.mapname} (Tier ${map.tier})` +
+    (map.wr_holder ? `. Current world record held by ${map.wr_holder}.` : '.');
+  const imagesBaseUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
+
   return {
     title: map.mapname,
+    description,
+    openGraph: {
+      type: 'website',
+      siteName,
+      title: `${map.mapname} - ${siteName}`,
+      description,
+      images: [{ url: mapImageUrl(imagesBaseUrl, map.mapname) }],
+    },
   };
 }
 
