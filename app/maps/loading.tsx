@@ -1,4 +1,5 @@
 import { Skeleton, SkeletonScreen } from '@/components/Skeleton';
+import MapsGridSkeleton from '@/components/MapsGridSkeleton';
 
 export default function Loading() {
   return (
@@ -15,13 +16,7 @@ export default function Loading() {
       </div>
 
       {/* Map card grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <div key={i} className="bg-surface border border-border rounded-xl overflow-hidden">
-            <Skeleton className="h-48 w-full" />
-          </div>
-        ))}
-      </div>
+      <MapsGridSkeleton />
     </SkeletonScreen>
   );
 }

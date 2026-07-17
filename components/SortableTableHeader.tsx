@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { useNavigationPending } from '@/components/NavigationPending';
 
 interface SortableTableHeaderProps {
   column: string;
@@ -25,7 +26,8 @@ export default function SortableTableHeader({
   className = '',
 }: SortableTableHeaderProps) {
   const isActive = currentSort === column;
-  
+  const nav = useNavigationPending();
+
   // Determine the order for this column when clicked
   // If currently active, toggle the order
   // If not active, use the default order for this column
@@ -55,11 +57,24 @@ export default function SortableTableHeader({
     
     return `${baseUrl}?${params.toString()}`;
   };
-  
+
+  const href = buildUrl();
+
+  // Route plain left-clicks through the transition-backed provider so the
+  // pending skeleton shows immediately; modified clicks and the no-provider
+  // case fall through to the <Link>.
+  const handleClick = (e: React.MouseEvent) => {
+    if (!nav) return;
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    nav.navigate(href);
+  };
+
   return (
     <th scope="col" className={`px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider ${className}`}>
       <Link
-        href={buildUrl()}
+        href={href}
+        onClick={handleClick}
         className="inline-flex items-center gap-1 hover:text-text transition-colors group"
       >
         <span>{label}</span>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
 import { usePagination } from '@/hooks/usePagination';
+import { useNavigationPending } from '@/components/NavigationPending';
 import { clientError } from '@/lib/client-logger';
 
 type NavigationMode = 'client' | 'server' | 'none';
@@ -69,6 +70,20 @@ export default function Pagination({
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  const nav = useNavigationPending();
+
+  // Intercept plain left-clicks on server-mode links so navigation runs through
+  // the transition-backed provider (instant pending state / skeleton). Modified
+  // clicks (new tab, etc.) and the no-provider case fall through to the <Link>.
+  const handleNavClick = useCallback(
+    (e: React.MouseEvent, href: string) => {
+      if (!nav) return;
+      if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      e.preventDefault();
+      nav.navigate(href);
+    },
+    [nav]
+  );
 
   // Handle jump to page
   const handleJumpSubmit = useCallback((e: React.SyntheticEvent) => {
@@ -82,11 +97,18 @@ export default function Pagination({
         const searchStr = searchParams.toString() || '';
         const params = new URLSearchParams(searchStr);
         params.set('page', page.toString());
-        router.push(`?${params.toString()}`);
+        const url = `?${params.toString()}`;
+        // Route through the transition-backed provider when available so the
+        // pending skeleton shows immediately; otherwise plain router push.
+        if (nav) {
+          nav.navigate(url);
+        } else {
+          router.push(url);
+        }
       }
       setJumpPage('');
     }
-  }, [jumpPage, totalPages, navigationMode, onPageChange, handlePageChange, router, searchParams]);
+  }, [jumpPage, totalPages, navigationMode, onPageChange, handlePageChange, router, searchParams, nav]);
 
   // Render page number button/link
   const renderPageNumber = (page: number | string) => {
@@ -114,11 +136,13 @@ export default function Pagination({
       );
     }
 
+    const href = buildUrl(page as number);
     return (
       <Link
         key={page}
-        href={buildUrl(page as number)}
+        href={href}
         scroll={false}
+        onClick={(e) => handleNavClick(e, href)}
         className={commonClasses}
       >
         {page}
@@ -159,6 +183,7 @@ export default function Pagination({
         key={ariaLabel}
         href={href}
         scroll={false}
+        onClick={(e) => handleNavClick(e, href)}
         className={commonClasses}
         aria-label={ariaLabel}
       >

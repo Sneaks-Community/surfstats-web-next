@@ -4,6 +4,9 @@ import { Search } from 'lucide-react';
 import { cache } from 'react';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import Pagination from '@/components/Pagination';
+import PlayersTableSkeleton from '@/components/PlayersTableSkeleton';
+import { SkeletonScreen } from '@/components/Skeleton';
+import { NavigationPendingProvider, PendingContent } from '@/components/NavigationPending';
 import { formatDate, parseIntParam } from '@/lib/utils';
 import { getPlayersFromCache } from '@/lib/player-cache';
 import { validateSearchQuery } from '@/lib/validators';
@@ -24,10 +27,10 @@ export default async function PlayersPage({
   const params = await searchParams;
   const q = validateSearchQuery(params.q);
   const page = parseIntParam(params.page);
-  
+
   // Fetch players first to get steam IDs
   const { players, total, totalPages } = await getPlayersFromCache(page, q);
-  
+
   // Extract steam IDs and fetch avatars (cached within request via React.cache)
   const steamIds = players.map(p => p.steamid);
   const avatarsWithData = await getCachedSteamProfiles(steamIds);
@@ -39,7 +42,7 @@ export default async function PlayersPage({
           <h1 className="text-3xl font-bold text-text">Players</h1>
           <p className="text-text-muted">Browse and search all {total.toLocaleString()} players</p>
         </div>
-        
+
         <form className="relative w-full sm:w-72">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search className="h-4 w-4 text-text-placeholder" />
@@ -55,77 +58,85 @@ export default async function PlayersPage({
         </form>
       </div>
 
-      <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-border">
-            <thead className="bg-surface/50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Rank</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Player</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Points</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Maps</th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Last Seen</th>
-              </tr>
-            </thead>
-            <tbody className="bg-surface divide-y divide-border">
-              {players.map((player) => {
-                const avatar = avatarsWithData.get(player.steamid);
-                return (
-                  <tr key={player.steamid} className="hover:bg-surface-hover/50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-muted">
-                      #{player.rank}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-3">
-                        {avatar && (
-                          <Image
-                            src={avatar.avatarmedium}
-                            alt={`${player.name}'s avatar`}
-                            width={32}
-                            height={32}
-                            className="rounded-full"
-                          />
-                        )}
-                        <Link href={`/players/${player.steamid}`} prefetch={false} className="text-primary hover:text-primary font-medium transition-colors">
-                          {player.name || 'Unknown'}
-                        </Link>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
-                      {player.points.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
-                      {player.finishedmaps.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-text-muted">
-                      {player.lastseen ? formatDate(player.lastseen) : 'Never'}
-                    </td>
+      {/* Pagination navigates through the provider, which shows the skeleton
+          the instant a page is clicked. `loading.tsx` only fires on the initial
+          route load; search-param navigations reuse the segment and would
+          otherwise sit frozen until the (uncached) query returns. */}
+      <NavigationPendingProvider>
+        <PendingContent fallback={<SkeletonScreen label="Loading players..."><PlayersTableSkeleton /></SkeletonScreen>}>
+          <div className="bg-surface border border-border rounded-xl overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-border">
+                <thead className="bg-surface/50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Rank</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Player</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Points</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Maps</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Last Seen</th>
                   </tr>
-                );
-              })}
-              {players.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-text-muted">
-                    No players found matching your search.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="px-6 border-t border-border">
-            <Pagination
-              currentPage={page}
-              totalPages={totalPages}
-              baseUrl="/players"
-              queryParams={q ? { q } : {}}
-            />
+                </thead>
+                <tbody className="bg-surface divide-y divide-border">
+                  {players.map((player) => {
+                    const avatar = avatarsWithData.get(player.steamid);
+                    return (
+                      <tr key={player.steamid} className="hover:bg-surface-hover/50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-muted">
+                          #{player.rank}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-3">
+                            {avatar && (
+                              <Image
+                                src={avatar.avatarmedium}
+                                alt={`${player.name}'s avatar`}
+                                width={32}
+                                height={32}
+                                className="rounded-full"
+                              />
+                            )}
+                            <Link href={`/players/${player.steamid}`} prefetch={false} className="text-primary hover:text-primary font-medium transition-colors">
+                              {player.name || 'Unknown'}
+                            </Link>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
+                          {player.points.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
+                          {player.finishedmaps.toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-muted">
+                          {player.lastseen ? formatDate(player.lastseen) : 'Never'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {players.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-8 text-center text-text-muted">
+                        No players found matching your search.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="px-6 border-t border-border">
+                <Pagination
+                  currentPage={page}
+                  totalPages={totalPages}
+                  baseUrl="/players"
+                  queryParams={q ? { q } : {}}
+                />
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </PendingContent>
+      </NavigationPendingProvider>
     </div>
   );
 }
