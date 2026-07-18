@@ -114,6 +114,22 @@ export function formatPlaytimeToggle(seconds: number): string {
   return `${hours.toLocaleString()}h ${minutes}m`;
 }
 
+/** Default map-thumbnail CDN base, used when `MAP_IMAGES_URL` is unset. */
+const DEFAULT_MAP_IMAGES_URL = 'https://image.gametracker.com/images/maps/160x120/csgo/';
+
+/**
+ * Resolve the base URL for map thumbnails.
+ *
+ * Reads `MAP_IMAGES_URL` (server env) and falls back to the shared default.
+ * On the client `process.env.MAP_IMAGES_URL` is undefined, so callers there
+ * always receive the default — matching the previous per-call-site fallbacks.
+ *
+ * @returns The map-images base URL
+ */
+export function getMapImagesUrl(): string {
+  return process.env.MAP_IMAGES_URL || DEFAULT_MAP_IMAGES_URL;
+}
+
 /**
  * Build a map thumbnail image URL
  *

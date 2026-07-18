@@ -4,6 +4,7 @@ import ServerCard from './ServerCard';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
 import { getErrorMessage } from '@/lib/errors';
+import { getMapImagesUrl } from '@/lib/utils';
 
 // Force dynamic rendering to ensure fresh data on each request
 export const dynamic = 'force-dynamic';
@@ -24,7 +25,7 @@ export default async function ServersPage() {
     logger.error('[Servers] Server list will be empty');
   }
   
-  const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
+  const mapImagesUrl = getMapImagesUrl();
 
   return (
     <div className="space-y-6">

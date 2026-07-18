@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/lib/theme-context';
 import { generateThemeStyles } from '@/lib/theme-config';
 import { validateEnv } from '@/lib/env';
 import { getSiteUrl } from '@/lib/site-url';
+import { getMapImagesUrl } from '@/lib/utils';
 import { startServerBackgroundRefresh } from '@/lib/server-background-refresh';
 import { startMapGraphPrecache } from '@/lib/map-graph-precache';
 import { startPlayersListBackgroundRefresh } from '@/lib/players-list-background-refresh';
@@ -57,7 +58,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default function RootLayout({children}: {children: React.ReactNode}) {
-  const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
+  const mapImagesUrl = getMapImagesUrl();
   const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats';
   const themeStyles = generateThemeStyles();
   

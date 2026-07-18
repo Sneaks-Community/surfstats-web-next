@@ -3,7 +3,7 @@ import { Search as SearchIcon, Map as MapIcon, Users, ChevronRight } from 'lucid
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTierTextColor } from '@/lib/tierColors';
-import { mapImageUrl } from '@/lib/utils';
+import { mapImageUrl, getMapImagesUrl } from '@/lib/utils';
 import { validateSearchQuery, validatePlayerName } from '@/lib/validators';
 import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
 import { searchPlayersFromCache } from '@/lib/player-cache';
@@ -56,7 +56,7 @@ export default async function SearchPage({
     }
   }
 
-  const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
+  const mapImagesUrl = getMapImagesUrl();
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">

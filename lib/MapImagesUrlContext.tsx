@@ -2,6 +2,7 @@
 
 import { createContext, useContext } from 'react';
 import type { ReactNode } from 'react';
+import { getMapImagesUrl } from './utils';
 
 const MapImagesUrlContext = createContext<string>('');
 
@@ -23,7 +24,7 @@ export function useMapImagesUrl() {
   const url = useContext(MapImagesUrlContext);
   if (!url) {
     // Fallback to default if used outside provider
-    return 'https://image.gametracker.com/images/maps/160x120/csgo/';
+    return getMapImagesUrl();
   }
   return url;
 }

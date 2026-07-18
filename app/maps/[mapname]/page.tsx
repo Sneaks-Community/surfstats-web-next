@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { Map as MapIcon, Users, Layers, Target, Download } from 'lucide-react';
 import MapImage from '@/components/MapImage';
 import { validateMapName, validatePlayerName } from '@/lib/validators';
-import { mapImageUrl } from '@/lib/utils';
+import { mapImageUrl, getMapImagesUrl } from '@/lib/utils';
 import logger from '@/lib/logger';
 import MapRecordsTabs from './components/MapRecordsTabs';
 import TierBadge from '@/components/TierBadge';
@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: { params: Promise<{ mapname: 
   const description =
     `Leaderboards, world records, and completion stats for the CS:GO surf map ${map.mapname} (Tier ${map.tier})` +
     (map.wr_holder ? `. Current world record held by ${map.wr_holder}.` : '.');
-  const imagesBaseUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
+  const imagesBaseUrl = getMapImagesUrl();
 
   return {
     title: map.mapname,
@@ -94,7 +94,7 @@ export default async function MapProfilePage({
   const leaderboard = recordsData.leaderboard;
   const total = recordsData.counts.leaderboardTotal;
 
-  const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
+  const mapImagesUrl = getMapImagesUrl();
 
   return (
     <div className="space-y-4">

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Users, Map as MapIcon, Trophy, Clock, Activity } from 'lucide-react';
-import { formatTime, formatDate, mapImageUrl } from '@/lib/utils';
+import { formatTime, formatDate, mapImageUrl, getMapImagesUrl } from '@/lib/utils';
 import { getStatsFromCache, getLatestCompletionsFromCache } from '@/lib/cache';
 import logger from '@/lib/logger';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
@@ -43,7 +43,7 @@ export default async function Home() {
   const latestCompletions = await getLatestCompletions();
 
 
-  const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
+  const mapImagesUrl = getMapImagesUrl();
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">

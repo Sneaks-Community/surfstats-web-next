@@ -7,7 +7,7 @@ import MapsGridSkeleton from '@/components/MapsGridSkeleton';
 import { SkeletonScreen } from '@/components/Skeleton';
 import { NavigationPendingProvider, PendingContent } from '@/components/NavigationPending';
 import { getTierColor } from '@/lib/tierColors';
-import { mapImageUrl } from '@/lib/utils';
+import { mapImageUrl, getMapImagesUrl } from '@/lib/utils';
 import Pagination from '@/components/Pagination';
 import { type MapMetadata } from '@/lib/map-cache';
 import { getAllMapMetadataFromCache, getTierDistributionFromCache } from '@/lib/valkey-map-cache';
@@ -100,7 +100,7 @@ export default async function MapsPage({
       .sort((a, b) => a.tier - b.tier),
   };
 
-  const mapImagesUrl = process.env.MAP_IMAGES_URL || 'https://image.gametracker.com/images/maps/160x120/csgo/';
+  const mapImagesUrl = getMapImagesUrl();
 
   return (
     <div className="space-y-6">
