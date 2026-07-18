@@ -122,6 +122,10 @@ const getCountriesRankingInternal = async (
       let comparison = 0;
       if (sortColumn === 'country') {
         comparison = a.country.localeCompare(b.country);
+      } else if (sortColumn === 'player_count') {
+        comparison = a.player_count - b.player_count;
+      } else if (sortColumn === 'rank') {
+        comparison = a.rank - b.rank;
       } else {
         comparison = a.total_points - b.total_points;
       }
