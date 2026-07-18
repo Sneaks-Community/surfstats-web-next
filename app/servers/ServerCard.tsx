@@ -78,7 +78,7 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
               onKeyDown={(e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  copyAddress(e);
+                  void copyAddress(e);
                 }
               }}
               title="Copy address to clipboard"

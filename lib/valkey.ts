@@ -17,7 +17,7 @@ const valkeyConnectTimeout = parseInt(process.env.VALKEY_CONNECT_TIMEOUT || '500
 function reconnectStrategy(retries: number, cause: Error): number {
   const delay = Math.min(2 ** retries * 100, 30_000);
   logger.warn(
-    `[Valkey] Reconnect attempt #${retries + 1} failed: ${cause?.message ?? 'unknown error'}. Next retry in ${delay}ms (backoff, capped at 30000ms).`
+    `[Valkey] Reconnect attempt #${retries + 1} failed: ${cause.message}. Next retry in ${delay}ms (backoff, capped at 30000ms).`
   );
   return delay;
 }
