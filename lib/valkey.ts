@@ -9,11 +9,28 @@ const valkeyTls = process.env.VALKEY_TLS === 'true';
 const valkeyTlsRejectUnauthorized = process.env.VALKEY_TLS_REJECT_UNAUTHORIZED !== 'false';
 const valkeyConnectTimeout = parseInt(process.env.VALKEY_CONNECT_TIMEOUT || '5000');
 
+// Exponential backoff (100ms, doubling) capped at 30s. node-redis calls this
+// once per reconnect attempt with the retry counter and the failure cause, so
+// it's the one place to emit an informative per-attempt log line. Returning a
+// number (never false/Error) preserves the default behavior of retrying
+// indefinitely.
+function reconnectStrategy(retries: number, cause: Error): number {
+  const delay = Math.min(2 ** retries * 100, 30_000);
+  logger.warn(
+    `[Valkey] Reconnect attempt #${retries + 1} failed: ${cause?.message ?? 'unknown error'}. Next retry in ${delay}ms (backoff, capped at 30000ms).`
+  );
+  return delay;
+}
+
 // Build socket options conditionally to satisfy TypeScript types
-const socketOptions: { tls?: true; rejectUnauthorized?: boolean; connectTimeout?: number } =
-  valkeyTls
-    ? { tls: true, rejectUnauthorized: valkeyTlsRejectUnauthorized, connectTimeout: valkeyConnectTimeout }
-    : { connectTimeout: valkeyConnectTimeout };
+const socketOptions: {
+  tls?: true;
+  rejectUnauthorized?: boolean;
+  connectTimeout?: number;
+  reconnectStrategy: (retries: number, cause: Error) => number;
+} = valkeyTls
+  ? { tls: true, rejectUnauthorized: valkeyTlsRejectUnauthorized, connectTimeout: valkeyConnectTimeout, reconnectStrategy }
+  : { connectTimeout: valkeyConnectTimeout, reconnectStrategy };
 
 const client = createClient({
   url: valkeyUrl,
