@@ -83,23 +83,31 @@ const getCountriesRankingInternal = async (
     `;
     
     const [rows] = await pool.query<RowDataPacket[]>(query);
-    
-    // Normalize country names to ISO codes and filter out invalid entries
-    const countriesArray: CountryRank[] = [];
+
+    // Merge rows that resolve to the same ISO code (e.g. England/Scotland -> GB),
+    // otherwise each variant is a duplicate row that skews counts and React keys.
+    const byCode = new Map<string, CountryRank>();
     for (const row of rows) {
       const countryCode = getCountryCodeFromName(row.country);
-      
+
       // Skip countries with 0 points or an unresolved country code
       if (row.total_points <= 0 || countryCode === UNKNOWN_COUNTRY_CODE) continue;
-      
-      countriesArray.push({
-        country: countryCode, // Use ISO code as the country identifier
-        country_code: countryCode,
-        total_points: Number(row.total_points),
-        player_count: Number(row.player_count),
-        rank: 0, // Will be calculated after sorting
-      });
+
+      const existing = byCode.get(countryCode);
+      if (existing) {
+        existing.total_points += Number(row.total_points);
+        existing.player_count += Number(row.player_count);
+      } else {
+        byCode.set(countryCode, {
+          country: countryCode, // Use ISO code as the country identifier
+          country_code: countryCode,
+          total_points: Number(row.total_points),
+          player_count: Number(row.player_count),
+          rank: 0, // Will be calculated after sorting
+        });
+      }
     }
+    const countriesArray: CountryRank[] = [...byCode.values()];
     
     // Sort by points descending to calculate ranks
     countriesArray.sort((a, b) => b.total_points - a.total_points);
@@ -165,7 +173,10 @@ const getCountriesRankingInternal = async (
  * We normalize them to ISO codes in application code to avoid duplicate entries.
  * Cached for 24 hours - country rankings change relatively infrequently
  */
-const COUNTRIES_RANKING_KEY = 'surfstats:countries:ranking';
+// Bump on any change to the cached result's shape or computation; orphans stale
+// payloads instead of serving them until the 24h TTL expires.
+const COUNTRIES_RANKING_SCHEMA_VERSION = 2;
+const COUNTRIES_RANKING_KEY = `surfstats:countries:ranking:v${COUNTRIES_RANKING_SCHEMA_VERSION}`;
 const COUNTRIES_RANKING_TTL = 86400; // 24 hours
 
 /**
@@ -344,16 +355,32 @@ function getPlayerOrderByClause(sort: PlayerSortKey, order: SortOrder): string {
  */
 const getCountriesStatsInternal = async (): Promise<{ totalCountries: number; totalPlayers: number }> => {
   try {
-    const query = `
-      SELECT
-        COUNT(DISTINCT CASE WHEN country IS NOT NULL AND country != '' THEN country END) as total_countries,
-        COUNT(*) as total_players
+    // Countries: distinct resolved ISO codes, matching the ranking list (raw
+    // DISTINCT names over-counted). Players: COUNT(*) over every row, including
+    // unresolved countries — the full player population.
+    const countriesQuery = `
+      SELECT country, SUM(points) as total_points
       FROM ck_playerrank
+      WHERE country IS NOT NULL AND country != ''
+      GROUP BY country
     `;
-    const [rows] = await pool.query<RowDataPacket[]>(query);
+    const playersQuery = `SELECT COUNT(*) as total_players FROM ck_playerrank`;
+
+    const [[countryRows], [playerRows]] = await Promise.all([
+      pool.query<RowDataPacket[]>(countriesQuery),
+      pool.query<RowDataPacket[]>(playersQuery),
+    ]);
+
+    const codes = new Set<string>();
+    for (const row of countryRows) {
+      const countryCode = getCountryCodeFromName(row.country);
+      if (row.total_points <= 0 || countryCode === UNKNOWN_COUNTRY_CODE) continue;
+      codes.add(countryCode);
+    }
+
     return {
-      totalCountries: rows[0]?.total_countries || 0,
-      totalPlayers: rows[0]?.total_players || 0,
+      totalCountries: codes.size,
+      totalPlayers: playerRows[0]?.total_players || 0,
     };
   } catch (error: unknown) {
     const errorMessage = getErrorMessage(error);
@@ -362,7 +389,8 @@ const getCountriesStatsInternal = async (): Promise<{ totalCountries: number; to
   }
 };
 
-const COUNTRIES_STATS_KEY = 'surfstats:countries:stats';
+// Versioned like the ranking key so logic changes orphan stale payloads.
+const COUNTRIES_STATS_KEY = 'surfstats:countries:stats:v2';
 const COUNTRIES_STATS_TTL = 86400; // 24 hours
 
 /**
