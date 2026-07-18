@@ -7,12 +7,6 @@
  * This is critical for high-traffic endpoints like player profiles and dashboard stats.
  */
 
-interface CacheLockEntry {
-  promise: Promise<unknown>;
-  resolve: (value: unknown) => void;
-  reject: (reason?: unknown) => void;
-}
-
 /**
  * CacheLock provides request deduplication for cache misses.
  *
@@ -30,7 +24,7 @@ interface CacheLockEntry {
  * }
  */
 export class CacheLock {
-  private locks = new Map<string, CacheLockEntry>();
+  private locks = new Map<string, Promise<unknown>>();
 
   /**
    * Acquires a lock for a given key and executes the factory function.
@@ -44,31 +38,17 @@ export class CacheLock {
     // Check if lock already exists
     const existingLock = this.locks.get(key);
     if (existingLock) {
-      return existingLock.promise as Promise<T>;
+      return existingLock as Promise<T>;
     }
 
-    // Create new lock entry
-    // The Promise executor runs synchronously, so resolveFn and rejectFn are always assigned before use.
-    let resolveFn: (value: unknown) => void;
-    let rejectFn: (reason?: unknown) => void;
-
-    const promise = new Promise<unknown>((resolve, reject) => {
-      resolveFn = resolve;
-      rejectFn = reject;
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Promise executor runs synchronously
-    const lockEntry: CacheLockEntry = { promise, resolve: resolveFn!, reject: rejectFn! };
-    this.locks.set(key, lockEntry);
+    // Store the factory's promise directly. The creator and any concurrent
+    // waiters all await this same promise, so a rejection is always observed
+    // by at least one handler (no unhandled rejection on the uncontended path).
+    const promise = factory();
+    this.locks.set(key, promise);
 
     try {
-      // Execute the factory function
-      const result = await factory();
-      lockEntry.resolve(result);
-      return result;
-    } catch (error) {
-      lockEntry.reject(error);
-      throw error;
+      return await promise;
     } finally {
       // Clean up lock entry
       this.locks.delete(key);
