@@ -13,6 +13,7 @@ import ProgressBar from '@/components/ProgressBar';
 import PlayerTimeDisplay from './PlayerTimeDisplay';
 import WRPerformanceChart from './LazyWRPerformanceChart';
 import ActivityHeatmapChart from './ActivityHeatmapChart';
+import CompletionBreakdownChart from './LazyCompletionBreakdownChart';
 
 interface PlayerProfileContentProps {
   // Cheap overview: identity + global rank + completion counts, sourced from
@@ -202,6 +203,7 @@ export default async function PlayerProfileContent({
 
   // Analytic charts shown under the Overview tab.
   const overviewSection = (
+    <div className="space-y-3">
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
       {/* Tier Distribution Radar */}
       <div className="lg:col-span-1 h-[280px] min-h-[280px]">
@@ -243,6 +245,23 @@ export default async function PlayerProfileContent({
           )}
         </div>
       </div>
+    </div>
+    {/* Second row: additional analytics charts */}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      {/* Completion Breakdown Doughnut */}
+      <div className="h-[280px]">
+        {counts.maps + counts.bonuses + counts.stages > 0 ? (
+          <CompletionBreakdownChart counts={counts} />
+        ) : (
+          <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
+            <h3 className="text-sm font-semibold text-text mb-2">Completion Breakdown</h3>
+            <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
+              No completions
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
     </div>
   );
 
