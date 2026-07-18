@@ -6,16 +6,18 @@ import { formatDate } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import CountryBadge from '@/components/CountryBadge';
 import { getCountryCodeFromName, UNKNOWN_COUNTRY_CODE } from '@/lib/countries';
-import TierDistributionChart from './LazyTierDistributionChart';
 import PlayerPageTabs from './PlayerPageTabs';
 import PlayerRecordsTabs from './PlayerRecordsTabs';
 import ProgressBar from '@/components/ProgressBar';
 import PlayerTimeDisplay from './PlayerTimeDisplay';
-import WRPerformanceChart from './LazyWRPerformanceChart';
 import ActivityHeatmapChart from './ActivityHeatmapChart';
-import CompletionBreakdownChart from './LazyCompletionBreakdownChart';
-import CareerTimelineChart from './LazyCareerTimelineChart';
-import MapEngagementChart from './LazyMapEngagementChart';
+import {
+  TierDistributionChart,
+  WRPerformanceChart,
+  CompletionBreakdownChart,
+  CareerTimelineChart,
+  MapEngagementChart,
+} from './LazyPlayerCharts';
 import type { MapEngagementPoint } from '@/lib/player-analytics';
 
 interface PlayerProfileContentProps {
