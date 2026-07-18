@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Activity, Search, Menu, X, ChevronDown } from 'lucide-react';
-import { ThemeToggleCompact } from '@/components/ThemeToggle';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { SearchDropdown } from '@/components/SearchDropdown';
 
 const navLinks = [
@@ -116,12 +116,12 @@ export function Navigation({ siteName }: { siteName: string }) {
           {/* Desktop search and theme toggle */}
           <div className="hidden md:flex items-center gap-4">
             <SearchDropdown />
-            <ThemeToggleCompact />
+            <ThemeToggle />
           </div>
 
           {/* Mobile menu button */}
           <div className="md:hidden flex items-center gap-2">
-            <ThemeToggleCompact />
+            <ThemeToggle />
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
               className="text-text-muted hover:text-text p-2 rounded-md transition-colors"

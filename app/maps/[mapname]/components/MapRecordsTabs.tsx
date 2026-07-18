@@ -179,9 +179,6 @@ export default function MapRecordsTabs({
 
   // State for loading additional records from API
   const [allLeaderboardRecords, setAllLeaderboardRecords] = useState<MapRecord[]>(records);
-  // Refs for values that are set but never read as state
-  const loadedPageRef = useRef(Math.ceil(records.length / ITEMS_PER_PAGE));
-  const hasMoreToLoadRef = useRef(totalRecords > records.length);
   // Ref to track loaded pages as a Set (for arbitrary page navigation)
   const loadedPagesRef = useRef<Set<number>>(new Set());
 
@@ -191,15 +188,11 @@ export default function MapRecordsTabs({
 
   // State for stages loaded via API
   const [allStageRecords, setAllStageRecords] = useState<StageRecord[]>([]);
-  // Ref for stages list - set but not read in component
-  const stagesListRef = useRef<number[]>([]);
   const [totalStageRecords, setTotalStageRecords] = useState(0);
   const [isLoadingStages, setIsLoadingStages] = useState(false);
 
   // State for bonuses loaded via API
   const [allBonusRecords, setAllBonusRecords] = useState<BonusRecord[]>([]);
-  // Ref for bonus groups list - set but not read in component
-  const bonusGroupsListRef = useRef<number[]>([]);
   const [totalBonusRecords, setTotalBonusRecords] = useState(0);
   const [isLoadingBonuses, setIsLoadingBonuses] = useState(false);
 
@@ -228,13 +221,11 @@ export default function MapRecordsTabs({
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing state with incoming records prop on map change
     setAllLeaderboardRecords(records);
     const initialLoadedPage = Math.ceil(records.length / ITEMS_PER_PAGE);
-    loadedPageRef.current = initialLoadedPage;
     // Initialize loadedPages Set with initial pages from server-rendered records
     loadedPagesRef.current = new Set();
     for (let i = 1; i <= initialLoadedPage; i++) {
       loadedPagesRef.current.add(i);
     }
-    hasMoreToLoadRef.current = totalRecords > records.length;
     allLeaderboardLoadedRef.current = totalRecords <= records.length;
     allBonusLoadedRef.current = new Set();
     // eslint-disable-next-line react-hooks/immutability -- useState setters are stable across renders
@@ -307,9 +298,6 @@ export default function MapRecordsTabs({
       if (data.stages && data.stages.length > 0) {
         setAllStageRecords(data.stages);
         setTotalStageRecords(data.pagination.total);
-        if (data.stagesList && data.stagesList.length > 0) {
-          stagesListRef.current = data.stagesList;
-        }
       } else {
         setAllStageRecords([]);
         setTotalStageRecords(0);
@@ -359,9 +347,6 @@ export default function MapRecordsTabs({
         allBonusLoadedRef.current.delete(bonus);
         setAllBonusRecords(data.bonuses);
         setTotalBonusRecords(data.pagination.total);
-        if (data.bonusGroupsList && data.bonusGroupsList.length > 0) {
-          bonusGroupsListRef.current = data.bonusGroupsList;
-        }
       } else {
         bonusCacheRef.current.set(cacheKey, []);
         setAllBonusRecords([]);
@@ -597,8 +582,6 @@ export default function MapRecordsTabs({
               return [...prev, ...newRecords];
             });
             loadedPagesRef.current.add(page);
-            loadedPageRef.current = page;
-            hasMoreToLoadRef.current = data.pagination.page < data.pagination.totalPages;
           }
         } catch (error) {
           clientError(`Failed to load records: ${getErrorMessage(error)}`);

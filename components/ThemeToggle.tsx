@@ -97,10 +97,3 @@ export function ThemeToggle() {
     </div>
   );
 }
-
-/**
- * Compact theme toggle for mobile/navigation
- */
-export function ThemeToggleCompact() {
-  return <ThemeToggle />;
-}

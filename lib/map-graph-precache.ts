@@ -27,25 +27,6 @@ const refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let precacheStarted = false;
 
 /**
- * Result type for all 8 graph data points of a single map.
- */
-export interface MapGraphData {
-  completionsOverTime: Array<{ date: string; count: number }>;
-  timeOnMapData: Array<{ date: string; totalDuration: number }>;
-  checkpointStats: { checkpointAvgTimes: Array<{ checkpoint: number; avgTime: number; sampleSize: number }> };
-  wrCheckpointTimes: Array<{ checkpoint: number; time: number }> | undefined;
-  finishTimeData: { avgTime: number | null; wrTime: number | null };
-  bonusCompletionsOverTime: Record<number, Array<{ date: string; count: number }>>;
-  percentileTimes: {
-    wrTime: number | null;
-    p1Time: number | null;
-    p10Time: number | null;
-    medianTime: number | null;
-    avgTime: number | null;
-  } | null;
-}
-
-/**
  * Fetch and cache all 8 graph data points for a single map using Valkey pipelining.
  * Uses pipeline() to batch all SET operations into a single network round-trip.
  */

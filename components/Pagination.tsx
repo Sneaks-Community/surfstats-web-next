@@ -20,9 +20,6 @@ interface PaginationProps {
   
   // Client-side navigation (callback)
   onPageChange?: (page: number) => void;
-  
-  // Optional: Enable jump-to-page for client-side mode
-  allowJumpToPage?: boolean;
 }
 
 export default function Pagination({
@@ -31,7 +28,6 @@ export default function Pagination({
   baseUrl,
   queryParams = {},
   onPageChange,
-  allowJumpToPage = false,
 }: PaginationProps) {
   const [jumpPage, setJumpPage] = useState('');
   const { pageNumbers, hasPrevPage, hasNextPage, canGoToFirst, canGoToLast } = usePagination({
@@ -111,13 +107,7 @@ export default function Pagination({
   }, [jumpPage, totalPages, navigationMode, onPageChange, handlePageChange, router, searchParams, nav]);
 
   // Render page number button/link
-  const renderPageNumber = (page: number | string) => {
-    if (page === '...') {
-      return (
-        <span key="ellipsis" className="px-2 text-text-placeholder">...</span>
-      );
-    }
-
+  const renderPageNumber = (page: number) => {
     const commonClasses = `min-w-[2.5rem] h-9 px-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-center ${
       currentPage === page
         ? 'bg-primary/20 border-primary text-primary'
@@ -128,7 +118,7 @@ export default function Pagination({
       return (
         <button
           key={page}
-          onClick={() => handlePageChange(page as number)}
+          onClick={() => handlePageChange(page)}
           className={commonClasses}
         >
           {page}
@@ -136,7 +126,7 @@ export default function Pagination({
       );
     }
 
-    const href = buildUrl(page as number);
+    const href = buildUrl(page);
     return (
       <Link
         key={page}
@@ -254,8 +244,8 @@ export default function Pagination({
           navigationMode === 'server' ? buildUrl(totalPages) : undefined
         )}
 
-        {/* Jump to page (only in server mode or if explicitly allowed) */}
-        {(navigationMode === 'server' || allowJumpToPage) && (
+        {/* Jump to page (server mode only) */}
+        {navigationMode === 'server' && (
           <form onSubmit={handleJumpSubmit} className="flex items-center gap-2 ml-2">
             <span className="text-sm text-text-muted hidden sm:inline">Go to</span>
             <input
