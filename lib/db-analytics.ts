@@ -3,6 +3,7 @@ import mysql from 'mysql2/promise';
 import logger from '@/lib/logger';
 import { wrapPoolQuery } from '@/lib/db-query-logger';
 import { getErrorMessage } from './errors';
+import { onShutdown } from './shutdown';
 
 // Track whether the analytics database connection is actually working
 let analyticsConnectionHealthy = false;
@@ -132,15 +133,13 @@ function startAnalyticsHealthCheck(): void {
 startAnalyticsHealthCheck();
 
 // Graceful shutdown cleanup
-if (typeof window === 'undefined') {
-  process.on('SIGTERM', () => {
-    if (healthCheckTimer) {
-      clearInterval(healthCheckTimer);
-      healthCheckTimer = null;
-      logger.info('[Analytics DB] Health check stopped');
-    }
-  });
-}
+onShutdown(() => {
+  if (healthCheckTimer) {
+    clearInterval(healthCheckTimer);
+    healthCheckTimer = null;
+    logger.info('[Analytics DB] Health check stopped');
+  }
+});
 
 export default analyticsPool;
 

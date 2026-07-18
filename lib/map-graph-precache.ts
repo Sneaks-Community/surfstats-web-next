@@ -12,6 +12,7 @@ import {
 } from './valkey-map-stats-cache';
 import { getAllMapMetadataFromCache } from './valkey-map-cache';
 import { getErrorMessage } from './errors';
+import { onShutdown } from './shutdown';
 
 // Configuration
 const BATCH_SIZE = 20;
@@ -160,15 +161,11 @@ export function startMapGraphPrecache(): void {
   })();
 }
 
-/**
- * Graceful shutdown: clear all refresh timers.
- */
-if (typeof window === 'undefined') {
-  process.on('SIGTERM', () => {
-    for (const [mapname, timer] of refreshTimers) {
-      clearTimeout(timer);
-      refreshTimers.delete(mapname);
-    }
-    logger.info('[MapGraphPrecache] All refresh timers cleared');
-  });
-}
+// Graceful shutdown: clear all refresh timers.
+onShutdown(() => {
+  for (const [mapname, timer] of refreshTimers) {
+    clearTimeout(timer);
+    refreshTimers.delete(mapname);
+  }
+  logger.info('[MapGraphPrecache] All refresh timers cleared');
+});
