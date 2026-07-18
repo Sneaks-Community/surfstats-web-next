@@ -2,7 +2,7 @@ import 'server-only';
 import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
-import { getCountryNamesFromCode, getCountryCodeFromName } from '@/lib/countries';
+import { getCountryNamesFromCode, getCountryCodeFromName, UNKNOWN_COUNTRY_CODE } from '@/lib/countries';
 import { cachedFetch } from './cached-fetch';
 import { getErrorMessage } from './errors';
 
@@ -89,8 +89,8 @@ const getCountriesRankingInternal = async (
     for (const row of rows) {
       const countryCode = getCountryCodeFromName(row.country);
       
-      // Skip countries with 0 points or unknown country code "UN"
-      if (row.total_points <= 0 || countryCode === 'UN') continue;
+      // Skip countries with 0 points or an unresolved country code
+      if (row.total_points <= 0 || countryCode === UNKNOWN_COUNTRY_CODE) continue;
       
       countriesArray.push({
         country: countryCode, // Use ISO code as the country identifier

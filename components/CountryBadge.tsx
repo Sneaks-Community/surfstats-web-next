@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { hasFlag } from 'country-flag-icons';
 import * as Flags from 'country-flag-icons/react/3x2';
-import { countryNameToCode, codeToCountryName } from '@/lib/countries';
+import { getCountryCodeFromName, getPrimaryCountryName, UNKNOWN_COUNTRY_CODE } from '@/lib/countries';
 
 interface CountryBadgeProps {
   countryCode: string | null | undefined;
@@ -21,26 +21,15 @@ function getCountryCode(input: string | null | undefined): string | null {
   if (trimmed.length === 2) {
     return trimmed.toUpperCase();
   }
-  
-  // Try to match by lowercase name
-  const lowerName = trimmed.toLowerCase();
-  if (countryNameToCode[lowerName]) {
-    return countryNameToCode[lowerName];
-  }
-  
-  // Try partial matching for names like "The United States" or "United States of America"
-  for (const [name, code] of Object.entries(countryNameToCode)) {
-    if (lowerName.includes(name) || name.includes(lowerName)) {
-      return code;
-    }
-  }
-  
-  return null;
+
+  // Resolve the name via the ISO dataset (handles aliases/variations)
+  const code = getCountryCodeFromName(trimmed);
+  return code === UNKNOWN_COUNTRY_CODE ? null : code;
 }
 
 function getCountryDisplayName(isoCode: string, originalName?: string): string {
   // Try to get the full country name from the code
-  const fullName = codeToCountryName[isoCode];
+  const fullName = getPrimaryCountryName(isoCode);
   if (fullName) {
     return fullName;
   }

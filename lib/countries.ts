@@ -1,413 +1,96 @@
 /**
- * Country name to ISO 3166-1 alpha-2 code mapping
- * Used for flag display based on country names
- */
-
-// Mapping of country names to ISO 3166-1 alpha-2 codes
-export const countryNameToCode: Record<string, string> = {
-  // Common variations and full names
-  'united states': 'US',
-  'the united states': 'US',
-  'united states of america': 'US',
-  'usa': 'US',
-  'us': 'US',
-  'mexico': 'MX',
-  'chile': 'CL',
-  'finland': 'FI',
-  'canada': 'CA',
-  'united kingdom': 'GB',
-  'the united kingdom': 'GB',
-  'uk': 'GB',
-  'great britain': 'GB',
-  'england': 'GB',
-  'scotland': 'GB',
-  'wales': 'GB',
-  'germany': 'DE',
-  'france': 'FR',
-  'spain': 'ES',
-  'italy': 'IT',
-  'portugal': 'PT',
-  'netherlands': 'NL',
-  'holland': 'NL',
-  'belgium': 'BE',
-  'sweden': 'SE',
-  'norway': 'NO',
-  'denmark': 'DK',
-  'poland': 'PL',
-  'russia': 'RU',
-  'brazil': 'BR',
-  'argentina': 'AR',
-  'australia': 'AU',
-  'new zealand': 'NZ',
-  'japan': 'JP',
-  'china': 'CN',
-  'south korea': 'KR',
-  'korea': 'KR',
-  'india': 'IN',
-  'indonesia': 'ID',
-  'thailand': 'TH',
-  'vietnam': 'VN',
-  'philippines': 'PH',
-  'malaysia': 'MY',
-  'singapore': 'SG',
-  'taiwan': 'TW',
-  'hong kong': 'HK',
-  'israel': 'IL',
-  'turkey': 'TR',
-  'greece': 'GR',
-  'austria': 'AT',
-  'switzerland': 'CH',
-  'czech republic': 'CZ',
-  'czechia': 'CZ',
-  'slovakia': 'SK',
-  'hungary': 'HU',
-  'romania': 'RO',
-  'bulgaria': 'BG',
-  'ukraine': 'UA',
-  'ireland': 'IE',
-  'iceland': 'IS',
-  'estonia': 'EE',
-  'latvia': 'LV',
-  'lithuania': 'LT',
-  'slovenia': 'SI',
-  'croatia': 'HR',
-  'serbia': 'RS',
-  'south africa': 'ZA',
-  'egypt': 'EG',
-  'morocco': 'MA',
-  'algeria': 'DZ',
-  'tunisia': 'TN',
-  'nigeria': 'NG',
-  'kenya': 'KE',
-  'saudi arabia': 'SA',
-  'uae': 'AE',
-  'united arab emirates': 'AE',
-  'pakistan': 'PK',
-  'bangladesh': 'BD',
-  'iran': 'IR',
-  'iraq': 'IQ',
-  'afghanistan': 'AF',
-  'colombia': 'CO',
-  'peru': 'PE',
-  'venezuela': 'VE',
-  'ecuador': 'EC',
-  'bolivia': 'BO',
-  'paraguay': 'PY',
-  'uruguay': 'UY',
-  'costa rica': 'CR',
-  'panama': 'PA',
-  'cuba': 'CU',
-  'jamaica': 'JM',
-  'dominican republic': 'DO',
-  'puerto rico': 'PR',
-  'guatemala': 'GT',
-  'honduras': 'HN',
-  'el salvador': 'SV',
-  'nicaragua': 'NI',
-  'haiti': 'HT',
-  'trinidad and tobago': 'TT',
-  'sri lanka': 'LK',
-  'myanmar': 'MM',
-  'burma': 'MM',
-  'cambodia': 'KH',
-  'laos': 'LA',
-  'nepal': 'NP',
-  'bhutan': 'BT',
-  'mongolia': 'MN',
-  'north korea': 'KP',
-  'maldives': 'MV',
-  'cyprus': 'CY',
-  'malta': 'MT',
-  'luxembourg': 'LU',
-  'monaco': 'MC',
-  'andorra': 'AD',
-  'san marino': 'SM',
-  'vatican': 'VA',
-  'vatican city': 'VA',
-  'liechtenstein': 'LI',
-  'albania': 'AL',
-  'bosnia and herzegovina': 'BA',
-  'bosnia': 'BA',
-  'montenegro': 'ME',
-  'kosovo': 'XK',
-  'north macedonia': 'MK',
-  'macedonia': 'MK',
-  'moldova': 'MD',
-  'belarus': 'BY',
-  'georgia': 'GE',
-  'armenia': 'AM',
-  'azerbaijan': 'AZ',
-  'kazakhstan': 'KZ',
-  'uzbekistan': 'UZ',
-  'turkmenistan': 'TM',
-  'tajikistan': 'TJ',
-  'kyrgyzstan': 'KG',
-  'oman': 'OM',
-  'yemen': 'YE',
-  'syria': 'SY',
-  'jordan': 'JO',
-  'lebanon': 'LB',
-  'kuwait': 'KW',
-  'bahrain': 'BH',
-  'qatar': 'QA',
-  'new caledonia': 'NC',
-  'fiji': 'FJ',
-  'papua new guinea': 'PG',
-  'solomon islands': 'SB',
-  'vanuatu': 'VU',
-  'samoa': 'WS',
-  'tonga': 'TO',
-  'micronesia': 'FM',
-  'palau': 'PW',
-  'marshall islands': 'MH',
-  'kiribati': 'KI',
-  'nauru': 'NR',
-  'tuvalu': 'TV',
-  'barbados': 'BB',
-  'bahamas': 'BS',
-  'belize': 'BZ',
-  'guyana': 'GY',
-  'suriname': 'SR',
-  'french guiana': 'GF',
-  'martinique': 'MQ',
-  'guadeloupe': 'GP',
-  'réunion': 'RE',
-  'mayotte': 'YT',
-  'guam': 'GU',
-  'american samoa': 'AS',
-  'northern mariana islands': 'MP',
-  'virgin islands': 'VI',
-  'us virgin islands': 'VI',
-  'british virgin islands': 'VG',
-  'cayman islands': 'KY',
-  'bermuda': 'BM',
-  'gibraltar': 'GI',
-  'isle of man': 'IM',
-  'channel islands': 'GG',
-  'guernsey': 'GG',
-  'jersey': 'JE',
-  'faroe islands': 'FO',
-  'greenland': 'GL',
-  'svalbard': 'SJ',
-  'jan mayen': 'SJ',
-  'aland islands': 'AX',
-  'aland': 'AX',
-};
-
-// Reverse mapping: ISO code to primary country name
-// Used for URL-to-database lookups
-export const codeToCountryName: Record<string, string> = {
-  'US': 'United States',
-  'MX': 'Mexico',
-  'CL': 'Chile',
-  'FI': 'Finland',
-  'CA': 'Canada',
-  'GB': 'United Kingdom',
-  'DE': 'Germany',
-  'FR': 'France',
-  'ES': 'Spain',
-  'IT': 'Italy',
-  'PT': 'Portugal',
-  'NL': 'Netherlands',
-  'BE': 'Belgium',
-  'SE': 'Sweden',
-  'NO': 'Norway',
-  'DK': 'Denmark',
-  'PL': 'Poland',
-  'RU': 'Russia',
-  'BR': 'Brazil',
-  'AR': 'Argentina',
-  'AU': 'Australia',
-  'NZ': 'New Zealand',
-  'JP': 'Japan',
-  'CN': 'China',
-  'KR': 'South Korea',
-  'IN': 'India',
-  'ID': 'Indonesia',
-  'TH': 'Thailand',
-  'VN': 'Vietnam',
-  'PH': 'Philippines',
-  'MY': 'Malaysia',
-  'SG': 'Singapore',
-  'TW': 'Taiwan',
-  'HK': 'Hong Kong',
-  'IL': 'Israel',
-  'TR': 'Turkey',
-  'GR': 'Greece',
-  'AT': 'Austria',
-  'CH': 'Switzerland',
-  'CZ': 'Czech Republic',
-  'SK': 'Slovakia',
-  'HU': 'Hungary',
-  'RO': 'Romania',
-  'BG': 'Bulgaria',
-  'UA': 'Ukraine',
-  'IE': 'Ireland',
-  'IS': 'Iceland',
-  'EE': 'Estonia',
-  'LV': 'Latvia',
-  'LT': 'Lithuania',
-  'SI': 'Slovenia',
-  'HR': 'Croatia',
-  'RS': 'Serbia',
-  'ZA': 'South Africa',
-  'EG': 'Egypt',
-  'MA': 'Morocco',
-  'DZ': 'Algeria',
-  'TN': 'Tunisia',
-  'NG': 'Nigeria',
-  'KE': 'Kenya',
-  'SA': 'Saudi Arabia',
-  'AE': 'United Arab Emirates',
-  'PK': 'Pakistan',
-  'BD': 'Bangladesh',
-  'IR': 'Iran',
-  'IQ': 'Iraq',
-  'AF': 'Afghanistan',
-  'CO': 'Colombia',
-  'PE': 'Peru',
-  'VE': 'Venezuela',
-  'EC': 'Ecuador',
-  'BO': 'Bolivia',
-  'PY': 'Paraguay',
-  'UY': 'Uruguay',
-  'CR': 'Costa Rica',
-  'PA': 'Panama',
-  'CU': 'Cuba',
-  'JM': 'Jamaica',
-  'DO': 'Dominican Republic',
-  'PR': 'Puerto Rico',
-  'GT': 'Guatemala',
-  'HN': 'Honduras',
-  'SV': 'El Salvador',
-  'NI': 'Nicaragua',
-  'HT': 'Haiti',
-  'TT': 'Trinidad and Tobago',
-  'LK': 'Sri Lanka',
-  'MM': 'Myanmar',
-  'KH': 'Cambodia',
-  'LA': 'Laos',
-  'NP': 'Nepal',
-  'BT': 'Bhutan',
-  'MN': 'Mongolia',
-  'KP': 'North Korea',
-  'MV': 'Maldives',
-  'CY': 'Cyprus',
-  'MT': 'Malta',
-  'LU': 'Luxembourg',
-  'MC': 'Monaco',
-  'AD': 'Andorra',
-  'SM': 'San Marino',
-  'VA': 'Vatican',
-  'LI': 'Liechtenstein',
-  'AL': 'Albania',
-  'BA': 'Bosnia and Herzegovina',
-  'ME': 'Montenegro',
-  'XK': 'Kosovo',
-  'MK': 'North Macedonia',
-  'MD': 'Moldova',
-  'BY': 'Belarus',
-  'GE': 'Georgia',
-  'AM': 'Armenia',
-  'AZ': 'Azerbaijan',
-  'KZ': 'Kazakhstan',
-  'UZ': 'Uzbekistan',
-  'TM': 'Turkmenistan',
-  'TJ': 'Tajikistan',
-  'KG': 'Kyrgyzstan',
-  'OM': 'Oman',
-  'YE': 'Yemen',
-  'SY': 'Syria',
-  'JO': 'Jordan',
-  'LB': 'Lebanon',
-  'KW': 'Kuwait',
-  'BH': 'Bahrain',
-  'QA': 'Qatar',
-  'NC': 'New Caledonia',
-  'FJ': 'Fiji',
-  'PG': 'Papua New Guinea',
-  'SB': 'Solomon Islands',
-  'VU': 'Vanuatu',
-  'WS': 'Samoa',
-  'TO': 'Tonga',
-  'FM': 'Micronesia',
-  'PW': 'Palau',
-  'MH': 'Marshall Islands',
-  'KI': 'Kiribati',
-  'NR': 'Nauru',
-  'TV': 'Tuvalu',
-  'BB': 'Barbados',
-  'BS': 'Bahamas',
-  'BZ': 'Belize',
-  'GY': 'Guyana',
-  'SR': 'Suriname',
-  'GF': 'French Guiana',
-  'MQ': 'Martinique',
-  'GP': 'Guadeloupe',
-  'RE': 'Réunion',
-  'YT': 'Mayotte',
-  'GU': 'Guam',
-  'AS': 'American Samoa',
-  'MP': 'Northern Mariana Islands',
-  'VI': 'Virgin Islands',
-  'VG': 'British Virgin Islands',
-  'KY': 'Cayman Islands',
-  'BM': 'Bermuda',
-  'GI': 'Gibraltar',
-  'IM': 'Isle of Man',
-  'GG': 'Guernsey',
-  'JE': 'Jersey',
-  'FO': 'Faroe Islands',
-  'GL': 'Greenland',
-  'SJ': 'Svalbard',
-  'AX': 'Aland Islands',
-};
-
-/**
- * Get all possible country name variations for a given ISO code
- * Returns an array of names that map to this code
- */
-export function getCountryNamesFromCode(code: string): string[] {
-  const upperCode = code.toUpperCase();
-  const names: string[] = [];
-  
-  for (const [name, c] of Object.entries(countryNameToCode)) {
-    if (c === upperCode) {
-      names.push(name);
-    }
-  }
-  
-  return names;
-}
-
-/**
- * Get the primary country name for a given ISO code
- */
-export function getPrimaryCountryName(code: string): string | undefined {
-  return codeToCountryName[code.toUpperCase()];
-}
-
-/**
- * Check if a country code is valid
- */
-export function isValidCountryCode(code: string): boolean {
-  return code.toUpperCase() in codeToCountryName;
-}
-
-/**
- * Convert a country name to its ISO 3166-1 alpha-2 code
- * Normalizes the input (lowercase, trim) before lookup
- * Falls back to first two uppercase characters if not found in mapping
+ * Country name <-> ISO 3166-1 alpha-2 helpers.
  *
- * @param name - Country name to convert (e.g., "United States", "thailand", "THAILAND")
- * @returns ISO 3166-1 alpha-2 code (e.g., "US", "TH"), or fallback code
+ * Backed by the maintained `i18n-iso-countries` dataset (complete ISO 3166
+ * coverage in English, including common aliases) rather than a hand-kept map.
+ * The database stores GeoIP-derived English country names, so the library's
+ * name set matches the values we see in `ck_playerrank.country`.
+ *
+ * A tiny override table handles game/GeoIP spellings the library does not
+ * recognise on its own (e.g. the UK constituent countries, bare "Korea").
+ */
+import countries from 'i18n-iso-countries';
+import enLocale from 'i18n-iso-countries/langs/en.json';
+
+countries.registerLocale(enLocale);
+
+/**
+ * Sentinel code for a country name we can't resolve. Not a real ISO code;
+ * callers treat it as "skip / unknown".
+ */
+export const UNKNOWN_COUNTRY_CODE = 'UN';
+
+/**
+ * Aliases not covered by i18n-iso-countries. Keys are lowercased names,
+ * values are ISO 3166-1 alpha-2 codes.
+ */
+const NAME_OVERRIDES: Record<string, string> = {
+  england: 'GB',
+  scotland: 'GB',
+  wales: 'GB',
+  'northern ireland': 'GB',
+  korea: 'KR',
+  holland: 'NL',
+};
+
+/**
+ * Convert a country name to its ISO 3166-1 alpha-2 code.
+ * Normalizes the input (lowercase, trim) and consults the override table
+ * before the ISO dataset.
+ *
+ * Returns "UN" (unknown) for any name that can't be resolved. We deliberately
+ * do NOT fabricate a code from the name's first two letters: that produced
+ * invalid codes that could collide and created ranking rows whose country
+ * pages resolved to zero players.
  *
  * @example
- * getCountryCodeFromName("United States") // returns "US"
- * getCountryCodeFromName("thailand") // returns "TH"
- * getCountryCodeFromName("Unknown Country") // returns "UN"
+ * getCountryCodeFromName("United States") // "US"
+ * getCountryCodeFromName("thailand")      // "TH"
+ * getCountryCodeFromName("Narnia")        // "UN"
  */
 export function getCountryCodeFromName(name: string): string {
-  const normalizedName = name.toLowerCase().trim();
-  return countryNameToCode[normalizedName] || name.toUpperCase().substring(0, 2);
+  const normalized = name.toLowerCase().trim();
+  if (!normalized) return UNKNOWN_COUNTRY_CODE;
+  if (NAME_OVERRIDES[normalized]) return NAME_OVERRIDES[normalized];
+  return countries.getAlpha2Code(name, 'en') || UNKNOWN_COUNTRY_CODE;
+}
+
+/**
+ * Get the primary (canonical) English country name for a given ISO code,
+ * or undefined if the code is not valid.
+ */
+export function getPrimaryCountryName(code: string): string | undefined {
+  return countries.getName(code.toUpperCase(), 'en') || undefined;
+}
+
+/**
+ * Check if a country code is a valid ISO 3166-1 code.
+ */
+export function isValidCountryCode(code: string): boolean {
+  return countries.isValid(code);
+}
+
+/**
+ * Get all name variations that map to a given ISO code.
+ *
+ * Used to build the `WHERE country = ? OR ...` clause that matches the
+ * various spellings stored in the database (matching is case-insensitive at
+ * the DB collation level). Combines the ISO dataset's aliases with our
+ * override aliases for that code.
+ */
+export function getCountryNamesFromCode(code: string): string[] {
+  const upper = code.toUpperCase();
+  const names = new Set<string>();
+
+  // Returns string[] for a valid code, or undefined for an unknown one.
+  const isoNames = countries.getName(upper, 'en', { select: 'all' });
+  if (Array.isArray(isoNames)) {
+    for (const name of isoNames) names.add(name);
+  }
+
+  for (const [alias, aliasCode] of Object.entries(NAME_OVERRIDES)) {
+    if (aliasCode === upper) names.add(alias);
+  }
+
+  return [...names];
 }

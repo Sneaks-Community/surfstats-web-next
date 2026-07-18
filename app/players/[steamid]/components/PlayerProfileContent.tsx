@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { formatDate } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import CountryBadge from '@/components/CountryBadge';
-import { countryNameToCode } from '@/lib/countries';
+import { getCountryCodeFromName, UNKNOWN_COUNTRY_CODE } from '@/lib/countries';
 import TierDistributionChart from './LazyTierDistributionChart';
 import PlayerPageTabs from './PlayerPageTabs';
 import PlayerRecordsTabs from './PlayerRecordsTabs';
@@ -157,8 +157,8 @@ export default async function PlayerProfileContent({
                 })()}
                 {player.country && (
                   (() => {
-                    const countryCode = countryNameToCode[player.country.toLowerCase()];
-                    if (!countryCode) return null;
+                    const countryCode = getCountryCodeFromName(player.country);
+                    if (countryCode === UNKNOWN_COUNTRY_CODE) return null;
                     return (
                       <Link
                         href={`/players/countries/${countryCode}`}
