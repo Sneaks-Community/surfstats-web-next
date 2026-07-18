@@ -86,7 +86,7 @@ export default async function PlayersPage({
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center gap-3">
-                            {avatar && (
+                            {avatar?.avatarmedium && (
                               <Image
                                 src={avatar.avatarmedium}
                                 alt={`${player.name}'s avatar`}
