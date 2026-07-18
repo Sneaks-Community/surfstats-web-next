@@ -103,8 +103,8 @@ export default async function MapsPage({
   const mapImagesUrl = getMapImagesUrl();
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4">
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold text-text">Maps</h1>
@@ -122,12 +122,12 @@ export default async function MapsPage({
           instantly. loading.tsx only covers the initial route load. */}
       <NavigationPendingProvider>
         <PendingContent className="space-y-6" fallback={<SkeletonScreen label="Loading maps..."><MapsGridSkeleton count={paginatedMaps.length || limit} /></SkeletonScreen>}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {paginatedMaps.map((map) => {
               const tierColor = getTierColor(map.tier);
               return (
                 <Link href={`/maps/${map.mapname}`} key={map.mapname} className="group block bg-surface border border-border rounded-xl overflow-hidden hover:border-primary/50 transition-colors">
-                  <div className="relative h-48 bg-surface-hover w-full overflow-hidden">
+                  <div className="relative aspect-video bg-surface-hover w-full overflow-hidden">
                     <MapImage
                       src={mapImageUrl(mapImagesUrl, map.mapname)}
                       alt={map.mapname}

@@ -11,10 +11,10 @@ import { Skeleton } from '@/components/Skeleton';
  */
 export default function MapsGridSkeleton({ count = 12 }: { count?: number }) {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="bg-surface border border-border rounded-xl overflow-hidden">
-          <Skeleton className="h-48 w-full" />
+          <Skeleton className="aspect-video w-full" />
         </div>
       ))}
     </div>
