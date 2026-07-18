@@ -141,7 +141,7 @@ export default async function Home() {
         )}
 
         {featuredMaps.length > 0 && (
-          <section className="bg-surface border border-border rounded-xl overflow-hidden">
+          <section className="bg-surface border border-border rounded-xl overflow-hidden flex flex-col">
             <PanelHeader
               icon={MapIcon}
               title="Popular Maps"
