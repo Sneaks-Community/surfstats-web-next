@@ -15,6 +15,7 @@ import { ZoneGroupBadge, StageBadge } from '@/components/RecordBadges';
 import { useDebounce } from '@/hooks/useDebounce';
 import { clientError } from '@/lib/client-logger';
 import { getErrorMessage, isAbortError } from '@/lib/errors';
+import type { PlayerCompletionCounts } from '@/lib/player-profile-cache';
 
 // Types for records
 interface MapRecord {
@@ -62,6 +63,10 @@ interface IncompleteStageRecord {
 
 interface PlayerRecordsTabsProps {
   steamid: string;
+  // Cheap authoritative completion totals from the overview query. Used for the
+  // finished-status badges so Bonuses/Stages show correct counts before their
+  // (lazily-fetched) section lists have loaded.
+  counts: PlayerCompletionCounts;
 }
 
 // Each player-times route returns the full per-section list + the not-yet-done
@@ -85,7 +90,7 @@ type SortField = 'map' | 'rank' | 'time' | 'wrDiff' | 'date' | 'tier' | 'wrTime'
 
 const ITEMS_PER_PAGE = 20;
 
-export default function PlayerRecordsTabs({ steamid }: PlayerRecordsTabsProps) {
+export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -448,10 +453,13 @@ export default function PlayerRecordsTabs({ steamid }: PlayerRecordsTabsProps) {
   // Get count for current tab based on status filter
   const getTabCount = (tabId: TabType): number => {
     if (statusFilter === 'finished') {
+      // Prefer the fetched list length once a section has loaded; otherwise fall
+      // back to the authoritative overview counts so badges are correct before
+      // the (lazily-fetched) Bonuses/Stages lists arrive.
       switch (tabId) {
-        case 'maps': return maps.length;
-        case 'bonuses': return bonuses.length;
-        case 'stages': return stages.length;
+        case 'maps': return mapsData ? maps.length : counts.maps;
+        case 'bonuses': return bonusesData ? bonuses.length : counts.bonuses;
+        case 'stages': return stagesData ? stages.length : counts.stages;
       }
     } else {
       switch (tabId) {
@@ -469,7 +477,7 @@ export default function PlayerRecordsTabs({ steamid }: PlayerRecordsTabsProps) {
   ];
 
   const statusFilters: Array<{ id: StatusFilter; label: string; count: number; icon: typeof CheckCircle }> = [
-    { id: 'finished', label: 'Finished', count: activeTab === 'maps' ? maps.length : activeTab === 'bonuses' ? bonuses.length : stages.length, icon: CheckCircle },
+    { id: 'finished', label: 'Finished', count: activeTab === 'maps' ? (mapsData ? maps.length : counts.maps) : activeTab === 'bonuses' ? (bonusesData ? bonuses.length : counts.bonuses) : (stagesData ? stages.length : counts.stages), icon: CheckCircle },
     { id: 'incomplete', label: 'Incomplete', count: activeTab === 'maps' ? incompleteMaps.length : activeTab === 'bonuses' ? incompleteBonuses.length : incompleteStages.length, icon: Circle },
   ];
 

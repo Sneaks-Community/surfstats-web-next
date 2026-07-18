@@ -271,7 +271,7 @@ export default async function PlayerProfileContent({
 
   // Records Section — gated behind the top-level Times tab. Fetches its full
   // lists on activation (no fetch on the initial render / for crawlers).
-  const timesSection = <PlayerRecordsTabs steamid={steamid} />;
+  const timesSection = <PlayerRecordsTabs steamid={steamid} counts={counts} />;
 
   return (
     <div className="space-y-4">
