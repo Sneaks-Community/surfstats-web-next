@@ -1,201 +1,150 @@
-import Link from 'next/link';
-import { Users, Map as MapIcon, Trophy, Clock, Activity } from 'lucide-react';
-import { formatTime, formatDate, mapImageUrl, getMapImagesUrl } from '@/lib/utils';
+import {
+  Users,
+  Map as MapIcon,
+  Trophy,
+  Activity,
+  Flag,
+  Layers,
+} from 'lucide-react';
+import { getMapImagesUrl } from '@/lib/utils';
 import { getStatsFromCache, getLatestCompletionsFromCache } from '@/lib/cache';
+import { getPlayersFromCache } from '@/lib/player-cache';
+import { getSteamProfilesFromCache } from '@/lib/steam';
+import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
+import { waitForCacheReady } from '@/lib/valkey';
 import logger from '@/lib/logger';
-import MapLinkWithPreview from '@/components/MapLinkWithPreview';
-import MapImage from '@/components/MapImage';
 import { getErrorMessage } from '@/lib/errors';
+import StatTile from '@/components/StatTile';
+import PanelHeader from '@/components/PanelHeader';
+import JoinServerCTA from '@/app/components/home/JoinServerCTA';
+import TopPlayersPreview, { type TopPlayerEntry } from '@/app/components/home/TopPlayersPreview';
+import FeaturedMaps, { type FeaturedMapEntry } from '@/app/components/home/FeaturedMaps';
+import ActivityTicker from '@/app/components/home/ActivityTicker';
 
 // Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
 
-// Wrapper that catches errors and returns null for display
-async function getStats() {
+// Small wrapper: run a cached fetch, log + degrade to a fallback on failure so a
+// single dead sub-source never blanks the whole page.
+async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
   try {
-    const stats = await getStatsFromCache();
-    logger.debug('[Home] Stats loaded successfully');
-    return stats;
+    return await fn();
   } catch (error: unknown) {
-    const errorMessage = getErrorMessage(error);
-    logger.error(`[Home] Failed to load stats: ${errorMessage}`);
-    logger.error('[Home] Dashboard will display without stats data');
-    return null;
-  }
-}
-
-// Wrapper that catches errors and returns null for display
-async function getLatestCompletions() {
-  try {
-    const completions = await getLatestCompletionsFromCache();
-    logger.debug('[Home] Latest completions loaded successfully');
-    return completions;
-  } catch (error: unknown) {
-    const errorMessage = getErrorMessage(error);
-    logger.error(`[Home] Failed to load latest completions: ${errorMessage}`);
-    logger.error('[Home] Dashboard will display without completions data');
-    return [];
+    logger.error(`[Home] Failed to load ${label}: ${getErrorMessage(error)}`);
+    return fallback;
   }
 }
 
 export default async function Home() {
-  const stats = await getStats();
-  const latestCompletions = await getLatestCompletions();
+  // Await the initial Valkey handshake so the very first request after a server
+  // start doesn't race it. Without this, `cachedFetch` fails closed
+  // (CacheUnavailableError) during the brief connect window and the safe()
+  // wrappers below degrade whole sections to empty — producing a partial page
+  // on first load that only fills in on refresh.
+  await waitForCacheReady();
 
+  const [stats, latestCompletions, topPlayersResult, mapMeta] = await Promise.all([
+    safe('stats', getStatsFromCache, null),
+    safe('latest completions', getLatestCompletionsFromCache, []),
+    safe('top players', () => getPlayersFromCache(1, ''), { players: [], total: 0, totalPages: 0 }),
+    safe('map metadata', getAllMapMetadataFromCache, new Map()),
+  ]);
 
   const mapImagesUrl = getMapImagesUrl();
 
+  const topPlayerRows = topPlayersResult.players.slice(0, 10);
+
+  // Steam avatars for the top-10 list — already cached (7-day TTL) via the same
+  // path the /players table uses; degrade to no-avatar on any failure.
+  const avatars = await safe(
+    'top player avatars',
+    () => getSteamProfilesFromCache(topPlayerRows.map((p) => p.steamid)),
+    new Map()
+  );
+
+  const topPlayers: TopPlayerEntry[] = topPlayerRows.map((p) => ({
+    steamid: p.steamid,
+    name: p.name,
+    country: p.country,
+    points: p.points,
+    finishedmaps: p.finishedmaps,
+    rank: p.rank,
+    avatar: avatars.get(p.steamid)?.avatarmedium || null,
+  }));
+
+  const featuredMaps: FeaturedMapEntry[] = Array.from(mapMeta.values())
+    .sort((a, b) => b.completions - a.completions)
+    .slice(0, 9)
+    .map((m) => ({ mapname: m.mapname, tier: m.tier, completions: m.completions }));
+
+  const recentRecords = stats?.recentRecords ?? [];
+
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      {/* Header */}
-      <section>
-        <h1 className="text-4xl font-bold tracking-tight text-text mb-2">Welcome to {process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats'}</h1>
-        <p className="text-text-muted text-lg">
-          {process.env.NEXT_PUBLIC_SITE_DESCRIPTION || 'Statistics, leaderboards, and server information for our CS:GO surf community.'}
-        </p>
+    <div className="max-w-7xl mx-auto space-y-8">
+      {/* Hero header */}
+      <section className="py-4 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+        <div className="min-w-0">
+          <h1 className="text-4xl font-bold tracking-tight text-text mb-2">
+            Welcome to {process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats'}
+          </h1>
+          <p className="text-text-muted text-lg max-w-2xl">
+            {process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
+              'Statistics, leaderboards, and server information for our CS:GO surf community.'}
+          </p>
+        </div>
+        <JoinServerCTA />
       </section>
 
-      {/* Stats Grid */}
+      {/* KPI stat row */}
       {stats && (
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center text-center">
-            <Users className="h-8 w-8 text-primary mb-3" />
-            <span className="text-3xl font-bold text-text">{stats.playerCount.toLocaleString()}</span>
-            <span className="text-sm text-text-muted uppercase tracking-wider font-semibold mt-1">Total Players</span>
-          </div>
-          <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center text-center">
-            <Activity className="h-8 w-8 text-blue-500 mb-3" />
-            <span className="text-3xl font-bold text-text">{stats.playersMonth.toLocaleString()}</span>
-            <span className="text-sm text-text-muted uppercase tracking-wider font-semibold mt-1">Active (30d)</span>
-          </div>
-          <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center text-center">
-            <MapIcon className="h-8 w-8 text-purple-500 mb-3" />
-            <span className="text-3xl font-bold text-text">{stats.mapCompletions.toLocaleString()}</span>
-            <span className="text-sm text-text-muted uppercase tracking-wider font-semibold mt-1">Map Completions</span>
-          </div>
-          <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center text-center">
-            <Trophy className="h-8 w-8 text-yellow-500 mb-3" />
-            <span className="text-3xl font-bold text-text">{stats.totalPoints.toLocaleString()}</span>
-            <span className="text-sm text-text-muted uppercase tracking-wider font-semibold mt-1">Total Points</span>
-          </div>
-          <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center text-center">
-            <Clock className="h-8 w-8 text-orange-500 mb-3" />
-            <span className="text-3xl font-bold text-text">{stats.bonusCompletions.toLocaleString()}</span>
-            <span className="text-sm text-text-muted uppercase tracking-wider font-semibold mt-1">Bonus Completions</span>
-          </div>
-          <div className="bg-surface border border-border rounded-xl p-4 flex flex-col items-center text-center">
-            <Clock className="h-8 w-8 text-pink-500 mb-3" />
-            <span className="text-3xl font-bold text-text">{stats.stageCompletions.toLocaleString()}</span>
-            <span className="text-sm text-text-muted uppercase tracking-wider font-semibold mt-1">Stage Completions</span>
-          </div>
+          <StatTile icon={Users} value={stats.playerCount} label="Total Players" accent="primary" />
+          <StatTile icon={Activity} value={stats.playersMonth} label="Active (30d)" accent="secondary" />
+          <StatTile icon={Trophy} value={stats.totalPoints} label="Total Points" accent="primary" />
+          <StatTile icon={MapIcon} value={stats.mapCompletions} label="Map Completions" accent="secondary" />
+          <StatTile icon={Flag} value={stats.bonusCompletions} label="Bonus Completions" accent="primary" />
+          <StatTile icon={Layers} value={stats.stageCompletions} label="Stage Completions" accent="secondary" />
         </section>
       )}
 
-      {/* Records and Completions Side by Side */}
-      {(stats && stats.recentRecords.length > 0) || latestCompletions.length > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Latest Records */}
-          {stats && stats.recentRecords.length > 0 && (
-            <section className="bg-surface border border-border rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-border bg-surface/50">
-                <h2 className="text-lg font-semibold text-text flex items-center gap-2">
-                  <Trophy className="h-5 w-5 text-yellow-500" />
-                  Latest Records
-                </h2>
-              </div>
-              <div className="divide-y divide-border">
-                {stats.recentRecords.map((record, i) => (
-                  <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-surface-hover/50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <MapImage
-                        src={mapImageUrl(mapImagesUrl, record.map)}
-                        alt={`${record.map} thumbnail`}
-                        unoptimized
-                        width={64}
-                        height={64}
-                        className="rounded-md"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div>
-                        <MapLinkWithPreview mapname={record.map}>
-                          {record.map}
-                        </MapLinkWithPreview>
-                        <div className="text-sm text-text-muted flex items-center gap-2 mt-1">
-                          <span>by</span>
-                          <Link href={`/players/${record.steamid}`} className="text-text-muted hover:text-text transition-colors">
-                            {record.name || 'Unknown'}
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-mono text-lg font-medium text-text">
-                        {formatTime(record.runtime)}
-                      </div>
-                      <div className="text-xs text-text-placeholder mt-1">
-                        {formatDate(record.date)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Latest Completions */}
-          {latestCompletions.length > 0 && (
-            <section className="bg-surface border border-border rounded-xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-border bg-surface/50">
-                <h2 className="text-lg font-semibold text-text flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-blue-500" />
-                  Latest Completions
-                </h2>
-              </div>
-              <div className="divide-y divide-border">
-                {latestCompletions.map((completion, i) => (
-                  <div key={i} className="px-4 py-3 flex items-center justify-between hover:bg-surface-hover/50 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <MapImage
-                        src={mapImageUrl(mapImagesUrl, completion.map)}
-                        alt={`${completion.map} thumbnail`}
-                        unoptimized
-                        width={64}
-                        height={64}
-                        className="rounded-md"
-                        referrerPolicy="no-referrer"
-                      />
-                      <div>
-                        <MapLinkWithPreview mapname={completion.map}>
-                          {completion.map}
-                        </MapLinkWithPreview>
-                        <div className="text-sm text-text-muted flex items-center gap-2 mt-1">
-                          <span>by</span>
-                          <Link href={`/players/${completion.steamid}`} className="text-text-muted hover:text-text transition-colors">
-                            {completion.name || 'Unknown'}
-                          </Link>
-                          {completion.type === 'bonus' && completion.bonus && (
-                            <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-0.5 rounded">
-                              Bonus {completion.bonus}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-mono text-lg font-medium text-text">
-                        {formatTime(completion.runtime)}
-                      </div>
-                      <div className="text-xs text-text-placeholder mt-1">
-                        {formatDate(completion.date)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
-        </div>
+      {/* Latest Activity — a single combined marquee (records + completions) that
+          keeps the page short while still surfacing fresh community activity. */}
+      {recentRecords.length > 0 || latestCompletions.length > 0 ? (
+        <section className="bg-surface border border-border rounded-xl overflow-hidden">
+          <PanelHeader icon={Activity} title="Latest Activity" />
+          <ActivityTicker
+            records={recentRecords}
+            completions={latestCompletions}
+            mapImagesUrl={mapImagesUrl}
+          />
+        </section>
       ) : null}
+
+      {/* Top players + featured maps */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {topPlayers.length > 0 && (
+          <section className="bg-surface border border-border rounded-xl overflow-hidden">
+            <PanelHeader
+              icon={Trophy}
+              title="Top Players"
+              iconClassName="text-yellow-500"
+              action={{ href: '/players', label: 'Full leaderboard →' }}
+            />
+            <TopPlayersPreview players={topPlayers} />
+          </section>
+        )}
+
+        {featuredMaps.length > 0 && (
+          <section className="bg-surface border border-border rounded-xl overflow-hidden">
+            <PanelHeader
+              icon={MapIcon}
+              title="Popular Maps"
+              action={{ href: '/maps', label: 'All maps →' }}
+            />
+            <FeaturedMaps maps={featuredMaps} mapImagesUrl={mapImagesUrl} />
+          </section>
+        )}
+      </div>
     </div>
   );
 }

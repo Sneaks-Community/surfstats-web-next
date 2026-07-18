@@ -132,3 +132,34 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Horizontal activity ticker (Latest Activity on the home page).
+   The track holds two identical sequences; sliding it left by exactly half its
+   width (one sequence) and looping gives a seamless, JS-free marquee. */
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.ticker-track {
+  animation: ticker-scroll var(--ticker-duration, 60s) linear infinite;
+  will-change: transform;
+}
+/* Pause while the reader is hovering, so they can follow / click an item. */
+.ticker-viewport:hover .ticker-track {
+  animation-play-state: paused;
+}
+/* Reduced motion: stop the slide entirely (overriding the global rule, which
+   would otherwise fast-forward the animation to its end and hide the first
+   copy), drop the duplicate, and let the strip scroll manually instead. */
+@media (prefers-reduced-motion: reduce) {
+  .ticker-track {
+    animation: none !important;
+    transform: none !important;
+  }
+  .ticker-viewport {
+    overflow-x: auto;
+  }
+  .ticker-dupe {
+    display: none;
+  }
+}

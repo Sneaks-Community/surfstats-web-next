@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "chart.js": "^4.5.1",
+    "chartjs-chart-geo": "^4.3.6",
     "country-flag-icons": "^1.6.20",
     "gamedig": "^5.3.3",
     "i18n-iso-countries": "^7.14.0",
@@ -28,6 +29,8 @@
     "react-dom": "^19.2.7",
     "redis": "^5.12.1",
     "server-only": "^0.0.1",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {
@@ -36,6 +39,7 @@
     "@types/node": "^25.9.3",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@types/topojson-client": "^3.1.5",
     "autoprefixer": "^10.5.2",
     "eslint": "^9.39.4",
     "eslint-config-next": "^16.2.10",

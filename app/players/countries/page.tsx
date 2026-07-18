@@ -1,153 +1,84 @@
-import Link from 'next/link';
+import { Globe } from 'lucide-react';
 import { getCountriesRankingFromCache, getCountriesStatsFromCache } from '@/lib/country-analytics';
-import type { CountrySortKey, SortOrder } from '@/lib/country-analytics';
-import CountryBadge from '@/components/CountryBadge';
-import Pagination from '@/components/Pagination';
-import SortableTableHeader from '@/components/SortableTableHeader';
-import CountriesTableSkeleton from '@/components/CountriesTableSkeleton';
-import { SkeletonScreen } from '@/components/Skeleton';
-import { NavigationPendingProvider, PendingContent } from '@/components/NavigationPending';
+import { getNumericCodeFromAlpha2, getPrimaryCountryName } from '@/lib/countries';
+import PanelHeader from '@/components/PanelHeader';
+import TopCountriesList, { type TopCountryEntry } from '@/app/components/countries/TopCountriesList';
+import { WorldReachChart } from '@/app/components/countries/LazyGlobalReach';
+import type { WorldReachDatum } from '@/app/components/countries/WorldReachChart';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Countries - Players',
-  description: 'Country rankings based on total player points',
+  description: "Global reach of the surf community — players ranked by country",
 };
 
-export default async function CountriesPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ sort?: string; order?: string; page?: string }>;
-}) {
-  const params = await searchParams;
+export default async function CountriesPage() {
+  // Pull a deep slice for the map (many countries shaded) plus the stats
+  // headline. The Top-Countries list beside the map is the accessible twin.
+  const [ranking, stats] = await Promise.all([
+    getCountriesRankingFromCache('players', 'desc', 1, 250),
+    getCountriesStatsFromCache(),
+  ]);
 
-  // Parse and validate sort/order parameters
-  const sort = (typeof params.sort === 'string' ? params.sort : undefined) as CountrySortKey | undefined || 'points';
-  const order = (typeof params.order === 'string' ? params.order : undefined) as SortOrder | undefined || 'desc';
-  const page = parseInt(params.page || '1', 10);
+  // World map: players per country, matched to map features by ISO numeric code.
+  const worldData: WorldReachDatum[] = ranking.countries
+    .map((c) => {
+      const numeric = getNumericCodeFromAlpha2(c.country_code);
+      if (!numeric) return null;
+      return {
+        // country-analytics uses the ISO code as the identifier, so resolve a
+        // human-readable name for the map tooltip (falls back to the code).
+        numeric,
+        name: getPrimaryCountryName(c.country_code) ?? c.country,
+        players: c.player_count,
+      };
+    })
+    .filter((d): d is WorldReachDatum => d !== null);
 
-  // Validate sort column
-  const validSortColumns: CountrySortKey[] = ['rank', 'country', 'points', 'players'];
-  const validatedSort = validSortColumns.includes(sort) ? sort : 'points';
-
-  // Validate order
-  const validatedOrder: SortOrder = order === 'asc' ? 'asc' : 'desc';
-
-  // Fetch countries ranking
-  const { countries, totalPages } = await getCountriesRankingFromCache(validatedSort, validatedOrder, page, 25);
-    const stats = await getCountriesStatsFromCache();
-
-  // Build query params for pagination
-  const queryParams: Record<string, string> = {};
-  if (validatedSort !== 'points') queryParams.sort = validatedSort;
-  if (validatedOrder !== 'desc') queryParams.order = validatedOrder;
+  // Top countries by player count (positional rank within this list).
+  const topCountries: TopCountryEntry[] = ranking.countries.slice(0, 10).map((c, i) => ({
+    code: c.country_code,
+    name: c.country,
+    players: c.player_count,
+    rank: i + 1,
+  }));
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold text-text">Countries</h1>
         <p className="text-text-muted">
-          Country rankings by total points • {stats.totalCountries.toLocaleString()} countries • {stats.totalPlayers.toLocaleString()} players
+          Global reach of the community • {stats.totalCountries.toLocaleString()} countries • {stats.totalPlayers.toLocaleString()} players
         </p>
       </div>
 
-      {/* Sort/pagination navigate through the provider, which shows the
-          skeleton instantly. loading.tsx only covers the initial route load. */}
-      <NavigationPendingProvider>
-        <PendingContent fallback={<SkeletonScreen label="Loading countries..."><CountriesTableSkeleton /></SkeletonScreen>}>
-          <div className="bg-surface border border-border rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-border">
-                <thead className="bg-surface/50">
-                  <tr>
-                    <SortableTableHeader
-                      column="rank"
-                      label="Rank"
-                      currentSort={validatedSort}
-                      currentOrder={validatedOrder}
-                      baseUrl="/players/countries"
-                      queryParams={queryParams}
-                      defaultOrder="asc"
-                    />
-                    <SortableTableHeader
-                      column="country"
-                      label="Country"
-                      currentSort={validatedSort}
-                      currentOrder={validatedOrder}
-                      baseUrl="/players/countries"
-                      queryParams={queryParams}
-                      defaultOrder="asc"
-                    />
-                    <SortableTableHeader
-                      column="points"
-                      label="Points"
-                      currentSort={validatedSort}
-                      currentOrder={validatedOrder}
-                      baseUrl="/players/countries"
-                      queryParams={queryParams}
-                      defaultOrder="desc"
-                    />
-                    <SortableTableHeader
-                      column="players"
-                      label="Players"
-                      currentSort={validatedSort}
-                      currentOrder={validatedOrder}
-                      baseUrl="/players/countries"
-                      queryParams={queryParams}
-                      defaultOrder="desc"
-                    />
-                  </tr>
-                </thead>
-                <tbody className="bg-surface divide-y divide-border">
-                  {countries.map((country) => (
-                    <tr key={country.country_code} className="hover:bg-surface-hover/50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-muted">
-                        #{country.rank}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <Link
-                          href={`/players/countries/${country.country_code}`}
-                          className="flex items-center gap-2 hover:text-primary transition-colors"
-                        >
-                          <CountryBadge
-                            countryCode={country.country_code}
-                            showName={true}
-                          />
-                        </Link>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
-                        {country.total_points.toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
-                        {country.player_count.toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                  {countries.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-text-muted">
-                        No countries found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+      {/* Global Reach — world choropleth + top countries */}
+      {worldData.length > 0 ? (
+        <section className="bg-surface border border-border rounded-xl overflow-hidden">
+          <PanelHeader
+            icon={Globe}
+            title="Global Reach"
+            action={{ href: '/players/countries/list', label: 'All countries →' }}
+          />
+          <div className="grid grid-cols-1 lg:grid-cols-3">
+            <div className="lg:col-span-2 p-4 border-b border-border lg:border-b-0 lg:border-r">
+              <p className="text-sm text-text-muted mb-3">
+                Players ranked from{' '}
+                <span className="text-text font-semibold">
+                  {stats.totalCountries.toLocaleString()}
+                </span>{' '}
+                countries around the world.
+              </p>
+              <WorldReachChart data={worldData} />
             </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="px-6 border-t border-border">
-                <Pagination
-                  currentPage={page}
-                  totalPages={totalPages}
-                  baseUrl="/players/countries"
-                  queryParams={queryParams}
-                />
-              </div>
-            )}
+            <TopCountriesList countries={topCountries} />
           </div>
-        </PendingContent>
-      </NavigationPendingProvider>
+        </section>
+      ) : (
+        <div className="bg-surface border border-border rounded-xl p-8 text-center text-text-muted">
+          No country data available.
+        </div>
+      )}
     </div>
   );
 }

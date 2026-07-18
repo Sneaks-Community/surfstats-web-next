@@ -92,7 +92,7 @@ export default function CountryBadge({
         />
       </span>
       {showName && (
-        <span className="text-sm text-zinc-300">{displayName}</span>
+        <span className="text-sm text-text-muted">{displayName}</span>
       )}
     </span>
   );

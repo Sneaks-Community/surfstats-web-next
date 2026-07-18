@@ -175,7 +175,10 @@ const getCountriesRankingInternal = async (
  */
 // Bump on any change to the cached result's shape or computation; orphans stale
 // payloads instead of serving them until the 24h TTL expires.
-const COUNTRIES_RANKING_SCHEMA_VERSION = 2;
+// v3: country-name normalization now resolves the GeoIP "The <country>" forms
+// (e.g. "The United States"), so the aggregation includes countries that v2
+// silently dropped — the old payload must not be served.
+const COUNTRIES_RANKING_SCHEMA_VERSION = 3;
 const COUNTRIES_RANKING_KEY = `surfstats:countries:ranking:v${COUNTRIES_RANKING_SCHEMA_VERSION}`;
 const COUNTRIES_RANKING_TTL = 86400; // 24 hours
 
@@ -281,7 +284,10 @@ const getCountryPlayersInternal = async (
   }
 };
 
-const COUNTRIES_PLAYERS_KEY = 'surfstats:countries:players';
+// v3: matches the country-name normalization fix (see ranking key) — the WHERE
+// clause now includes "The <country>" spellings, changing which players a
+// country page returns.
+const COUNTRIES_PLAYERS_KEY = 'surfstats:countries:players:v3';
 const COUNTRIES_PLAYERS_TTL = 86400; // 24 hours — matches country ranking/stats
 
 /**
@@ -390,7 +396,7 @@ const getCountriesStatsInternal = async (): Promise<{ totalCountries: number; to
 };
 
 // Versioned like the ranking key so logic changes orphan stale payloads.
-const COUNTRIES_STATS_KEY = 'surfstats:countries:stats:v2';
+const COUNTRIES_STATS_KEY = 'surfstats:countries:stats:v3';
 const COUNTRIES_STATS_TTL = 86400; // 24 hours
 
 /**
