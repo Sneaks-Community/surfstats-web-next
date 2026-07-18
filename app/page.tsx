@@ -80,14 +80,14 @@ export default async function Home() {
   const recentRecords = stats?.recentRecords ?? [];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8">
+    <div className="space-y-5">
       {/* Hero header */}
-      <section className="py-4 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <section className="pt-1 pb-2 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <div className="min-w-0">
-          <h1 className="text-4xl font-bold tracking-tight text-text mb-2">
+          <h1 className="text-3xl font-bold tracking-tight text-text mb-1">
             Welcome to {process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats'}
           </h1>
-          <p className="text-text-muted text-lg max-w-2xl">
+          <p className="text-text-muted text-base max-w-2xl">
             {process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
               'Statistics, leaderboards, and server information for our CS:GO surf community.'}
           </p>
@@ -95,30 +95,36 @@ export default async function Home() {
         <JoinServerCTA />
       </section>
 
-      {/* KPI stat row */}
+      {/* KPI stat row + Latest Activity, grouped so the ticker reads as an
+          extension of the stats block rather than its own full-height section. */}
       {stats && (
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <StatTile icon={Users} value={stats.playerCount} label="Total Players" accent="primary" />
-          <StatTile icon={Activity} value={stats.playersMonth} label="Active (30d)" accent="secondary" />
-          <StatTile icon={Trophy} value={stats.totalPoints} label="Total Points" accent="primary" />
-          <StatTile icon={MapIcon} value={stats.mapCompletions} label="Map Completions" accent="secondary" />
-          <StatTile icon={Flag} value={stats.bonusCompletions} label="Bonus Completions" accent="primary" />
-          <StatTile icon={Layers} value={stats.stageCompletions} label="Stage Completions" accent="secondary" />
+        <section className="space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
+            <StatTile icon={Users} value={stats.playerCount} label="Total Players" accent="primary" />
+            <StatTile icon={Activity} value={stats.playersMonth} label="Active (30d)" accent="secondary" />
+            <StatTile icon={Trophy} value={stats.totalPoints} label="Total Points" accent="primary" />
+            <StatTile icon={MapIcon} value={stats.mapCompletions} label="Map Completions" accent="secondary" />
+            <StatTile icon={Flag} value={stats.bonusCompletions} label="Bonus Completions" accent="primary" />
+            <StatTile icon={Layers} value={stats.stageCompletions} label="Stage Completions" accent="secondary" />
+          </div>
+
+          {/* Latest Activity — a single combined marquee (records + completions)
+              tucked directly under the stats with just a small label. */}
+          {recentRecords.length > 0 || latestCompletions.length > 0 ? (
+            <div className="bg-surface border border-border rounded-xl overflow-hidden">
+              <div className="flex items-center gap-1.5 px-4 pt-2 text-xs font-medium uppercase tracking-wider text-text-muted">
+                <Activity className="h-3.5 w-3.5" aria-hidden />
+                Latest Activity
+              </div>
+              <ActivityTicker
+                records={recentRecords}
+                completions={latestCompletions}
+                mapImagesUrl={mapImagesUrl}
+              />
+            </div>
+          ) : null}
         </section>
       )}
-
-      {/* Latest Activity — a single combined marquee (records + completions) that
-          keeps the page short while still surfacing fresh community activity. */}
-      {recentRecords.length > 0 || latestCompletions.length > 0 ? (
-        <section className="bg-surface border border-border rounded-xl overflow-hidden">
-          <PanelHeader icon={Activity} title="Latest Activity" />
-          <ActivityTicker
-            records={recentRecords}
-            completions={latestCompletions}
-            mapImagesUrl={mapImagesUrl}
-          />
-        </section>
-      ) : null}
 
       {/* Top players + featured maps */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

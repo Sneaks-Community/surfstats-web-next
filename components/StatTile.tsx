@@ -25,14 +25,15 @@ export default function StatTile({ icon: Icon, value, label, accent = 'primary' 
   const display = typeof value === 'number' ? value.toLocaleString() : value;
 
   return (
-    <div className="bg-surface border border-border rounded-xl p-4 flex items-center gap-4">
-      <div className={`flex items-center justify-center h-11 w-11 rounded-lg shrink-0 ${ACCENT_CLASSES[accent]}`}>
-        <Icon className="h-6 w-6" />
+    <div className="bg-surface border border-border rounded-xl p-4 xl:p-3 flex items-center gap-4 xl:gap-3">
+      <div className={`flex items-center justify-center h-11 w-11 xl:h-9 xl:w-9 rounded-lg shrink-0 ${ACCENT_CLASSES[accent]}`}>
+        <Icon className="h-6 w-6 xl:h-5 xl:w-5" />
       </div>
       <div className="min-w-0">
-        {/* Proportional figures (no tabular-nums) for a large standalone value. */}
-        <div className="text-2xl font-bold text-text leading-tight">{display}</div>
-        <div className="text-xs text-text-muted uppercase tracking-wider font-semibold mt-0.5">{label}</div>
+        {/* Value shrinks at the dense 6-up (xl) breakpoint so large totals fit;
+            truncate + title guards against any value wider than the tile. */}
+        <div className="text-2xl xl:text-base font-bold text-text leading-tight tabular-nums truncate" title={display}>{display}</div>
+        <div className="text-xs xl:text-[10px] text-text-muted uppercase tracking-wider xl:tracking-normal font-semibold mt-0.5 whitespace-nowrap">{label}</div>
       </div>
     </div>
   );
