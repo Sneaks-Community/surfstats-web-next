@@ -3,7 +3,7 @@ import PlayersTableSkeleton from '@/components/PlayersTableSkeleton';
 
 export default function Loading() {
   return (
-    <SkeletonScreen label="Loading country players..." className="space-y-6">
+    <SkeletonScreen label="Loading country players..." className="space-y-4">
       {/* Back link */}
       <Skeleton className="h-4 w-40 rounded" />
 

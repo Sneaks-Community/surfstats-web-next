@@ -1,17 +1,16 @@
 import { cache } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { getCountryPlayers } from '@/lib/country-analytics';
 import type { PlayerSortKey, SortOrder } from '@/lib/country-analytics';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import { isValidCountryCode, getPrimaryCountryName } from '@/lib/countries';
 import CountryBadge from '@/components/CountryBadge';
 import Pagination from '@/components/Pagination';
-import SortableTableHeader from '@/components/SortableTableHeader';
+import PlayerListTable from '@/components/PlayerListTable';
 import PlayersTableSkeleton from '@/components/PlayersTableSkeleton';
 import { SkeletonScreen } from '@/components/Skeleton';
 import { NavigationPendingProvider, PendingContent } from '@/components/NavigationPending';
-import { formatDate, parseIntParam } from '@/lib/utils';
+import { parseIntParam } from '@/lib/utils';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
@@ -82,7 +81,7 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
   if (validatedOrder !== 'desc') queryParams.order = validatedOrder;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header with country info */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
@@ -112,122 +111,27 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
       {/* Sort/pagination navigate through the provider, which shows the
           skeleton instantly. loading.tsx only covers the initial route load. */}
       <NavigationPendingProvider>
-        <PendingContent fallback={<SkeletonScreen label="Loading country players..."><PlayersTableSkeleton /></SkeletonScreen>}>
-          <div className="bg-surface border border-border rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-border">
-                <thead className="bg-surface/50">
-                  <tr>
-                    <SortableTableHeader
-                      column="rank"
-                      label="Rank"
-                      currentSort={validatedSort}
-                      currentOrder={validatedOrder}
-                      baseUrl={`/players/countries/${countryCode}`}
-                      queryParams={queryParams}
-                      defaultOrder="asc"
-                    />
-                    <SortableTableHeader
-                      column="player"
-                      label="Player"
-                      currentSort={validatedSort}
-                      currentOrder={validatedOrder}
-                      baseUrl={`/players/countries/${countryCode}`}
-                      queryParams={queryParams}
-                      defaultOrder="asc"
-                    />
-                    <SortableTableHeader
-                      column="points"
-                      label="Points"
-                      currentSort={validatedSort}
-                      currentOrder={validatedOrder}
-                      baseUrl={`/players/countries/${countryCode}`}
-                      queryParams={queryParams}
-                      defaultOrder="desc"
-                    />
-                    <SortableTableHeader
-                      column="maps"
-                      label="Maps"
-                      currentSort={validatedSort}
-                      currentOrder={validatedOrder}
-                      baseUrl={`/players/countries/${countryCode}`}
-                      queryParams={queryParams}
-                      defaultOrder="desc"
-                    />
-                    <SortableTableHeader
-                      column="lastseen"
-                      label="Last Seen"
-                      currentSort={validatedSort}
-                      currentOrder={validatedOrder}
-                      baseUrl={`/players/countries/${countryCode}`}
-                      queryParams={queryParams}
-                      defaultOrder="desc"
-                    />
-                  </tr>
-                </thead>
-                <tbody className="bg-surface divide-y divide-border">
-                  {players.map((player) => {
-                    const avatar = avatarsWithData.get(player.steamid);
-                    return (
-                      <tr key={player.steamid} className="hover:bg-surface-hover/50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-muted">
-                          #{player.rank}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            {avatar?.avatarmedium && (
-                              <Image
-                                src={avatar.avatarmedium}
-                                alt={`${player.name}'s avatar`}
-                                width={32}
-                                height={32}
-                                className="rounded-full"
-                              />
-                            )}
-                            <Link
-                              href={`/players/${player.steamid}`}
-                              prefetch={false}
-                              className="text-primary hover:text-primary font-medium transition-colors"
-                            >
-                              {player.name || 'Unknown'}
-                            </Link>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
-                          {player.points.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
-                          {player.finishedmaps.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-muted">
-                          {player.lastseen ? formatDate(player.lastseen) : 'Never'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {players.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-text-muted">
-                        No players found for this country.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+        <PendingContent className="space-y-4" fallback={<SkeletonScreen label="Loading country players..."><PlayersTableSkeleton /></SkeletonScreen>}>
+          <PlayerListTable
+            players={players}
+            avatars={avatarsWithData}
+            emptyMessage="No players found for this country."
+            sort={{
+              baseUrl: `/players/countries/${countryCode}`,
+              queryParams,
+              currentSort: validatedSort,
+              currentOrder: validatedOrder,
+            }}
+          />
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="px-6 border-t border-border">
-                <Pagination
-                  currentPage={page}
-                  totalPages={totalPages}
-                  baseUrl={`/players/countries/${countryCode}`}
-                  queryParams={queryParams}
-                />
-              </div>
-            )}
-          </div>
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              baseUrl={`/players/countries/${countryCode}`}
+              queryParams={queryParams}
+            />
+          )}
         </PendingContent>
       </NavigationPendingProvider>
     </div>

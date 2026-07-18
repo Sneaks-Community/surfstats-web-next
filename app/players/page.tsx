@@ -1,13 +1,12 @@
-import Link from 'next/link';
-import Image from 'next/image';
 import { Search } from 'lucide-react';
 import { cache } from 'react';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import Pagination from '@/components/Pagination';
+import PlayerListTable from '@/components/PlayerListTable';
 import PlayersTableSkeleton from '@/components/PlayersTableSkeleton';
 import { SkeletonScreen } from '@/components/Skeleton';
 import { NavigationPendingProvider, PendingContent } from '@/components/NavigationPending';
-import { formatDate, parseIntParam } from '@/lib/utils';
+import { parseIntParam } from '@/lib/utils';
 import { getPlayersFromCache } from '@/lib/player-cache';
 import { validateSearchQuery } from '@/lib/validators';
 import type { Metadata } from 'next';
@@ -36,7 +35,7 @@ export default async function PlayersPage({
   const avatarsWithData = await getCachedSteamProfiles(steamIds);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-text">Players</h1>
@@ -63,78 +62,21 @@ export default async function PlayersPage({
           route load; search-param navigations reuse the segment and would
           otherwise sit frozen until the (uncached) query returns. */}
       <NavigationPendingProvider>
-        <PendingContent fallback={<SkeletonScreen label="Loading players..."><PlayersTableSkeleton /></SkeletonScreen>}>
-          <div className="bg-surface border border-border rounded-xl overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-border">
-                <thead className="bg-surface/50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Rank</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Player</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Points</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Maps</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider">Last Seen</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-surface divide-y divide-border">
-                  {players.map((player) => {
-                    const avatar = avatarsWithData.get(player.steamid);
-                    return (
-                      <tr key={player.steamid} className="hover:bg-surface-hover/50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-muted">
-                          #{player.rank}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            {avatar?.avatarmedium && (
-                              <Image
-                                src={avatar.avatarmedium}
-                                alt={`${player.name}'s avatar`}
-                                width={32}
-                                height={32}
-                                className="rounded-full"
-                              />
-                            )}
-                            <Link href={`/players/${player.steamid}`} prefetch={false} className="text-primary hover:text-primary font-medium transition-colors">
-                              {player.name || 'Unknown'}
-                            </Link>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
-                          {player.points.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
-                          {player.finishedmaps.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-text-muted">
-                          {player.lastseen ? formatDate(player.lastseen) : 'Never'}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                  {players.length === 0 && (
-                    <tr>
-                      <td colSpan={5} className="px-6 py-8 text-center text-text-muted">
-                        No players found matching your search.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+        <PendingContent className="space-y-4" fallback={<SkeletonScreen label="Loading players..."><PlayersTableSkeleton /></SkeletonScreen>}>
+          <PlayerListTable
+            players={players}
+            avatars={avatarsWithData}
+            emptyMessage="No players found matching your search."
+          />
 
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="px-6 border-t border-border">
-                <Pagination
-                  currentPage={page}
-                  totalPages={totalPages}
-                  baseUrl="/players"
-                  queryParams={q ? { q } : {}}
-                />
-              </div>
-            )}
-          </div>
+          {totalPages > 1 && (
+            <Pagination
+              currentPage={page}
+              totalPages={totalPages}
+              baseUrl="/players"
+              queryParams={q ? { q } : {}}
+            />
+          )}
         </PendingContent>
       </NavigationPendingProvider>
     </div>
