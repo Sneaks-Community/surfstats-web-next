@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import SortIcon from '@/components/SortIcon';
 import { useNavigationPending } from '@/components/NavigationPending';
 
 interface SortableTableHeaderProps {
@@ -79,15 +79,13 @@ export default function SortableTableHeader({
       >
         <span>{label}</span>
         <span className="inline-flex items-center">
-          {isActive ? (
-            currentOrder === 'asc' ? (
-              <ArrowUp className="h-4 w-4" aria-label="Sorted ascending" />
-            ) : (
-              <ArrowDown className="h-4 w-4" aria-label="Sorted descending" />
-            )
-          ) : (
-            <ArrowUpDown className="h-4 w-4 opacity-0 group-hover:opacity-50 transition-opacity" aria-label="Click to sort" />
-          )}
+          <SortIcon
+            field={column}
+            sortField={currentSort}
+            sortDirection={currentOrder}
+            activeClassName=""
+            inactiveClassName="opacity-0 group-hover:opacity-50 transition-opacity"
+          />
         </span>
       </Link>
     </th>
