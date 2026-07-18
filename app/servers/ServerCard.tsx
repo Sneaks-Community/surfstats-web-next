@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Server, Users, ChevronDown, Clock } from 'lucide-react';
+import { Server, Users, ChevronDown, Clock, Check, Copy } from 'lucide-react';
 import Link from 'next/link';
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
@@ -20,6 +20,20 @@ function formatTime(seconds?: number) {
 
 export default function ServerCard({ server, mapImagesUrl }: { server: ServerStatus; mapImagesUrl: string }) {
   const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const address = `${server.config.ip}:${server.config.port}`;
+
+  const copyAddress = async (e: React.MouseEvent | React.KeyboardEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Clipboard unavailable (e.g. insecure context) — silently ignore
+    }
+  };
 
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden flex flex-col transition-all">
@@ -57,7 +71,27 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
                 )}
               </span>
             </div>
-            <div className="text-xs text-text-placeholder font-mono mt-0.5">{server.config.ip}:{server.config.port}</div>
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={copyAddress}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  copyAddress(e);
+                }
+              }}
+              title="Copy address to clipboard"
+              aria-label={copied ? 'Address copied to clipboard' : `Copy ${address} to clipboard`}
+              className="group inline-flex items-center gap-1.5 text-xs text-text-placeholder hover:text-text font-mono mt-0.5 transition-colors cursor-pointer"
+            >
+              <span>{address}</span>
+              {copied ? (
+                <Check className="h-3 w-3 text-green-500" />
+              ) : (
+                <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+              )}
+            </span>
           </div>
         </div>
         
