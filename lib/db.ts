@@ -3,6 +3,7 @@ import mysql from 'mysql2/promise';
 import logger from '@/lib/logger';
 import { wrapPoolQuery } from '@/lib/db-query-logger';
 import { validateEnv } from '@/lib/env';
+import { onShutdown } from '@/lib/shutdown';
 
 // Check if in build phase - skip validation during build
 const isBuildPhase = process.env.npm_lifecycle_event === 'build' ||
@@ -92,6 +93,12 @@ if (!isBuildPhase) {
         const message = err instanceof Error ? err.message : String(err);
         logger.error({ msg: '[DB] Deferred initialization failed', error: message });
       });
+    });
+
+    // Graceful shutdown: drain the pool so open connections close cleanly.
+    onShutdown('db-pool', async () => {
+      await pool.end();
+      logger.info('[DB] Connection pool closed');
     });
   }
 }

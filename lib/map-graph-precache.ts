@@ -162,7 +162,7 @@ export function startMapGraphPrecache(): void {
 }
 
 // Graceful shutdown: clear all refresh timers.
-onShutdown(() => {
+onShutdown('map-graph-precache', () => {
   for (const [mapname, timer] of refreshTimers) {
     clearTimeout(timer);
     refreshTimers.delete(mapname);

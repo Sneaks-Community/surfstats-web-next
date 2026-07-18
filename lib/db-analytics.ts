@@ -132,13 +132,15 @@ function startAnalyticsHealthCheck(): void {
 // Start monitoring on module load
 startAnalyticsHealthCheck();
 
-// Graceful shutdown cleanup
-onShutdown(() => {
+// Graceful shutdown: stop the health monitor and drain the pool.
+onShutdown('analytics-pool', async () => {
   if (healthCheckTimer) {
     clearInterval(healthCheckTimer);
     healthCheckTimer = null;
     logger.info('[Analytics DB] Health check stopped');
   }
+  await analyticsPool.end();
+  logger.info('[Analytics DB] Connection pool closed');
 });
 
 export default analyticsPool;

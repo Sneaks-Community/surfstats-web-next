@@ -68,7 +68,7 @@ export function createBackgroundRefresh({
     );
   };
 
-  onShutdown(() => {
+  onShutdown(`background-refresh:${name}`, () => {
     if (refreshTimer) {
       clearInterval(refreshTimer);
       refreshTimer = null;

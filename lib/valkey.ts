@@ -1,5 +1,6 @@
 import { createClient } from 'redis';
 import logger from './logger';
+import { onShutdown } from './shutdown';
 
 const valkeyUrl = process.env.VALKEY_URL || 'redis://localhost:6379';
 const valkeyUsername = process.env.VALKEY_USERNAME;
@@ -51,6 +52,15 @@ const initialConnect: Promise<void> = (async () => {
     }
   }
 })();
+
+// Graceful shutdown: quit the client so in-flight commands drain and the
+// connection closes cleanly instead of being reset when the process exits.
+onShutdown('valkey-client', async () => {
+  if (client.isOpen) {
+    await client.quit();
+    logger.info('[Valkey] Connection closed gracefully');
+  }
+});
 
 /** Whether the Valkey client is connected and ready to serve commands. */
 export function isCacheReady(): boolean {
