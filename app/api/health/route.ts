@@ -1,15 +1,25 @@
 import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import client from '@/lib/valkey';
 import { getErrorMessage } from '@/lib/errors';
+import { isInternalRequest } from '@/lib/internal-network';
 import logger from '@/lib/logger';
 
-export async function GET() {
-  const healthStatus: Record<string, string | boolean | number> = {
+export async function GET(request: NextRequest) {
+  // Cheap public liveness: no dependency round-trips, no status disclosure.
+  const liveness: Record<string, string | number> = {
     status: 'ok',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
   };
 
+  // The detailed DB/Valkey probe is an unmetered DoS surface and leaks infra
+  // health, so limit it to callers on the internal network.
+  if (!isInternalRequest(request)) {
+    return NextResponse.json(liveness, { status: 200 });
+  }
+
+  const healthStatus: Record<string, string | boolean | number> = { ...liveness };
   let overallHealthy = true;
 
   // Check Valkey connectivity
@@ -37,6 +47,6 @@ export async function GET() {
   }
 
   const statusCode = overallHealthy ? 200 : 503;
-  
+
   return NextResponse.json(healthStatus, { status: statusCode });
 }
