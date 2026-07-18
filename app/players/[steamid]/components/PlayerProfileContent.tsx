@@ -14,6 +14,7 @@ import PlayerTimeDisplay from './PlayerTimeDisplay';
 import WRPerformanceChart from './LazyWRPerformanceChart';
 import ActivityHeatmapChart from './ActivityHeatmapChart';
 import CompletionBreakdownChart from './LazyCompletionBreakdownChart';
+import CareerTimelineChart from './LazyCareerTimelineChart';
 
 interface PlayerProfileContentProps {
   // Cheap overview: identity + global rank + completion counts, sourced from
@@ -255,6 +256,19 @@ export default async function PlayerProfileContent({
         ) : (
           <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
             <h3 className="text-sm font-semibold text-text mb-2">Completion Breakdown</h3>
+            <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
+              No completions
+            </div>
+          </div>
+        )}
+      </div>
+      {/* Career Timeline Stacked Bar */}
+      <div className="h-[280px]">
+        {wrPerformanceData.length > 0 ? (
+          <CareerTimelineChart data={wrPerformanceData} />
+        ) : (
+          <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
+            <h3 className="text-sm font-semibold text-text mb-2">Career Timeline</h3>
             <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
               No completions
             </div>
