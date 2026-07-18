@@ -9,6 +9,7 @@ import { getCountryCodeFromName, UNKNOWN_COUNTRY_CODE } from '@/lib/countries';
 import PlayerPageTabs from './PlayerPageTabs';
 import PlayerRecordsTabs from './PlayerRecordsTabs';
 import ProgressBar from '@/components/ProgressBar';
+import ChartEmptyState from '@/components/ChartEmptyState';
 import PlayerTimeDisplay from './PlayerTimeDisplay';
 import ActivityHeatmapChart from './ActivityHeatmapChart';
 import {
@@ -217,12 +218,7 @@ export default async function PlayerProfileContent({
         {linearVsStagedPerTier.length > 0 ? (
           <TierDistributionChart data={linearVsStagedPerTier} />
         ) : (
-          <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-            <h3 className="text-sm font-semibold text-text mb-2">Tier Distribution</h3>
-            <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-              No data available
-            </div>
-          </div>
+          <ChartEmptyState title="Tier Distribution" message="No data available" />
         )}
       </div>
       {/* Completion Percentile + Activity Heatmap */}
@@ -231,24 +227,14 @@ export default async function PlayerProfileContent({
           {wrPerformanceData.length > 0 ? (
             <WRPerformanceChart data={wrPerformanceData} />
           ) : (
-            <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-              <h3 className="text-sm font-semibold text-text mb-2">Completion Percentile</h3>
-              <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-                No completions
-              </div>
-            </div>
+            <ChartEmptyState title="Completion Percentile" message="No completions" />
           )}
         </div>
         <div className="h-[280px] lg:h-auto">
           {activityHeatmap && activityHeatmap.length > 0 ? (
             <ActivityHeatmapChart data={activityHeatmap} />
           ) : (
-            <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-              <h3 className="text-sm font-semibold text-text mb-2">Activity Heatmap</h3>
-              <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-                No connection data
-              </div>
-            </div>
+            <ChartEmptyState title="Activity Heatmap" message="No connection data" />
           )}
         </div>
       </div>
@@ -260,12 +246,7 @@ export default async function PlayerProfileContent({
         {counts.maps + counts.bonuses + counts.stages > 0 ? (
           <CompletionBreakdownChart counts={counts} />
         ) : (
-          <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-            <h3 className="text-sm font-semibold text-text mb-2">Completion Breakdown</h3>
-            <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-              No completions
-            </div>
-          </div>
+          <ChartEmptyState title="Completion Breakdown" message="No completions" />
         )}
       </div>
       {/* Career Timeline Stacked Bar */}
@@ -273,12 +254,7 @@ export default async function PlayerProfileContent({
         {wrPerformanceData.length > 0 ? (
           <CareerTimelineChart data={wrPerformanceData} />
         ) : (
-          <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-            <h3 className="text-sm font-semibold text-text mb-2">Career Timeline</h3>
-            <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-              No completions
-            </div>
-          </div>
+          <ChartEmptyState title="Career Timeline" message="No completions" />
         )}
       </div>
       {/* Map Engagement Bubble */}
@@ -286,12 +262,7 @@ export default async function PlayerProfileContent({
         {mapEngagement && mapEngagement.length > 0 ? (
           <MapEngagementChart data={mapEngagement} />
         ) : (
-          <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-            <h3 className="text-sm font-semibold text-text mb-2">Map Engagement</h3>
-            <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-              No connection data
-            </div>
-          </div>
+          <ChartEmptyState title="Map Engagement" message="No connection data" />
         )}
       </div>
     </div>

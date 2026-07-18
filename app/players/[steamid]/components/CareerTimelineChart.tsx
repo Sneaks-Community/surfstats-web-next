@@ -11,6 +11,7 @@ import {
   Legend,
 } from 'chart.js';
 import { useMemo } from 'react';
+import ChartEmptyState from '@/components/ChartEmptyState';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -166,17 +167,15 @@ export default function CareerTimelineChart({ data }: CareerTimelineChartProps) 
     return { chartData, options };
   }, [data]);
 
+  if (!chartData) {
+    return <ChartEmptyState title="Career Timeline" message="No completions" />;
+  }
+
   return (
     <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
       <h3 className="text-sm font-semibold text-text mb-2">Career Timeline</h3>
       <div className="flex-1 min-h-[200px]">
-        {chartData ? (
-          <Bar data={chartData} options={options} />
-        ) : (
-          <div className="h-full flex items-center justify-center text-text-muted text-sm">
-            No completions
-          </div>
-        )}
+        <Bar data={chartData} options={options} />
       </div>
     </div>
   );

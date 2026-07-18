@@ -12,6 +12,7 @@ import {
   Legend,
 } from 'chart.js';
 import { useMemo } from 'react';
+import ChartEmptyState from '@/components/ChartEmptyState';
 
 ChartJS.register(
   RadialLinearScale,
@@ -166,16 +167,7 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
 
   // If no data, show empty state
   if (chartData.labels.length === 0) {
-    return (
-      <div className="bg-surface border border-border rounded-xl p-2 h-full flex flex-col">
-        <div className="flex items-center justify-between mb-2 px-1">
-          <h3 className="text-sm font-semibold text-text">Tier Distribution</h3>
-        </div>
-        <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-          No completions
-        </div>
-      </div>
-    );
+    return <ChartEmptyState title="Tier Distribution" message="No completions" />;
   }
 
   return (

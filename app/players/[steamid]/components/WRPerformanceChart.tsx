@@ -13,6 +13,7 @@ import {
   Filler,
 } from 'chart.js';
 import { useMemo } from 'react';
+import ChartEmptyState from '@/components/ChartEmptyState';
 
 ChartJS.register(
   CategoryScale,
@@ -320,14 +321,7 @@ export default function WRPerformanceChart({ data }: WRPerformanceChartProps) {
   }, [aggregatedData]);
 
   if (chartData === null) {
-    return (
-      <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-        <h3 className="text-sm font-semibold text-text mb-2">Completion Percentile</h3>
-        <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-          No completions
-        </div>
-      </div>
-    );
+    return <ChartEmptyState title="Completion Percentile" message="No completions" />;
   }
 
   return (

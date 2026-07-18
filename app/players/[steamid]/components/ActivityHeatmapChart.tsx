@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import ChartEmptyState from '@/components/ChartEmptyState';
 
 interface HeatmapDataPoint {
   dayOfWeek: number; // 0=Sunday, 1=Monday, ..., 6=Saturday
@@ -77,14 +78,7 @@ export default function ActivityHeatmapChart({ data }: ActivityHeatmapChartProps
   }, [safeData]);
 
   if (safeData.length === 0) {
-    return (
-      <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-        <h3 className="text-sm font-semibold text-text mb-2">Activity Heatmap</h3>
-        <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-          No connection data
-        </div>
-      </div>
-    );
+    return <ChartEmptyState title="Activity Heatmap" message="No connection data" />;
   }
 
   return (
