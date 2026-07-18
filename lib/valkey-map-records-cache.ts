@@ -1,5 +1,5 @@
 import 'server-only';
-import { cachedFetch } from './cached-fetch';
+import { mapCachedFetch } from './map-cached-fetch';
 import pool from './db';
 import type { RowDataPacket } from 'mysql2';
 import { validateMapName } from './validators';
@@ -101,18 +101,14 @@ interface BonusRecordsResult {
  * Get record counts and WR time from cache
  */
 export async function getRecordCountsAndWRFromCache(mapname: string): Promise<CountsAndWr> {
-  const empty: CountsAndWr = { counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) {
-    logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return empty;
-  }
-  const key = `surfstats:map:${validMapname}:counts`;
-
-  return cachedFetch<CountsAndWr>(
-    key,
-    RECORDS_COUNTS_TTL,
-    async () => {
+  return mapCachedFetch<CountsAndWr>({
+    mapname,
+    keySuffix: 'counts',
+    ttl: RECORDS_COUNTS_TTL,
+    empty: { counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null },
+    errorLabel: 'counts and WR',
+    expensive: true,
+    fetch: async (validMapname) => {
       const [countsRows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT
@@ -141,15 +137,7 @@ export async function getRecordCountsAndWRFromCache(mapname: string): Promise<Co
 
       return { counts, wr_time };
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.error(`[Cache] Failed to fetch counts and WR for ${validMapname}: ${getErrorMessage(error)}`);
-        return empty;
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -161,18 +149,16 @@ export async function getLeaderboardRecordsFromCache(
   pageSize: number,
   wr_time: number | null = null
 ): Promise<LeaderboardResult> {
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) {
-    logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return { records: [], wr_time: null };
-  }
   const offset = (page - 1) * pageSize;
-  const key = `surfstats:map:${validMapname}:leaderboard:${page}:${pageSize}`;
 
-  return cachedFetch<LeaderboardResult>(
-    key,
-    RECORDS_CACHE_TTL,
-    async () => {
+  return mapCachedFetch<LeaderboardResult>({
+    mapname,
+    keySuffix: `leaderboard:${page}:${pageSize}`,
+    ttl: RECORDS_CACHE_TTL,
+    empty: { records: [], wr_time: null },
+    errorLabel: 'leaderboard records',
+    expensive: true,
+    fetch: async (validMapname) => {
       let localWrTime = wr_time;
       if (localWrTime === null) {
         const [wrTimeRows] = await withTimeout(
@@ -202,15 +188,7 @@ export async function getLeaderboardRecordsFromCache(
 
       return { records: leaderboardRows, wr_time: localWrTime };
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.error(`[Cache] Failed to fetch leaderboard records for ${validMapname}: ${getErrorMessage(error)}`);
-        return { records: [], wr_time: null };
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -258,7 +236,6 @@ export async function getStageRecordsFromCache(
   pageSize: number,
   offset: number
 ): Promise<StageRecordsResult> {
-  const validMapname = validateMapName(mapname);
   const emptyPagination = {
     stage,
     page: Math.floor(offset / pageSize) + 1,
@@ -267,16 +244,15 @@ export async function getStageRecordsFromCache(
     total: 0,
     totalPages: 0,
   };
-  if (!validMapname) {
-    logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return { stages: [], stagesList: [], pagination: emptyPagination };
-  }
-  const key = `surfstats:map:${validMapname}:stages:${stage}:${sortField}:${sortOrder}:${pageSize}:${offset}`;
 
-  return cachedFetch<StageRecordsResult>(
-    key,
-    STAGES_CACHE_TTL,
-    async () => {
+  return mapCachedFetch<StageRecordsResult>({
+    mapname,
+    keySuffix: `stages:${stage}:${sortField}:${sortOrder}:${pageSize}:${offset}`,
+    ttl: STAGES_CACHE_TTL,
+    empty: { stages: [], stagesList: [], pagination: emptyPagination },
+    errorLabel: 'stage records',
+    expensive: true,
+    fetch: async (validMapname) => {
       const MAX_STAGE_RECORDS = 100;
 
       const [wrResult, rankCountResult] = await Promise.all([
@@ -349,15 +325,7 @@ export async function getStageRecordsFromCache(
         },
       };
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.error(`[Cache] Failed to fetch stage records for ${validMapname}: ${getErrorMessage(error)}`);
-        return { stages: [], stagesList: [], pagination: emptyPagination };
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -371,17 +339,15 @@ export async function getBonusRecordsFromCache(
 ): Promise<BonusRecordsResult> {
   const offset = (page - 1) * pageSize;
   const emptyPagination = { bonus, page, pageSize, offset, total: 0, totalPages: 0 };
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) {
-    logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return { bonuses: [], bonusGroupsList: [], pagination: emptyPagination };
-  }
-  const key = `surfstats:map:${validMapname}:bonuses:${bonus}:${page}:${pageSize}`;
 
-  return cachedFetch<BonusRecordsResult>(
-    key,
-    BONUSES_CACHE_TTL,
-    async () => {
+  return mapCachedFetch<BonusRecordsResult>({
+    mapname,
+    keySuffix: `bonuses:${bonus}:${page}:${pageSize}`,
+    ttl: BONUSES_CACHE_TTL,
+    empty: { bonuses: [], bonusGroupsList: [], pagination: emptyPagination },
+    errorLabel: 'bonus records',
+    expensive: true,
+    fetch: async (validMapname) => {
       const [countRows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT COUNT(*) as total FROM ck_bonus WHERE mapname = ? AND zonegroup = ?
@@ -419,15 +385,7 @@ export async function getBonusRecordsFromCache(
         },
       };
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.error(`[Cache] Failed to fetch bonus records for ${validMapname}: ${getErrorMessage(error)}`);
-        return { bonuses: [], bonusGroupsList: [], pagination: emptyPagination };
-      },
-    }
-  );
+  });
 }
 
 const SEARCH_CACHE_TTL = 60; // 1 minute — short TTL since query results vary
@@ -441,19 +399,17 @@ export async function searchLeaderboardRecordsFromCache(
   mapname: string,
   query: string
 ): Promise<LeaderboardResult> {
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) {
-    return { records: [], wr_time: null };
-  }
-
   const normalizedQuery = query.toLowerCase();
   const likePattern = `%${normalizedQuery}%`;
-  const key = `surfstats:map:${validMapname}:search:${normalizedQuery}`;
 
-  return cachedFetch<LeaderboardResult>(
-    key,
-    SEARCH_CACHE_TTL,
-    async () => {
+  return mapCachedFetch<LeaderboardResult>({
+    mapname,
+    keySuffix: `search:${normalizedQuery}`,
+    ttl: SEARCH_CACHE_TTL,
+    empty: { records: [], wr_time: null },
+    errorLabel: `search results (query "${query}")`,
+    expensive: true,
+    fetch: async (validMapname) => {
       const [wrRows] = await withTimeout(
         pool.query<RowDataPacket[]>(
           `SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?`,
@@ -485,15 +441,7 @@ export async function searchLeaderboardRecordsFromCache(
 
       return { records: rows, wr_time };
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.error(`[Cache] Search failed for ${validMapname} query "${query}": ${getErrorMessage(error)}`);
-        return { records: [], wr_time: null };
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -505,17 +453,17 @@ export async function searchStageRecordsFromCache(
   stage: number,
   query: string
 ): Promise<{ stages: StageRecord[] }> {
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) return { stages: [] };
-
   const normalizedQuery = query.toLowerCase();
   const likePattern = `%${normalizedQuery}%`;
-  const key = `surfstats:map:${validMapname}:stage:${stage}:search:${normalizedQuery}`;
 
-  return cachedFetch<{ stages: StageRecord[] }>(
-    key,
-    SEARCH_CACHE_TTL,
-    async () => {
+  return mapCachedFetch<{ stages: StageRecord[] }>({
+    mapname,
+    keySuffix: `stage:${stage}:search:${normalizedQuery}`,
+    ttl: SEARCH_CACHE_TTL,
+    empty: { stages: [] },
+    errorLabel: `stage ${stage} search results (query "${query}")`,
+    expensive: true,
+    fetch: async (validMapname) => {
       const [wrRows] = await withTimeout(
         pool.query<RowDataPacket[]>(
           `SELECT MIN(runtime) AS wr_time FROM ck_stages WHERE map = ? AND stage = ?`,
@@ -548,15 +496,7 @@ export async function searchStageRecordsFromCache(
 
       return { stages: rows };
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.error(`[Cache] Stage search failed for ${validMapname} stage ${stage} query "${query}": ${getErrorMessage(error)}`);
-        return { stages: [] };
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -567,19 +507,17 @@ export async function searchBonusRecordsFromCache(
   bonus: number,
   query: string
 ): Promise<{ records: BonusRecord[] }> {
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) {
-    return { records: [] };
-  }
-
   const normalizedQuery = query.toLowerCase();
   const likePattern = `%${normalizedQuery}%`;
-  const key = `surfstats:map:${validMapname}:bonus:${bonus}:search:${normalizedQuery}`;
 
-  return cachedFetch<{ records: BonusRecord[] }>(
-    key,
-    SEARCH_CACHE_TTL,
-    async () => {
+  return mapCachedFetch<{ records: BonusRecord[] }>({
+    mapname,
+    keySuffix: `bonus:${bonus}:search:${normalizedQuery}`,
+    ttl: SEARCH_CACHE_TTL,
+    empty: { records: [] },
+    errorLabel: `bonus ${bonus} search results (query "${query}")`,
+    expensive: true,
+    fetch: async (validMapname) => {
       const [rows] = await withTimeout(
         pool.query<BonusRecord[]>(
           `SELECT ranked.steamid, ranked.name, ranked.zonegroup, ranked.runtime, ranked.date, ranked.startspeed,
@@ -602,13 +540,5 @@ export async function searchBonusRecordsFromCache(
 
       return { records: rows };
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.error(`[Cache] Bonus search failed for ${validMapname} bonus ${bonus} query "${query}": ${getErrorMessage(error)}`);
-        return { records: [] };
-      },
-    }
-  );
+  });
 }

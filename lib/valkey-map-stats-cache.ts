@@ -1,12 +1,10 @@
 import 'server-only';
-import { cachedFetch } from './cached-fetch';
+import { mapCachedFetch } from './map-cached-fetch';
 import pool from './db';
 import analyticsPool from './db-analytics';
 import type { RowDataPacket } from 'mysql2';
 import { getMapMetadataFromCache } from './valkey-map-cache';
 import { validateMapName } from './validators';
-import logger from './logger';
-import { getErrorMessage } from './errors';
 
 const STATS_CACHE_TTL = 43200; // 12 hours
 
@@ -84,17 +82,14 @@ export async function getWRCheckpointTimesFromCache(
     return undefined;
   }
 
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) {
-    logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return undefined;
-  }
-  const key = `surfstats:map:${validMapname}:stats:wr-checkpoint:${maxCheckpoint}`;
-
-  return cachedFetch(
-    key,
-    STATS_CACHE_TTL,
-    async (): Promise<Array<{ checkpoint: number; time: number }> | undefined> => {
+  return mapCachedFetch<Array<{ checkpoint: number; time: number }> | undefined>({
+    mapname,
+    keySuffix: `stats:wr-checkpoint:${maxCheckpoint}`,
+    ttl: STATS_CACHE_TTL,
+    empty: undefined,
+    errorLabel: 'WR checkpoint times',
+    errorLevel: 'warn',
+    fetch: async (validMapname) => {
       const mapMetadata = await getMapMetadataFromCache(validMapname);
       const wrSteamid = mapMetadata?.wr_holder_steamid || null;
 
@@ -146,31 +141,22 @@ export async function getWRCheckpointTimesFromCache(
 
       return checkpointData;
     },
-    {
-      lock: true,
-      onError: (error) => {
-        logger.warn(`[Cache] Failed to fetch WR checkpoint times for ${mapname}: ${getErrorMessage(error)}`);
-        return undefined;
-      },
-    }
-  );
+  });
 }
 
 /**
  * Get checkpoint stats from cache
  */
 export async function getCheckpointStatsFromCache(mapname: string): Promise<CheckpointStatsResult> {
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) {
-    logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return { checkpointAvgTimes: [] };
-  }
-  const key = `surfstats:map:${validMapname}:stats:checkpoints`;
-
-  return cachedFetch(
-    key,
-    STATS_CACHE_TTL,
-    async (): Promise<CheckpointStatsResult> => {
+  return mapCachedFetch<CheckpointStatsResult>({
+    mapname,
+    keySuffix: 'stats:checkpoints',
+    ttl: STATS_CACHE_TTL,
+    empty: { checkpointAvgTimes: [] },
+    errorLabel: 'checkpoint stats',
+    expensive: true,
+    errorLevel: 'warn',
+    fetch: async (validMapname) => {
       const mapMetadata = await getMapMetadataFromCache(validMapname);
       const checkpoints = mapMetadata?.checkpoints || 0;
       const stages = mapMetadata?.stages || 0;
@@ -207,15 +193,7 @@ export async function getCheckpointStatsFromCache(mapname: string): Promise<Chec
 
       return processCheckpointData(checkpointRows, maxCheckpoint);
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.warn(`[Cache] Failed to fetch checkpoint stats for ${mapname}: ${getErrorMessage(error)}`);
-        return { checkpointAvgTimes: [] };
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -224,17 +202,14 @@ export async function getCheckpointStatsFromCache(mapname: string): Promise<Chec
 export async function getBonusCompletionsOverTimeFromCache(
   mapname: string
 ): Promise<Record<number, Array<{ date: string; count: number }>>> {
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) {
-    logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return {};
-  }
-  const key = `surfstats:map:${validMapname}:stats:bonus-time`;
-
-  return cachedFetch(
-    key,
-    STATS_CACHE_TTL,
-    async (): Promise<Record<number, Array<{ date: string; count: number }>>> => {
+  return mapCachedFetch<Record<number, Array<{ date: string; count: number }>>>({
+    mapname,
+    keySuffix: 'stats:bonus-time',
+    ttl: STATS_CACHE_TTL,
+    empty: {},
+    errorLabel: 'bonus completions over time',
+    errorLevel: 'warn',
+    fetch: async (validMapname) => {
       const [bonusRows] = await pool.query<BonusTimeSeriesData[]>(`
         SELECT
           DATE_FORMAT(date, '%Y-%m-01') as date,
@@ -261,31 +236,21 @@ export async function getBonusCompletionsOverTimeFromCache(
 
       return bonusData;
     },
-    {
-      lock: true,
-      onError: (error) => {
-        logger.warn(`[Cache] Failed to fetch bonus completions over time for ${mapname}: ${getErrorMessage(error)}`);
-        return {};
-      },
-    }
-  );
+  });
 }
 
 /**
  * Get completions over time from cache
  */
 export async function getCompletionsOverTimeFromCache(mapname: string): Promise<Array<{ date: string; count: number }>> {
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) {
-    logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return [];
-  }
-  const key = `surfstats:map:${validMapname}:stats:completions`;
-
-  return cachedFetch(
-    key,
-    STATS_CACHE_TTL,
-    async (): Promise<Array<{ date: string; count: number }>> => {
+  return mapCachedFetch<Array<{ date: string; count: number }>>({
+    mapname,
+    keySuffix: 'stats:completions',
+    ttl: STATS_CACHE_TTL,
+    empty: [],
+    errorLabel: 'completions over time',
+    errorLevel: 'warn',
+    fetch: async (validMapname) => {
       const [completionsRows] = await pool.query<CompletionsOverTimeData[]>(`
         SELECT
           DATE_FORMAT(date, '%Y-%m-01') as date,
@@ -301,31 +266,22 @@ export async function getCompletionsOverTimeFromCache(mapname: string): Promise<
         count: row.count,
       }));
     },
-    {
-      lock: true,
-      onError: (error) => {
-        logger.warn(`[Cache] Failed to fetch completions over time for ${mapname}: ${getErrorMessage(error)}`);
-        return [];
-      },
-    }
-  );
+  });
 }
 
 /**
  * Get time on map data from cache
  */
 export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<{ date: string; totalDuration: number }>> {
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) {
-    logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return [];
-  }
-  const key = `surfstats:map:${validMapname}:stats:time-on-map`;
-
-  return cachedFetch(
-    key,
-    STATS_CACHE_TTL,
-    async (): Promise<Array<{ date: string; totalDuration: number }>> => {
+  return mapCachedFetch<Array<{ date: string; totalDuration: number }>>({
+    mapname,
+    keySuffix: 'stats:time-on-map',
+    ttl: STATS_CACHE_TTL,
+    empty: [],
+    errorLabel: 'time on map data',
+    expensive: true,
+    errorLevel: 'warn',
+    fetch: async (validMapname) => {
       const [timeOnMapRows] = await analyticsPool.query<TimeOnMapData[]>(`
         SELECT
           DATE_FORMAT(connect_date, '%Y-%m-01') as date,
@@ -347,32 +303,21 @@ export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<
         };
       });
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.warn(`[Cache] Failed to fetch time on map data for ${mapname}: ${getErrorMessage(error)}`);
-        return [];
-      },
-    }
-  );
+  });
 }
 
 /**
  * Get finish time data from cache
  */
 export async function getFinishTimeDataFromCache(mapname: string): Promise<{ avgTime: number | null; wrTime: number | null }> {
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) {
-    logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return { avgTime: null, wrTime: null };
-  }
-  const key = `surfstats:map:${validMapname}:stats:finish-time`;
-
-  return cachedFetch(
-    key,
-    STATS_CACHE_TTL,
-    async (): Promise<{ avgTime: number | null; wrTime: number | null }> => {
+  return mapCachedFetch<{ avgTime: number | null; wrTime: number | null }>({
+    mapname,
+    keySuffix: 'stats:finish-time',
+    ttl: STATS_CACHE_TTL,
+    empty: { avgTime: null, wrTime: null },
+    errorLabel: 'finish time data',
+    errorLevel: 'warn',
+    fetch: async (validMapname) => {
       const [finishRows] = await pool.query<RowDataPacket[]>(`
         SELECT
           AVG(runtimepro) as avgTime,
@@ -389,14 +334,7 @@ export async function getFinishTimeDataFromCache(mapname: string): Promise<{ avg
         wrTime: wrTime ? Number(wrTime) : null,
       };
     },
-    {
-      lock: true,
-      onError: (error) => {
-        logger.warn(`[Cache] Failed to fetch finish time data for ${mapname}: ${getErrorMessage(error)}`);
-        return { avgTime: null, wrTime: null };
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -412,23 +350,20 @@ export async function getPercentileTimesFromCache(
   medianTime: number | null;
   avgTime: number | null;
 } | null> {
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) {
-    logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return null;
-  }
-  const key = `surfstats:map:${validMapname}:stats:percentiles`;
-
-  return cachedFetch(
-    key,
-    STATS_CACHE_TTL,
-    async (): Promise<{
-      wrTime: number | null;
-      p1Time: number | null;
-      p10Time: number | null;
-      medianTime: number | null;
-      avgTime: number | null;
-    } | null> => {
+  return mapCachedFetch<{
+    wrTime: number | null;
+    p1Time: number | null;
+    p10Time: number | null;
+    medianTime: number | null;
+    avgTime: number | null;
+  } | null>({
+    mapname,
+    keySuffix: 'stats:percentiles',
+    ttl: STATS_CACHE_TTL,
+    empty: null,
+    errorLabel: 'percentile times',
+    errorLevel: 'warn',
+    fetch: async (validMapname) => {
       // First, get count, min (WR), and avg in a single query
       const [summaryRows] = await pool.query<RowDataPacket[]>(`
         SELECT
@@ -481,14 +416,7 @@ export async function getPercentileTimesFromCache(
         avgTime: summary.avgTime ? Number(summary.avgTime) : null,
       };
     },
-    {
-      lock: true,
-      onError: (error) => {
-        logger.warn(`[Cache] Failed to fetch percentile times for ${mapname}: ${getErrorMessage(error)}`);
-        return null;
-      },
-    }
-  );
+  });
 }
 
 /**
