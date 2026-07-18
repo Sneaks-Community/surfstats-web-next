@@ -48,7 +48,7 @@ export default async function CountriesPage() {
       <div>
         <h1 className="text-3xl font-bold text-text">Countries</h1>
         <p className="text-text-muted">
-          Global reach of the community • {stats.totalCountries.toLocaleString()} countries • {stats.totalPlayers.toLocaleString()} players
+          Global reach of the surf community • {stats.totalCountries.toLocaleString()} countries • {stats.totalPlayers.toLocaleString()} players
         </p>
       </div>
 

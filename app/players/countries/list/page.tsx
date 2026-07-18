@@ -37,7 +37,7 @@ export default async function CountriesListPage({
   const validatedOrder: SortOrder = order === 'asc' ? 'asc' : 'desc';
 
   // Fetch countries ranking
-  const { countries, totalPages } = await getCountriesRankingFromCache(validatedSort, validatedOrder, page, 25);
+  const { countries, totalPages } = await getCountriesRankingFromCache(validatedSort, validatedOrder, page, 20);
   const stats = await getCountriesStatsFromCache();
 
   // Build query params for pagination
@@ -111,10 +111,10 @@ export default async function CountriesListPage({
                 <tbody className="bg-surface divide-y divide-border">
                   {countries.map((country) => (
                     <tr key={country.country_code} className="hover:bg-surface-hover/50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-text-muted">
+                      <td className="px-4 py-2.5 whitespace-nowrap text-sm font-medium text-text-muted">
                         #{country.rank}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-2.5 whitespace-nowrap">
                         <Link
                           href={`/players/countries/${country.country_code}`}
                           className="flex items-center gap-2 hover:text-primary transition-colors"
@@ -125,10 +125,10 @@ export default async function CountriesListPage({
                           />
                         </Link>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
+                      <td className="px-4 py-2.5 whitespace-nowrap text-sm text-text">
                         {country.total_points.toLocaleString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-text">
+                      <td className="px-4 py-2.5 whitespace-nowrap text-sm text-text">
                         {country.player_count.toLocaleString()}
                       </td>
                     </tr>
@@ -146,7 +146,7 @@ export default async function CountriesListPage({
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="px-6 border-t border-border">
+              <div className="px-4 border-t border-border">
                 <Pagination
                   currentPage={page}
                   totalPages={totalPages}

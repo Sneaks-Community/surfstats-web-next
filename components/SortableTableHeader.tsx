@@ -71,7 +71,7 @@ export default function SortableTableHeader({
   };
 
   return (
-    <th scope="col" className={`px-6 py-3 text-left text-xs font-medium text-text-muted uppercase tracking-wider ${className}`}>
+    <th scope="col" className={`px-4 py-2 text-left text-xs font-medium text-text-muted uppercase tracking-wider ${className}`}>
       <Link
         href={href}
         onClick={handleClick}
