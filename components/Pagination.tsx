@@ -219,9 +219,9 @@ export default function Pagination({
 
         {/* Page numbers */}
         <div className="flex items-center gap-1">
-          {pageNumbers.map((page) =>
+          {pageNumbers.map((page, idx) =>
             typeof page === 'number' ? renderPageNumber(page) : (
-              <span key={page} className="px-2 text-text-placeholder">...</span>
+              <span key={`ellipsis-${idx}`} className="px-2 text-text-placeholder">...</span>
             )
           )}
         </div>
