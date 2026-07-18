@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import { validateSteamId } from '@/lib/validators';
 import { getTotalsFromCache } from '@/lib/cache';
-import { getPlayerTimeOnServerFromCache, getActivityHeatmapFromCache } from '@/lib/player-analytics';
+import { getPlayerTimeOnServerFromCache, getActivityHeatmapFromCache, getPlayerMapEngagementFromCache } from '@/lib/player-analytics';
 import { getTierDistributionFromCache } from '@/lib/valkey-map-cache';
 import { getPlayerNameFromCache } from '@/lib/player-cache';
 import { getPlayerOverviewFromCache, getPlayerWrPerformanceFromCache, getLinearVsStagedPerTierFromCache } from '@/lib/player-profile-cache';
@@ -112,7 +112,7 @@ export default async function PlayerProfilePage({
     );
   }
 
-  const [totals, steamAvatars, playtimeData, linearVsStagedRaw, activityHeatmap, tierDistribution, wrPerformanceData] = await Promise.all([
+  const [totals, steamAvatars, playtimeData, linearVsStagedRaw, activityHeatmap, tierDistribution, wrPerformanceData, mapEngagement] = await Promise.all([
     getTotalsFromCache(),
     getSteamProfilesFromCache([decodedSteamId]),
     getPlayerTimeOnServerFromCache(validSteamId),
@@ -120,6 +120,7 @@ export default async function PlayerProfilePage({
     getActivityHeatmapFromCache(validSteamId),
     getTierDistributionFromCache(),
     getPlayerWrPerformanceFromCache(validSteamId),
+    getPlayerMapEngagementFromCache(validSteamId),
   ]);
 
   // The tier ceiling is a property of the server's map pool, not the player.
@@ -146,6 +147,7 @@ export default async function PlayerProfilePage({
         linearVsStagedPerTier={linearVsStagedPerTier}
         wrPerformanceData={wrPerformanceData}
         activityHeatmap={activityHeatmap}
+        mapEngagement={mapEngagement}
         steamid={validSteamId}
       />
     </div>

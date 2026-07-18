@@ -192,3 +192,74 @@ export async function getActivityHeatmapFromCache(
   // A null result (analytics unavailable / invalid id / error) is not cached.
   return cachedFetch(cacheKey, ACTIVITY_HEATMAP_TTL, () => getPlayerActivityHeatmapInternal(steamId));
 }
+
+interface MapEngagementRow extends RowDataPacket {
+  map: string;
+  sessions: number | string;
+  total_seconds: number | string | null;
+}
+
+interface MapEngagementPoint {
+  map: string;
+  sessions: number;
+  hours: number;
+  avgMinutes: number;
+}
+
+async function getPlayerMapEngagementInternal(
+  steamId: string
+): Promise<MapEngagementPoint[] | null> {
+  if (!isAnalyticsAvailable()) {
+    return null;
+  }
+
+  const steamId3Numeric = convertSteamId2ToSteamId3Numeric(steamId);
+  if (steamId3Numeric === null) {
+    logger.warn(`[Analytics] Invalid SteamID format: ${steamId}`);
+    return null;
+  }
+
+  try {
+    const [rows] = await analyticsPool.query<MapEngagementRow[]>(`
+      SELECT
+        map,
+        COUNT(*)      AS sessions,
+        SUM(duration) AS total_seconds
+      FROM player_analytics
+      WHERE steamid3 = ?
+      GROUP BY map
+      ORDER BY total_seconds DESC
+      LIMIT 10
+    `, [steamId3Numeric]);
+
+    return rows
+      .filter((row) => row.map)
+      .map((row) => {
+        const sessions = Number(row.sessions) || 0;
+        const seconds = Number(row.total_seconds) || 0;
+        return {
+          map: row.map,
+          sessions,
+          hours: seconds / 3600,
+          avgMinutes: sessions > 0 ? seconds / sessions / 60 : 0,
+        };
+      });
+  } catch (error: unknown) {
+    logger.error(`[Analytics] Failed to fetch map engagement for ${steamId}: ${getErrorMessage(error)}`);
+    return null;
+  }
+}
+
+const MAP_ENGAGEMENT_KEY = 'surfstats:player:map-engagement';
+const MAP_ENGAGEMENT_TTL = 3600; // 1 hour
+
+export async function getPlayerMapEngagementFromCache(
+  steamId: string
+): Promise<MapEngagementPoint[] | null> {
+  const cacheKey = `${MAP_ENGAGEMENT_KEY}:${steamId}`;
+
+  // A null result (analytics unavailable / invalid id / error) is not cached.
+  return cachedFetch(cacheKey, MAP_ENGAGEMENT_TTL, () => getPlayerMapEngagementInternal(steamId));
+}
+
+export type { MapEngagementPoint };

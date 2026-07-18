@@ -15,6 +15,8 @@ import WRPerformanceChart from './LazyWRPerformanceChart';
 import ActivityHeatmapChart from './ActivityHeatmapChart';
 import CompletionBreakdownChart from './LazyCompletionBreakdownChart';
 import CareerTimelineChart from './LazyCareerTimelineChart';
+import MapEngagementChart from './LazyMapEngagementChart';
+import type { MapEngagementPoint } from '@/lib/player-analytics';
 
 interface PlayerProfileContentProps {
   // Cheap overview: identity + global rank + completion counts, sourced from
@@ -60,6 +62,7 @@ interface PlayerProfileContentProps {
     hour: number;
     count: number;
   }> | null;
+  mapEngagement: MapEngagementPoint[] | null;
   steamid: string;
 }
 
@@ -72,6 +75,7 @@ export default async function PlayerProfileContent({
   linearVsStagedPerTier,
   wrPerformanceData,
   activityHeatmap,
+  mapEngagement,
   steamid,
 }: PlayerProfileContentProps) {
   // Identity + stats come from the cheap overview query, not the expensive
@@ -271,6 +275,19 @@ export default async function PlayerProfileContent({
             <h3 className="text-sm font-semibold text-text mb-2">Career Timeline</h3>
             <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
               No completions
+            </div>
+          </div>
+        )}
+      </div>
+      {/* Map Engagement Bubble */}
+      <div className="h-[280px]">
+        {mapEngagement && mapEngagement.length > 0 ? (
+          <MapEngagementChart data={mapEngagement} />
+        ) : (
+          <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
+            <h3 className="text-sm font-semibold text-text mb-2">Map Engagement</h3>
+            <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
+              No connection data
             </div>
           </div>
         )}
