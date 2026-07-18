@@ -27,7 +27,7 @@
     "react": "^19.2.7",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.7",
-    "redis": "^5.12.1",
+    "redis": "^6.1.0",
     "server-only": "^0.0.1",
     "topojson-client": "^3.1.0",
     "world-atlas": "^2.0.2",
