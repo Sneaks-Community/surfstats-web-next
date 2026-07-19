@@ -7,7 +7,7 @@ import MapsGridSkeleton from '@/components/MapsGridSkeleton';
 import { SkeletonScreen } from '@/components/Skeleton';
 import { NavigationPendingProvider, PendingContent } from '@/components/NavigationPending';
 import { getTierColor } from '@/lib/tierColors';
-import { mapImageUrl, getMapImagesUrl } from '@/lib/utils';
+import { mapImageUrl, getMapImagesUrl, parseIntParam } from '@/lib/utils';
 import Pagination from '@/components/Pagination';
 import { type MapMetadata } from '@/lib/map-cache';
 import { getAllMapMetadataFromCache, getTierDistributionFromCache } from '@/lib/valkey-map-cache';
@@ -45,7 +45,7 @@ export default async function MapsPage({
   };
 
   const q = validateSearchQuery(getParam(params.q));
-  const page = parseInt(getParam(params.page, '1'), 10);
+  const page = parseIntParam(getParam(params.page, '1'));
   const type = getParam(params.type, 'all');
   // Handle tiers from URL - can be comma-separated or multiple params
   const tiersParams = getParamArray(params.tiers);
