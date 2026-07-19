@@ -72,7 +72,6 @@ export default async function SearchPage({
             defaultValue={query}
             className="block w-full pl-12 pr-4 py-4 border border-border rounded-xl leading-5 bg-background-secondary text-lg text-text placeholder-text-placeholder focus:outline-none focus:bg-surface focus:border-border-focus focus:ring-2 focus:ring-border-focus transition-all shadow-lg"
             placeholder="Search for players (name, SteamID) or maps..."
-            autoFocus
           />
         </form>
       </div>
