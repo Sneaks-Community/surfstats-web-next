@@ -4,10 +4,14 @@
  */
 
 // Pre-created formatter for better performance (avoids creating new Intl.DateTimeFormat on each call)
+// timeZone: 'UTC' keeps output stable regardless of the server's TZ, avoiding
+// hydration mismatches when a server component's formatted date is compared
+// against the client's re-render in a different timezone.
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
   year: 'numeric',
   month: '2-digit',
   day: 'numeric',
+  timeZone: 'UTC',
 });
 
 /**
