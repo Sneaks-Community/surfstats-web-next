@@ -448,34 +448,23 @@ export async function getTotalsFromCache(): Promise<{
 export async function prewarmCaches(): Promise<void> {
   logger.info('[Cache] Pre-warming caches...');
 
-  // Pre-warm stats - use direct database query instead of cache
+  // Pre-warm stats - populates the Valkey cache
   try {
     const startTime = Date.now();
-    const [rows] = await pool.query<RowDataPacket[]>('SELECT `key`, `value` FROM ck_stats');
-    const [recentRecords] = await pool.query<RowDataPacket[]>(`
-      SELECT lr.steamid, lr.name, lr.runtime, lr.map, lr.date, pr.country
-      FROM ck_latestrecords lr
-      LEFT JOIN ck_playerrank pr ON lr.steamid = pr.steamid
-      ORDER BY lr.date DESC
-      LIMIT 5
-    `);
-    const duration = Date.now() - startTime;
-    logger.info(
-      `[Cache] Stats pre-warmed successfully (${rows.length} stats, ${recentRecords.length} records, ${duration}ms)`
-    );
+    await getStatsFromCache();
+    logger.info(`[Cache] Stats cache pre-warmed successfully (${Date.now() - startTime}ms)`);
   } catch (error: unknown) {
     logger.error('[Cache] Stats cache pre-warm failed');
     logger.error(`[Cache] Error: ${getErrorMessage(error)}`);
   }
 
-  // Pre-warm totals - use direct database call
+  // Pre-warm totals - populates the Valkey cache
   try {
     const startTime = Date.now();
-    const { getTotals } = await import('./map-cache');
-    const totals = await getTotals();
+    const totals = await getTotalsFromCache();
     const duration = Date.now() - startTime;
     logger.info(
-      `[Cache] Totals pre-warmed successfully (maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}, ${duration}ms)`
+      `[Cache] Totals cache pre-warmed successfully (maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}, ${duration}ms)`
     );
   } catch (error: unknown) {
     logger.error('[Cache] Totals cache pre-warm failed');
