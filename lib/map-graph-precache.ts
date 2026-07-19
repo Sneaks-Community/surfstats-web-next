@@ -28,8 +28,10 @@ const refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
 let precacheStarted = false;
 
 /**
- * Fetch and cache all 8 graph data points for a single map using Valkey pipelining.
- * Uses pipeline() to batch all SET operations into a single network round-trip.
+ * Refresh all graph data points for a single map from the database.
+ * Deletes the cached series first so the *FromCache calls cold-miss and
+ * repopulate from the DB (rather than re-extending stale entries), and each
+ * call writes its own key — no second write here.
  */
 async function precacheMapGraphs(mapname: string): Promise<void> {
   try {
@@ -38,16 +40,19 @@ async function precacheMapGraphs(mapname: string): Promise<void> {
     const stages = metadata?.stages || 0;
     const maxCheckpoint = checkpoints > 0 ? checkpoints : stages;
 
-    // Fetch all 8 data points in parallel
-    const [
-      completionsOverTime,
-      timeOnMapData,
-      checkpointStats,
-      wrCheckpointTimes,
-      finishTimeData,
-      bonusCompletionsOverTime,
-      percentileTimes,
-    ] = await Promise.all([
+    // Force a fresh DB read on the next fetch.
+    await client.del([
+      `surfstats:map:${mapname}:stats:completions`,
+      `surfstats:map:${mapname}:stats:time-on-map`,
+      `surfstats:map:${mapname}:stats:checkpoints`,
+      `surfstats:map:${mapname}:stats:wr-checkpoint:${maxCheckpoint}`,
+      `surfstats:map:${mapname}:stats:finish-time`,
+      `surfstats:map:${mapname}:stats:bonus-time`,
+      `surfstats:map:${mapname}:stats:percentiles`,
+    ]);
+
+    // Each call reads from the DB (cache now empty) and writes its own key.
+    await Promise.all([
       getCompletionsOverTimeFromCache(mapname),
       getTimeOnMapDataFromCache(mapname),
       getCheckpointStatsFromCache(mapname),
@@ -55,21 +60,6 @@ async function precacheMapGraphs(mapname: string): Promise<void> {
       getFinishTimeDataFromCache(mapname),
       getBonusCompletionsOverTimeFromCache(mapname),
       getPercentileTimesFromCache(mapname),
-    ]);
-
-    // Use Valkey pipelining for batch SET operations (single network round-trip)
-    // redis v5 client: use Promise.all() with individual setEx calls
-    // This batches commands efficiently within the same event loop tick
-    const TTL = 43200; // 12 hours
-
-    await Promise.all([
-      client.setEx(`surfstats:map:${mapname}:stats:completions`, TTL, JSON.stringify(completionsOverTime)),
-      client.setEx(`surfstats:map:${mapname}:stats:time-on-map`, TTL, JSON.stringify(timeOnMapData)),
-      client.setEx(`surfstats:map:${mapname}:stats:checkpoints`, TTL, JSON.stringify(checkpointStats)),
-      client.setEx(`surfstats:map:${mapname}:stats:wr-checkpoint:${maxCheckpoint}`, TTL, JSON.stringify(wrCheckpointTimes ?? [])),
-      client.setEx(`surfstats:map:${mapname}:stats:finish-time`, TTL, JSON.stringify(finishTimeData)),
-      client.setEx(`surfstats:map:${mapname}:stats:bonus-time`, TTL, JSON.stringify(bonusCompletionsOverTime)),
-      client.setEx(`surfstats:map:${mapname}:stats:percentiles`, TTL, JSON.stringify(percentileTimes)),
     ]);
 
     logger.debug(`[MapGraphPrecache] Cached graphs for ${mapname}`);
