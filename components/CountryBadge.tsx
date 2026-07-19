@@ -52,7 +52,7 @@ export default function CountryBadge({
   // Handle null, undefined, or empty country codes
   if (!isoCode) {
     return (
-      <span className={`inline-flex items-center gap-2 text-zinc-500 ${className}`} title={countryCode || 'Unknown'}>
+      <span className={`inline-flex items-center gap-2 text-text-placeholder ${className}`} title={countryCode || 'Unknown'}>
         <span className="text-xs">N/A</span>
       </span>
     );
@@ -62,7 +62,7 @@ export default function CountryBadge({
   if (!hasFlag(isoCode)) {
     const displayName = getCountryDisplayName(isoCode, countryCode || undefined);
     return (
-      <span className={`inline-flex items-center gap-2 text-zinc-500 ${className}`} title={countryCode || 'Unknown'}>
+      <span className={`inline-flex items-center gap-2 text-text-placeholder ${className}`} title={countryCode || 'Unknown'}>
         <span className="text-xs">{displayName}</span>
       </span>
     );
@@ -75,7 +75,7 @@ export default function CountryBadge({
   if (FlagComponent == null) {
     const displayName = getCountryDisplayName(isoCode, countryCode || undefined);
     return (
-      <span className={`inline-flex items-center gap-2 text-zinc-500 ${className}`} title={countryCode || 'Unknown'}>
+      <span className={`inline-flex items-center gap-2 text-text-placeholder ${className}`} title={countryCode || 'Unknown'}>
         <span className="text-xs">{displayName}</span>
       </span>
     );
