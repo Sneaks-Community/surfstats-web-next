@@ -33,14 +33,18 @@ export interface RateLimitResult {
 }
 
 /**
- * Best-effort client IP from proxy headers. Trusts `x-forwarded-for`/`x-real-ip`,
- * so the deployment must terminate at a proxy that sets them (see INF-2 notes).
+ * Best-effort client IP from proxy headers. Reads the right-most `x-forwarded-for`
+ * hop — the address the edge proxy (Traefik) actually observed and appended, which
+ * a client cannot forge — rather than the spoofable left-most entry. Assumes a
+ * single trusted proxy hop and that the app is only reachable through it; add a
+ * hop for each additional proxy placed in front of Traefik.
  */
 function getClientIp(request: NextRequest): string {
   const xff = request.headers.get('x-forwarded-for');
   if (xff) {
-    const first = xff.split(',')[0]?.trim();
-    if (first) return first;
+    const parts = xff.split(',');
+    const last = parts[parts.length - 1]?.trim();
+    if (last) return last;
   }
   return request.headers.get('x-real-ip')?.trim() || 'unknown';
 }

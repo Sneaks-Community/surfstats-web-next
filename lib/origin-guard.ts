@@ -8,8 +8,25 @@ const ALLOWED_ORIGINS: readonly string[] = (process.env.ALLOWED_ORIGINS || '')
   .map((o) => o.trim())
   .filter(Boolean);
 
-/** The request's own public origin, honoring proxy headers. */
+// Canonical origin from config, if set. Preferred over the header-derived origin
+// because X-Forwarded-Host is client-spoofable (see C2).
+const CONFIGURED_ORIGIN: string | null = (() => {
+  const url = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!url) return null;
+  try {
+    return new URL(url).origin;
+  } catch {
+    return null;
+  }
+})();
+
+/**
+ * The request's own public origin. Uses the configured canonical origin when
+ * set; otherwise falls back to the (spoofable) proxy headers so a default
+ * deployment works without extra config.
+ */
 function ownOrigin(request: NextRequest): string | null {
+  if (CONFIGURED_ORIGIN) return CONFIGURED_ORIGIN;
   const host = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim()
     || request.headers.get('host');
   if (!host) return null;
