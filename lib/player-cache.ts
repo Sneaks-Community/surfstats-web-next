@@ -244,7 +244,7 @@ async function searchPlayersInternal(query: string): Promise<PlayerSearchResult[
 }
 
 const PLAYER_SEARCH_KEY = 'surfstats:players:search';
-const PLAYER_SEARCH_TTL = 3600; // 1 hour
+const PLAYER_SEARCH_TTL = 300; // 5 minutes
 
 /**
  * Search players from Valkey cache
