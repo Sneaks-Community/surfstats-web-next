@@ -158,12 +158,9 @@ interface RecentRecords {
   country: string | null;
 }
 
-const getStatsInternal = async (): Promise<{
-  stats: DashboardStats;
-  recentRecords: RecentRecords[];
-}> => {
-  const startTime = Date.now();
-
+// Split per key so a single expired key (their TTLs differ) refreshes only its
+// own query instead of both.
+const getDashboardStatsInternal = async (): Promise<DashboardStats> => {
   try {
     const [statsRows] = await pool.query<RowDataPacket[]>('SELECT `key`, `value` FROM ck_stats');
     const statsMap = new Map<string, string>();
@@ -171,15 +168,7 @@ const getStatsInternal = async (): Promise<{
       statsMap.set(row.key, row.value);
     });
 
-    const [recentRecords] = await pool.query<RowDataPacket[]>(`
-      SELECT lr.steamid, lr.name, lr.runtime, lr.map, lr.date, pr.country
-      FROM ck_latestrecords lr
-      LEFT JOIN ck_playerrank pr ON lr.steamid = pr.steamid
-      ORDER BY lr.date DESC
-      LIMIT 5
-    `);
-
-    const stats: DashboardStats = {
+    return {
       playerCount: parseInt(statsMap.get('player_count') || '0', 10),
       playersMonth: parseInt(statsMap.get('players_month') || '0', 10),
       mapCompletions: parseInt(statsMap.get('map_completions') || '0', 10),
@@ -187,27 +176,32 @@ const getStatsInternal = async (): Promise<{
       stageCompletions: parseInt(statsMap.get('stage_completions') || '0', 10),
       totalPoints: parseInt(statsMap.get('total_points') || '0', 10),
     };
-
-    const duration = Date.now() - startTime;
-    logger.debug(`[StatsCache] Fetched stats in ${duration}ms`);
-
-    return {
-      stats,
-      recentRecords: recentRecords as RecentRecords[],
-    };
   } catch (error: unknown) {
     logger.error(`[StatsCache] Failed to fetch stats: ${getErrorMessage(error)}`);
     return {
-      stats: {
-        playerCount: 0,
-        playersMonth: 0,
-        mapCompletions: 0,
-        bonusCompletions: 0,
-        stageCompletions: 0,
-        totalPoints: 0,
-      },
-      recentRecords: [],
+      playerCount: 0,
+      playersMonth: 0,
+      mapCompletions: 0,
+      bonusCompletions: 0,
+      stageCompletions: 0,
+      totalPoints: 0,
     };
+  }
+};
+
+const getRecentRecordsInternal = async (): Promise<RecentRecords[]> => {
+  try {
+    const [recentRecords] = await pool.query<RowDataPacket[]>(`
+      SELECT lr.steamid, lr.name, lr.runtime, lr.map, lr.date, pr.country
+      FROM ck_latestrecords lr
+      LEFT JOIN ck_playerrank pr ON lr.steamid = pr.steamid
+      ORDER BY lr.date DESC
+      LIMIT 5
+    `);
+    return recentRecords as RecentRecords[];
+  } catch (error: unknown) {
+    logger.error(`[StatsCache] Failed to fetch recent records: ${getErrorMessage(error)}`);
+    return [];
   }
 };
 
@@ -245,9 +239,8 @@ export async function getStatsFromCache(): Promise<{
     return { ...cachedStats, recentRecords: cachedRecords };
   }
 
-  // Cold load (both missing): getStatsInternal() returns both datasets in one
-  // pass, so fetch once and populate both keys instead of letting each helper
-  // run getStatsInternal() independently (which would run all 4 queries).
+  // Cold load (both missing): fetch both under one lock and populate both keys
+  // in a single pass, rather than letting each helper acquire its own lock.
   if (!cachedStats && !cachedRecords) {
     const { stats, recentRecords } = await cacheLock.acquire(
       DASHBOARD_STATS_KEY,
@@ -261,12 +254,15 @@ export async function getStatsFromCache(): Promise<{
           return { stats: rs, recentRecords: rr };
         }
 
-        const fresh = await getStatsInternal();
-        await Promise.all([
-          cacheSet(DASHBOARD_STATS_KEY, fresh.stats, DASHBOARD_STATS_TTL),
-          cacheSet(DASHBOARD_RECENT_RECORDS_KEY, fresh.recentRecords, DASHBOARD_RECENT_RECORDS_TTL),
+        const [stats, recentRecords] = await Promise.all([
+          getDashboardStatsInternal(),
+          getRecentRecordsInternal(),
         ]);
-        return fresh;
+        await Promise.all([
+          cacheSet(DASHBOARD_STATS_KEY, stats, DASHBOARD_STATS_TTL),
+          cacheSet(DASHBOARD_RECENT_RECORDS_KEY, recentRecords, DASHBOARD_RECENT_RECORDS_TTL),
+        ]);
+        return { stats, recentRecords };
       }
     );
 
@@ -289,7 +285,7 @@ export async function getDashboardStatsFromCache(): Promise<DashboardStats> {
   return cachedFetch(
     DASHBOARD_STATS_KEY,
     DASHBOARD_STATS_TTL,
-    async () => (await getStatsInternal()).stats,
+    getDashboardStatsInternal,
     { lock: true }
   );
 }
@@ -301,7 +297,7 @@ export async function getRecentRecordsFromCache(): Promise<RecentRecords[]> {
   return cachedFetch(
     DASHBOARD_RECENT_RECORDS_KEY,
     DASHBOARD_RECENT_RECORDS_TTL,
-    async () => (await getStatsInternal()).recentRecords,
+    getRecentRecordsInternal,
     { lock: true }
   );
 }
