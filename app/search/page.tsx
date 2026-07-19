@@ -14,6 +14,8 @@ import { getErrorMessage } from '@/lib/errors';
 
 export const metadata: Metadata = {
   title: 'Search',
+  // Search results are thin/duplicate content — keep them out of the index.
+  robots: { index: false },
 };
 
 interface MapResult {

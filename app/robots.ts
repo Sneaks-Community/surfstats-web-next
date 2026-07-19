@@ -15,6 +15,5 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
       disallow: '/api/',
     },
     sitemap: `${base}/sitemap.xml`,
-    host: base,
   };
 }
