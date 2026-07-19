@@ -63,14 +63,19 @@ export async function checkRateLimit(request: NextRequest): Promise<RateLimitRes
       .multi()
       .incr(key)
       .expire(key, WINDOW_SECONDS, 'NX')
+      .pttl(key)
       .exec();
 
     const count = Number(results[0]);
+    // PTTL gives the true remaining time in the current window; fall back to the
+    // full window if the key has no TTL yet (-1) or vanished (-2).
+    const pttlMs = Number(results[2]);
+    const resetSeconds = pttlMs > 0 ? Math.ceil(pttlMs / 1000) : WINDOW_SECONDS;
     return {
       allowed: count <= MAX_REQUESTS,
       limit: MAX_REQUESTS,
       remaining: Math.max(0, MAX_REQUESTS - count),
-      resetSeconds: WINDOW_SECONDS,
+      resetSeconds,
     };
   } catch (err) {
     logger.warn(
