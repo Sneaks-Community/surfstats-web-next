@@ -705,8 +705,12 @@ export default function MapRecordsTabs({
             return a.name.localeCompare(b.name);
           case 'time':
             return a.runtimepro - b.runtimepro;
-          case 'speed':
-            return a.startspeed - b.startspeed;
+          case 'speed': {
+            // -1 = no speed data; push to the end like the wrDiff sentinel.
+            const aSpeed = a.startspeed === -1 ? Infinity : a.startspeed;
+            const bSpeed = b.startspeed === -1 ? Infinity : b.startspeed;
+            return aSpeed - bSpeed;
+          }
           case 'wrDiff': {
             const aDiff = a.wr_time ? a.runtimepro - a.wr_time : Infinity;
             const bDiff = b.wr_time ? b.runtimepro - b.wr_time : Infinity;
@@ -756,8 +760,12 @@ export default function MapRecordsTabs({
             return a.name.localeCompare(b.name);
           case 'time':
             return a.runtime - b.runtime;
-          case 'speed':
-            return a.startspeed - b.startspeed;
+          case 'speed': {
+            // -1 = no speed data; push to the end like the wrDiff sentinel.
+            const aSpeed = a.startspeed === -1 ? Infinity : a.startspeed;
+            const bSpeed = b.startspeed === -1 ? Infinity : b.startspeed;
+            return aSpeed - bSpeed;
+          }
           case 'wrDiff': {
             const aDiff = a.wr_time ? a.runtime - a.wr_time : Infinity;
             const bDiff = b.wr_time ? b.runtime - b.wr_time : Infinity;
@@ -797,8 +805,12 @@ export default function MapRecordsTabs({
             return a.runtime - b.runtime;
           case 'player':
             return a.name.localeCompare(b.name);
-          case 'speed':
-            return a.startspeed - b.startspeed;
+          case 'speed': {
+            // -1 = no speed data; push to the end like the wrDiff sentinel.
+            const aSpeed = a.startspeed === -1 ? Infinity : a.startspeed;
+            const bSpeed = b.startspeed === -1 ? Infinity : b.startspeed;
+            return aSpeed - bSpeed;
+          }
           case 'date':
             return new Date(a.date).getTime() - new Date(b.date).getTime();
           default:
