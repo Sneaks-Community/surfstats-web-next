@@ -43,6 +43,10 @@ function isPrivateIp(ip: string): boolean {
  * notes): a request lacking any forwarding header came straight over the private
  * network (container healthcheck, internal monitoring), and a forwarded request
  * is internal only if its client IP is itself private/allow-listed.
+ *
+ * Uses the right-most XFF hop — the address the proxy observed and appended,
+ * which a client cannot forge — so a public caller can't spoof a private source
+ * IP to pass this gate. Assumes a single trusted proxy hop.
  */
 export function isInternalRequest(request: NextRequest): boolean {
   const xff = request.headers.get('x-forwarded-for');
@@ -50,7 +54,8 @@ export function isInternalRequest(request: NextRequest): boolean {
 
   if (!xff && !realIp) return true;
 
-  const clientIp = (xff?.split(',')[0] || realIp || '').trim();
+  const parts = xff?.split(',') ?? [];
+  const clientIp = (parts[parts.length - 1]?.trim() || realIp?.trim() || '');
   if (!clientIp) return true;
   if (TRUSTED_INTERNAL_IPS.includes(clientIp)) return true;
   return isPrivateIp(clientIp);
