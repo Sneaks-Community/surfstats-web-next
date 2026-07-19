@@ -10,7 +10,7 @@ import {
   getBonusCompletionsOverTimeFromCache,
   getPercentileTimesFromCache,
 } from './valkey-map-stats-cache';
-import { getAllMapMetadataFromCache } from './valkey-map-cache';
+import { getAllMapMetadataFromCache, getMapMetadataFromCache } from './valkey-map-cache';
 import { getErrorMessage } from './errors';
 import { onShutdown } from './shutdown';
 
@@ -33,6 +33,11 @@ let precacheStarted = false;
  */
 async function precacheMapGraphs(mapname: string): Promise<void> {
   try {
+    const metadata = await getMapMetadataFromCache(mapname);
+    const checkpoints = metadata?.checkpoints || 0;
+    const stages = metadata?.stages || 0;
+    const maxCheckpoint = checkpoints > 0 ? checkpoints : stages;
+
     // Fetch all 8 data points in parallel
     const [
       completionsOverTime,
@@ -46,7 +51,7 @@ async function precacheMapGraphs(mapname: string): Promise<void> {
       getCompletionsOverTimeFromCache(mapname),
       getTimeOnMapDataFromCache(mapname),
       getCheckpointStatsFromCache(mapname),
-      getWRCheckpointTimesFromCache(mapname, 10), // approximate max for precache
+      getWRCheckpointTimesFromCache(mapname, maxCheckpoint),
       getFinishTimeDataFromCache(mapname),
       getBonusCompletionsOverTimeFromCache(mapname),
       getPercentileTimesFromCache(mapname),
@@ -61,7 +66,7 @@ async function precacheMapGraphs(mapname: string): Promise<void> {
       client.setEx(`surfstats:map:${mapname}:stats:completions`, TTL, JSON.stringify(completionsOverTime)),
       client.setEx(`surfstats:map:${mapname}:stats:time-on-map`, TTL, JSON.stringify(timeOnMapData)),
       client.setEx(`surfstats:map:${mapname}:stats:checkpoints`, TTL, JSON.stringify(checkpointStats)),
-      client.setEx(`surfstats:map:${mapname}:stats:wr-checkpoint:10`, TTL, JSON.stringify(wrCheckpointTimes ?? [])),
+      client.setEx(`surfstats:map:${mapname}:stats:wr-checkpoint:${maxCheckpoint}`, TTL, JSON.stringify(wrCheckpointTimes ?? [])),
       client.setEx(`surfstats:map:${mapname}:stats:finish-time`, TTL, JSON.stringify(finishTimeData)),
       client.setEx(`surfstats:map:${mapname}:stats:bonus-time`, TTL, JSON.stringify(bonusCompletionsOverTime)),
       client.setEx(`surfstats:map:${mapname}:stats:percentiles`, TTL, JSON.stringify(percentileTimes)),
