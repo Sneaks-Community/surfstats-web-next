@@ -231,25 +231,18 @@ export async function getMapRecordsFromCache(
 export async function getStageRecordsFromCache(
   mapname: string,
   stage: number,
-  sortField: string,
-  sortOrder: string,
-  pageSize: number,
-  offset: number
+  page: number,
+  pageSize: number
 ): Promise<StageRecordsResult> {
-  const emptyPagination = {
-    stage,
-    page: Math.floor(offset / pageSize) + 1,
-    pageSize,
-    offset,
-    total: 0,
-    totalPages: 0,
-  };
+  const offset = (page - 1) * pageSize;
 
-  return mapCachedFetch<StageRecordsResult>({
+  // Row data is always the rank-ordered top-100 per (map, stage); sort/page are
+  // applied client-side. Cache only that expensive slice, keyed by stage alone.
+  const { stages, total } = await mapCachedFetch<{ stages: StageRecord[]; total: number }>({
     mapname,
-    keySuffix: `stages:${stage}:${sortField}:${sortOrder}:${pageSize}:${offset}`,
+    keySuffix: `stages:${stage}`,
     ttl: STAGES_CACHE_TTL,
-    empty: { stages: [], stagesList: [], pagination: emptyPagination },
+    empty: { stages: [], total: 0 },
     errorLabel: 'stage records',
     expensive: true,
     fetch: async (validMapname) => {
@@ -309,23 +302,25 @@ export async function getStageRecordsFromCache(
       );
 
       const totalWithRank = rankCountRows[0]?.total || 0;
-      const cappedTotal = Math.min(totalWithRank, MAX_STAGE_RECORDS);
-      const cappedTotalPages = Math.ceil(cappedTotal / pageSize);
-
       return {
         stages: stageRows,
-        stagesList: [],
-        pagination: {
-          stage,
-          page: Math.floor(offset / pageSize) + 1,
-          pageSize,
-          offset,
-          total: cappedTotal,
-          totalPages: cappedTotalPages,
-        },
+        total: Math.min(totalWithRank, MAX_STAGE_RECORDS),
       };
     },
   });
+
+  return {
+    stages,
+    stagesList: [],
+    pagination: {
+      stage,
+      page,
+      pageSize,
+      offset,
+      total,
+      totalPages: Math.ceil(total / pageSize),
+    },
+  };
 }
 
 /**
