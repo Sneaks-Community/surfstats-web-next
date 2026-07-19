@@ -23,6 +23,8 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
   const [copied, setCopied] = useState(false);
 
   const address = `${server.config.ip}:${server.config.port}`;
+  // Unique per card so aria-controls resolves and ids don't collide across cards.
+  const panelId = `server-details-${server.config.ip}-${server.config.port}`;
 
   const copyAddress = async (e: React.MouseEvent | React.KeyboardEvent) => {
     e.stopPropagation();
@@ -42,7 +44,7 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
         className={`px-4 py-3 flex items-center justify-between transition-colors w-full text-left ${server.online ? 'cursor-pointer hover:bg-surface-hover/50' : ''}`}
         onClick={() => server.online && setExpanded(!expanded)}
         aria-expanded={expanded}
-        aria-controls="server-details"
+        aria-controls={panelId}
         disabled={!server.online}
       >
         <div className="flex items-center gap-4">
@@ -130,7 +132,7 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
       </button>
       
       {expanded && server.online && (
-        <div className="border-t border-border bg-surface/30">
+        <div id={panelId} className="border-t border-border bg-surface/30">
           {/* Mobile-only stats row */}
           <div className="sm:hidden flex items-center justify-between p-4 border-b border-border/50 bg-surface-hover/20">
             <div>
