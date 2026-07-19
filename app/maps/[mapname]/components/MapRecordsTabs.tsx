@@ -994,7 +994,7 @@ export default function MapRecordsTabs({
                   <>
                     {paginatedRecords.map((record) => (
                       <RecordRow
-                        key={record.steamid}
+                        key={`${record.steamid}-${record.date}`}
                         rank={record.rank}
                         steamid={record.steamid}
                         name={record.name}
