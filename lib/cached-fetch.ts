@@ -79,11 +79,12 @@ function shouldRefreshEarly(remainingTtlMs: number, ttlSeconds: number): boolean
 function triggerBackgroundRefresh<T>(
   key: string,
   ttl: number,
-  fetchFn: () => Promise<T>
+  fetchFn: () => Promise<T>,
+  expensive: boolean
 ): void {
   void cacheLock
     .acquire(`refresh:${key}`, async () => {
-      const value = await fetchFn();
+      const value = await (expensive ? withExpensiveQueryLimit(fetchFn) : fetchFn());
       // Mirror the foreground guard: never persist null/undefined.
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (value !== null && value !== undefined) {
@@ -139,7 +140,7 @@ export async function cachedFetch<T>(
   const { value: cached, ttlMs } = await cacheGetWithTtl<T>(key);
   if (cached !== null) {
     if (shouldRefreshEarly(ttlMs, ttl)) {
-      triggerBackgroundRefresh(key, ttl, fetchFn);
+      triggerBackgroundRefresh(key, ttl, fetchFn, options.expensive ?? false);
     }
     return cached;
   }
