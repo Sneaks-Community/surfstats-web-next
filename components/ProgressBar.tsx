@@ -1,5 +1,3 @@
-'use client';
-
 interface ProgressBarProps {
   label: string;
   current: number;
