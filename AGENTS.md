@@ -43,7 +43,7 @@ The `zonetypeid` column is what determines the order of stages in the zone struc
 This project utilizes the latest minor versions of the following:
 
 - **Next.js 16** (App Router) + **React 19**
-- **TypeScript 5** - Strict mode enabled
+- **TypeScript 6** - Strict mode enabled
 - **Tailwind CSS 4** - Theme-aware classes only
 - **MySQL2 3** - Database driver
 - **Pino 9** - Structured JSON logging
