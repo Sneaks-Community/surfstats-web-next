@@ -63,7 +63,7 @@ export async function checkRateLimit(request: NextRequest): Promise<RateLimitRes
       .multi()
       .incr(key)
       .expire(key, WINDOW_SECONDS, 'NX')
-      .pttl(key)
+      .pTTL(key)
       .exec();
 
     const count = Number(results[0]);
