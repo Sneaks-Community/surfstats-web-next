@@ -10,6 +10,11 @@ const isBuildPhase = process.env.npm_lifecycle_event === 'build' ||
                      process.env.NEXT_PHASE === 'build' ||
                      process.env.NEXT_PHASE === 'phase-production-build';
 
+// queueLimit accepts 0 (mysql2's "unlimited"), so a plain `|| default` won't do —
+// only fall back when the var is unset/non-numeric.
+const parsedQueueLimit = parseInt(process.env.DB_QUEUE_LIMIT ?? '', 10);
+const queueLimit = Number.isNaN(parsedQueueLimit) ? 100 : parsedQueueLimit;
+
 // Create pool - uses env vars at runtime, fallback defaults at build time
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST || 'localhost',
@@ -17,10 +22,10 @@ const pool = mysql.createPool({
   password: process.env.MYSQL_PASSWORD || '',
   database: process.env.MYSQL_DATABASE || 'cksurf',
   waitForConnections: true,
-  connectionLimit: 20,
-  queueLimit: 100,
+  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '20', 10) || 20,
+  queueLimit,
   // Milliseconds before a timeout occurs during the initial connection to the MySQL server
-  connectTimeout: 5000,
+  connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT_MS || '5000', 10) || 5000,
 });
 
 // Validate env vars at module load time (only at runtime, not build)

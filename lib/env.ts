@@ -39,6 +39,10 @@ const optionalSchema = z.object({
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().optional(),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().optional(),
   DB_MAX_CONCURRENT_EXPENSIVE: z.coerce.number().int().positive().optional(),
+  // MySQL connection pool tuning (see lib/db.ts for defaults).
+  DB_CONNECTION_LIMIT: z.coerce.number().int().positive().optional(),
+  DB_QUEUE_LIMIT: z.coerce.number().int().nonnegative().optional(),
+  DB_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
   // Background warmer for the default players-list pages.
   PLAYERS_LIST_WARM_PAGES: z.coerce.number().int().positive().optional(),
   PLAYERS_LIST_WARM_INTERVAL_MS: z.coerce.number().int().positive().optional(),
