@@ -29,6 +29,15 @@ export default defineConfig(
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylistic,
 
+  // Pin the React version instead of eslint-config-next's "detect". Detection
+  // in eslint-plugin-react 7.37.5 calls the removed context.getFilename() API,
+  // which throws under ESLint 10.
+  {
+    settings: {
+      react: { version: "19.2" },
+    },
+  },
+
   // Configure TypeScript parser globally for type-aware rules
   {
     files: ["**/*.ts", "**/*.tsx"],

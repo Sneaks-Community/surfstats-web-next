@@ -127,7 +127,7 @@ const getCountriesRankingInternal = async (
                         sort === 'points' ? 'total_points' : 'player_count';
     
     countriesArray.sort((a, b) => {
-      let comparison = 0;
+      let comparison: number;
       if (sortColumn === 'country') {
         comparison = a.country.localeCompare(b.country);
       } else if (sortColumn === 'player_count') {

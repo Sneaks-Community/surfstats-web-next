@@ -116,7 +116,7 @@ export async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
     // Handle timeout specifically
     if (getErrorMessage(error) === 'Query timeout exceeded') {
       logger.error(`[MapCache] Query timeout after ${duration}ms`);
-      throw new Error(`Map metadata query exceeded ${QUERY_TIMEOUT_MS / 1000} second timeout`);
+      throw new Error(`Map metadata query exceeded ${QUERY_TIMEOUT_MS / 1000} second timeout`, { cause: error });
     }
     
     logger.error(`[MapCache] Failed to fetch map metadata after ${duration}ms`);
