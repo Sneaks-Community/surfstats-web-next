@@ -77,3 +77,13 @@ Analytics DB: `player_analytics` (connection/time-on-server tracking).
 ## Config
 
 Env template in `.env.example` (validated by `lib/env.ts`). Required: `MYSQL_*`. Optional: `ANALYTICS_MYSQL_*`, `VALKEY_*`, `STEAM_API_KEY` (avatars/names), `SERVERS_JSON` (live status), `MAP_IMAGES_URL`, `RATE_LIMIT_*`, `ALLOWED_ORIGINS`, `DB_*` pool tuning, `PLAYERS_LIST_WARM_*`, `THEME_*`, `NEXT_PUBLIC_*`, `LOG_LEVEL`, `MAX_TIER`. Deploy via Docker (`output: 'standalone'`); security headers/CSP set in [`next.config.ts`](next.config.ts).
+
+<!-- BEGIN:nextjs-agent-rules -->
+ 
+# This is NOT the Next.js you know
+ 
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+ 
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+ 
+<!-- END:nextjs-agent-rules -->
