@@ -325,6 +325,53 @@ export async function getCountryPlayers(
   );
 }
 
+const COUNTRY_PLAYER_COUNT_KEY = 'surfstats:countries:playercount:v3';
+const COUNTRY_PLAYER_COUNT_TTL = 86400; // 24 hours — matches the sibling country caches
+
+/**
+ * Total players in one country.
+ *
+ * Exists so the country page can clamp `?page=` against the real page count
+ * *before* the paginated `RANK()` query runs, bounding both the `OFFSET` and the
+ * number of distinct cache keys a caller can mint. This is the same shape as
+ * `/api/maps/[mapname]/records`, which fetches its counts first and clamps against them.
+ *
+ * Deliberately uses the identical `WHERE` clause to
+ * {@link getCountryPlayersInternal}, including its lack of a `points > 0` filter,
+ * so the ceiling and the page's own `totalPages` always agree. **COR-1 must
+ * change both together**: aligning one filter without the other would make real
+ * pages unreachable.
+ *
+ * @param countryCode - ISO 3166-1 alpha-2 code
+ * @returns Player count, or 0 for an unresolvable code
+ */
+export async function getCountryPlayerCount(countryCode: string): Promise<number> {
+  const cacheKey = `${COUNTRY_PLAYER_COUNT_KEY}:${countryCode}`;
+
+  return cachedFetch(
+    cacheKey,
+    COUNTRY_PLAYER_COUNT_TTL,
+    async () => {
+      const countryNames = getCountryNamesFromCode(countryCode);
+      if (countryNames.length === 0) return 0;
+
+      const whereClause = countryNames.map(() => 'country = ?').join(' OR ');
+      const [rows] = await pool.query<RowDataPacket[]>(
+        `SELECT COUNT(*) as total FROM ck_playerrank WHERE ${whereClause}`,
+        countryNames
+      );
+      return Number(rows[0]?.total) || 0;
+    },
+    {
+      lock: true,
+      onError: (error) => {
+        logger.error(`[CountryAnalytics] Failed to count players for country ${countryCode}: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
+        return 0;
+      },
+    }
+  );
+}
+
 /**
  * Helper: Build ORDER BY clause for player listings
  */

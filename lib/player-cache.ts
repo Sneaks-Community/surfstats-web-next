@@ -47,6 +47,33 @@ export interface PlayersResult {
 }
 
 /**
+ * Rows per page in every player listing (the global list, search results and the
+ * per-country pages). Shared so the read path, the background warmer and the
+ * page routes' clamping can never disagree on it.
+ */
+export const PLAYERS_PAGE_SIZE = 20;
+
+/**
+ * Upper bound on any player-listing page number, derived from the cached total
+ * player count.
+ *
+ * Page routes clamp `?page=` against this *before* calling the cache functions,
+ * so an out-of-range value can neither mint a fresh Valkey key nor produce a
+ * huge `OFFSET` against the `RANK() OVER ()` window.
+ *
+ * For filtered listings (a search, a single country) this is deliberately a
+ * coarse ceiling rather than the exact page count: it costs one cached read
+ * instead of a `COUNT(*)`, and the fetchers still return the precise
+ * `totalPages` the UI paginates on.
+ *
+ * @param pageSize - Rows per page (defaults to {@link PLAYERS_PAGE_SIZE})
+ */
+export async function getPlayerPageCeiling(pageSize = PLAYERS_PAGE_SIZE): Promise<number> {
+  const total = await getPlayerCountFromCache();
+  return Math.max(1, Math.ceil(total / pageSize));
+}
+
+/**
  * Internal function to fetch paginated players list
  *
  * Throws on DB failure by design. The empty fallback lives in the caller's
@@ -59,7 +86,7 @@ async function fetchPlayersInternal(
 ): Promise<PlayersResult> {
   logger.debug(`[PlayerCache] Fetching players list (page: ${page}, search: "${search || 'none'}")`);
 
-  const limit = 20;
+  const limit = PLAYERS_PAGE_SIZE;
   const offset = (page - 1) * limit;
 
   // Sanitize search query to prevent SQL injection via LIKE wildcards
@@ -183,7 +210,7 @@ export async function getPlayersFromCache(
  * query. Called on an interval by the players-list background refresh.
  */
 export async function warmPlayersListCache(pageCount: number): Promise<void> {
-  const pageSize = 20;
+  const pageSize = PLAYERS_PAGE_SIZE;
   const k = Math.max(1, pageCount) * pageSize;
 
   const [rows] = await pool.query<PlayerRank[]>(

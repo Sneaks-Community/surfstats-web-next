@@ -1,6 +1,7 @@
 import { cache } from 'react';
 import Link from 'next/link';
-import { getCountryPlayers } from '@/lib/country-analytics';
+import { getCountryPlayers, getCountryPlayerCount } from '@/lib/country-analytics';
+import { PLAYERS_PAGE_SIZE } from '@/lib/player-cache';
 import type { PlayerSortKey, SortOrder } from '@/lib/country-analytics';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import { isValidCountryCode, getPrimaryCountryName } from '@/lib/countries';
@@ -49,7 +50,14 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
   }
 
   const countryCode = countrycode.toUpperCase();
-  const page = parseIntParam(pageParam);
+  // Clamp before the value reaches the cache key / RANK() window OFFSET.
+  // Uses this country's own count so the ceiling matches the `totalPages` the
+  // fetcher reports: the global ranked count is *not* a valid bound here, because
+  // the country queries omit the `points > 0` filter the global count applies and
+  // so report more pages (see COR-1).
+  const countryPlayerCount = await getCountryPlayerCount(countryCode);
+  const pageCeiling = Math.max(1, Math.ceil(countryPlayerCount / PLAYERS_PAGE_SIZE));
+  const page = parseIntParam(pageParam, { max: pageCeiling });
 
   // Validate and parse sort parameters
   // Default sort is by points descending (top players first)
@@ -63,7 +71,7 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
   const { players, total, totalPages, countryName } = await getCountryPlayers(
     countryCode,
     page,
-    20,
+    PLAYERS_PAGE_SIZE,
     validatedSort,
     validatedOrder
   );

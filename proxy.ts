@@ -3,13 +3,22 @@ import type { NextRequest } from 'next/server';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { isTrustedRequest } from '@/lib/origin-guard';
 import { waitForCacheReady } from '@/lib/valkey';
-import { cacheUnavailableHtml } from '@/lib/cache-unavailable-page';
+import { cacheUnavailableHtml, tooManyRequestsHtml } from '@/lib/cache-unavailable-page';
 
 // Runs on the Node.js runtime so it can reuse the node-redis Valkey client
-// (unavailable on Edge). Matches all routes except Next internals and static
-// files (anything with a dot), so the cache-readiness gate covers pages too.
+// (unavailable on Edge).
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|.*\\..*).*)'],
+  matcher: [
+    // API routes match unconditionally. They must NOT go through the
+    // dot-excluding pattern below: user-supplied path segments legitimately
+    // contain dots (`/api/maps/foo.bar/records`), and such a request would then
+    // skip the cache gate, origin guard and rate limiter entirely — a free
+    // unmetered path into the route handlers.
+    '/api/:path*',
+    // Pages: everything except Next internals and static files (anything with a
+    // dot), so the cache-readiness gate and page rate limit cover pages too.
+    '/((?!_next/static|_next/image|.*\\..*).*)',
+  ],
 };
 
 export async function proxy(request: NextRequest) {
@@ -40,30 +49,40 @@ export async function proxy(request: NextRequest) {
     });
   }
 
-  // The remaining protections apply to the API only.
-  if (!isApi) {
-    return NextResponse.next();
-  }
-
-  // Lock the API to the site itself (and any allow-listed origins).
-  if (!isTrustedRequest(request)) {
+  // The origin guard is API-only: pages must stay publicly reachable (direct
+  // navigation and crawlers send no same-origin Referer/Origin).
+  if (isApi && !isTrustedRequest(request)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  const result = await checkRateLimit(request);
+  // Rate limiting covers pages as well as the API. Page routes run the same
+  // uncached, user-parameterized heavy queries (`/search?q=`, `/players?page=`),
+  // so limiting only `/api/*` left the documented cache-miss-cycling attack
+  // reachable one URL over. Separate budget per scope.
+  const result = await checkRateLimit(request, isApi ? 'api' : 'page');
 
   if (!result.allowed) {
-    return NextResponse.json(
-      { error: 'Too many requests' },
-      {
-        status: 429,
-        headers: {
-          'X-RateLimit-Limit': String(result.limit),
-          'X-RateLimit-Remaining': '0',
-          'Retry-After': String(result.resetSeconds),
-        },
-      }
-    );
+    const rateLimitHeaders = {
+      'X-RateLimit-Limit': String(result.limit),
+      'X-RateLimit-Remaining': '0',
+      'Retry-After': String(result.resetSeconds),
+    };
+
+    if (isApi) {
+      return NextResponse.json(
+        { error: 'Too many requests' },
+        { status: 429, headers: rateLimitHeaders }
+      );
+    }
+
+    return new NextResponse(tooManyRequestsHtml(result.resetSeconds), {
+      status: 429,
+      headers: {
+        ...rateLimitHeaders,
+        'content-type': 'text/html; charset=utf-8',
+        'X-Robots-Tag': 'noindex',
+      },
+    });
   }
 
   const response = NextResponse.next();

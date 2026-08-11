@@ -7,7 +7,7 @@ import PlayersTableSkeleton from '@/components/PlayersTableSkeleton';
 import { SkeletonScreen } from '@/components/Skeleton';
 import { NavigationPendingProvider, PendingContent } from '@/components/NavigationPending';
 import { parseIntParam } from '@/lib/utils';
-import { getPlayersFromCache } from '@/lib/player-cache';
+import { getPlayersFromCache, getPlayerPageCeiling } from '@/lib/player-cache';
 import { validateSearchQuery } from '@/lib/validators';
 import type { Metadata } from 'next';
 
@@ -25,7 +25,10 @@ export default async function PlayersPage({
 }) {
   const params = await searchParams;
   const q = validateSearchQuery(params.q);
-  const page = parseIntParam(params.page);
+  // Clamp the page against the real player count before it reaches the cache
+  // layer: unclamped, `?page=9999999` mints a fresh Valkey key and a huge OFFSET
+  // over the RANK() window on every distinct value.
+  const page = parseIntParam(params.page, { max: await getPlayerPageCeiling() });
 
   // Fetch players first to get steam IDs
   const { players, total, totalPages } = await getPlayersFromCache(page, q);

@@ -23,6 +23,9 @@ interface MapResult {
   tier: number;
 }
 
+/** Shortest query that may reach the DB; matches `MIN_CHARS` in `/api/search`. */
+const MIN_SEARCH_CHARS = 3;
+
 export default async function SearchPage({
   searchParams,
 }: {
@@ -34,8 +37,12 @@ export default async function SearchPage({
   
   let players: PlayerSearchResult[] = [];
   let maps: MapResult[] = [];
-  
-  if (query.length >= 2) {
+
+  // Minimum matches /api/search's MIN_CHARS and the record search routes. Each
+  // distinct query is a `LIKE '%q%'` scan of ck_playerrank cached under its own
+  // key, so a 2-character floor made `?q=aa`, `?q=ab`, ... a cheap way to stream
+  // full-table scans.
+  if (query.length >= MIN_SEARCH_CHARS) {
     try {
       // Search players using cached function
       players = await searchPlayersFromCache(query);
@@ -78,13 +85,13 @@ export default async function SearchPage({
         </form>
       </div>
 
-      {query.length > 0 && query.length < 2 && (
+      {query.length > 0 && query.length < MIN_SEARCH_CHARS && (
         <div className="text-center text-text-muted py-8">
-          Please enter at least 2 characters to search.
+          Please enter at least {MIN_SEARCH_CHARS} characters to search.
         </div>
       )}
 
-      {query.length >= 2 && (
+      {query.length >= MIN_SEARCH_CHARS && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Players Results */}
           <div className="space-y-4">

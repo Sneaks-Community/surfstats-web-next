@@ -19,7 +19,7 @@ const isAnalyticsConfigured = !!(
 // Create analytics database pool with graceful fallback
 const analyticsPool = mysql.createPool({
   host: process.env.ANALYTICS_MYSQL_HOST || process.env.MYSQL_HOST || 'localhost',
-  port: parseInt(process.env.ANALYTICS_MYSQL_PORT || process.env.MYSQL_PORT || '3306'),
+  port: parseInt(process.env.ANALYTICS_MYSQL_PORT || process.env.MYSQL_PORT || '3306', 10) || 3306,
   user: process.env.ANALYTICS_MYSQL_USER || process.env.MYSQL_USER || 'root',
   password: process.env.ANALYTICS_MYSQL_PASSWORD || process.env.MYSQL_PASSWORD || '',
   database: process.env.ANALYTICS_MYSQL_DATABASE || 'player_analytics_surf',

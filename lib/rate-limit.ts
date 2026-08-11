@@ -11,6 +11,12 @@ import logger from './logger';
  * `ROW_NUMBER()`/`DENSE_RANK()` full-table scans and exhaust the ~20-connection
  * MySQL pool. Capping requests per IP bounds that blast radius.
  *
+ * Applies to page routes as well as `/api/*`: `/search`, `/players`, `/maps` and
+ * the country listings run the same user-parameterized heavy queries, so gating
+ * only the API left the identical attack reachable one URL over. The two scopes get
+ * independent budgets and counters so a page render's own client-side API fetches
+ * don't eat the browsing allowance.
+ *
  * Fails open: if Valkey is unreachable the request is allowed, so a cache
  * outage degrades protection rather than taking the whole API down.
  */
@@ -23,6 +29,18 @@ const MAX_REQUESTS = Math.max(
   1,
   parseInt(process.env.RATE_LIMIT_MAX || '120', 10) || 120
 );
+/**
+ * Page-route budget, deliberately more generous than the API's: a single page
+ * view is one request here but fans out into several `/api/*` calls, and this
+ * cap exists to bound scan-cycling rather than to throttle real browsing.
+ */
+const PAGE_MAX_REQUESTS = Math.max(
+  1,
+  parseInt(process.env.RATE_LIMIT_PAGE_MAX || '300', 10) || 300
+);
+
+/** Which budget a request counts against. */
+export type RateLimitScope = 'api' | 'page';
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -53,10 +71,17 @@ function getClientIp(request: NextRequest): string {
  * Increment the caller's window counter and report whether they are within the
  * limit. Uses a single round-trip MULTI: `INCR` then `EXPIRE ... NX` so the TTL
  * is set once per window (and self-heals if a counter was ever left without one).
+ *
+ * @param request - The incoming request (for client-IP resolution)
+ * @param scope - Which budget to charge; `'api'` and `'page'` count separately
  */
-export async function checkRateLimit(request: NextRequest): Promise<RateLimitResult> {
+export async function checkRateLimit(
+  request: NextRequest,
+  scope: RateLimitScope = 'api'
+): Promise<RateLimitResult> {
   const ip = getClientIp(request);
-  const key = `ratelimit:${ip}`;
+  const maxRequests = scope === 'page' ? PAGE_MAX_REQUESTS : MAX_REQUESTS;
+  const key = `ratelimit:${scope}:${ip}`;
 
   try {
     const results = await client
@@ -72,9 +97,9 @@ export async function checkRateLimit(request: NextRequest): Promise<RateLimitRes
     const pttlMs = Number(results[2]);
     const resetSeconds = pttlMs > 0 ? Math.ceil(pttlMs / 1000) : WINDOW_SECONDS;
     return {
-      allowed: count <= MAX_REQUESTS,
-      limit: MAX_REQUESTS,
-      remaining: Math.max(0, MAX_REQUESTS - count),
+      allowed: count <= maxRequests,
+      limit: maxRequests,
+      remaining: Math.max(0, maxRequests - count),
       resetSeconds,
     };
   } catch (err) {
@@ -83,8 +108,8 @@ export async function checkRateLimit(request: NextRequest): Promise<RateLimitRes
     );
     return {
       allowed: true,
-      limit: MAX_REQUESTS,
-      remaining: MAX_REQUESTS,
+      limit: maxRequests,
+      remaining: maxRequests,
       resetSeconds: WINDOW_SECONDS,
     };
   }

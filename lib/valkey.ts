@@ -7,7 +7,7 @@ const valkeyUsername = process.env.VALKEY_USERNAME;
 const valkeyPassword = process.env.VALKEY_PASSWORD;
 const valkeyTls = process.env.VALKEY_TLS === 'true';
 const valkeyTlsRejectUnauthorized = process.env.VALKEY_TLS_REJECT_UNAUTHORIZED !== 'false';
-const valkeyConnectTimeout = parseInt(process.env.VALKEY_CONNECT_TIMEOUT || '5000');
+const valkeyConnectTimeout = parseInt(process.env.VALKEY_CONNECT_TIMEOUT || '5000', 10) || 5000;
 
 // Exponential backoff (100ms, doubling) capped at 30s. node-redis calls this
 // once per reconnect attempt with the retry counter and the failure cause, so

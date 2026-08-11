@@ -8,6 +8,7 @@ import SortableTableHeader from '@/components/SortableTableHeader';
 import CountriesTableSkeleton from '@/components/CountriesTableSkeleton';
 import { SkeletonScreen } from '@/components/Skeleton';
 import { NavigationPendingProvider, PendingContent } from '@/components/NavigationPending';
+import { parseIntParam } from '@/lib/utils';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export const metadata: Metadata = {
 };
 
 const BASE_URL = '/players/countries/list';
+const COUNTRIES_PER_PAGE = 20;
 
 export default async function CountriesListPage({
   searchParams,
@@ -27,7 +29,6 @@ export default async function CountriesListPage({
   // Parse and validate sort/order parameters
   const sort = (typeof params.sort === 'string' ? params.sort : undefined) as CountrySortKey | undefined || 'points';
   const order = (typeof params.order === 'string' ? params.order : undefined) as SortOrder | undefined || 'desc';
-  const page = parseInt(params.page || '1', 10);
 
   // Validate sort column
   const validSortColumns: CountrySortKey[] = ['rank', 'country', 'points', 'players'];
@@ -36,9 +37,17 @@ export default async function CountriesListPage({
   // Validate order
   const validatedOrder: SortOrder = order === 'asc' ? 'asc' : 'desc';
 
-  // Fetch countries ranking
-  const { countries, totalPages } = await getCountriesRankingFromCache(validatedSort, validatedOrder, page, 20);
+  // Stats first: `totalCountries` is the length of the ranking list, so it gives
+  // the real page ceiling. Clamping before the fetch keeps an out-of-range
+  // `?page=` from minting a distinct 24h cache key per value, and
+  // `parseIntParam` replaces a bare `parseInt` that let `?page=abc` through
+  // as NaN.
   const stats = await getCountriesStatsFromCache();
+  const pageCeiling = Math.max(1, Math.ceil(stats.totalCountries / COUNTRIES_PER_PAGE));
+  const page = parseIntParam(params.page, { max: pageCeiling });
+
+  // Fetch countries ranking
+  const { countries, totalPages } = await getCountriesRankingFromCache(validatedSort, validatedOrder, page, COUNTRIES_PER_PAGE);
 
   // Build query params for pagination
   const queryParams: Record<string, string> = {};

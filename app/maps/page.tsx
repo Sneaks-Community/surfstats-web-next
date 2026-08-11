@@ -45,11 +45,11 @@ export default async function MapsPage({
   };
 
   const q = validateSearchQuery(getParam(params.q));
-  const page = parseIntParam(getParam(params.page, '1'));
+  const requestedPage = parseIntParam(getParam(params.page, '1'));
   const type = getParam(params.type, 'all');
   // Handle tiers from URL - can be comma-separated or multiple params
   const tiersParams = getParamArray(params.tiers);
-  const tiers = tiersParams.flatMap(t => t.split(',').map(tier => parseInt(tier.trim())).filter(tier => !isNaN(tier)));
+  const tiers = tiersParams.flatMap(t => t.split(',').map(tier => parseInt(tier.trim(), 10)).filter(tier => !isNaN(tier)));
   const mapper = getParam(params.mapper);
   const bonuses = getParam(params.bonuses, 'all');
 
@@ -76,7 +76,7 @@ export default async function MapsPage({
     if (bonuses !== 'all') {
       if (bonuses === '0' && metadata.bonuses !== 0) continue;
       if (bonuses === '4+' && metadata.bonuses < 4) continue;
-      if (!['0', '4+'].includes(bonuses) && parseInt(bonuses) !== metadata.bonuses) continue;
+      if (!['0', '4+'].includes(bonuses) && parseInt(bonuses, 10) !== metadata.bonuses) continue;
     }
 
     filteredMaps.push(metadata);
@@ -85,12 +85,15 @@ export default async function MapsPage({
   // Sort by mapname
   filteredMaps.sort((a, b) => a.mapname.localeCompare(b.mapname));
 
-  // Apply pagination
+  // Apply pagination. The filtered set is already in memory, so the real page
+  // count is known here: clamp against it so `?page=9999999` shows the last page
+  // instead of an empty grid with a stale "current page" in the pager.
   const limit = 20;
-  const offset = (page - 1) * limit;
   const total = filteredMaps.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const page = Math.min(requestedPage, totalPages);
+  const offset = (page - 1) * limit;
   const paginatedMaps = filteredMaps.slice(offset, offset + limit);
-  const totalPages = Math.ceil(total / limit);
 
   // Get filter options from cache
   const tierDistribution = await getTierDistributionFromCache();
