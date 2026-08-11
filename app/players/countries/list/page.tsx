@@ -37,11 +37,8 @@ export default async function CountriesListPage({
   // Validate order
   const validatedOrder: SortOrder = order === 'asc' ? 'asc' : 'desc';
 
-  // Stats first: `totalCountries` is the length of the ranking list, so it gives
-  // the real page ceiling. Clamping before the fetch keeps an out-of-range
-  // `?page=` from minting a distinct 24h cache key per value, and
-  // `parseIntParam` replaces a bare `parseInt` that let `?page=abc` through
-  // as NaN.
+  // Stats first: `totalCountries` is the ranking length, so it gives the real
+  // ceiling. Clamping here stops an out-of-range `?page=` minting a 24h key.
   const stats = await getCountriesStatsFromCache();
   const pageCeiling = Math.max(1, Math.ceil(stats.totalCountries / COUNTRIES_PER_PAGE));
   const page = parseIntParam(params.page, { max: pageCeiling });

@@ -3,14 +3,9 @@ import 'server-only';
 const SITE_NAME = process.env.NEXT_PUBLIC_SITE_NAME || 'Surf Stats';
 
 /**
- * Shared shell for the proxy's short-circuit HTML responses.
- *
- * Inline styles, no external assets and no inline scripts, so it renders while
- * the app is degraded and needs no CSP exemption.
- *
- * @param heading - Headline shown in the card
- * @param body - Explanatory sentence beneath the headline
- * @param action - Optional link rendered as the call-to-action button
+ * Shared shell for the proxy's short-circuit HTML responses. Inline styles, no
+ * external assets and no inline scripts, so it renders while the app is
+ * degraded and needs no CSP exemption.
  */
 function errorPageHtml(
   heading: string,

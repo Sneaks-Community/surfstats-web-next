@@ -38,10 +38,8 @@ export default async function SearchPage({
   let players: PlayerSearchResult[] = [];
   let maps: MapResult[] = [];
 
-  // Minimum matches /api/search's MIN_CHARS and the record search routes. Each
-  // distinct query is a `LIKE '%q%'` scan of ck_playerrank cached under its own
-  // key, so a 2-character floor made `?q=aa`, `?q=ab`, ... a cheap way to stream
-  // full-table scans.
+  // Each distinct query is a `LIKE '%q%'` scan cached under its own key, so the
+  // floor bounds how cheaply those can be cycled.
   if (query.length >= MIN_SEARCH_CHARS) {
     try {
       // Search players using cached function

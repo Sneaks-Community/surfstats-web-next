@@ -46,25 +46,13 @@ export interface PlayersResult {
   totalPages: number;
 }
 
-/**
- * Rows per page in every player listing (the global list, search results and the
- * per-country pages). Shared so the read path, the background warmer and the
- * page routes' clamping can never disagree on it.
- */
+/** Rows per page in every player listing. Read path, warmer and clamping share it. */
 export const PLAYERS_PAGE_SIZE = 20;
 
 /**
- * Upper bound on any player-listing page number, derived from the cached total
- * player count.
- *
- * Page routes clamp `?page=` against this *before* calling the cache functions,
- * so an out-of-range value can neither mint a fresh Valkey key nor produce a
- * huge `OFFSET` against the `RANK() OVER ()` window.
- *
- * For filtered listings (a search, a single country) this is deliberately a
- * coarse ceiling rather than the exact page count: it costs one cached read
- * instead of a `COUNT(*)`, and the fetchers still return the precise
- * `totalPages` the UI paginates on.
+ * Page-number ceiling from the cached player count. Page routes clamp `?page=`
+ * against this before calling the cache functions, so an out-of-range value
+ * can't mint a fresh key or a huge OFFSET.
  *
  * @param pageSize - Rows per page (defaults to {@link PLAYERS_PAGE_SIZE})
  */
@@ -76,9 +64,7 @@ export async function getPlayerPageCeiling(pageSize = PLAYERS_PAGE_SIZE): Promis
 /**
  * Internal function to fetch paginated players list
  *
- * Throws on DB failure by design. The empty fallback lives in the caller's
- * `cachedFetch` `onError` handler so a transient error is never written to the
- * cache and pinned for the full TTL (plan item REL-1).
+ * Throws on failure; the fallback lives in the caller's `onError`, uncached.
  */
 async function fetchPlayersInternal(
   page: number,
@@ -249,7 +235,7 @@ export async function warmPlayersListCache(pageCount: number): Promise<void> {
 /**
  * Internal function to search players (for search page)
  *
- * Throws on DB failure by design; see {@link fetchPlayersInternal} (REL-1).
+ * Throws on failure; the fallback lives in the caller's `onError`, uncached.
  */
 async function searchPlayersInternal(query: string): Promise<PlayerSearchResult[]> {
   // Sanitize search query to prevent SQL injection via LIKE wildcards
@@ -301,9 +287,8 @@ export async function searchPlayersFromCache(query: string): Promise<PlayerSearc
 /**
  * Internal function to fetch player name
  *
- * Throws on DB failure by design; see {@link fetchPlayersInternal} (REL-1). The
- * empty name returned for an unknown SteamID is a real result, not a fallback,
- * so it stays here and is cached normally.
+ * Throws on failure; the fallback lives in the caller's `onError`, uncached. The
+ * empty name for an unknown SteamID is a real result and stays cached.
  */
 async function getPlayerNameInternal(steamid: string): Promise<PlayerNameResult> {
   logger.debug(`[PlayerCache] Fetching player name for: ${steamid}`);

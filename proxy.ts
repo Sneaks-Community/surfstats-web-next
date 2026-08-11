@@ -9,14 +9,10 @@ import { cacheUnavailableHtml, tooManyRequestsHtml } from '@/lib/cache-unavailab
 // (unavailable on Edge).
 export const config = {
   matcher: [
-    // API routes match unconditionally. They must NOT go through the
-    // dot-excluding pattern below: user-supplied path segments legitimately
-    // contain dots (`/api/maps/foo.bar/records`), and such a request would then
-    // skip the cache gate, origin guard and rate limiter entirely — a free
-    // unmetered path into the route handlers.
+    // Unconditional: must not use the dot-excluding pattern below, or a dotted
+    // path segment (`/api/maps/foo.bar/records`) skips every gate.
     '/api/:path*',
-    // Pages: everything except Next internals and static files (anything with a
-    // dot), so the cache-readiness gate and page rate limit cover pages too.
+    // Pages: all but Next internals and static files (anything with a dot).
     '/((?!_next/static|_next/image|.*\\..*).*)',
   ],
 };
@@ -55,10 +51,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  // Rate limiting covers pages as well as the API. Page routes run the same
-  // uncached, user-parameterized heavy queries (`/search?q=`, `/players?page=`),
-  // so limiting only `/api/*` left the documented cache-miss-cycling attack
-  // reachable one URL over. Separate budget per scope.
+  // Pages too, not just the API: they run the same user-parameterized heavy
+  // queries. Separate budget per scope.
   const result = await checkRateLimit(request, isApi ? 'api' : 'page');
 
   if (!result.allowed) {

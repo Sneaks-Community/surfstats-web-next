@@ -11,11 +11,9 @@ import logger from './logger';
  * `ROW_NUMBER()`/`DENSE_RANK()` full-table scans and exhaust the ~20-connection
  * MySQL pool. Capping requests per IP bounds that blast radius.
  *
- * Applies to page routes as well as `/api/*`: `/search`, `/players`, `/maps` and
- * the country listings run the same user-parameterized heavy queries, so gating
- * only the API left the identical attack reachable one URL over. The two scopes get
- * independent budgets and counters so a page render's own client-side API fetches
- * don't eat the browsing allowance.
+ * Applies to page routes as well as `/api/*`, since they run the same queries.
+ * The two scopes get independent budgets and counters so a page render's own
+ * client-side API fetches don't eat the browsing allowance.
  *
  * Fails open: if Valkey is unreachable the request is allowed, so a cache
  * outage degrades protection rather than taking the whole API down.
@@ -29,11 +27,7 @@ const MAX_REQUESTS = Math.max(
   1,
   parseInt(process.env.RATE_LIMIT_MAX || '120', 10) || 120
 );
-/**
- * Page-route budget, deliberately more generous than the API's: a single page
- * view is one request here but fans out into several `/api/*` calls, and this
- * cap exists to bound scan-cycling rather than to throttle real browsing.
- */
+/** More generous than the API's: one page view fans out into several API calls. */
 const PAGE_MAX_REQUESTS = Math.max(
   1,
   parseInt(process.env.RATE_LIMIT_PAGE_MAX || '300', 10) || 300

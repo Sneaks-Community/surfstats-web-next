@@ -25,9 +25,8 @@ export default async function PlayersPage({
 }) {
   const params = await searchParams;
   const q = validateSearchQuery(params.q);
-  // Clamp the page against the real player count before it reaches the cache
-  // layer: unclamped, `?page=9999999` mints a fresh Valkey key and a huge OFFSET
-  // over the RANK() window on every distinct value.
+  // Clamp before the cache layer: unclamped, each distinct `?page=` mints a
+  // fresh key and a huge OFFSET over the RANK() window.
   const page = parseIntParam(params.page, { max: await getPlayerPageCeiling() });
 
   // Fetch players first to get steam IDs

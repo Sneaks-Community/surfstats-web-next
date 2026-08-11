@@ -66,9 +66,7 @@ const getCountriesRankingInternal = async (
 ): Promise<{ countries: CountryRank[]; total: number; totalPages: number }> => {
   logger.debug(`[CountryAnalytics] Fetching countries ranking (sort: ${sort}, order: ${order}, page: ${page})`);
 
-  // Throws on DB failure by design: the empty fallback belongs in the caller's
-  // `cachedFetch` `onError` so a transient error is never written to the cache
-  // and pinned for the full 24h TTL (plan item REL-1).
+  // Throws on failure; the fallback lives in the caller's `onError`, uncached.
   const offset = (page - 1) * limit;
 
   // Use SQL GROUP BY for efficient aggregation instead of loading all rows into memory
@@ -226,10 +224,7 @@ const getCountryPlayersInternal = async (
 ): Promise<{ players: CountryPlayer[]; total: number; totalPages: number; countryName: string }> => {
   logger.debug(`[CountryAnalytics] Fetching players for country: ${countryCode} (page: ${page}, sort: ${sort}, order: ${order})`);
 
-  // Throws on DB failure by design; the empty fallback is in getCountryPlayers'
-  // `cachedFetch` `onError`, which an internal catch here used to make
-  // unreachable while caching the fallback for 24h (plan item REL-1).
-  //
+  // Throws on failure; the fallback lives in the caller's `onError`, uncached.
   // Get all possible country name variations for this code
   const countryNames = getCountryNamesFromCode(countryCode);
 
@@ -329,18 +324,12 @@ const COUNTRY_PLAYER_COUNT_KEY = 'surfstats:countries:playercount:v3';
 const COUNTRY_PLAYER_COUNT_TTL = 86400; // 24 hours — matches the sibling country caches
 
 /**
- * Total players in one country.
+ * Total players in one country, so the country page can clamp `?page=` before
+ * the paginated RANK() query runs.
  *
- * Exists so the country page can clamp `?page=` against the real page count
- * *before* the paginated `RANK()` query runs, bounding both the `OFFSET` and the
- * number of distinct cache keys a caller can mint. This is the same shape as
- * `/api/maps/[mapname]/records`, which fetches its counts first and clamps against them.
- *
- * Deliberately uses the identical `WHERE` clause to
- * {@link getCountryPlayersInternal}, including its lack of a `points > 0` filter,
- * so the ceiling and the page's own `totalPages` always agree. **COR-1 must
- * change both together**: aligning one filter without the other would make real
- * pages unreachable.
+ * Uses the same `WHERE` clause as {@link getCountryPlayersInternal}, including
+ * its missing `points > 0` filter — change both together or the ceiling and
+ * `totalPages` disagree and real pages become unreachable.
  *
  * @param countryCode - ISO 3166-1 alpha-2 code
  * @returns Player count, or 0 for an unresolvable code
@@ -409,9 +398,7 @@ function getPlayerOrderByClause(sort: PlayerSortKey, order: SortOrder): string {
  * Used for displaying total countries count
  */
 const getCountriesStatsInternal = async (): Promise<{ totalCountries: number; totalPlayers: number }> => {
-  // Throws on DB failure by design; the zeroed fallback lives in the caller's
-  // `cachedFetch` `onError` so it is never cached for 24h (plan item REL-1).
-  //
+  // Throws on failure; the fallback lives in the caller's `onError`, uncached.
   // Countries: distinct resolved ISO codes, matching the ranking list (raw
   // DISTINCT names over-counted). Players: COUNT(*) over every row, including
   // unresolved countries — the full player population.

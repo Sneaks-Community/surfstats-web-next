@@ -49,7 +49,7 @@ export interface CachedFetchOptions<T> {
  * of its TTL. Inside that window the probability of refreshing ramps linearly
  * from ~0 (just entered the window) to ~1 (about to expire), so across the many
  * requests that hit a hot key some request almost always refreshes it *before*
- * it expires — closing the gap where everyone misses at once (plan item COR-2).
+ * it expires — closing the gap where everyone misses at once.
  *
  * @param remainingTtlMs - Remaining TTL from Valkey PTTL (ms). Negative means
  *   no key / no expiry, in which case early refresh is skipped.
@@ -110,13 +110,13 @@ function triggerBackgroundRefresh<T>(
  *   the cached value is returned directly. If the hit is within the final
  *   {@link EARLY_REFRESH_WINDOW} of its TTL, a probabilistic background refresh
  *   may be triggered (see {@link shouldRefreshEarly}) so the entry is renewed
- *   before it expires (plan item COR-2). The refresh never delays the caller.
+ *   before it expires. The refresh never delays the caller.
  * - On miss, `fetchFn` runs and its result is cached under `key` for `ttl`
  *   seconds, then returned.
  * - `null`/`undefined` results are never written to the cache: a stored `null`
  *   is indistinguishable from a miss on read, so caching it is pointless churn.
  *   This preserves the "only cache a real value" behavior used across the
- *   callers and is the single place negative caching would be added (COR-5).
+ *   callers and is the single place negative caching would be added.
  *
  * @param key - Fully-qualified Valkey key
  * @param ttl - Time-to-live in seconds

@@ -85,9 +85,8 @@ export default async function MapsPage({
   // Sort by mapname
   filteredMaps.sort((a, b) => a.mapname.localeCompare(b.mapname));
 
-  // Apply pagination. The filtered set is already in memory, so the real page
-  // count is known here: clamp against it so `?page=9999999` shows the last page
-  // instead of an empty grid with a stale "current page" in the pager.
+  // Apply pagination. The filtered set is in memory, so clamp against the real
+  // page count: an out-of-range `?page=` shows the last page, not an empty grid.
   const limit = 20;
   const total = filteredMaps.length;
   const totalPages = Math.max(1, Math.ceil(total / limit));

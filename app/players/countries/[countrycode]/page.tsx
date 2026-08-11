@@ -50,11 +50,9 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
   }
 
   const countryCode = countrycode.toUpperCase();
-  // Clamp before the value reaches the cache key / RANK() window OFFSET.
-  // Uses this country's own count so the ceiling matches the `totalPages` the
-  // fetcher reports: the global ranked count is *not* a valid bound here, because
-  // the country queries omit the `points > 0` filter the global count applies and
-  // so report more pages (see COR-1).
+  // Clamp before the cache key / RANK() OFFSET. Must use this country's own
+  // count: the global ranked count is lower (it filters `points > 0`, these
+  // queries don't) and would hide real pages.
   const countryPlayerCount = await getCountryPlayerCount(countryCode);
   const pageCeiling = Math.max(1, Math.ceil(countryPlayerCount / PLAYERS_PAGE_SIZE));
   const page = parseIntParam(pageParam, { max: pageCeiling });

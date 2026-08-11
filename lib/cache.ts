@@ -158,11 +158,7 @@ interface RecentRecords {
   country: string | null;
 }
 
-/**
- * All-zero stats, served when the DB is unreachable. Never cached — see the
- * `onError` handlers below and the cold-load catch in {@link getStatsFromCache}
- * (plan item REL-1).
- */
+/** Served when the DB is unreachable. Never cached. */
 const EMPTY_DASHBOARD_STATS: DashboardStats = {
   playerCount: 0,
   playersMonth: 0,
@@ -173,11 +169,8 @@ const EMPTY_DASHBOARD_STATS: DashboardStats = {
 };
 
 // Split per key so a single expired key (their TTLs differ) refreshes only its
-// own query instead of both.
-//
-// Both loaders throw on DB failure by design: the empty fallback belongs in the
-// callers' `cachedFetch` `onError` so a transient error is never written to the
-// cache and pinned for the full TTL (REL-1).
+// own query instead of both. Both loaders throw: the fallback belongs in the
+// callers' `onError`, which isn't cached.
 const getDashboardStatsInternal = async (): Promise<DashboardStats> => {
   const [statsRows] = await pool.query<RowDataPacket[]>('SELECT `key`, `value` FROM ck_stats');
   const statsMap = new Map<string, string>();
@@ -255,10 +248,8 @@ export async function getStatsFromCache(): Promise<{
           return { stats: rs, recentRecords: rr };
         }
 
-        // This path calls the loaders directly rather than through
-        // `cachedFetch`, so it has to honour the REL-1 contract itself: on
-        // failure, degrade without writing anything, so the next request retries
-        // instead of being served zeros for the full 5-minute TTL.
+        // Calls the loaders directly, so it must avoid caching the fallback
+        // itself: degrade without writing, so the next request retries.
         try {
           const [stats, recentRecords] = await Promise.all([
             getDashboardStatsInternal(),
@@ -343,9 +334,7 @@ const getLatestCompletionsInternal = async (): Promise<
 > => {
   const startTime = Date.now();
 
-  // Throws on DB failure by design; the empty fallback lives in the caller's
-  // `cachedFetch` `onError` so it is never cached (plan item REL-1).
-  //
+  // Throws on failure; the fallback lives in the caller's `onError`, uncached.
   // Fetch map and bonus completions separately, then combine and sort
   const [mapRows, bonusRows] = await Promise.all([
     pool.query<RowDataPacket[]>(`
@@ -432,8 +421,7 @@ export async function getLatestCompletionsFromCache(): Promise<
 // TOTALS CACHE
 // =============
 
-// Throws on failure by design; the zeroed fallback lives in the caller's
-// `cachedFetch` `onError` so it is never cached (plan item REL-1).
+// Throws on failure; the fallback lives in the caller's `onError`, uncached.
 const fetchTotalsInternal = async () => {
   const startTime = Date.now();
 
