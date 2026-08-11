@@ -73,9 +73,10 @@ Powers play-time and activity displays. Requires [the PlayerAnalytics fork](http
 * `RATE_LIMIT_PAGE_MAX`: Max page requests per window per IP (default: `300`). Counted separately from the API budget.
 * `RATE_LIMIT_PREFETCH_MAX`: Max router link prefetches per window per IP (default: `900`). Own budget, since one page view prefetches every viewport `<Link>`.
 * `RATE_LIMIT_WINDOW_SECONDS`: Window length in seconds (default: `60`).
+* `RATE_LIMIT_BLOCK_SECONDS`: Extra seconds an over-budget IP stays blocked past the end of its window (default: `0`, disabled). Use it to make sustained abuse expensive without lowering the budget for everyone.
 * `HEALTH_INTERNAL_IPS`: Comma-separated extra source IPs treated as internal, so they receive the detailed `/api/health` payload. Loopback and RFC1918 addresses always count as internal.
 
-Rate limiting is backed by Valkey and fails open if the cache is down.
+Rate limiting uses [`rate-limiter-flexible`](https://github.com/animir/node-rate-limiter-flexible) against Valkey, keyed `surfstats:ratelimit:<scope>:<ip>`. If Valkey is unreachable it falls back to an in-process counter with the same budget, so an outage degrades the limiter to per-instance accounting rather than dropping it.
 
 ### Database load
 

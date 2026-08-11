@@ -79,11 +79,6 @@ onShutdown('valkey-client', async () => {
   }
 });
 
-/** Whether the Valkey client is connected and ready to serve commands. */
-export function isCacheReady(): boolean {
-  return client.isReady;
-}
-
 /**
  * Await the initial connection attempt, then report readiness. Use this on
  * request paths that would otherwise reject before startup finishes; the

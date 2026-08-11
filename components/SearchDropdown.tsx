@@ -9,6 +9,7 @@ import { useMapImagesUrl } from '@/lib/MapImagesUrlContext';
 import { mapImageUrl } from '@/lib/utils';
 import { clientError } from '@/lib/client-logger';
 import { getErrorMessage, isAbortError } from '@/lib/errors';
+import { fetchJson } from '@/lib/fetch-json';
 
 interface PlayerResult {
   steamid: string;
@@ -43,7 +44,9 @@ export function SearchDropdown({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  
+  const [error, setError] = useState<string | null>(null);
+
+
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<NodeJS.Timeout | null>(null);
@@ -70,11 +73,11 @@ export function SearchDropdown({
     abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
+    setError(null);
     try {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
+      const data = await fetchJson<SearchResponse>(`/api/search?q=${encodeURIComponent(searchQuery)}`, {
         signal: abortControllerRef.current.signal,
       });
-      const data: SearchResponse = await response.json();
       setResults(data);
       setIsOpen(true);
       setSelectedIndex(-1);
@@ -85,6 +88,9 @@ export function SearchDropdown({
       }
       clientError(`Search error: ${getErrorMessage(error)}`);
       setResults({ players: [], maps: [] });
+      // Surface it: a 429/503 must not read as "no matches".
+      setError(getErrorMessage(error));
+      setIsOpen(true);
     } finally {
       setIsLoading(false);
     }
@@ -99,7 +105,7 @@ export function SearchDropdown({
     if (query.length < minChars) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing results with query length
       setResults({ players: [], maps: [] });
-       
+      setError(null);
       setIsOpen(false);
       return;
     }
@@ -195,7 +201,7 @@ export function SearchDropdown({
   };
 
   const hasResults = results.players.length > 0 || results.maps.length > 0;
-  const showDropdown = isOpen && query.length >= minChars && hasResults;
+  const showDropdown = isOpen && query.length >= minChars && (hasResults || error !== null);
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -232,6 +238,18 @@ export function SearchDropdown({
           role="listbox"
           className="absolute z-50 mt-1 w-full bg-surface border border-border rounded-md shadow-lg"
         >
+          {error && (
+            <div className="px-3 py-2 flex items-center justify-between gap-2">
+              <span className="text-text-muted text-sm">Search failed: {error}</span>
+              <button
+                onClick={() => void performSearch(query)}
+                className="text-primary text-sm font-medium hover:underline shrink-0"
+              >
+                Try again
+              </button>
+            </div>
+          )}
+
           {/* Players section */}
           {results.players.length > 0 && (
             <div>

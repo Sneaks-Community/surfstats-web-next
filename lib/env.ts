@@ -41,6 +41,8 @@ const optionalSchema = z.object({
   RATE_LIMIT_MAX: z.coerce.number().int().positive().optional(),
   RATE_LIMIT_PAGE_MAX: z.coerce.number().int().positive().optional(),
   RATE_LIMIT_PREFETCH_MAX: z.coerce.number().int().positive().optional(),
+  // 0 (or unset) means a blown budget clears when the window rolls over.
+  RATE_LIMIT_BLOCK_SECONDS: z.coerce.number().int().nonnegative().optional(),
   DB_MAX_CONCURRENT_EXPENSIVE: z.coerce.number().int().positive().optional(),
   // MySQL connection pool tuning (see lib/db.ts for defaults).
   DB_CONNECTION_LIMIT: z.coerce.number().int().positive().optional(),

@@ -52,13 +52,19 @@ export async function proxy(request: NextRequest) {
   }
 
   // Pages too, not just the API: they run the same user-parameterized heavy
-  // queries. Separate budget per scope — router prefetches (every viewport
-  // `<Link>`, ~35 per link-dense page view) are cheap shell renders and must not
-  // spend the same allowance as real navigations.
-  const isPrefetch =
-    request.headers.has('next-router-prefetch') ||
-    request.headers.has('next-router-segment-prefetch');
-  const result = await checkRateLimit(request, isApi ? 'api' : isPrefetch ? 'prefetch' : 'page');
+  // queries. Separate budget per scope — the router's RSC requests (a prefetch
+  // for every viewport `<Link>`, ~38 on the home page alone) must not spend the
+  // same allowance as real navigations.
+  //
+  // Do NOT test `next-router-prefetch`/`rsc` here: Next strips every flight
+  // header before middleware runs, so those checks are always false and the
+  // whole prefetch fan-out lands on the page budget (see FLIGHT_HEADERS in
+  // `next/dist/server/web/adapter.js`, "Ensure users only see page requests").
+  // `Sec-Fetch-Dest` survives, and browsers send `document` only for a real
+  // navigation. Missing header (older browsers, crawlers, curl) counts as a
+  // navigation, the stricter budget.
+  const isNavigation = (request.headers.get('sec-fetch-dest') ?? 'document') === 'document';
+  const result = await checkRateLimit(request, isApi ? 'api' : isNavigation ? 'page' : 'prefetch');
 
   if (!result.allowed) {
     const rateLimitHeaders = {

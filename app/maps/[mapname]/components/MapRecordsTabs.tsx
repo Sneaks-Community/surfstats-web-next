@@ -13,6 +13,7 @@ import { validatePlayerName } from '@/lib/validators';
 import { useDebounce } from '@/hooks/useDebounce';
 import { clientError } from '@/lib/client-logger';
 import { getErrorMessage, isAbortError } from '@/lib/errors';
+import { fetchJson } from '@/lib/fetch-json';
 
 interface MapRecord {
   steamid: string;
@@ -54,6 +55,28 @@ interface MapRecordsTabsProps {
   numStages: number;
 }
 
+// API response shapes. The bonus endpoint returns `bonuses` when paginating and
+// `records` in search mode.
+interface RecordsResponse {
+  records?: MapRecord[];
+  pagination?: { total: number };
+}
+interface BonusesResponse {
+  bonuses?: BonusRecord[];
+  records?: BonusRecord[];
+  pagination?: { total: number };
+}
+interface StagesResponse {
+  stages?: StageRecord[];
+  pagination?: { total: number };
+}
+
+/** A failed load, with the action that re-runs it. */
+interface LoadError {
+  message: string;
+  retry: () => void;
+}
+
 type TabType = 'map' | 'bonus' | 'stages';
 
 const ITEMS_PER_PAGE = 20;
@@ -83,6 +106,22 @@ const LeaderboardHeaderRow = ({
       <SortableTh label="Date" field="date" align="right" onSort={onSort} sortField={sortField} sortDirection={sortDirection} />
     </tr>
   </thead>
+);
+
+// Shown in place of the table body when a request fails, so a 403/429/503
+// reads as an error the user can retry rather than an empty leaderboard.
+const ErrorRow = ({ error }: { error: LoadError }) => (
+  <tr>
+    <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
+      <p className="text-text-muted text-sm font-medium">Couldn&apos;t load records: {error.message}</p>
+      <button
+        onClick={error.retry}
+        className="mt-3 px-3 py-1.5 rounded-lg bg-surface-hover text-text text-sm font-medium hover:bg-surface-hover/70 transition-colors"
+      >
+        Try again
+      </button>
+    </td>
+  </tr>
 );
 
 // Format time difference from WR
@@ -216,6 +255,11 @@ export default function MapRecordsTabs({
   const [isStageSearchingApi, setIsStageSearchingApi] = useState(false);
   const [stageSearchApiPage, setStageSearchApiPage] = useState(1);
 
+  // Only one tab renders at a time, so a single error slot covers all three.
+  // `retryToken` re-runs whichever effect-driven load failed.
+  const [error, setError] = useState<LoadError | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
+
   // Reset state when map changes - only depends on mapname to avoid pagination issues
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing state with incoming records prop on map change
@@ -246,6 +290,7 @@ export default function MapRecordsTabs({
     setStageSearchApiResults([]);
     setIsStageSearchingApi(false);
     setStageSearchApiPage(1);
+    setError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapname]);
 
@@ -280,98 +325,83 @@ export default function MapRecordsTabs({
   const debouncedBonusSearch = useDebounce(bonusSearchQuery, 400);
   const debouncedStageSearch = useDebounce(stageSearchQuery, 400);
 
-  // Function to load stage records from API - returns all 100 records for client-side pagination
+  // The stages API returns all 100 records at once, paginated client-side.
   const MAX_STAGE_PAGES = Math.ceil(MAX_STAGE_RECORDS / ITEMS_PER_PAGE);
 
-  const loadStageRecords = async (stage: number) => {
-    if (isLoadingStages) return;
+  // Load stage records when the selected stage changes (sort is handled
+  // client-side). The API returns all 100 records sorted by rank. Cancellation
+  // rather than an in-flight guard: switching stages rapidly must never let an
+  // earlier response overwrite the current selection.
+  useEffect(() => {
+    if (activeTab !== 'stages' || numStages <= 1) return;
 
-    setIsLoadingStages(true);
-    try {
-      // Build query - API returns all 100 records sorted by rank
-      const params = new URLSearchParams();
-      params.set('stage', stage.toString());
-
-      const response = await fetch(`/api/maps/${mapname}/stages?${params.toString()}`);
-      const data = await response.json();
-
-      if (data.stages && data.stages.length > 0) {
-        setAllStageRecords(data.stages);
-        setTotalStageRecords(data.pagination.total);
-      } else {
+    const controller = new AbortController();
+    void (async () => {
+      setIsLoadingStages(true);
+      setError(null);
+      try {
+        const data = await fetchJson<StagesResponse>(
+          `/api/maps/${mapname}/stages?stage=${selectedStage}`,
+          { signal: controller.signal }
+        );
+        setAllStageRecords(data.stages ?? []);
+        setTotalStageRecords(data.pagination?.total ?? 0);
+      } catch (err: unknown) {
+        if (isAbortError(err)) return;
+        clientError(`Failed to load stage records: ${getErrorMessage(err)}`);
         setAllStageRecords([]);
         setTotalStageRecords(0);
+        setError({ message: getErrorMessage(err), retry: () => setRetryToken((t) => t + 1) });
+      } finally {
+        if (!controller.signal.aborted) setIsLoadingStages(false);
       }
-    } catch (error) {
-      clientError(`Failed to load stage records: ${getErrorMessage(error)}`);
-      setAllStageRecords([]);
-      setTotalStageRecords(0);
-    } finally {
-      setIsLoadingStages(false);
-    }
-  };
+    })();
+    return () => controller.abort();
+  }, [activeTab, selectedStage, numStages, mapname, retryToken]);
 
-  // Load stage records when selected stage changes (sort is handled client-side)
+  // Load bonus records when the selected bonus or page changes, with a
+  // client-side cache. Skip while a non-rank sort is active — that uses the
+  // load-all path below, which needs the full set rather than a single
+  // rank-window page. A failure is never cached, so retrying re-fetches.
   useEffect(() => {
-    if (activeTab === 'stages' && numStages > 1) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- Triggering data load on tab/stage change
-      void loadStageRecords(selectedStage);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, selectedStage, numStages]);
+    if (activeTab !== 'bonus' || numBonuses === 0 || sortField !== 'rank') return;
 
-  // Function to load bonus records from API with client-side caching
-  const loadBonusRecords = async (bonus: number, page = 1) => {
-    if (isLoadingBonuses) return;
-
-    // Check client-side cache first
-    const cacheKey = `${bonus}-${page}`;
+    const cacheKey = `${selectedBonus}-${bonusPage}`;
     const cachedData = bonusCacheRef.current.get(cacheKey);
-    
     if (cachedData) {
-      // Cache hit - use cached data
       setAllBonusRecords(cachedData);
       setIsLoadingBonuses(false);
+      setError(null);
       return;
     }
 
-    setIsLoadingBonuses(true);
-    try {
-      const response = await fetch(`/api/maps/${mapname}/bonuses?bonus=${bonus}&page=${page}&pageSize=${ITEMS_PER_PAGE}`);
-      const data = await response.json();
-
-      if (data.bonuses && data.bonuses.length > 0) {
-        // Store in client-side cache
-        bonusCacheRef.current.set(cacheKey, data.bonuses);
+    const controller = new AbortController();
+    void (async () => {
+      setIsLoadingBonuses(true);
+      setError(null);
+      try {
+        const data = await fetchJson<BonusesResponse>(
+          `/api/maps/${mapname}/bonuses?bonus=${selectedBonus}&page=${bonusPage}&pageSize=${ITEMS_PER_PAGE}`,
+          { signal: controller.signal }
+        );
+        const rows = data.bonuses ?? [];
+        bonusCacheRef.current.set(cacheKey, rows);
         // This is a single rank-window page — the full set is no longer loaded.
-        allBonusLoadedRef.current.delete(bonus);
-        setAllBonusRecords(data.bonuses);
-        setTotalBonusRecords(data.pagination.total);
-      } else {
-        bonusCacheRef.current.set(cacheKey, []);
+        allBonusLoadedRef.current.delete(selectedBonus);
+        setAllBonusRecords(rows);
+        setTotalBonusRecords(data.pagination?.total ?? 0);
+      } catch (err: unknown) {
+        if (isAbortError(err)) return;
+        clientError(`Failed to load bonus records: ${getErrorMessage(err)}`);
         setAllBonusRecords([]);
         setTotalBonusRecords(0);
+        setError({ message: getErrorMessage(err), retry: () => setRetryToken((t) => t + 1) });
+      } finally {
+        if (!controller.signal.aborted) setIsLoadingBonuses(false);
       }
-    } catch (error) {
-      clientError(`Failed to load bonus records: ${getErrorMessage(error)}`);
-      bonusCacheRef.current.set(cacheKey, []);
-      setAllBonusRecords([]);
-      setTotalBonusRecords(0);
-    } finally {
-      setIsLoadingBonuses(false);
-    }
-  };
-
-  // Load bonus records when selected bonus changes.
-  // Skip while a non-rank sort is active — that uses the load-all path below,
-  // which needs the full set rather than a single rank-window page.
-  useEffect(() => {
-    if (activeTab === 'bonus' && numBonuses > 0) {
-      if (sortField !== 'rank') return;
-      void loadBonusRecords(selectedBonus, bonusPage);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, selectedBonus, bonusPage, numBonuses, sortField]);
+    })();
+    return () => controller.abort();
+  }, [activeTab, selectedBonus, bonusPage, numBonuses, sortField, mapname, retryToken]);
 
   // When a non-rank sort is active on the map tab, load the full
   // leaderboard once so pagination pages through the globally-sorted order.
@@ -384,27 +414,32 @@ export default function MapRecordsTabs({
     const controller = new AbortController();
     void (async () => {
       setIsLoadingAllLeaderboard(true);
+      setError(null);
       try {
         const LOAD_PAGE_SIZE = 100;
         const apiPages = Math.max(1, Math.ceil(totalRecords / LOAD_PAGE_SIZE));
         const merged = new Map<string, MapRecord>();
         for (let p = 1; p <= apiPages; p++) {
-          const response = await fetch(`/api/maps/${mapname}/records?page=${p}&pageSize=${LOAD_PAGE_SIZE}`, { signal: controller.signal });
-          const data = await response.json();
+          const data = await fetchJson<RecordsResponse>(
+            `/api/maps/${mapname}/records?page=${p}&pageSize=${LOAD_PAGE_SIZE}`,
+            { signal: controller.signal }
+          );
           if (Array.isArray(data.records)) {
-            for (const r of data.records as MapRecord[]) merged.set(r.steamid + r.date, r);
+            for (const r of data.records) merged.set(r.steamid + r.date, r);
           }
         }
         setAllLeaderboardRecords(Array.from(merged.values()));
         allLeaderboardLoadedRef.current = true;
-      } catch (error) {
-        if (!isAbortError(error)) clientError(`Failed to load all records for sorting: ${getErrorMessage(error)}`);
+      } catch (err: unknown) {
+        if (isAbortError(err)) return;
+        clientError(`Failed to load all records for sorting: ${getErrorMessage(err)}`);
+        setError({ message: getErrorMessage(err), retry: () => setRetryToken((t) => t + 1) });
       } finally {
         if (!controller.signal.aborted) setIsLoadingAllLeaderboard(false);
       }
     })();
     return () => controller.abort();
-  }, [activeTab, sortField, searchQuery, mapname, totalRecords]);
+  }, [activeTab, sortField, searchQuery, mapname, totalRecords, retryToken]);
 
   // same load-all path for the bonus tab (per-bonus).
   useEffect(() => {
@@ -416,16 +451,19 @@ export default function MapRecordsTabs({
     const controller = new AbortController();
     void (async () => {
       setIsLoadingAllBonus(true);
+      setError(null);
       try {
         const LOAD_PAGE_SIZE = 100;
         const merged = new Map<string, BonusRecord>();
         let total = Infinity;
         for (let p = 1; (p - 1) * LOAD_PAGE_SIZE < total; p++) {
-          const response = await fetch(`/api/maps/${mapname}/bonuses?bonus=${selectedBonus}&page=${p}&pageSize=${LOAD_PAGE_SIZE}`, { signal: controller.signal });
-          const data = await response.json();
+          const data = await fetchJson<BonusesResponse>(
+            `/api/maps/${mapname}/bonuses?bonus=${selectedBonus}&page=${p}&pageSize=${LOAD_PAGE_SIZE}`,
+            { signal: controller.signal }
+          );
           total = data.pagination?.total ?? 0;
           if (Array.isArray(data.bonuses) && data.bonuses.length > 0) {
-            for (const r of data.bonuses as BonusRecord[]) merged.set(`${r.steamid}-${r.zonegroup}`, r);
+            for (const r of data.bonuses) merged.set(`${r.steamid}-${r.zonegroup}`, r);
           } else {
             break;
           }
@@ -433,14 +471,16 @@ export default function MapRecordsTabs({
         setAllBonusRecords(Array.from(merged.values()));
         setTotalBonusRecords(merged.size);
         allBonusLoadedRef.current.add(selectedBonus);
-      } catch (error) {
-        if (!isAbortError(error)) clientError(`Failed to load all bonus records for sorting: ${getErrorMessage(error)}`);
+      } catch (err: unknown) {
+        if (isAbortError(err)) return;
+        clientError(`Failed to load all bonus records for sorting: ${getErrorMessage(err)}`);
+        setError({ message: getErrorMessage(err), retry: () => setRetryToken((t) => t + 1) });
       } finally {
         if (!controller.signal.aborted) setIsLoadingAllBonus(false);
       }
     })();
     return () => controller.abort();
-  }, [activeTab, sortField, bonusSearchQuery, selectedBonus, mapname]);
+  }, [activeTab, sortField, bonusSearchQuery, selectedBonus, mapname, retryToken]);
 
   // Server-side search — map tab
   // Fires after 400 ms of silence; only when query is ≥ 3 characters
@@ -453,10 +493,10 @@ export default function MapRecordsTabs({
     }
     const controller = new AbortController();
     setIsSearchingApi(true);
-    fetch(`/api/maps/${mapname}/records?q=${encodeURIComponent(debouncedSearch)}`, {
+    setError(null);
+    fetchJson<RecordsResponse>(`/api/maps/${mapname}/records?q=${encodeURIComponent(debouncedSearch)}`, {
       signal: controller.signal,
     })
-      .then((r) => r.json())
       .then((data) => {
         setSearchApiResults(data.records ?? []);
         setSearchApiPage(1);
@@ -465,11 +505,12 @@ export default function MapRecordsTabs({
         if (!isAbortError(err)) {
           clientError(`[MapRecordsTabs] Search failed: ${getErrorMessage(err)}`);
           setSearchApiResults([]);
+          setError({ message: getErrorMessage(err), retry: () => setRetryToken((t) => t + 1) });
         }
       })
       .finally(() => setIsSearchingApi(false));
     return () => controller.abort();
-  }, [debouncedSearch, mapname]);
+  }, [debouncedSearch, mapname, retryToken]);
 
   // Server-side search — bonus tab
   useEffect(() => {
@@ -481,11 +522,11 @@ export default function MapRecordsTabs({
     }
     const controller = new AbortController();
     setIsBonusSearchingApi(true);
-    fetch(
+    setError(null);
+    fetchJson<BonusesResponse>(
       `/api/maps/${mapname}/bonuses?bonus=${selectedBonus}&q=${encodeURIComponent(debouncedBonusSearch)}`,
       { signal: controller.signal }
     )
-      .then((r) => r.json())
       .then((data) => {
         setBonusSearchApiResults(data.records ?? []);
         setBonusSearchApiPage(1);
@@ -494,11 +535,12 @@ export default function MapRecordsTabs({
         if (!isAbortError(err)) {
           clientError(`[MapRecordsTabs] Bonus search failed: ${getErrorMessage(err)}`);
           setBonusSearchApiResults([]);
+          setError({ message: getErrorMessage(err), retry: () => setRetryToken((t) => t + 1) });
         }
       })
       .finally(() => setIsBonusSearchingApi(false));
     return () => controller.abort();
-  }, [debouncedBonusSearch, mapname, selectedBonus]);
+  }, [debouncedBonusSearch, mapname, selectedBonus, retryToken]);
 
   // Server-side search — stages tab
   useEffect(() => {
@@ -510,11 +552,11 @@ export default function MapRecordsTabs({
     }
     const controller = new AbortController();
     setIsStageSearchingApi(true);
-    fetch(
+    setError(null);
+    fetchJson<StagesResponse>(
       `/api/maps/${mapname}/stages?stage=${selectedStage}&q=${encodeURIComponent(debouncedStageSearch)}`,
       { signal: controller.signal }
     )
-      .then((r) => r.json())
       .then((data) => {
         setStageSearchApiResults(data.stages ?? []);
         setStageSearchApiPage(1);
@@ -523,11 +565,12 @@ export default function MapRecordsTabs({
         if (!isAbortError(err)) {
           clientError(`[MapRecordsTabs] Stage search failed: ${getErrorMessage(err)}`);
           setStageSearchApiResults([]);
+          setError({ message: getErrorMessage(err), retry: () => setRetryToken((t) => t + 1) });
         }
       })
       .finally(() => setIsStageSearchingApi(false));
     return () => controller.abort();
-  }, [debouncedStageSearch, mapname, selectedStage]);
+  }, [debouncedStageSearch, mapname, selectedStage, retryToken]);
 
   // Update URL when state changes
   useEffect(() => {
@@ -556,10 +599,13 @@ export default function MapRecordsTabs({
     // Reset sort to default when changing tabs
     setSortField('rank');
     setSortDirection('asc');
+    // The error slot is shared across tabs; don't carry one tab's failure over.
+    setError(null);
   };
 
   // Handle page change - with auto-loading for map tab
-  const handlePageChange = async (page: number) => {
+  // Return type annotated because the retry closure below references this.
+  const handlePageChange = async (page: number): Promise<void> => {
     if (activeTab === 'map') {
       // Full set already loaded (non-rank sort path) — just change the page.
       if (allLeaderboardLoadedRef.current) {
@@ -569,24 +615,27 @@ export default function MapRecordsTabs({
       // Check if this page has already been loaded
       if (!loadedPagesRef.current.has(page)) {
         try {
-          const response = await fetch(`/api/maps/${mapname}/records?page=${page}&pageSize=${ITEMS_PER_PAGE}`);
-          const data = await response.json();
-          
-          if (data.records && data.records.length > 0) {
+          const data = await fetchJson<RecordsResponse>(
+            `/api/maps/${mapname}/records?page=${page}&pageSize=${ITEMS_PER_PAGE}`
+          );
+          const records = data.records ?? [];
+          if (records.length > 0) {
             // Merge with existing records, ensuring we don't have duplicates
             setAllLeaderboardRecords(prev => {
               const existingIds = new Set(prev.map(r => r.steamid + r.date));
-              const newRecords = data.records.filter((r: MapRecord) =>
-                !existingIds.has(r.steamid + r.date)
-              );
+              const newRecords = records.filter((r) => !existingIds.has(r.steamid + r.date));
               return [...prev, ...newRecords];
             });
             loadedPagesRef.current.add(page);
           }
         } catch (error) {
+          // Stay on the current page: advancing would render an empty table.
           clientError(`Failed to load records: ${getErrorMessage(error)}`);
+          setError({ message: getErrorMessage(error), retry: () => void handlePageChange(page) });
+          return;
         }
       }
+      setError(null);
       setLeaderboardPage(page);
     } else if (activeTab === 'bonus') {
       setBonusPage(page);
@@ -972,6 +1021,8 @@ export default function MapRecordsTabs({
                       Type at least 3 characters to search all players.
                     </td>
                   </tr>
+                ) : error ? (
+                  <ErrorRow error={error} />
                 ) : isSearchingApi ? (
                   <tr>
                     <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
@@ -1043,6 +1094,8 @@ export default function MapRecordsTabs({
                       Type at least 3 characters to search all players.
                     </td>
                   </tr>
+                ) : error ? (
+                  <ErrorRow error={error} />
                 ) : isBonusSearchingApi ? (
                   <tr>
                     <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
@@ -1116,6 +1169,8 @@ export default function MapRecordsTabs({
                       Type at least 3 characters to search all players.
                     </td>
                   </tr>
+                ) : error ? (
+                  <ErrorRow error={error} />
                 ) : isLoadingStages || isStageSearchingApi ? (
                   <tr>
                     <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">

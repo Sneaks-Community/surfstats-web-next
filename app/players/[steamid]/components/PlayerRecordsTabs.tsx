@@ -15,6 +15,7 @@ import { ZoneGroupBadge, StageBadge } from '@/components/RecordBadges';
 import { useDebounce } from '@/hooks/useDebounce';
 import { clientError } from '@/lib/client-logger';
 import { getErrorMessage, isAbortError } from '@/lib/errors';
+import { fetchJson } from '@/lib/fetch-json';
 import type { PlayerCompletionCounts } from '@/lib/player-profile-cache';
 
 // Types for records
@@ -101,6 +102,10 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
   const [isLoadingMaps, setIsLoadingMaps] = useState(false);
   const [isLoadingBonuses, setIsLoadingBonuses] = useState(false);
   const [isLoadingStages, setIsLoadingStages] = useState(false);
+  // Only the active tab fetches, so one error slot covers all three.
+  // `retryToken` re-runs the load; a failed section is never marked loaded.
+  const [error, setError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   // Derived arrays default to empty until their section loads, so all the
   // client-side filter/sort/pagination below is unchanged from when these
@@ -164,22 +169,23 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
     else setIsLoadingStages(true);
 
     void (async () => {
+      setError(null);
       try {
-        const res = await fetch(`/api/players/${encodeURIComponent(steamid)}/${activeTab}`, {
-          signal: controller.signal,
-        });
-        const data = await res.json();
+        // Row shapes differ per tab; the two keys don't.
+        const data = await fetchJson<{ records?: unknown[]; incomplete?: unknown[] }>(
+          `/api/players/${encodeURIComponent(steamid)}/${activeTab}`,
+          { signal: controller.signal }
+        );
         const section = { records: data.records ?? [], incomplete: data.incomplete ?? [] };
-        if (activeTab === 'maps') setMapsData(section);
-        else if (activeTab === 'bonuses') setBonusesData(section);
-        else setStagesData(section);
+        if (activeTab === 'maps') setMapsData(section as MapsSection);
+        else if (activeTab === 'bonuses') setBonusesData(section as BonusesSection);
+        else setStagesData(section as StagesSection);
       } catch (err: unknown) {
         if (!isAbortError(err)) {
+          // Leave the section null so it isn't treated as loaded — the retry
+          // below (and re-selecting the tab) fetches again.
           clientError(`[PlayerRecordsTabs] Failed to load ${activeTab}: ${getErrorMessage(err)}`);
-          const empty = { records: [], incomplete: [] };
-          if (activeTab === 'maps') setMapsData(empty);
-          else if (activeTab === 'bonuses') setBonusesData(empty);
-          else setStagesData(empty);
+          setError(getErrorMessage(err));
         }
       } finally {
         if (!controller.signal.aborted) {
@@ -192,7 +198,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
 
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, steamid]);
+  }, [activeTab, steamid, retryToken]);
 
   // Update URL when state changes
   useEffect(() => {
@@ -218,6 +224,8 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
     // Reset sort to default when changing tabs
     setSortField('map');
     setSortDirection('asc');
+    // The error slot is shared across tabs; don't carry one tab's failure over.
+    setError(null);
   };
 
   // Handle status filter change
@@ -566,6 +574,18 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
           <div className="flex flex-col items-center justify-center gap-3 py-20">
             <LoadingSpinner />
             <span className="text-text-muted text-sm font-medium">Loading {activeTab}...</span>
+          </div>
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-20">
+            <span className="text-text-muted text-sm font-medium">
+              Couldn&apos;t load {activeTab}: {error}
+            </span>
+            <button
+              onClick={() => setRetryToken((t) => t + 1)}
+              className="px-3 py-1.5 rounded-lg bg-surface-hover text-text text-sm font-medium hover:bg-surface-hover/70 transition-colors"
+            >
+              Try again
+            </button>
           </div>
         ) : paginatedRecords.length > 0 ? (
           <>

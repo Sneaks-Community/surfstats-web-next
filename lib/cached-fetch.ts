@@ -2,7 +2,7 @@ import 'server-only';
 import { cacheGetWithTtl, cacheSet } from './valkey-cache';
 import { cacheLock, shouldExpireEarly } from './cache-lock';
 import { withExpensiveQueryLimit } from './db-semaphore';
-import { isCacheReady } from './valkey';
+import { waitForCacheReady } from './valkey';
 import { CacheUnavailableError } from './errors';
 import logger from './logger';
 
@@ -133,7 +133,13 @@ export async function cachedFetch<T>(
   // the try/catch, so `onError` deliberately doesn't swallow it. The proxy gate
   // serves the 503 for normal requests; this backstops the post-gate race
   // (API: `apiError` → 503; page render → Next 500) and timer paths.
-  if (!isCacheReady()) {
+  //
+  // Await rather than test `isCacheReady()`: the proxy runs in its own module
+  // scope, so its gate says nothing about this one's client. A lazily loaded
+  // route chunk initializes `lib/valkey` fresh and the first request through it
+  // races the handshake. Once connected this is a no-op, and a later outage
+  // still fails immediately because the initial-connect promise has settled.
+  if (!(await waitForCacheReady())) {
     throw new CacheUnavailableError();
   }
 

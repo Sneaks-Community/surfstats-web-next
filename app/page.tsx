@@ -11,7 +11,6 @@ import { getStatsFromCache, getLatestCompletionsFromCache } from '@/lib/cache';
 import { getPlayersFromCache } from '@/lib/player-cache';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
-import { waitForCacheReady } from '@/lib/valkey';
 import logger from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
 import StatTile from '@/components/StatTile';
@@ -36,13 +35,6 @@ async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promis
 }
 
 export default async function Home() {
-  // Await the initial Valkey handshake so the very first request after a server
-  // start doesn't race it. Without this, `cachedFetch` fails closed
-  // (CacheUnavailableError) during the brief connect window and the safe()
-  // wrappers below degrade whole sections to empty — producing a partial page
-  // on first load that only fills in on refresh.
-  await waitForCacheReady();
-
   const [stats, latestCompletions, topPlayersResult, mapMeta] = await Promise.all([
     safe('stats', getStatsFromCache, null),
     safe('latest completions', getLatestCompletionsFromCache, []),
