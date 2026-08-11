@@ -52,8 +52,13 @@ export async function proxy(request: NextRequest) {
   }
 
   // Pages too, not just the API: they run the same user-parameterized heavy
-  // queries. Separate budget per scope.
-  const result = await checkRateLimit(request, isApi ? 'api' : 'page');
+  // queries. Separate budget per scope — router prefetches (every viewport
+  // `<Link>`, ~35 per link-dense page view) are cheap shell renders and must not
+  // spend the same allowance as real navigations.
+  const isPrefetch =
+    request.headers.has('next-router-prefetch') ||
+    request.headers.has('next-router-segment-prefetch');
+  const result = await checkRateLimit(request, isApi ? 'api' : isPrefetch ? 'prefetch' : 'page');
 
   if (!result.allowed) {
     const rateLimitHeaders = {

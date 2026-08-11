@@ -7,14 +7,9 @@ import { cacheGet, cacheSet } from './valkey-cache';
 import { cacheLock } from './cache-lock';
 import { cachedFetch } from './cached-fetch';
 import { getErrorCode, getErrorMessage } from './errors';
+import { getServerConfigs, type ServerConfig } from './env';
 
 // Types
-interface ServerConfig {
-  name: string;
-  ip: string;
-  port: number;
-}
-
 interface GameDigPlayer {
   name: string;
   raw?: Record<string, unknown>;
@@ -45,26 +40,7 @@ export async function fetchServersFromGame(): Promise<ServerStatus[]> {
 
   try {
     logger.debug('[ServerCache] Fetching server statuses...');
-    let serversJson = process.env.SERVERS_JSON || '[]';
-
-    // Remove surrounding single quotes if they exist
-    if (serversJson.startsWith("'") && serversJson.endsWith("'")) {
-      serversJson = serversJson.slice(1, -1);
-    }
-
-    let configs: ServerConfig[];
-    try {
-      configs = JSON.parse(serversJson);
-    } catch (parseError: unknown) {
-      logger.error('[ServerCache] Failed to parse SERVERS_JSON environment variable');
-      logger.error(`[ServerCache] JSON parse error: ${getErrorMessage(parseError)}`);
-      return [];
-    }
-
-    if (!Array.isArray(configs)) {
-      logger.error('[ServerCache] SERVERS_JSON is not an array');
-      return [];
-    }
+    const configs = getServerConfigs();
 
     logger.debug(`[ServerCache] Querying ${configs.length} servers...`);
 

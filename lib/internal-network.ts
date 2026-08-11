@@ -25,8 +25,8 @@ function isPrivateIp(ip: string): boolean {
   // IPv4 private/loopback/link-local ranges.
   const parts = normalized.split('.');
   if (parts.length === 4) {
+    if (!parts.every((p) => /^\d{1,3}$/.test(p) && parseInt(p, 10) <= 255)) return false;
     const [a, b] = parts.map((p) => parseInt(p, 10));
-    if ([a, b].some((n) => Number.isNaN(n))) return false;
     if (a === 127) return true; // 127.0.0.0/8 loopback
     if (a === 10) return true; // 10.0.0.0/8
     if (a === 192 && b === 168) return true; // 192.168.0.0/16

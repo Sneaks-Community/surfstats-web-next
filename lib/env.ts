@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import logger from './logger';
+import { COLOR_FAMILIES, BACKGROUND_FAMILIES } from './theme-config';
 
 /**
  * Centralized, boot-time environment validation.
@@ -39,6 +40,7 @@ const optionalSchema = z.object({
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().optional(),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().optional(),
   RATE_LIMIT_PAGE_MAX: z.coerce.number().int().positive().optional(),
+  RATE_LIMIT_PREFETCH_MAX: z.coerce.number().int().positive().optional(),
   DB_MAX_CONCURRENT_EXPENSIVE: z.coerce.number().int().positive().optional(),
   // MySQL connection pool tuning (see lib/db.ts for defaults).
   DB_CONNECTION_LIMIT: z.coerce.number().int().positive().optional(),
@@ -58,7 +60,64 @@ const optionalSchema = z.object({
   MAP_IMAGES_URL: z.url('MAP_IMAGES_URL must be a valid URL').optional(),
   // Highest tier shown on the player Tier Distribution radar.
   MAX_TIER: z.coerce.number().int().positive().optional(),
+  // Theme palette families. Injected as CSS vars from the root layout, so an
+  // unknown value would otherwise throw on every page render.
+  THEME_PRIMARY: z.enum(COLOR_FAMILIES).optional(),
+  THEME_SECONDARY: z.enum(COLOR_FAMILIES).optional(),
+  THEME_LIGHT_PRIMARY: z.enum(COLOR_FAMILIES).optional(),
+  THEME_LIGHT_SECONDARY: z.enum(COLOR_FAMILIES).optional(),
+  THEME_DARK_PRIMARY: z.enum(COLOR_FAMILIES).optional(),
+  THEME_DARK_SECONDARY: z.enum(COLOR_FAMILIES).optional(),
+  THEME_LIGHT_BACKGROUND: z.enum(BACKGROUND_FAMILIES).optional(),
+  THEME_DARK_BACKGROUND: z.enum(BACKGROUND_FAMILIES).optional(),
 });
+
+// Live-status game servers. Validated per item so a malformed entry can't reach
+// GameDig.query() as an arbitrary host/port.
+const serverConfigSchema = z.object({
+  name: z.string().min(1),
+  ip: z.string().min(1),
+  port: z.coerce.number().int().min(1).max(65535),
+});
+
+export type ServerConfig = z.infer<typeof serverConfigSchema>;
+
+let serverConfigs: ServerConfig[] | null = null;
+
+function parseServerConfigs(): ServerConfig[] {
+  const raw = process.env.SERVERS_JSON?.trim();
+  if (!raw || raw === '[]') {
+    logger.warn('[env] SERVERS_JSON not set (or empty) — live server status will be empty');
+    return [];
+  }
+
+  // Strip surrounding single quotes, which shells and compose files often leave in.
+  const candidate = raw.startsWith("'") && raw.endsWith("'") ? raw.slice(1, -1) : raw;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(candidate);
+  } catch {
+    logger.error('[env] SERVERS_JSON is not valid JSON — live server status will be empty');
+    return [];
+  }
+
+  const result = z.array(serverConfigSchema).safeParse(parsed);
+  if (!result.success) {
+    const details = result.error.issues
+      .map((i) => `${i.path.join('.') || '(root)'}: ${i.message}`)
+      .join('; ');
+    logger.error(`[env] SERVERS_JSON is invalid — live server status will be empty (${details})`);
+    return [];
+  }
+  return result.data;
+}
+
+/** Validated game server list from SERVERS_JSON. Parsed once, empty on any error. */
+export function getServerConfigs(): ServerConfig[] {
+  serverConfigs ??= parseServerConfigs();
+  return serverConfigs;
+}
 
 let validated = false;
 
@@ -91,24 +150,8 @@ export function validateEnv(): void {
     logger.warn('[env] STEAM_API_KEY not set — Steam profile names/avatars will be unavailable');
   }
 
-  const serversJson = process.env.SERVERS_JSON?.trim();
-  if (!serversJson || serversJson === '[]') {
-    logger.warn('[env] SERVERS_JSON not set (or empty) — live server status will be empty');
-  } else {
-    // Mirror the quote-stripping in cache.ts so the warning matches runtime parsing.
-    let candidate = serversJson;
-    if (candidate.startsWith("'") && candidate.endsWith("'")) {
-      candidate = candidate.slice(1, -1);
-    }
-    try {
-      const parsed: unknown = JSON.parse(candidate);
-      if (!Array.isArray(parsed)) {
-        logger.warn('[env] SERVERS_JSON is not a JSON array — live server status will be empty');
-      }
-    } catch {
-      logger.warn('[env] SERVERS_JSON is not valid JSON — live server status will be empty');
-    }
-  }
+  // Parse (and warn) once at boot; the result is what fetchServersFromGame uses.
+  getServerConfigs();
 
   const analyticsConfigured = Boolean(
     process.env.ANALYTICS_MYSQL_HOST ||

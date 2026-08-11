@@ -4,13 +4,17 @@ import 'server-only';
  * Supported Tailwind color families for theming
  * These can be set via environment variables
  */
-export type ColorFamily = 
-  | 'emerald' | 'green' | 'teal' | 'cyan' | 'sky' 
-  | 'blue' | 'indigo' | 'violet' | 'purple' | 'fuchsia'
-  | 'pink' | 'rose' | 'red' | 'orange' | 'amber' | 'yellow' | 'lime';
+export const COLOR_FAMILIES = [
+  'emerald', 'green', 'teal', 'cyan', 'sky',
+  'blue', 'indigo', 'violet', 'purple', 'fuchsia',
+  'pink', 'rose', 'red', 'orange', 'amber', 'yellow', 'lime',
+] as const;
 
-export type BackgroundFamily = 
-  | 'slate' | 'gray' | 'zinc' | 'neutral' | 'stone';
+export const BACKGROUND_FAMILIES = ['slate', 'gray', 'zinc', 'neutral', 'stone'] as const;
+
+export type ColorFamily = (typeof COLOR_FAMILIES)[number];
+
+export type BackgroundFamily = (typeof BACKGROUND_FAMILIES)[number];
 
 // Color definitions using hex values for runtime injection
 const colorPalettes: Record<ColorFamily, Record<string, string>> = {
@@ -111,26 +115,36 @@ const backgroundPalettes: Record<BackgroundFamily, Record<string, string>> = {
 let cachedThemeConfig: ReturnType<typeof createThemeConfig> | null = null;
 
 /**
+ * Resolve an env value to a known palette family, falling back when it is unset
+ * or misspelled. Env is also validated at boot (lib/env.ts), so a typo normally
+ * fails fast; this keeps an unvalidated value from throwing in the root layout
+ * and 500-ing every route.
+ */
+function colorFamily(value: string | undefined, fallback: ColorFamily): ColorFamily {
+  return value && Object.hasOwn(colorPalettes, value) ? (value as ColorFamily) : fallback;
+}
+
+function backgroundFamily(value: string | undefined, fallback: BackgroundFamily): BackgroundFamily {
+  return value && Object.hasOwn(backgroundPalettes, value) ? (value as BackgroundFamily) : fallback;
+}
+
+/**
  * Create theme configuration from environment variables
  */
 function createThemeConfig() {
-  const primary = (process.env.THEME_PRIMARY ?? 'emerald') as ColorFamily;
-  const secondary = (process.env.THEME_SECONDARY ?? 'cyan') as ColorFamily;
-  
-  // Debug log - theme config once at server start
-  // console.log('[Theme Config] Initialized with THEME_PRIMARY:', process.env.THEME_PRIMARY || '(not set)', '-> using:', primary);
-  // console.log('[Theme Config] Initialized with THEME_SECONDARY:', process.env.THEME_SECONDARY || '(not set)', '-> using:', secondary);
-  
+  const primary = colorFamily(process.env.THEME_PRIMARY, 'emerald');
+  const secondary = colorFamily(process.env.THEME_SECONDARY, 'cyan');
+
   return {
     light: {
-      primary: (process.env.THEME_LIGHT_PRIMARY ?? primary) as ColorFamily,
-      secondary: (process.env.THEME_LIGHT_SECONDARY ?? secondary) as ColorFamily,
-      background: (process.env.THEME_LIGHT_BACKGROUND ?? 'gray') as BackgroundFamily,
+      primary: colorFamily(process.env.THEME_LIGHT_PRIMARY, primary),
+      secondary: colorFamily(process.env.THEME_LIGHT_SECONDARY, secondary),
+      background: backgroundFamily(process.env.THEME_LIGHT_BACKGROUND, 'gray'),
     },
     dark: {
-      primary: (process.env.THEME_DARK_PRIMARY ?? primary) as ColorFamily,
-      secondary: (process.env.THEME_DARK_SECONDARY ?? secondary) as ColorFamily,
-      background: (process.env.THEME_DARK_BACKGROUND ?? 'zinc') as BackgroundFamily,
+      primary: colorFamily(process.env.THEME_DARK_PRIMARY, primary),
+      secondary: colorFamily(process.env.THEME_DARK_SECONDARY, secondary),
+      background: backgroundFamily(process.env.THEME_DARK_BACKGROUND, 'zinc'),
     },
   };
 }

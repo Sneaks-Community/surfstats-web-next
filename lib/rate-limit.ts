@@ -12,8 +12,9 @@ import logger from './logger';
  * MySQL pool. Capping requests per IP bounds that blast radius.
  *
  * Applies to page routes as well as `/api/*`, since they run the same queries.
- * The two scopes get independent budgets and counters so a page render's own
- * client-side API fetches don't eat the browsing allowance.
+ * Each scope gets an independent budget and counter so a page render's own
+ * client-side API fetches, and the router's link prefetches, don't eat the
+ * browsing allowance.
  *
  * Fails open: if Valkey is unreachable the request is allowed, so a cache
  * outage degrades protection rather than taking the whole API down.
@@ -32,9 +33,27 @@ const PAGE_MAX_REQUESTS = Math.max(
   1,
   parseInt(process.env.RATE_LIMIT_PAGE_MAX || '300', 10) || 300
 );
+/**
+ * Router prefetches get their own, much larger budget. Every viewport `<Link>`
+ * prefetches, so a single link-dense page view (20 map cards plus nav, sort and
+ * pagination links) is ~35 requests — charging those to the page budget rate
+ * limited ordinary browsing. They render only to the `loading.tsx` boundary, so
+ * they never reach the heavy queries this limiter exists to bound; the cap stays
+ * to keep a forged prefetch header from being an unmetered path.
+ */
+const PREFETCH_MAX_REQUESTS = Math.max(
+  1,
+  parseInt(process.env.RATE_LIMIT_PREFETCH_MAX || '900', 10) || 900
+);
 
 /** Which budget a request counts against. */
-export type RateLimitScope = 'api' | 'page';
+export type RateLimitScope = 'api' | 'page' | 'prefetch';
+
+const MAX_BY_SCOPE: Record<RateLimitScope, number> = {
+  api: MAX_REQUESTS,
+  page: PAGE_MAX_REQUESTS,
+  prefetch: PREFETCH_MAX_REQUESTS,
+};
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -74,7 +93,7 @@ export async function checkRateLimit(
   scope: RateLimitScope = 'api'
 ): Promise<RateLimitResult> {
   const ip = getClientIp(request);
-  const maxRequests = scope === 'page' ? PAGE_MAX_REQUESTS : MAX_REQUESTS;
+  const maxRequests = MAX_BY_SCOPE[scope];
   const key = `ratelimit:${scope}:${ip}`;
 
   try {

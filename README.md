@@ -23,25 +23,90 @@ A modern, fast, and responsive web interface for displaying player statistics, m
 * **Performance:** Intelligent caching with Valkey.
 * **Player Analytics:** Utilizes [a fork of Player Analytics](https://github.com/sneak-it/PlayerAnalytics) for **optional** play time display.
 
+## Requirements
+
+* **MySQL** database populated by the ckSurf timer plugin.
+* **Valkey** (or Redis). Every query is served through the cache, and when Valkey is unreachable the app serves a "temporarily unavailable" page instead of running uncached queries against your database.
+* **A reverse proxy** in front of the app, setting `x-forwarded-for`.
+* **Node.js >= 24** for a non-Docker deployment (see `.nvmrc`).
+
 ## Configuration
 
 The application is configured using environment variables. You can set these in a `.env` file for local development or in your `docker-compose.yml` for production.
 
 ### Database Settings
+
 * `MYSQL_HOST`: Your MySQL database host (e.g., `localhost` or `db`).
 * `MYSQL_PORT`: Your MySQL database port (default: `3306`).
 * `MYSQL_USER`: Your MySQL database user.
 * `MYSQL_PASSWORD`: Your MySQL database password.
 * `MYSQL_DATABASE`: The name of your ckSurf database (usually `cksurf`).
 
-### Application Settings
-* `STEAM_API_KEY`: Your Steam Web API key, required to fetch player avatars on their profile pages. Get one [here](https://steamcommunity.com/dev/apikey).
-* `SERVERS_JSON`: A JSON array defining your game servers for the live status page.
-  * Example: `'[{"name":"Main Surf Server","ip":"192.168.1.100","port":27015}]'`
-* `MAP_IMAGES_URL`: (Optional) Base URL for fetching map thumbnail images. Defaults to GameTracker's image repository.
+### Cache (required)
 
-### Optional Settings
-* `LOG_LEVEL`: Logging verbosity level (default: `warn`). Options: `debug`, `info`, `warn`, `error`.
+* `VALKEY_URL`: Connection URL (default: `redis://localhost:6379`; `redis://valkey:6379` with the example compose file).
+* `VALKEY_USERNAME` / `VALKEY_PASSWORD`: Credentials, if the server requires auth. The example compose file sets `requirepass`, so `VALKEY_PASSWORD` is required there.
+* `VALKEY_TLS`: Set to `true` to connect over TLS.
+* `VALKEY_TLS_REJECT_UNAUTHORIZED`: Set to `false` to accept self-signed certificates.
+* `VALKEY_CONNECT_TIMEOUT`: Connection timeout in ms (default: `5000`).
+
+### Player Analytics database (optional)
+
+Powers play-time and activity displays. Requires [the PlayerAnalytics fork](https://github.com/sneak-it/PlayerAnalytics).
+
+* `ANALYTICS_MYSQL_HOST`, `ANALYTICS_MYSQL_PORT`, `ANALYTICS_MYSQL_USER`, `ANALYTICS_MYSQL_PASSWORD`, `ANALYTICS_MYSQL_DATABASE`
+* `ANALYTICS_HEALTHCHECK_INTERVAL_MS`: How often to re-check the connection, in ms (default: `60000`; `0` disables).
+
+### Application
+
+* `STEAM_API_KEY`: Your Steam Web API key, required to fetch player avatars and names. Get one [here](https://steamcommunity.com/dev/apikey). Without it, avatars and Steam names are unavailable.
+* `SERVERS_JSON`: A JSON array defining your game servers for the live status page. Each entry needs `name`, `ip`, and `port`; the whole list is ignored (with a logged error) if any entry is malformed.
+  * Example: `'[{"name":"Main Surf Server","ip":"192.168.1.100","port":27015}]'`
+* `MAP_IMAGES_URL`: Base URL for map thumbnails. Defaults to GameTracker's image repository.
+* `MAX_TIER`: Highest tier shown on the player Tier Distribution radar (default: `10`). Caps the axes so a junk placeholder tier doesn't distort the chart.
+* `LOG_LEVEL`: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, or `silent` (default: `warn`).
+
+### Security and limits
+
+* `ALLOWED_ORIGINS`: Comma-separated extra origins allowed to call `/api/*`. The site's own origin is always allowed.
+* `RATE_LIMIT_MAX`: Max `/api/*` requests per window per IP (default: `120`).
+* `RATE_LIMIT_PAGE_MAX`: Max page requests per window per IP (default: `300`). Counted separately from the API budget.
+* `RATE_LIMIT_PREFETCH_MAX`: Max router link prefetches per window per IP (default: `900`). Own budget, since one page view prefetches every viewport `<Link>`.
+* `RATE_LIMIT_WINDOW_SECONDS`: Window length in seconds (default: `60`).
+* `HEALTH_INTERNAL_IPS`: Comma-separated extra source IPs treated as internal, so they receive the detailed `/api/health` payload. Loopback and RFC1918 addresses always count as internal.
+
+Rate limiting is backed by Valkey and fails open if the cache is down.
+
+### Database load
+
+* `DB_MAX_CONCURRENT_EXPENSIVE`: Max concurrent expensive scans, so a burst can't starve page rendering (default: `6`).
+* `DB_CONNECTION_LIMIT`: Max pool connections (default: `20`).
+* `DB_QUEUE_LIMIT`: Max queued connection requests; `0` = unlimited (default: `100`).
+* `DB_CONNECT_TIMEOUT_MS`: Initial connection timeout in ms (default: `5000`).
+* `PLAYERS_LIST_WARM_PAGES`: Leading players-list pages kept cache-hot (default: `10`).
+* `PLAYERS_LIST_WARM_INTERVAL_MS`: How often to refresh them, in ms (default: `300000`).
+
+### Site branding
+
+All are optional and public (baked into the client bundle at build time).
+
+* `NEXT_PUBLIC_SITE_TITLE`, `NEXT_PUBLIC_SITE_NAME`, `NEXT_PUBLIC_SITE_DESCRIPTION`
+* `NEXT_PUBLIC_SITE_URL`: Canonical public base URL, used for absolute `robots.txt` / `sitemap.xml` links. Falls back to the request host.
+* `NEXT_PUBLIC_MAIN_SITE_URL`, `NEXT_PUBLIC_MAIN_SITE_NAME`: Link back to your community's main site.
+* `NEXT_PUBLIC_FOOTER_LINK_URL`, `NEXT_PUBLIC_FOOTER_LINK_TEXT`: One extra footer link (e.g. Discord).
+* `NEXT_PUBLIC_MAP_DOWNLOAD_URL_PREFIX`, `NEXT_PUBLIC_MAP_DOWNLOAD_URL_SUFFIX`: Wrap a map name into a download URL. Leave the prefix blank to hide the download icon.
+
+### Theme
+
+Colors are injected as CSS variables at render time. `THEME_PRIMARY` and `THEME_SECONDARY` set both modes; the per-mode variables override them.
+
+* `THEME_PRIMARY` (default: `emerald`), `THEME_SECONDARY` (default: `cyan`)
+* `THEME_LIGHT_PRIMARY`, `THEME_LIGHT_SECONDARY`, `THEME_DARK_PRIMARY`, `THEME_DARK_SECONDARY`
+  * Any of: `emerald`, `green`, `teal`, `cyan`, `sky`, `blue`, `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose`, `red`, `orange`, `amber`, `yellow`, `lime`
+* `THEME_LIGHT_BACKGROUND` (default: `gray`), `THEME_DARK_BACKGROUND` (default: `zinc`)
+  * Any of: `slate`, `gray`, `zinc`, `neutral`, `stone`
+
+Surface, border, and text colors are derived from the background family. An unrecognized value fails validation at boot.
 
 ### AI Disclaimer
 
@@ -55,13 +120,14 @@ The easiest way to run the application is using the provided Docker Compose conf
 
 1. Clone the repository.
 2. Copy `docker-compose.yml.example` to `docker-compose.yml` and `.env.example` to `.env`, then fill in your database credentials, server list, and a `VALKEY_PASSWORD`.
-3. Run the following command to build and start the containers in the background:
+3. Point `VALKEY_URL` at the Valkey service (`redis://valkey:6379`). It is not published to the host.
+4. Run the following command to build and start the containers in the background:
 
 ```bash
 docker compose up -d --build
 ```
 
-The application will be available at `http://localhost:3000`.
+The application listens on port 3000. Put your reverse proxy in front of it (see [Requirements](#requirements)) rather than exposing that port publicly.
 
 ### Local Development
 
@@ -71,17 +137,10 @@ If you prefer to run the application directly using Node.js:
    ```bash
    npm install
    ```
-2. Create a `.env.local` file in the root directory and add your configuration variables.
-3. Start the development server:
+2. Start a Valkey (or Redis) instance the app can reach.
+3. Create a `.env.local` file in the root directory and add your configuration variables.
+4. Start the development server:
    ```bash
    npm run dev
    ```
-4. Open `http://localhost:3000` in your browser.
-
-## Tech Stack
-
-* **Framework:** [Next.js](https://nextjs.org/) 16 (App Router) & [React](https://react.dev/) 19
-* **Styling:** [Tailwind CSS](https://tailwindcss.com/) 4 & [Lucide Icons](https://lucide.dev/)
-* **Database:** [MySQL2](https://github.com/sidorares/node-mysql2) (Connects directly to your existing ckSurf database)
-* **Server Query:** [GameDig](https://github.com/gamedig/node-gamedig) for real-time server status
-* **Deployment:** Docker & Docker Compose (Multi-stage Alpine builds for minimal footprint)
+5. Open `http://localhost:3000` in your browser.
