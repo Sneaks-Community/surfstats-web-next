@@ -54,7 +54,7 @@ This project was developed with AI assistance. All code has been reviewed, best 
 The easiest way to run the application is using the provided Docker Compose configuration.
 
 1. Clone the repository.
-2. Edit the `docker-compose.yml` file to include your specific database credentials and server list.
+2. Copy `docker-compose.yml.example` to `docker-compose.yml` and `.env.example` to `.env`, then fill in your database credentials, server list, and a `VALKEY_PASSWORD`.
 3. Run the following command to build and start the containers in the background:
 
 ```bash

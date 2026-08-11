@@ -34,30 +34,35 @@ services:
         limits:
           memory: 512M
           cpus: '1'
-    
+
   valkey:
     image: valkey/valkey:9-alpine
     container_name: surfstats-valkey
     restart: unless-stopped
-    ports:
-      - "6379:6379"
     volumes:
       - valkey_data:/data
-    command: valkey-server --appendonly yes
+    command: >
+      valkey-server
+      --appendonly yes
+      --requirepass "${VALKEY_PASSWORD:?set VALKEY_PASSWORD in .env}"
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    environment:
+      # Read by valkey-cli, so the healthcheck authenticates without the password
+      # reaching the process list.
+      - REDISCLI_AUTH=${VALKEY_PASSWORD}
+    # Match the reply: valkey-cli exits 0 even when it answers NOAUTH.
     healthcheck:
-      test: ["CMD", "valkey-cli", "ping"]
+      test: ["CMD-SHELL", "valkey-cli ping | grep -q PONG"]
       interval: 5s
       timeout: 3s
       retries: 5
+    user: valkey
     security_opt:
       - "apparmor=docker-default"
       - "no-new-privileges=true"
     cap_drop:
       - ALL
-    cap_add:
-      - CAP_CHOWN
-      - CAP_SETUID
-      - CAP_SETGID
 
 volumes:
   valkey_data:
