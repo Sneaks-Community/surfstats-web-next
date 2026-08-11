@@ -19,6 +19,21 @@ export function getErrorMessage(error: unknown): string {
 }
 
 /**
+ * Extract a driver error code (mysql2 `ER_*`/`ECONNREFUSED`, ioredis, etc.) from
+ * an unknown error value, for log context alongside {@link getErrorMessage}.
+ * @param error - The caught value (typed `unknown`)
+ * @returns The code, or 'N/A' when the value carries none
+ */
+export function getErrorCode(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === 'string') return code;
+    if (typeof code === 'number') return String(code);
+  }
+  return 'N/A';
+}
+
+/**
  * Whether an error is a fetch/AbortController abort (safe to ignore).
  * @param error - The caught value
  */

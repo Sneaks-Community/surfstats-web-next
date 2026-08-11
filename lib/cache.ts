@@ -6,7 +6,7 @@ import logger from '@/lib/logger';
 import { cacheGet, cacheSet } from './valkey-cache';
 import { cacheLock } from './cache-lock';
 import { cachedFetch } from './cached-fetch';
-import { getErrorMessage } from './errors';
+import { getErrorCode, getErrorMessage } from './errors';
 
 // Types
 interface ServerConfig {
@@ -158,51 +158,52 @@ interface RecentRecords {
   country: string | null;
 }
 
+/**
+ * All-zero stats, served when the DB is unreachable. Never cached — see the
+ * `onError` handlers below and the cold-load catch in {@link getStatsFromCache}
+ * (plan item REL-1).
+ */
+const EMPTY_DASHBOARD_STATS: DashboardStats = {
+  playerCount: 0,
+  playersMonth: 0,
+  mapCompletions: 0,
+  bonusCompletions: 0,
+  stageCompletions: 0,
+  totalPoints: 0,
+};
+
 // Split per key so a single expired key (their TTLs differ) refreshes only its
 // own query instead of both.
+//
+// Both loaders throw on DB failure by design: the empty fallback belongs in the
+// callers' `cachedFetch` `onError` so a transient error is never written to the
+// cache and pinned for the full TTL (REL-1).
 const getDashboardStatsInternal = async (): Promise<DashboardStats> => {
-  try {
-    const [statsRows] = await pool.query<RowDataPacket[]>('SELECT `key`, `value` FROM ck_stats');
-    const statsMap = new Map<string, string>();
-    statsRows.forEach((row) => {
-      statsMap.set(row.key, row.value);
-    });
+  const [statsRows] = await pool.query<RowDataPacket[]>('SELECT `key`, `value` FROM ck_stats');
+  const statsMap = new Map<string, string>();
+  statsRows.forEach((row) => {
+    statsMap.set(row.key, row.value);
+  });
 
-    return {
-      playerCount: parseInt(statsMap.get('player_count') || '0', 10),
-      playersMonth: parseInt(statsMap.get('players_month') || '0', 10),
-      mapCompletions: parseInt(statsMap.get('map_completions') || '0', 10),
-      bonusCompletions: parseInt(statsMap.get('bonus_completions') || '0', 10),
-      stageCompletions: parseInt(statsMap.get('stage_completions') || '0', 10),
-      totalPoints: parseInt(statsMap.get('total_points') || '0', 10),
-    };
-  } catch (error: unknown) {
-    logger.error(`[StatsCache] Failed to fetch stats: ${getErrorMessage(error)}`);
-    return {
-      playerCount: 0,
-      playersMonth: 0,
-      mapCompletions: 0,
-      bonusCompletions: 0,
-      stageCompletions: 0,
-      totalPoints: 0,
-    };
-  }
+  return {
+    playerCount: parseInt(statsMap.get('player_count') || '0', 10),
+    playersMonth: parseInt(statsMap.get('players_month') || '0', 10),
+    mapCompletions: parseInt(statsMap.get('map_completions') || '0', 10),
+    bonusCompletions: parseInt(statsMap.get('bonus_completions') || '0', 10),
+    stageCompletions: parseInt(statsMap.get('stage_completions') || '0', 10),
+    totalPoints: parseInt(statsMap.get('total_points') || '0', 10),
+  };
 };
 
 const getRecentRecordsInternal = async (): Promise<RecentRecords[]> => {
-  try {
-    const [recentRecords] = await pool.query<RowDataPacket[]>(`
-      SELECT lr.steamid, lr.name, lr.runtime, lr.map, lr.date, pr.country
-      FROM ck_latestrecords lr
-      LEFT JOIN ck_playerrank pr ON lr.steamid = pr.steamid
-      ORDER BY lr.date DESC
-      LIMIT 5
-    `);
-    return recentRecords as RecentRecords[];
-  } catch (error: unknown) {
-    logger.error(`[StatsCache] Failed to fetch recent records: ${getErrorMessage(error)}`);
-    return [];
-  }
+  const [recentRecords] = await pool.query<RowDataPacket[]>(`
+    SELECT lr.steamid, lr.name, lr.runtime, lr.map, lr.date, pr.country
+    FROM ck_latestrecords lr
+    LEFT JOIN ck_playerrank pr ON lr.steamid = pr.steamid
+    ORDER BY lr.date DESC
+    LIMIT 5
+  `);
+  return recentRecords as RecentRecords[];
 };
 
 /**
@@ -254,15 +255,26 @@ export async function getStatsFromCache(): Promise<{
           return { stats: rs, recentRecords: rr };
         }
 
-        const [stats, recentRecords] = await Promise.all([
-          getDashboardStatsInternal(),
-          getRecentRecordsInternal(),
-        ]);
-        await Promise.all([
-          cacheSet(DASHBOARD_STATS_KEY, stats, DASHBOARD_STATS_TTL),
-          cacheSet(DASHBOARD_RECENT_RECORDS_KEY, recentRecords, DASHBOARD_RECENT_RECORDS_TTL),
-        ]);
-        return { stats, recentRecords };
+        // This path calls the loaders directly rather than through
+        // `cachedFetch`, so it has to honour the REL-1 contract itself: on
+        // failure, degrade without writing anything, so the next request retries
+        // instead of being served zeros for the full 5-minute TTL.
+        try {
+          const [stats, recentRecords] = await Promise.all([
+            getDashboardStatsInternal(),
+            getRecentRecordsInternal(),
+          ]);
+          await Promise.all([
+            cacheSet(DASHBOARD_STATS_KEY, stats, DASHBOARD_STATS_TTL),
+            cacheSet(DASHBOARD_RECENT_RECORDS_KEY, recentRecords, DASHBOARD_RECENT_RECORDS_TTL),
+          ]);
+          return { stats, recentRecords };
+        } catch (error: unknown) {
+          logger.error(
+            `[StatsCache] Cold load failed, not caching fallback: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`
+          );
+          return { stats: EMPTY_DASHBOARD_STATS, recentRecords: [] };
+        }
       }
     );
 
@@ -286,7 +298,13 @@ export async function getDashboardStatsFromCache(): Promise<DashboardStats> {
     DASHBOARD_STATS_KEY,
     DASHBOARD_STATS_TTL,
     getDashboardStatsInternal,
-    { lock: true }
+    {
+      lock: true,
+      onError: (error) => {
+        logger.error(`[StatsCache] Failed to fetch stats: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
+        return EMPTY_DASHBOARD_STATS;
+      },
+    }
   );
 }
 
@@ -298,7 +316,13 @@ export async function getRecentRecordsFromCache(): Promise<RecentRecords[]> {
     DASHBOARD_RECENT_RECORDS_KEY,
     DASHBOARD_RECENT_RECORDS_TTL,
     getRecentRecordsInternal,
-    { lock: true }
+    {
+      lock: true,
+      onError: (error) => {
+        logger.error(`[StatsCache] Failed to fetch recent records: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
+        return [];
+      },
+    }
   );
 }
 
@@ -319,59 +343,57 @@ const getLatestCompletionsInternal = async (): Promise<
 > => {
   const startTime = Date.now();
 
-  try {
-    // Fetch map and bonus completions separately, then combine and sort
-    const [mapRows, bonusRows] = await Promise.all([
-      pool.query<RowDataPacket[]>(`
-        SELECT
-          pt.steamid,
-          pt.name,
-          pt.mapname,
-          pt.runtimepro as runtime,
-          pt.date,
-          'map' as type,
-          NULL as bonus
-        FROM ck_playertimes pt
-        ORDER BY pt.date DESC
-        LIMIT 25
-      `),
-      pool.query<RowDataPacket[]>(`
-        SELECT
-          b.steamid,
-          b.name,
-          b.mapname,
-          b.runtime,
-          b.date,
-          'bonus' as type,
-          b.zonegroup as bonus
-        FROM ck_bonus b
-        ORDER BY b.date DESC
-        LIMIT 25
-      `),
-    ]);
+  // Throws on DB failure by design; the empty fallback lives in the caller's
+  // `cachedFetch` `onError` so it is never cached (plan item REL-1).
+  //
+  // Fetch map and bonus completions separately, then combine and sort
+  const [mapRows, bonusRows] = await Promise.all([
+    pool.query<RowDataPacket[]>(`
+      SELECT
+        pt.steamid,
+        pt.name,
+        pt.mapname,
+        pt.runtimepro as runtime,
+        pt.date,
+        'map' as type,
+        NULL as bonus
+      FROM ck_playertimes pt
+      ORDER BY pt.date DESC
+      LIMIT 25
+    `),
+    pool.query<RowDataPacket[]>(`
+      SELECT
+        b.steamid,
+        b.name,
+        b.mapname,
+        b.runtime,
+        b.date,
+        'bonus' as type,
+        b.zonegroup as bonus
+      FROM ck_bonus b
+      ORDER BY b.date DESC
+      LIMIT 25
+    `),
+  ]);
 
-    // Combine and sort in application code
-    const combined = [...mapRows[0], ...bonusRows[0]];
-    combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  // Combine and sort in application code
+  const combined = [...mapRows[0], ...bonusRows[0]];
+  combined.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    const result = combined.slice(0, 10).map((row) => ({
-      steamid: row.steamid,
-      name: row.name,
-      map: row.mapname,
-      runtime: row.runtime,
-      date: row.date,
-      type: row.type,
-      bonus: row.bonus,
-    }));
+  const result = combined.slice(0, 10).map((row) => ({
+    steamid: row.steamid,
+    name: row.name,
+    map: row.mapname,
+    runtime: row.runtime,
+    date: row.date,
+    type: row.type,
+    bonus: row.bonus,
+  }));
 
-    const duration = Date.now() - startTime;
-    logger.debug(`[CompletionsCache] Fetched ${result.length} completions in ${duration}ms`);
+  const duration = Date.now() - startTime;
+  logger.debug(`[CompletionsCache] Fetched ${result.length} completions in ${duration}ms`);
 
-    return result;
-  } catch (error: unknown) {
-    logger.error(`[CompletionsCache] Failed to fetch completions: ${getErrorMessage(error)}`);
-    return [];
-  }
+  return result;
 };
 
 const LATEST_COMPLETIONS_KEY = 'surfstats:dashboard:completions';
@@ -399,6 +421,10 @@ export async function getLatestCompletionsFromCache(): Promise<
 > {
   return cachedFetch(LATEST_COMPLETIONS_KEY, LATEST_COMPLETIONS_TTL, getLatestCompletionsInternal, {
     lock: true,
+    onError: (error) => {
+      logger.error(`[CompletionsCache] Failed to fetch completions: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
+      return [];
+    },
   });
 }
 
@@ -406,19 +432,16 @@ export async function getLatestCompletionsFromCache(): Promise<
 // TOTALS CACHE
 // =============
 
+// Throws on failure by design; the zeroed fallback lives in the caller's
+// `cachedFetch` `onError` so it is never cached (plan item REL-1).
 const fetchTotalsInternal = async () => {
   const startTime = Date.now();
 
-  try {
-    const { getTotals } = await import('./map-cache');
-    const totals = await getTotals();
-    const duration = Date.now() - startTime;
-    logger.debug(`[TotalsCache] Fetched totals in ${duration}ms`);
-    return totals;
-  } catch (error: unknown) {
-    logger.error(`[TotalsCache] Failed to fetch totals: ${getErrorMessage(error)}`);
-    return { totalMaps: 0, totalBonuses: 0, totalStages: 0 };
-  }
+  const { getTotals } = await import('./map-cache');
+  const totals = await getTotals();
+  const duration = Date.now() - startTime;
+  logger.debug(`[TotalsCache] Fetched totals in ${duration}ms`);
+  return totals;
 };
 
 const TOTALS_KEY = 'surfstats:totals:data';
@@ -432,7 +455,12 @@ export async function getTotalsFromCache(): Promise<{
   totalBonuses: number;
   totalStages: number;
 }> {
-  return cachedFetch(TOTALS_KEY, TOTALS_TTL, fetchTotalsInternal);
+  return cachedFetch(TOTALS_KEY, TOTALS_TTL, fetchTotalsInternal, {
+    onError: (error) => {
+      logger.error(`[TotalsCache] Failed to fetch totals: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
+      return { totalMaps: 0, totalBonuses: 0, totalStages: 0 };
+    },
+  });
 }
 
 // ============================================================

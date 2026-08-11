@@ -18,6 +18,7 @@ const queueLimit = Number.isNaN(parsedQueueLimit) ? 100 : parsedQueueLimit;
 // Create pool - uses env vars at runtime, fallback defaults at build time
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST || 'localhost',
+  port: parseInt(process.env.MYSQL_PORT || '3306', 10) || 3306,
   user: process.env.MYSQL_USER || 'root',
   password: process.env.MYSQL_PASSWORD || '',
   database: process.env.MYSQL_DATABASE || 'cksurf',
