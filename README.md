@@ -52,7 +52,9 @@ The application is configured using environment variables. You can set these in 
 
 ### Player Analytics database (optional)
 
-Powers play-time and activity displays. Requires [the PlayerAnalytics fork](https://github.com/sneak-it/PlayerAnalytics).
+Powers play-time and activity displays. Requires [the PlayerAnalytics fork](https://github.com/sneak-it/PlayerAnalytics), including its `player_analytics_summary` table; without that table player play-time reads as unavailable.
+
+Analytics is opt-in: it is enabled only when `ANALYTICS_MYSQL_HOST` or `ANALYTICS_MYSQL_DATABASE` is set. Leave both unset and the feature is off, with no connection attempts. The remaining `ANALYTICS_MYSQL_*` values fall back to their `MYSQL_*` counterparts, so pointing at a second database on the same server needs only `ANALYTICS_MYSQL_DATABASE`.
 
 * `ANALYTICS_MYSQL_HOST`, `ANALYTICS_MYSQL_PORT`, `ANALYTICS_MYSQL_USER`, `ANALYTICS_MYSQL_PASSWORD`, `ANALYTICS_MYSQL_DATABASE`
 * `ANALYTICS_HEALTHCHECK_INTERVAL_MS`: How often to re-check the connection, in ms (default: `60000`; `0` disables).

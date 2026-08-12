@@ -1,9 +1,10 @@
 import 'server-only';
 import { mapCachedFetch } from './map-cached-fetch';
 import pool from './db';
-import analyticsPool from './db-analytics';
+import analyticsPool, { isAnalyticsAvailable } from './db-analytics';
 import type { RowDataPacket } from 'mysql2';
 import { getMapMetadataFromCache } from './valkey-map-cache';
+import { isStagedMap } from './map-cache';
 import { validateMapName } from './validators';
 
 const STATS_CACHE_TTL = 43200; // 12 hours
@@ -270,9 +271,19 @@ export async function getCompletionsOverTimeFromCache(mapname: string): Promise<
 }
 
 /**
- * Get time on map data from cache
+ * Get time on map data from cache.
+ *
+ * Backed by the optional analytics DB, so it short-circuits when that database
+ * is absent or unhealthy: without the guard every map render and every precache
+ * pass attempted a doomed connection and logged a warning. The empty result is
+ * deliberately returned *outside* the cache, so it isn't pinned for the TTL and
+ * the chart repopulates as soon as the health probe recovers.
  */
 export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<{ date: string; totalDuration: number }>> {
+  if (!isAnalyticsAvailable()) {
+    return [];
+  }
+
   return mapCachedFetch<Array<{ date: string; totalDuration: number }>>({
     mapname,
     keySuffix: 'stats:time-on-map',
@@ -466,7 +477,7 @@ export async function getMapChartDataFromCache(mapname: string): Promise<MapChar
   const stages = mapMetadata?.stages || 0;
   // For staged maps, stages double as checkpoints (stored in ck_checkpoints).
   const maxCheckpoint = checkpoints > 0 ? checkpoints : stages;
-  const isStageMap = stages > 0;
+  const isStageMap = isStagedMap({ stages });
 
   if (totalCompletions === 0) {
     return {

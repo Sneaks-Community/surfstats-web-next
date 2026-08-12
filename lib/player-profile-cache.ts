@@ -9,6 +9,7 @@ import 'server-only';
 import pool from './db';
 import type { RowDataPacket } from 'mysql2';
 import { cachedFetch } from './cached-fetch';
+import { isStagedMap } from './map-cache';
 import { withTimeout } from './timeout';
 import { validateSteamId } from './validators';
 import logger from './logger';
@@ -467,7 +468,7 @@ export async function getIncompleteMapsFromCache(steamid: string): Promise<Incom
       const allMapMetadata = await getAllMapMetadataFromCache();
       return rows.map(r => {
         const mapMetadata = allMapMetadata.get(r.mapname);
-        const mapType: 'linear' | 'staged' = mapMetadata && mapMetadata.stages > 1 ? 'staged' : 'linear';
+        const mapType: 'linear' | 'staged' = mapMetadata && isStagedMap(mapMetadata) ? 'staged' : 'linear';
         return {
           mapname: r.mapname,
           tier: r.tier,

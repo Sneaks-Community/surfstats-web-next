@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import { validateSteamId } from '@/lib/validators';
 import { getTotalsFromCache } from '@/lib/cache';
@@ -84,32 +84,17 @@ export default async function PlayerProfilePage({
   const { steamid } = await params;
   const decodedSteamId: string = decodeURIComponent(steamid);
   
-  // Validate and sanitize SteamID input
-  const validSteamId = validateSteamId(decodedSteamId) ?? decodedSteamId;
+  // No `?? decodedSteamId` fallback: substituting the raw value made this guard
+  // unreachable for everything but the empty string.
+  const validSteamId = validateSteamId(decodedSteamId);
   if (!validSteamId) {
-    return (
-      <div className="text-center py-20 bg-surface border border-border rounded-xl">
-        <h1 className="text-2xl font-bold text-text mb-2">Invalid SteamID</h1>
-        <p className="text-text-muted">The provided SteamID format is invalid.</p>
-        <Link href="/players" className="inline-block mt-6 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-md transition-colors">
-          Back to Players
-        </Link>
-      </div>
-    );
+    notFound();
   }
-  
+
   const overview = await getPlayerOverviewFromCache(validSteamId);
 
   if (!overview) {
-    return (
-      <div className="text-center py-20 bg-surface border border-border rounded-xl">
-        <h1 className="text-2xl font-bold text-text mb-2">Player Not Found</h1>
-        <p className="text-text-muted">The player with SteamID {decodedSteamId} could not be found.</p>
-        <Link href="/players" className="inline-block mt-6 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-md transition-colors">
-          Back to Players
-        </Link>
-      </div>
-    );
+    notFound();
   }
 
   const [totals, steamAvatars, playtimeData, linearVsStagedRaw, activityHeatmap, tierDistribution, wrPerformanceData, mapEngagement] = await Promise.all([

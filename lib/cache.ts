@@ -5,7 +5,7 @@ import { GameDig } from 'gamedig';
 import logger from '@/lib/logger';
 import { cacheGet, cacheSet } from './valkey-cache';
 import { cacheLock } from './cache-lock';
-import { cachedFetch } from './cached-fetch';
+import { cachedFetch, normalizeToCachedShape } from './cached-fetch';
 import { getErrorCode, getErrorMessage } from './errors';
 import { getServerConfigs, type ServerConfig } from './env';
 
@@ -227,9 +227,11 @@ export async function getStatsFromCache(): Promise<{
         // Calls the loaders directly, so it must avoid caching the fallback
         // itself: degrade without writing, so the next request retries.
         try {
+          // This branch calls the loaders directly, so it also has to apply the
+          // normalization `cachedFetch` would have done.
           const [stats, recentRecords] = await Promise.all([
             getDashboardStatsInternal(),
-            getRecentRecordsInternal(),
+            getRecentRecordsInternal().then(normalizeToCachedShape),
           ]);
           await Promise.all([
             cacheSet(DASHBOARD_STATS_KEY, stats, DASHBOARD_STATS_TTL),

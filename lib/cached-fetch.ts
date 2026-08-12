@@ -17,6 +17,26 @@ export { CacheUnavailableError };
 const EARLY_REFRESH_WINDOW = 0.1;
 
 /**
+ * Put a freshly fetched value through the same JSON round trip a cached value
+ * takes, so the miss path and the hit path hand back identical shapes.
+ *
+ * mysql2 returns `DATETIME` columns as `Date` instances, but everything that
+ * survives `cacheSet`/`JSON.parse` comes back as an ISO string. The row types
+ * declare `date: string`, so without this the declaration is wrong on exactly
+ * the first request after an expiry — a consumer calling `date.getTime()` or
+ * comparing strings behaves differently there and nowhere else. Doing it here
+ * rather than in each fetcher covers every current and future caller.
+ *
+ * Every value passed through {@link cachedFetch} is already JSON-safe (callers
+ * that hold a `Map` convert it at the boundary), and the extra serialization
+ * only ever runs on a miss, which is already paying for a DB query.
+ */
+export function normalizeToCachedShape<T>(value: T): T {
+  if (value === null || value === undefined) return value;
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/**
  * Options for {@link cachedFetch}.
  */
 export interface CachedFetchOptions<T> {
@@ -161,7 +181,8 @@ export async function cachedFetch<T>(
       }
     }
 
-    const value = await (options.expensive ? withExpensiveQueryLimit(fetchFn) : fetchFn());
+    const fetched = await (options.expensive ? withExpensiveQueryLimit(fetchFn) : fetchFn());
+    const value = normalizeToCachedShape(fetched);
 
     // Guard is meaningful at call sites where T is nullable (e.g. player
     // profiles resolve to null, WR checkpoints to undefined); the generic T

@@ -28,23 +28,30 @@ interface PlayerListTableProps {
   avatars: AvatarMap;
   emptyMessage: string;
   sort?: PlayerListSort;
+  /**
+   * Header for the rank column. The country page passes "Country Rank" because
+   * its `rank` is computed within the country, not against the global list.
+   */
+  rankLabel?: string;
 }
 
 // Shared column widths so the header and every row align. `player` takes the
 // slack (flex-1) so the numeric columns pack tightly on the right instead of
 // spreading across the full width.
 const COLUMNS = [
-  { key: 'rank', label: 'Rank', width: 'w-12', right: false, defaultOrder: 'asc' as const },
+  { key: 'rank', label: 'Rank', width: 'w-20', right: false, defaultOrder: 'asc' as const },
   { key: 'player', label: 'Player', width: 'flex-1 min-w-0', right: false, defaultOrder: 'asc' as const },
   { key: 'points', label: 'Points', width: 'w-20', right: true, defaultOrder: 'desc' as const },
   { key: 'maps', label: 'Maps', width: 'w-16', right: true, defaultOrder: 'desc' as const },
   { key: 'lastseen', label: 'Last Seen', width: 'w-24', right: true, defaultOrder: 'desc' as const },
 ];
 
-function Header({ sort }: { sort?: PlayerListSort }) {
+function Header({ sort, rankLabel }: { sort?: PlayerListSort; rankLabel: string }) {
   return (
     <div className="flex items-center gap-3 px-4 py-2.5 bg-surface/50 border-b border-border">
-      {COLUMNS.map((col) => (
+      {COLUMNS.map((col) => {
+        const label = col.key === 'rank' ? rankLabel : col.label;
+        return (
         <div
           key={col.key}
           className={`${col.width} ${col.right ? 'flex justify-end text-right' : ''} text-xs font-medium text-text-muted uppercase tracking-wider`}
@@ -52,7 +59,7 @@ function Header({ sort }: { sort?: PlayerListSort }) {
           {sort ? (
             <SortLink
               column={col.key}
-              label={col.label}
+              label={label}
               currentSort={sort.currentSort}
               currentOrder={sort.currentOrder}
               baseUrl={sort.baseUrl}
@@ -60,10 +67,11 @@ function Header({ sort }: { sort?: PlayerListSort }) {
               defaultOrder={col.defaultOrder}
             />
           ) : (
-            <span>{col.label}</span>
+            <span>{label}</span>
           )}
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -71,7 +79,7 @@ function Header({ sort }: { sort?: PlayerListSort }) {
 function Row({ player, avatar }: { player: PlayerListEntry; avatar?: { avatarmedium?: string | null } }) {
   return (
     <div className="flex items-center gap-3 px-4 py-3 hover:bg-surface-hover/50 transition-colors">
-      <div className="w-12 text-sm font-medium text-text-muted">#{player.rank}</div>
+      <div className="w-20 text-sm font-medium text-text-muted">#{player.rank}</div>
       <div className="flex-1 min-w-0 flex items-center gap-2">
         {avatar?.avatarmedium && (
           <Image
@@ -105,7 +113,13 @@ function Row({ player, avatar }: { player: PlayerListEntry; avatar?: { avatarmed
  * and halving the height) and collapse to a single continuous list below `xl`.
  * Numeric columns are right-aligned with fixed widths so they group tightly.
  */
-export default function PlayerListTable({ players, avatars, emptyMessage, sort }: PlayerListTableProps) {
+export default function PlayerListTable({
+  players,
+  avatars,
+  emptyMessage,
+  sort,
+  rankLabel = 'Rank',
+}: PlayerListTableProps) {
   if (players.length === 0) {
     return (
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
@@ -123,7 +137,7 @@ export default function PlayerListTable({ players, avatars, emptyMessage, sort }
       <div className="grid grid-cols-1 xl:grid-cols-2">
         {/* Left column: ranks 1–10 (or first half). */}
         <div className="xl:border-r border-border">
-          <Header sort={sort} />
+          <Header sort={sort} rankLabel={rankLabel} />
           <div className="divide-y divide-border">
             {left.map((player) => (
               <Row key={player.steamid} player={player} avatar={avatars.get(player.steamid)} />
@@ -137,7 +151,7 @@ export default function PlayerListTable({ players, avatars, emptyMessage, sort }
         {right.length > 0 && (
           <div className="border-t border-border xl:border-t-0">
             <div className="hidden xl:block">
-              <Header sort={sort} />
+              <Header sort={sort} rankLabel={rankLabel} />
             </div>
             <div className="divide-y divide-border">
               {right.map((player) => (

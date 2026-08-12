@@ -77,7 +77,7 @@ const getCountriesRankingInternal = async (
       SUM(points) as total_points,
       COUNT(*) as player_count
     FROM ck_playerrank
-    WHERE country IS NOT NULL AND country != ''
+    WHERE points > 0 AND country IS NOT NULL AND country != ''
     GROUP BY country
     ORDER BY total_points DESC
   `;
@@ -90,8 +90,10 @@ const getCountriesRankingInternal = async (
   for (const row of rows) {
     const countryCode = getCountryCodeFromName(row.country);
 
-    // Skip countries with 0 points or an unresolved country code
-    if (row.total_points <= 0 || countryCode === UNKNOWN_COUNTRY_CODE) continue;
+    // Skip unresolved country codes. `points > 0` in the query already means
+    // total_points is positive and player_count counts only ranked players,
+    // matching the per-country page's total.
+    if (countryCode === UNKNOWN_COUNTRY_CODE) continue;
 
     const existing = byCode.get(countryCode);
     if (existing) {
@@ -173,7 +175,9 @@ const getCountriesRankingInternal = async (
 // v3: country-name normalization now resolves the GeoIP "The <country>" forms
 // (e.g. "The United States"), so the aggregation includes countries that v2
 // silently dropped — the old payload must not be served.
-const COUNTRIES_RANKING_SCHEMA_VERSION = 3;
+// v4: `player_count` now counts only players with points > 0, matching the
+// per-country page's total and the players list.
+const COUNTRIES_RANKING_SCHEMA_VERSION = 4;
 const COUNTRIES_RANKING_KEY = `surfstats:countries:ranking:v${COUNTRIES_RANKING_SCHEMA_VERSION}`;
 const COUNTRIES_RANKING_TTL = 86400; // 24 hours
 
@@ -206,10 +210,22 @@ export async function getCountriesRankingFromCache(
 export type PlayerSortKey = 'rank' | 'player' | 'points' | 'maps' | 'lastseen';
 
 /**
+ * `WHERE` fragment selecting one country's ranked players.
+ *
+ * Carries the same `points > 0` filter `fetchPlayersInternal` applies, so the
+ * country page's total, its page ceiling, and the countries list's
+ * `player_count` all count the same rows. The name variations are OR'd and
+ * parenthesised; without the parens the `AND` would bind to the first one only.
+ */
+function countryWhereClause(countryNames: string[]): string {
+  return `points > 0 AND (${countryNames.map(() => 'country = ?').join(' OR ')})`;
+}
+
+/**
  * Internal function for getting players from a specific country
  *
  * Query optimization notes:
- * - Uses RANK() window function for player ranking within country
+ * - Uses RANK() window function for player ranking within the country
  * - Uses index on country column (if available) for filtering
  * - Pagination with LIMIT/OFFSET
  * - Handles multiple country name variations for the same ISO code
@@ -236,15 +252,14 @@ const getCountryPlayersInternal = async (
 
   const offset = (page - 1) * limit;
 
-  // Build WHERE clause for multiple country name variations
-  // Using OR conditions for each variation
-  const whereClause = countryNames.map(() => 'country = ?').join(' OR ');
+  const whereClause = countryWhereClause(countryNames);
 
   // Build ORDER BY clause based on sort column
   const orderByClause = getPlayerOrderByClause(sort, order);
 
-  // Query for players with rank calculation
-  // RANK() OVER (ORDER BY points DESC) calculates global rank
+  // Rank is deliberately *within the country*: the window runs after the WHERE,
+  // so the numbering is 1..N over this country's players, not the global list.
+  // The column is labelled "Country Rank" in the UI to keep that explicit.
   const playersQuery = `
     SELECT
       steamid, name, country, points, finishedmaps, lastseen,
@@ -284,7 +299,8 @@ const getCountryPlayersInternal = async (
 // v3: matches the country-name normalization fix (see ranking key) — the WHERE
 // clause now includes "The <country>" spellings, changing which players a
 // country page returns.
-const COUNTRIES_PLAYERS_KEY = 'surfstats:countries:players:v3';
+// v4: rows and `total` are filtered to points > 0 (see countryWhereClause).
+const COUNTRIES_PLAYERS_KEY = 'surfstats:countries:players:v4';
 const COUNTRIES_PLAYERS_TTL = 86400; // 24 hours — matches country ranking/stats
 
 /**
@@ -320,16 +336,17 @@ export async function getCountryPlayers(
   );
 }
 
-const COUNTRY_PLAYER_COUNT_KEY = 'surfstats:countries:playercount:v3';
+// v4: filtered to points > 0, in step with COUNTRIES_PLAYERS_KEY.
+const COUNTRY_PLAYER_COUNT_KEY = 'surfstats:countries:playercount:v4';
 const COUNTRY_PLAYER_COUNT_TTL = 86400; // 24 hours — matches the sibling country caches
 
 /**
  * Total players in one country, so the country page can clamp `?page=` before
  * the paginated RANK() query runs.
  *
- * Uses the same `WHERE` clause as {@link getCountryPlayersInternal}, including
- * its missing `points > 0` filter — change both together or the ceiling and
- * `totalPages` disagree and real pages become unreachable.
+ * Shares {@link countryWhereClause} with {@link getCountryPlayersInternal}; the
+ * two must stay on the same filter or the ceiling and `totalPages` disagree and
+ * real pages become unreachable.
  *
  * @param countryCode - ISO 3166-1 alpha-2 code
  * @returns Player count, or 0 for an unresolvable code
@@ -344,9 +361,8 @@ export async function getCountryPlayerCount(countryCode: string): Promise<number
       const countryNames = getCountryNamesFromCode(countryCode);
       if (countryNames.length === 0) return 0;
 
-      const whereClause = countryNames.map(() => 'country = ?').join(' OR ');
       const [rows] = await pool.query<RowDataPacket[]>(
-        `SELECT COUNT(*) as total FROM ck_playerrank WHERE ${whereClause}`,
+        `SELECT COUNT(*) as total FROM ck_playerrank WHERE ${countryWhereClause(countryNames)}`,
         countryNames
       );
       return Number(rows[0]?.total) || 0;

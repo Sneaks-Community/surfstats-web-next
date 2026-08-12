@@ -51,16 +51,6 @@ interface StageRecord extends RowDataPacket {
   startspeed: number;
 }
 
-interface BonusGroup {
-  bonus: number;
-  name: string;
-}
-
-interface StageGroup {
-  stage: number;
-  name: string;
-}
-
 interface CountsAndWr {
   counts: RecordCounts;
   wr_time: number | null;
@@ -73,7 +63,6 @@ interface LeaderboardResult {
 
 interface StageRecordsResult {
   stages: StageRecord[];
-  stagesList: StageGroup[];
   pagination: {
     stage: number;
     page: number;
@@ -86,7 +75,6 @@ interface StageRecordsResult {
 
 interface BonusRecordsResult {
   bonuses: BonusRecord[];
-  bonusGroupsList: BonusGroup[];
   pagination: {
     bonus: number;
     page: number;
@@ -311,7 +299,6 @@ export async function getStageRecordsFromCache(
 
   return {
     stages,
-    stagesList: [],
     pagination: {
       stage,
       page,
@@ -339,7 +326,7 @@ export async function getBonusRecordsFromCache(
     mapname,
     keySuffix: `bonuses:${bonus}:${page}:${pageSize}`,
     ttl: BONUSES_CACHE_TTL,
-    empty: { bonuses: [], bonusGroupsList: [], pagination: emptyPagination },
+    empty: { bonuses: [], pagination: emptyPagination },
     errorLabel: 'bonus records',
     expensive: true,
     fetch: async (validMapname) => {
@@ -369,7 +356,6 @@ export async function getBonusRecordsFromCache(
 
       return {
         bonuses: bonusRows,
-        bonusGroupsList: [],
         pagination: {
           bonus,
           page,

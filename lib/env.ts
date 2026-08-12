@@ -155,10 +155,9 @@ export function validateEnv(): void {
   // Parse (and warn) once at boot; the result is what fetchServersFromGame uses.
   getServerConfigs();
 
+  // Opt-in only; must match `isAnalyticsConfigured` in lib/db-analytics.ts.
   const analyticsConfigured = Boolean(
-    process.env.ANALYTICS_MYSQL_HOST ||
-      process.env.ANALYTICS_MYSQL_DATABASE ||
-      (process.env.MYSQL_HOST && process.env.MYSQL_DATABASE)
+    process.env.ANALYTICS_MYSQL_HOST || process.env.ANALYTICS_MYSQL_DATABASE
   );
   if (!analyticsConfigured) {
     logger.warn('[env] Analytics DB not configured — activity/time-on-server analytics disabled');

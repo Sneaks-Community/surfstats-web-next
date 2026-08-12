@@ -241,6 +241,13 @@ async function searchPlayersInternal(query: string): Promise<PlayerSearchResult[
   // Sanitize search query to prevent SQL injection via LIKE wildcards
   const sanitizedQuery = validateSearchQuery(query);
 
+  // An empty term would issue `LIKE '%%'`, a full scan of ck_playerrank that
+  // matches every row. Callers bound the length, this backstops them.
+  if (!sanitizedQuery) {
+    logger.debug('[PlayerCache] Empty search query after sanitization, skipping query');
+    return [];
+  }
+
   logger.debug(`[PlayerCache] Searching players for: "${sanitizedQuery}"`);
 
   const [rows] = await pool.query<RowDataPacket[]>(`

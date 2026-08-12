@@ -20,6 +20,18 @@ export interface MapMetadata {
   wr_holder_steamid: string | null;
 }
 
+/**
+ * Whether a map is staged rather than linear.
+ *
+ * `stages` comes from `COUNT(*) + 1` over the stage zones, so a linear map is 0
+ * and a staged map is at least 2 — never 1. Call sites used to test `> 0` and
+ * `> 1` interchangeably, which agreed only by that accident; route every check
+ * through here so one query change can't split the filter from the badge.
+ */
+export function isStagedMap(metadata: Pick<MapMetadata, 'stages'>): boolean {
+  return metadata.stages > 1;
+}
+
 // Configuration constants
 const QUERY_TIMEOUT_MS = 30000; // 30 seconds - prevents indefinite query hanging
 
@@ -73,6 +85,9 @@ export async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
           WHERE zonetype = 4
           GROUP BY mapname
         ) c_cnt ON m.mapname = c_cnt.mapname
+        -- MIN() + self-join, NOT a ROW_NUMBER() window: the MIN is answered by a
+        -- loose index scan of ~862 index entries, while partitioning over
+        -- ck_playertimes forces a full sort of 1.6M rows (100ms vs >300s).
         LEFT JOIN (
           SELECT mapname, MIN(runtimepro) as min_runtime
           FROM ck_playertimes
@@ -82,7 +97,10 @@ export async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
           ON wr.mapname = wr_holder.mapname
           AND wr.min_runtime = wr_holder.runtimepro
         WHERE pt_cnt.completions > 0
-        ORDER BY m.mapname ASC
+        -- The join emits one row per tied holder (11 maps today), so the sort
+        -- keys fix which one the loop below keeps. Cheap: it orders the ~1038
+        -- joined rows, not the base table.
+        ORDER BY m.mapname ASC, wr_holder.date ASC, wr_holder.steamid ASC
       `),
       QUERY_TIMEOUT_MS,
       'Query timeout exceeded'
@@ -91,6 +109,11 @@ export async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
     const metadataMap = new Map<string, MapMetadata>();
     
     for (const row of rows) {
+      // First row per map wins. Combined with the ORDER BY above that means the
+      // earliest run, then the lowest steamid, so a tied WR resolves to a stable
+      // holder instead of whichever row MySQL happened to return last.
+      if (metadataMap.has(row.mapname)) continue;
+
       metadataMap.set(row.mapname, {
         mapname: row.mapname,
         tier: row.tier,

@@ -8,12 +8,13 @@ import { onShutdown } from './shutdown';
 // Track whether the analytics database connection is actually working
 let analyticsConnectionHealthy = false;
 
-// Check if analytics database is configured (env vars are set)
+// Analytics is opt-in: it needs one of its own env vars. Falling back to
+// MYSQL_HOST/MYSQL_DATABASE made this always true (they are required to boot),
+// so the "not configured" branch was dead and the pool always dialled
+// player_analytics_surf on the main host. Keep this rule in step with the same
+// check in lib/env.ts.
 const isAnalyticsConfigured = !!(
-  process.env.ANALYTICS_MYSQL_HOST ||
-  process.env.ANALYTICS_MYSQL_DATABASE ||
-  // Fall back to main database config if analytics-specific not set
-  (process.env.MYSQL_HOST && process.env.MYSQL_DATABASE)
+  process.env.ANALYTICS_MYSQL_HOST || process.env.ANALYTICS_MYSQL_DATABASE
 );
 
 // Create analytics database pool with graceful fallback

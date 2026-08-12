@@ -35,8 +35,9 @@ async function getPlayerTimeOnServerInternal(steamId: string): Promise<PlayerTim
   }
 
   try {
-    // Use the pre-aggregated summary table for fast lookups
-    // Falls back to original query if summary table doesn't exist
+    // Reads the pre-aggregated `player_analytics_summary` table. There is no
+    // fallback to the raw scan: that table is a hard requirement of the
+    // analytics feature, and a deployment missing it gets null playtime.
     const [rows] = await analyticsPool.query<PlayerTimeData[]>(`
       SELECT
         total_duration,

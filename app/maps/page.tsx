@@ -9,7 +9,7 @@ import { NavigationPendingProvider, PendingContent } from '@/components/Navigati
 import { getTierColor } from '@/lib/tierColors';
 import { mapImageUrl, getMapImagesUrl, parseIntParam } from '@/lib/utils';
 import Pagination from '@/components/Pagination';
-import { type MapMetadata } from '@/lib/map-cache';
+import { isStagedMap, type MapMetadata } from '@/lib/map-cache';
 import { getAllMapMetadataFromCache, getTierDistributionFromCache } from '@/lib/valkey-map-cache';
 import { validateSearchQuery } from '@/lib/validators';
 import type { Metadata } from 'next';
@@ -63,8 +63,8 @@ export default async function MapsPage({
     if (q && !metadata.mapname.toLowerCase().includes(q.toLowerCase())) continue;
 
     // Apply type filter (linear vs staged)
-    if (type === 'linear' && metadata.stages > 0) continue;
-    if (type === 'staged' && metadata.stages === 0) continue;
+    if (type === 'linear' && isStagedMap(metadata)) continue;
+    if (type === 'staged' && !isStagedMap(metadata)) continue;
 
     // Apply tier filter
     if (tiers.length > 0 && !tiers.includes(metadata.tier)) continue;
@@ -155,7 +155,7 @@ export default async function MapsPage({
                       {map.bonuses || 0}
                     </span>
                     <span className="flex items-center gap-1">
-                      {map.stages > 1 ? (
+                      {isStagedMap(map) ? (
                         <>
                           <Layers className="h-3 w-3" />
                           {map.stages}

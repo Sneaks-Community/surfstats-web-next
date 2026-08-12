@@ -50,9 +50,8 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
   }
 
   const countryCode = countrycode.toUpperCase();
-  // Clamp before the cache key / RANK() OFFSET. Must use this country's own
-  // count: the global ranked count is lower (it filters `points > 0`, these
-  // queries don't) and would hide real pages.
+  // Clamp before the cache key / RANK() OFFSET, using this country's own count
+  // so the ceiling matches `totalPages` from the same filter.
   const countryPlayerCount = await getCountryPlayerCount(countryCode);
   const pageCeiling = Math.max(1, Math.ceil(countryPlayerCount / PLAYERS_PAGE_SIZE));
   const page = parseIntParam(pageParam, { max: pageCeiling });
@@ -109,7 +108,7 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
         <div>
           <h1 className="text-3xl font-bold text-text">{displayName}</h1>
           <p className="text-text-muted">
-            {total.toLocaleString()} players • Ranked by points
+            {total.toLocaleString()} players • Ranked by points within {displayName}
           </p>
         </div>
       </div>
@@ -122,6 +121,7 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
             players={players}
             avatars={avatarsWithData}
             emptyMessage="No players found for this country."
+            rankLabel="Country Rank"
             sort={{
               baseUrl: `/players/countries/${countryCode}`,
               queryParams,

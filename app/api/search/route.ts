@@ -15,13 +15,13 @@ export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const query = searchParams.get('q') || '';
 
-  // Validate query length
-  if (query.length < MIN_CHARS || query.length > MAX_CHARS) {
+  // Sanitize first, then bound the *sanitized* length. Checking the raw input
+  // let junk like `<<<<` clear MIN_CHARS and sanitize down to '', which reached
+  // the cache as `LIKE '%%'` — a full scan of ck_playerrank.
+  const sanitizedQuery = validateSearchQuery(query);
+  if (sanitizedQuery.length < MIN_CHARS || sanitizedQuery.length > MAX_CHARS) {
     return NextResponse.json({ players: [], maps: [] });
   }
-
-  // Sanitize query to prevent XSS
-  const sanitizedQuery = validateSearchQuery(query);
 
   try {
     // Search players using cached function

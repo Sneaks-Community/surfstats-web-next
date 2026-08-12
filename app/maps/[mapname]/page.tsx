@@ -1,5 +1,5 @@
 import { getSteamProfileUrl } from '@/lib/steam';
-import Link from 'next/link';
+import { notFound } from 'next/navigation';
 import { Map as MapIcon, Users, Layers, Target, Download } from 'lucide-react';
 import MapImage from '@/components/MapImage';
 import { validateMapName, validatePlayerName } from '@/lib/validators';
@@ -8,6 +8,7 @@ import logger from '@/lib/logger';
 import MapRecordsTabs from './components/MapRecordsTabs';
 import TierBadge from '@/components/TierBadge';
 import MapChartGrid from './components/charts/MapChartGrid';
+import { isStagedMap } from '@/lib/map-cache';
 import { getMapMetadataFromCache } from '@/lib/valkey-map-cache';
 import { getMapRecordsFromCache } from '@/lib/valkey-map-records-cache';
 import { getMapChartDataFromCache } from '@/lib/valkey-map-stats-cache';
@@ -60,17 +61,9 @@ export default async function MapProfilePage({
   // Validate and sanitize map name input
   const validMapname = validateMapName(decodedMapname);
   if (!validMapname) {
-    return (
-      <div className="text-center py-20 bg-surface border border-border rounded-xl">
-        <h1 className="text-2xl font-bold text-text mb-2">Map Not Found</h1>
-        <p className="text-text-muted">The map name contains invalid characters.</p>
-        <Link href="/maps" className="inline-block mt-6 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-md transition-colors">
-          Back to Maps
-        </Link>
-      </div>
-    );
+    notFound();
   }
-  
+
   const [map, recordsData, chartData] = await Promise.all([
     getMapMetadataFromCache(validMapname),
     getMapRecordsFromCache(validMapname, 1, DEFAULT_PAGE_SIZE),
@@ -80,17 +73,9 @@ export default async function MapProfilePage({
   logger.debug(`[Map Page] Map data for ${validMapname}: stages=${map?.stages}, checkpoints=${map?.checkpoints}`);
   
   if (!map) {
-    return (
-      <div className="text-center py-20 bg-surface border border-border rounded-xl">
-        <h1 className="text-2xl font-bold text-text mb-2">Map Not Found</h1>
-        <p className="text-text-muted">The map "{decodedMapname}" was not found in the database.</p>
-        <Link href="/maps" className="inline-block mt-6 px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-md transition-colors">
-          Back to Maps
-        </Link>
-      </div>
-    );
+    notFound();
   }
-  
+
   const leaderboard = recordsData.leaderboard;
   const total = recordsData.counts.leaderboardTotal;
 
@@ -127,7 +112,7 @@ export default async function MapProfilePage({
           <div className="flex-1 w-full">
             <div className="flex flex-wrap items-center gap-3 mb-3">
               <TierBadge tier={map.tier} variant="full" className="rounded-full" />
-              {map.stages > 1 ? (
+              {isStagedMap(map) ? (
                 <span className="px-3 py-1 bg-orange-500/20 text-orange-400 border border-orange-500/30 rounded-full text-sm font-bold tracking-wider uppercase flex items-center gap-1">
                   <Layers className="h-3 w-3" /> {map.stages} Stages
                 </span>
