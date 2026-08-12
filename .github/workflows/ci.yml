@@ -16,7 +16,7 @@ permissions:
 jobs:
 
   quality:
-    name: Lint, Build & Security Audit
+    name: Lint, Test, Build & Security Audit
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -41,6 +41,9 @@ jobs:
       
       - name: Type check
         run: npm run typecheck
+
+      - name: Test
+        run: npm test
 
       - name: Build
         run: npm run build

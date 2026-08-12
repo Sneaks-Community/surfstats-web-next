@@ -9,7 +9,7 @@
 // against the client's re-render in a different timezone.
 const dateFormatter = new Intl.DateTimeFormat('en-US', {
   year: 'numeric',
-  month: '2-digit',
+  month: 'numeric',
   day: 'numeric',
   timeZone: 'UTC',
 });
@@ -17,7 +17,7 @@ const dateFormatter = new Intl.DateTimeFormat('en-US', {
 /**
  * Format a date string into localized format
  * @param date - Date string or Date object
- * @returns Formatted date string (e.g., "01/15/2024")
+ * @returns Formatted date string (e.g., "1/15/2024")
  */
 export function formatDate(date: string | Date | null | undefined): string {
   if (!date) return 'N/A';

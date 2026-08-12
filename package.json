@@ -12,7 +12,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "clean": "next clean",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "chart.js": "^4.5.1",
@@ -41,14 +43,13 @@
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@types/topojson-client": "^3.1.5",
-    "autoprefixer": "^10.5.4",
     "eslint": "^10.8.1",
     "eslint-config-next": "^16.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "postcss": "^8.5.26",
     "tailwindcss": "4.3.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "8.66.0"
+    "typescript-eslint": "8.66.0",
+    "vitest": "^4.1.10"
   },
   "overrides": {
     "eslint-plugin-react": {

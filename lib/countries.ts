@@ -70,9 +70,13 @@ const NAME_OVERRIDES: Record<string, string> = {
 export function getCountryCodeFromName(name: string): string {
   const normalized = name.toLowerCase().trim();
   if (!normalized) return UNKNOWN_COUNTRY_CODE;
-  if (NAME_OVERRIDES[normalized]) return NAME_OVERRIDES[normalized];
+  // hasOwn, not a truthiness test: a DB value of `constructor` or `toString`
+  // would otherwise return a Function off the prototype chain.
+  if (Object.hasOwn(NAME_OVERRIDES, normalized)) return NAME_OVERRIDES[normalized];
 
-  const direct = countries.getAlpha2Code(name, 'en');
+  // Look up the normalized form, not the raw one: the dataset is
+  // case-insensitive but not whitespace-tolerant, so " Germany " missed.
+  const direct = countries.getAlpha2Code(normalized, 'en');
   if (direct) return direct;
 
   // GeoIP uses the official ISO short name with a leading article for some
@@ -82,7 +86,7 @@ export function getCountryCodeFromName(name: string): string {
   // "The " and retry (through the overrides too).
   const stripped = normalized.replace(/^the\s+/, '');
   if (stripped !== normalized) {
-    if (NAME_OVERRIDES[stripped]) return NAME_OVERRIDES[stripped];
+    if (Object.hasOwn(NAME_OVERRIDES, stripped)) return NAME_OVERRIDES[stripped];
     const retry = countries.getAlpha2Code(stripped, 'en');
     if (retry) return retry;
   }

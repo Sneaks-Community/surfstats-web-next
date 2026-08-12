@@ -9,9 +9,12 @@ npm run dev        # dev server (pipe to pino-pretty for readable logs: npm run 
 npm run build      # production build
 npm run lint       # eslint (also lint:fix to autofix)
 npm run typecheck  # tsc --noEmit
+npm test           # vitest run (test:watch for watch mode)
 ```
 
-Always run `npm run lint`, `npm run typecheck`, and `npm run build` before finishing. Resolve all warnings/errors. Node >= 24 (see `.nvmrc`). There is no automated test suite — verify changes via lint/typecheck/build and, where relevant, by running the app.
+Always run `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` before finishing. Resolve all warnings/errors. Node >= 24 (see `.nvmrc`).
+
+Tests are vitest specs in `tests/` as `*.test.ts`, one per `lib/` module, covering the pure logic modules only (validation, country/ISO mapping, formatting, SteamID conversion, cache-wrapper contracts, IP classification, env parsing). There is no DOM runner, so components are still verified by running the app. Anything touching MySQL or Valkey is mocked; no test needs a live service.
 
 ## Tech stack
 

@@ -113,25 +113,6 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
   logger.debug(`[Steam] Fetching profiles for ${steamIds.length} SteamIDs`);
   
   try {
-    // Convert all SteamIDs to SteamID64 and map them back
-    const steamId64Map = new Map<string, string>();
-    const steamId64s: string[] = [];
-    
-    for (const steamId of steamIds) {
-      const steamId64 = convertSteamIdTo64(steamId);
-      if (steamId64) {
-        steamId64Map.set(steamId64, steamId);
-        steamId64s.push(steamId64);
-      } else {
-        logger.warn(`[Steam] Could not convert SteamID: ${steamId}`);
-      }
-    }
-
-    if (steamId64s.length === 0) {
-      logger.warn('[Steam] No valid SteamID64s to query');
-      return result;
-    }
-
     // Check cache for each SteamID first
     const uncachedSteamIds: string[] = [];
     for (const steamId of steamIds) {
@@ -154,7 +135,14 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
         if (steamId64) {
           uncachedSteamId64Map.set(steamId64, steamId);
           uncachedSteamId64s.push(steamId64);
+        } else {
+          logger.warn(`[Steam] Could not convert SteamID: ${steamId}`);
         }
+      }
+
+      if (uncachedSteamId64s.length === 0) {
+        logger.warn('[Steam] No valid SteamID64s to query');
+        return result;
       }
 
       const players = await fetchSteamPlayerData(uncachedSteamId64s);
