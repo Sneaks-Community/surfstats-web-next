@@ -1,5 +1,6 @@
 import 'server-only';
 import { mapCachedFetch } from './map-cached-fetch';
+import type { RefreshOptions } from './cached-fetch';
 import pool from './db';
 import analyticsPool, { isAnalyticsAvailable } from './db-analytics';
 import type { RowDataPacket } from 'mysql2';
@@ -8,7 +9,10 @@ import { isStagedMap } from './map-cache';
 import { validateMapName } from './validators';
 import { MAP_STATS_SUFFIXES, wrCheckpointSuffix } from './cache-keys';
 
-const STATS_CACHE_TTL = 43200; // 12 hours
+// TTL is the safety net, the 12h precache sweep is the freshness guarantee, so the
+// net has to be slacker: at 1x every map but the first in the sweep spent part of
+// each cycle expired, making its next visitor pay for seven aggregates.
+const STATS_CACHE_TTL = 129600; // 36 hours = 3x the sweep interval
 
 // Every fetcher here aggregates over ck_playertimes/ck_checkpoints/ck_bonus, so all
 // of them pass `expensive: true`; otherwise the precache floods the 20-connection
@@ -82,7 +86,8 @@ function processCheckpointData(
  */
 export async function getWRCheckpointTimesFromCache(
   mapname: string,
-  maxCheckpoint: number
+  maxCheckpoint: number,
+  { force = false }: RefreshOptions = {}
 ): Promise<Array<{ checkpoint: number; time: number }> | undefined> {
   if (maxCheckpoint === 0) {
     return undefined;
@@ -92,6 +97,7 @@ export async function getWRCheckpointTimesFromCache(
     mapname,
     keySuffix: wrCheckpointSuffix(maxCheckpoint),
     ttl: STATS_CACHE_TTL,
+    force,
     empty: undefined,
     errorLabel: 'WR checkpoint times',
     expensive: true,
@@ -154,11 +160,15 @@ export async function getWRCheckpointTimesFromCache(
 /**
  * Get checkpoint stats from cache
  */
-export async function getCheckpointStatsFromCache(mapname: string): Promise<CheckpointStatsResult> {
+export async function getCheckpointStatsFromCache(
+  mapname: string,
+  { force = false }: RefreshOptions = {}
+): Promise<CheckpointStatsResult> {
   return mapCachedFetch<CheckpointStatsResult>({
     mapname,
     keySuffix: MAP_STATS_SUFFIXES.checkpoints,
     ttl: STATS_CACHE_TTL,
+    force,
     empty: { checkpointAvgTimes: [] },
     errorLabel: 'checkpoint stats',
     expensive: true,
@@ -207,12 +217,14 @@ export async function getCheckpointStatsFromCache(mapname: string): Promise<Chec
  * Get bonus completions over time from cache
  */
 export async function getBonusCompletionsOverTimeFromCache(
-  mapname: string
+  mapname: string,
+  { force = false }: RefreshOptions = {}
 ): Promise<Record<number, Array<{ date: string; count: number }>>> {
   return mapCachedFetch<Record<number, Array<{ date: string; count: number }>>>({
     mapname,
     keySuffix: MAP_STATS_SUFFIXES.bonusTime,
     ttl: STATS_CACHE_TTL,
+    force,
     empty: {},
     errorLabel: 'bonus completions over time',
     expensive: true,
@@ -250,11 +262,15 @@ export async function getBonusCompletionsOverTimeFromCache(
 /**
  * Get completions over time from cache
  */
-export async function getCompletionsOverTimeFromCache(mapname: string): Promise<Array<{ date: string; count: number }>> {
+export async function getCompletionsOverTimeFromCache(
+  mapname: string,
+  { force = false }: RefreshOptions = {}
+): Promise<Array<{ date: string; count: number }>> {
   return mapCachedFetch<Array<{ date: string; count: number }>>({
     mapname,
     keySuffix: MAP_STATS_SUFFIXES.completions,
     ttl: STATS_CACHE_TTL,
+    force,
     empty: [],
     errorLabel: 'completions over time',
     expensive: true,
@@ -287,7 +303,10 @@ export async function getCompletionsOverTimeFromCache(mapname: string): Promise<
  * deliberately returned *outside* the cache, so it isn't pinned for the TTL and
  * the chart repopulates as soon as the health probe recovers.
  */
-export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<{ date: string; totalDuration: number }>> {
+export async function getTimeOnMapDataFromCache(
+  mapname: string,
+  { force = false }: RefreshOptions = {}
+): Promise<Array<{ date: string; totalDuration: number }>> {
   if (!isAnalyticsAvailable()) {
     return [];
   }
@@ -296,6 +315,7 @@ export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<
     mapname,
     keySuffix: MAP_STATS_SUFFIXES.timeOnMap,
     ttl: STATS_CACHE_TTL,
+    force,
     empty: [],
     errorLabel: 'time on map data',
     expensive: true,
@@ -328,11 +348,15 @@ export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<
 /**
  * Get finish time data from cache
  */
-export async function getFinishTimeDataFromCache(mapname: string): Promise<{ avgTime: number | null; wrTime: number | null }> {
+export async function getFinishTimeDataFromCache(
+  mapname: string,
+  { force = false }: RefreshOptions = {}
+): Promise<{ avgTime: number | null; wrTime: number | null }> {
   return mapCachedFetch<{ avgTime: number | null; wrTime: number | null }>({
     mapname,
     keySuffix: MAP_STATS_SUFFIXES.finishTime,
     ttl: STATS_CACHE_TTL,
+    force,
     empty: { avgTime: null, wrTime: null },
     errorLabel: 'finish time data',
     expensive: true,
@@ -362,7 +386,8 @@ export async function getFinishTimeDataFromCache(mapname: string): Promise<{ avg
  * Uses MariaDB-compatible queries with LIMIT/OFFSET
  */
 export async function getPercentileTimesFromCache(
-  mapname: string
+  mapname: string,
+  { force = false }: RefreshOptions = {}
 ): Promise<{
   wrTime: number | null;
   p1Time: number | null;
@@ -380,6 +405,7 @@ export async function getPercentileTimesFromCache(
     mapname,
     keySuffix: MAP_STATS_SUFFIXES.percentiles,
     ttl: STATS_CACHE_TTL,
+    force,
     empty: null,
     errorLabel: 'percentile times',
     expensive: true,

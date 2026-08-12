@@ -81,6 +81,25 @@ describe('cachedFetch', () => {
     expect(loader).not.toHaveBeenCalled();
   });
 
+  // A background refresher must not DEL first: forcing skips the read and overwrites,
+  // so there is no window where the key is missing and a visitor pays for the query.
+  it('runs the loader and overwrites on a forced reload, hit or not', async () => {
+    cacheGetWithTtl.mockResolvedValue({ value: { n: 1 }, ttlMs: 60_000 });
+    const loader = vi.fn().mockResolvedValue({ n: 2 });
+
+    expect(await cachedFetch('k', 60, loader, { lock: true, force: true })).toEqual({ n: 2 });
+    expect(cacheGetWithTtl).not.toHaveBeenCalled();
+    expect(cacheSet).toHaveBeenCalledWith('k', { n: 2 }, 60);
+  });
+
+  // One transient DB blip must not blank a page for the whole refresh interval.
+  it('writes nothing when a forced reload fails, leaving the old value served', async () => {
+    await expect(
+      cachedFetch('k', 60, () => Promise.reject(new Error('DB down')), { force: true })
+    ).rejects.toThrow('DB down');
+    expect(cacheSet).not.toHaveBeenCalled();
+  });
+
   // COR-9: the miss path must hand back the same shape the hit path does.
   it('normalizes the fetched value to its cached shape', async () => {
     const date = new Date('2026-02-24T19:15:18.000Z');

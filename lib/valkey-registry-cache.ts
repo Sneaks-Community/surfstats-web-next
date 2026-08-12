@@ -1,22 +1,22 @@
 import 'server-only';
-import { cachedFetch } from './cached-fetch';
+import { cachedFetch, type RefreshOptions } from './cached-fetch';
 import { fetchRegistryData } from './registry-cache';
 import type { BonusGroup, StageGroup } from './registry-cache';
 
 const REGISTRY_DATA_KEY = 'surfstats:registry:data';
-const REGISTRY_CACHE_TTL = 3600; // 1 hour
+const REGISTRY_CACHE_TTL = 7200; // 2 hours, comfortably over the 30min refresh
 
 /**
  * Get all registry data (bonuses, stages, player count) from Valkey cache with request deduplication
  * Falls back to database if cache miss
  * Uses CacheLock to prevent cache stampede when multiple requests miss simultaneously
  */
-async function getAllRegistryDataFromCache(): Promise<{
+export async function getAllRegistryDataFromCache({ force }: RefreshOptions = {}): Promise<{
   bonuses: BonusGroup[];
   stages: StageGroup[];
   playerCount: number;
 }> {
-  return cachedFetch(REGISTRY_DATA_KEY, REGISTRY_CACHE_TTL, fetchRegistryData, { lock: true });
+  return cachedFetch(REGISTRY_DATA_KEY, REGISTRY_CACHE_TTL, fetchRegistryData, { lock: true, force });
 }
 
 /**

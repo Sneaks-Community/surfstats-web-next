@@ -59,9 +59,8 @@ describe('key builders', () => {
   });
 });
 
-// The precache DELs per-map keys built from MAP_STATS_SUFFIXES + wrCheckpointSuffix.
-// If a fetcher writes a suffix that isn't in there, the DEL matches nothing and the
-// stale entry gets re-extended, with no error anywhere.
+// MAP_STATS_SUFFIXES is the canonical list of the seven series the precache refreshes,
+// so a fetcher writing a suffix that isn't in there is a series nothing enumerates.
 describe('map stats suffixes', () => {
   it('cover every key the stats fetchers write', async () => {
     await Promise.all([
@@ -75,10 +74,10 @@ describe('map stats suffixes', () => {
     ]);
 
     const written = new Set(cacheSet.mock.calls.map((call) => String(call[0])));
-    const deletedByPrecache = new Set(
+    const declared = new Set(
       [...Object.values(MAP_STATS_SUFFIXES), wrCheckpointSuffix(3)].map(s => mapKey(MAP, s))
     );
 
-    expect(written).toEqual(deletedByPrecache);
+    expect(written).toEqual(declared);
   });
 });

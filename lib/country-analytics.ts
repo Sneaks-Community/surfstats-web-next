@@ -3,7 +3,7 @@ import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
 import { getCountryNamesFromCode, getCountryCodeFromName, UNKNOWN_COUNTRY_CODE } from '@/lib/countries';
-import { cachedFetch } from './cached-fetch';
+import { cachedFetch, type RefreshOptions } from './cached-fetch';
 import { PLAYERS_PAGE_SIZE } from './player-cache';
 import { getErrorCode, getErrorMessage } from './errors';
 
@@ -189,7 +189,8 @@ export async function getCountriesRankingFromCache(
   sort: CountrySortKey = 'points',
   order: SortOrder = 'desc',
   page = 1,
-  limit = 50
+  limit = 50,
+  { force }: RefreshOptions = {}
 ): Promise<{ countries: CountryRank[]; total: number; totalPages: number }> {
   const cacheKey = `${COUNTRIES_RANKING_KEY}:${sort}:${order}:${page}:${limit}`;
 
@@ -197,6 +198,7 @@ export async function getCountriesRankingFromCache(
     getCountriesRankingInternal(sort, order, page, limit),
     {
       expensive: true,
+      force,
       onError: (error) => {
         logger.error(`[CountryAnalytics] Failed to fetch countries ranking: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
         return { countries: [], total: 0, totalPages: 0 };
@@ -453,9 +455,10 @@ const COUNTRIES_STATS_TTL = 86400; // 24 hours
  * Get country statistics summary from Valkey cache
  * Used for displaying total countries count
  */
-export async function getCountriesStatsFromCache(): Promise<{ totalCountries: number; totalPlayers: number }> {
+export async function getCountriesStatsFromCache({ force }: RefreshOptions = {}): Promise<{ totalCountries: number; totalPlayers: number }> {
   return cachedFetch(COUNTRIES_STATS_KEY, COUNTRIES_STATS_TTL, getCountriesStatsInternal, {
     expensive: true,
+    force,
     onError: (error) => {
       logger.error(`[CountryAnalytics] Failed to fetch countries stats: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
       return { totalCountries: 0, totalPlayers: 0 };

@@ -57,8 +57,9 @@ wrapPoolQuery(pool, { prefix: 'DB' });
 applyStatementTimeout(pool, 'DB');
 
 /**
- * Probe the connection and pre-warm the caches. Called once from `lib/startup.ts`,
- * never at module scope (a lib module can be evaluated in several bundles).
+ * Probe the connection. Called once from `lib/startup.ts`, never at module scope
+ * (a lib module can be evaluated in several bundles). Warming is not done here:
+ * every cache is owned by a background refresher whose first run is its warm.
  *
  * @returns whether the probe succeeded; gates the map-graph precache.
  */
@@ -71,12 +72,6 @@ export async function initializeDatabase(): Promise<boolean> {
     await pool.query('SELECT 1');
     const duration = Date.now() - startTime;
     logger.info(`[DB] Database connection established successfully (${duration}ms)`);
-    
-    // Pre-warm all caches (stats, servers, map metadata)
-    logger.debug('[DB] Pre-warming application caches...');
-    const { prewarmCaches } = await import('./cache');
-    await prewarmCaches();
-    
     logger.info('[DB] Initialization complete');
     return true;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

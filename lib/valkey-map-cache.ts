@@ -1,10 +1,10 @@
 import 'server-only';
-import { cachedFetch } from './cached-fetch';
+import { cachedFetch, type RefreshOptions } from './cached-fetch';
 import { fetchAllMapMetadata } from './map-cache';
 import type { MapMetadata } from './map-cache';
 
 const MAP_METADATA_KEY = 'surfstats:map:metadata';
-const MAP_METADATA_TTL = 3600; // 1 hour
+const MAP_METADATA_TTL = 7200; // 2 hours, comfortably over the 30min refresh
 
 /**
  * Get all map metadata from Valkey cache with request deduplication
@@ -14,12 +14,12 @@ const MAP_METADATA_TTL = 3600; // 1 hour
  * The metadata Map is stored as a plain object for JSON serialization and
  * rehydrated on read.
  */
-export async function getAllMapMetadataFromCache(): Promise<Map<string, MapMetadata>> {
+export async function getAllMapMetadataFromCache({ force }: RefreshOptions = {}): Promise<Map<string, MapMetadata>> {
   const stored = await cachedFetch(
     MAP_METADATA_KEY,
     MAP_METADATA_TTL,
     async () => Object.fromEntries(await fetchAllMapMetadata()),
-    { lock: true }
+    { lock: true, force }
   );
 
   return new Map(Object.entries(stored));
@@ -44,7 +44,7 @@ export async function getMapMetadataFromCache(mapname: string): Promise<MapMetad
  * The distribution Map is stored as a plain object for JSON serialization and
  * rehydrated on read.
  */
-export async function getTierDistributionFromCache(): Promise<Map<number, number>> {
+export async function getTierDistributionFromCache({ force }: RefreshOptions = {}): Promise<Map<number, number>> {
   const stored = await cachedFetch(
     `${MAP_METADATA_KEY}:tier_distribution`,
     MAP_METADATA_TTL,
@@ -57,7 +57,8 @@ export async function getTierDistributionFromCache(): Promise<Map<number, number
         distribution[map.tier] = (distribution[map.tier] || 0) + 1;
       }
       return distribution;
-    }
+    },
+    { force }
   );
 
   return new Map(Object.entries(stored).map(([k, v]) => [Number(k), v]));

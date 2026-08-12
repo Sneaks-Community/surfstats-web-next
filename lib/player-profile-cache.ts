@@ -8,10 +8,11 @@
 import 'server-only';
 import pool from './db';
 import type { RowDataPacket } from 'mysql2';
-import { cachedFetch } from './cached-fetch';
+import { cachedFetch, type RefreshOptions } from './cached-fetch';
 import { isStagedMap } from './map-cache';
 import { withTimeout } from './timeout';
 import { validateSteamId } from './validators';
+import { recordProfileView } from './recent-profiles';
 import logger from './logger';
 import { getErrorMessage } from './errors';
 
@@ -24,7 +25,10 @@ const PLAYER_INCOMPLETE_MAPS_KEY = 'surfstats:player:incomplete:maps';
 const PLAYER_INCOMPLETE_BONUSES_KEY = 'surfstats:player:incomplete:bonuses';
 const PLAYER_INCOMPLETE_STAGES_KEY = 'surfstats:player:incomplete:stages';
 const PLAYER_TIER_DIST_KEY = 'surfstats:player:tierdist';
-const PLAYER_PROFILE_TTL = 300; // 5 minutes
+// The recently-viewed warmer refreshes the render keys every 15 minutes, so the TTL
+// is the safety net rather than the freshness guarantee. Profiles outside that set
+// are on-demand and stale for up to an hour.
+const PLAYER_PROFILE_TTL = 3600; // 1 hour
 const QUERY_TIMEOUT_MS = 30000; // 30 seconds — per-query backstop
 
 // Type definitions for cached profile data
@@ -124,12 +128,17 @@ export interface TierDistributionRow {
  * @param steamid - The player's SteamID
  * @returns Overview data, or null if the SteamID is invalid / player not found
  */
-export async function getPlayerOverviewFromCache(steamid: string): Promise<PlayerOverview | null> {
+export async function getPlayerOverviewFromCache(steamid: string, { force }: RefreshOptions = {}): Promise<PlayerOverview | null> {
   const validSteamId = validateSteamId(steamid);
   if (!validSteamId) {
     logger.warn(`[PlayerProfileCache] Invalid SteamID for overview: ${steamid}`);
     return null;
   }
+
+  // Every profile view calls this first, and nothing else does, so it is where the
+  // warm set is fed. Skipped on a forced refresh: that is the warmer itself, and
+  // re-recording would keep the same 100 profiles in the set forever.
+  if (!force) recordProfileView(validSteamId);
 
   // A null overview (player not found / query error) is never cached, so
   // subsequent requests keep retrying rather than pinning the absence.
@@ -187,6 +196,7 @@ export async function getPlayerOverviewFromCache(steamid: string): Promise<Playe
     },
     {
       lock: true,
+      force,
       onError: (error) => {
         logger.error(`[PlayerProfileCache] Failed to fetch overview for ${validSteamId}: ${getErrorMessage(error)}`);
         return null;
@@ -209,7 +219,7 @@ export async function getPlayerOverviewFromCache(steamid: string): Promise<Playe
  * @param steamid - The player's SteamID
  * @returns One point per completed map that has a WR time (empty on invalid id / error)
  */
-export async function getPlayerWrPerformanceFromCache(steamid: string): Promise<PlayerWrPerformancePoint[]> {
+export async function getPlayerWrPerformanceFromCache(steamid: string, { force }: RefreshOptions = {}): Promise<PlayerWrPerformancePoint[]> {
   const validSteamId = validateSteamId(steamid);
   if (!validSteamId) {
     logger.warn(`[PlayerProfileCache] Invalid SteamID for WR performance: ${steamid}`);
@@ -254,6 +264,7 @@ export async function getPlayerWrPerformanceFromCache(steamid: string): Promise<
     },
     {
       lock: true,
+      force,
       onError: (error) => {
         logger.error(`[PlayerProfileCache] Failed to fetch WR performance for ${validSteamId}: ${getErrorMessage(error)}`);
         return [];
@@ -599,7 +610,7 @@ export async function getIncompleteStagesFromCache(steamid: string): Promise<Inc
  * @param steamid - The player's SteamID
  * @returns Per-tier rows (empty on invalid id / error)
  */
-export async function getLinearVsStagedPerTierFromCache(steamid: string): Promise<TierDistributionRow[]> {
+export async function getLinearVsStagedPerTierFromCache(steamid: string, { force }: RefreshOptions = {}): Promise<TierDistributionRow[]> {
   const validSteamId = validateSteamId(steamid);
   if (!validSteamId) {
     logger.warn(`[PlayerProfileCache] Invalid SteamID for tier distribution: ${steamid}`);
@@ -637,6 +648,7 @@ export async function getLinearVsStagedPerTierFromCache(steamid: string): Promis
     },
     {
       lock: true,
+      force,
       expensive: true,
       onError: (error) => {
         logger.error(`[PlayerProfileCache] Failed to fetch tier distribution for ${validSteamId}: ${getErrorMessage(error)}`);

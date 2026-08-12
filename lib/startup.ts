@@ -6,6 +6,7 @@ import { startAnalyticsHealthCheck } from './db-analytics';
 import { startServerBackgroundRefresh } from './server-background-refresh';
 import { startPlayersListBackgroundRefresh } from './players-list-background-refresh';
 import { startMapGraphPrecache } from './map-graph-precache';
+import { startCacheRefreshers } from './cache-background-refresh';
 
 /**
  * Everything that has to happen once per server process, in order.
@@ -24,6 +25,10 @@ export async function startServer(): Promise<void> {
 
   startServerBackgroundRefresh();
   startPlayersListBackgroundRefresh();
+  // Each of these runs once immediately, which is the cache warm that used to
+  // happen in initializeDatabase; started even if the probe failed, so a late DB
+  // heals on the next interval instead of waiting for a restart.
+  startCacheRefreshers();
 
   // Seven aggregate queries per map across ~1,000 maps: skip the sweep if the probe
   // failed, rather than logging a thousand failures.

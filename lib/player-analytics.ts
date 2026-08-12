@@ -3,7 +3,7 @@ import analyticsPool, { isAnalyticsAvailable } from '@/lib/db-analytics';
 import type { RowDataPacket } from 'mysql2';
 import { convertSteamId2ToSteamId3Numeric } from '@/lib/steam';
 import logger from '@/lib/logger';
-import { cachedFetch } from './cached-fetch';
+import { cachedFetch, type RefreshOptions } from './cached-fetch';
 import { getErrorMessage } from './errors';
 
 interface PlayerTimeData extends RowDataPacket {
@@ -65,19 +65,19 @@ async function getPlayerTimeOnServerInternal(steamId: string): Promise<PlayerTim
 }
 
 const PLAYER_TIME_KEY = 'surfstats:player:time';
-const PLAYER_TIME_TTL = 300; // 5 minutes
+const PLAYER_TIME_TTL = 3600; // 1 hour, in step with the other profile render keys
 
 /**
  * Get player time on server from Valkey cache
- * Cache for 5 minutes (300 seconds) to reduce database load on high-traffic pages
  */
 export async function getPlayerTimeOnServerFromCache(
-  steamId: string
+  steamId: string,
+  { force }: RefreshOptions = {}
 ): Promise<PlayerTimeResult | null> {
   const cacheKey = `${PLAYER_TIME_KEY}:${steamId}`;
 
   // A null result (analytics unavailable / invalid id / error) is not cached.
-  return cachedFetch(cacheKey, PLAYER_TIME_TTL, () => getPlayerTimeOnServerInternal(steamId));
+  return cachedFetch(cacheKey, PLAYER_TIME_TTL, () => getPlayerTimeOnServerInternal(steamId), { force });
 }
 
 // Activity Heatmap Data Interface
@@ -186,12 +186,13 @@ const ACTIVITY_HEATMAP_TTL = 3600; // 1 hour (data changes slowly)
  * Cache for 1 hour (3600 seconds) to reduce database load on high-traffic pages
  */
 export async function getActivityHeatmapFromCache(
-  steamId: string
+  steamId: string,
+  { force }: RefreshOptions = {}
 ): Promise<HeatmapDataPoint[] | null> {
   const cacheKey = `${ACTIVITY_HEATMAP_KEY}:${steamId}`;
 
   // A null result (analytics unavailable / invalid id / error) is not cached.
-  return cachedFetch(cacheKey, ACTIVITY_HEATMAP_TTL, () => getPlayerActivityHeatmapInternal(steamId));
+  return cachedFetch(cacheKey, ACTIVITY_HEATMAP_TTL, () => getPlayerActivityHeatmapInternal(steamId), { force });
 }
 
 interface MapEngagementRow extends RowDataPacket {
@@ -255,12 +256,13 @@ const MAP_ENGAGEMENT_KEY = 'surfstats:player:map-engagement';
 const MAP_ENGAGEMENT_TTL = 3600; // 1 hour
 
 export async function getPlayerMapEngagementFromCache(
-  steamId: string
+  steamId: string,
+  { force }: RefreshOptions = {}
 ): Promise<MapEngagementPoint[] | null> {
   const cacheKey = `${MAP_ENGAGEMENT_KEY}:${steamId}`;
 
   // A null result (analytics unavailable / invalid id / error) is not cached.
-  return cachedFetch(cacheKey, MAP_ENGAGEMENT_TTL, () => getPlayerMapEngagementInternal(steamId));
+  return cachedFetch(cacheKey, MAP_ENGAGEMENT_TTL, () => getPlayerMapEngagementInternal(steamId), { force });
 }
 
 export type { MapEngagementPoint };

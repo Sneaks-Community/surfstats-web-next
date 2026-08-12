@@ -5,7 +5,7 @@ import { GameDig } from 'gamedig';
 import logger from '@/lib/logger';
 import { cacheGet, cacheSet } from './valkey-cache';
 import { cacheLock } from './cache-lock';
-import { cachedFetch, normalizeToCachedShape } from './cached-fetch';
+import { cachedFetch, normalizeToCachedShape, type RefreshOptions } from './cached-fetch';
 import { getErrorCode, getErrorMessage } from './errors';
 import { getServerConfigs, type ServerConfig } from './env';
 
@@ -111,10 +111,10 @@ export async function fetchServersFromGame(): Promise<ServerStatus[]> {
 
 // Split stats into separate cache entries for better granularity
 const DASHBOARD_STATS_KEY = 'surfstats:dashboard:stats';
-const DASHBOARD_STATS_TTL = 300; // 5 minutes for static stats
+const DASHBOARD_STATS_TTL = 180; // 3x the 60s dashboard refresh
 
 const DASHBOARD_RECENT_RECORDS_KEY = 'surfstats:dashboard:recent-records';
-const DASHBOARD_RECENT_RECORDS_TTL = 60; // 1 minute for volatile recent records
+const DASHBOARD_RECENT_RECORDS_TTL = 180; // 3x the 60s dashboard refresh
 
 interface DashboardStats {
   playerCount: number;
@@ -262,13 +262,14 @@ export async function getStatsFromCache(): Promise<{
 /**
  * Get static dashboard stats from Valkey cache
  */
-export async function getDashboardStatsFromCache(): Promise<DashboardStats> {
+export async function getDashboardStatsFromCache({ force }: RefreshOptions = {}): Promise<DashboardStats> {
   return cachedFetch(
     DASHBOARD_STATS_KEY,
     DASHBOARD_STATS_TTL,
     getDashboardStatsInternal,
     {
       lock: true,
+      force,
       onError: (error) => {
         logger.error(`[StatsCache] Failed to fetch stats: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
         return EMPTY_DASHBOARD_STATS;
@@ -280,13 +281,14 @@ export async function getDashboardStatsFromCache(): Promise<DashboardStats> {
 /**
  * Get recent records from Valkey cache with shorter TTL
  */
-export async function getRecentRecordsFromCache(): Promise<RecentRecords[]> {
+export async function getRecentRecordsFromCache({ force }: RefreshOptions = {}): Promise<RecentRecords[]> {
   return cachedFetch(
     DASHBOARD_RECENT_RECORDS_KEY,
     DASHBOARD_RECENT_RECORDS_TTL,
     getRecentRecordsInternal,
     {
       lock: true,
+      force,
       onError: (error) => {
         logger.error(`[StatsCache] Failed to fetch recent records: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
         return [];
@@ -364,7 +366,7 @@ const getLatestCompletionsInternal = async (): Promise<
 };
 
 const LATEST_COMPLETIONS_KEY = 'surfstats:dashboard:completions';
-const LATEST_COMPLETIONS_TTL = 180; // Reduced to 3 minutes for fresher data
+const LATEST_COMPLETIONS_TTL = 180; // 3x the 60s dashboard refresh
 
 /**
  * Get latest completions from Valkey cache with request deduplication
@@ -375,7 +377,7 @@ const LATEST_COMPLETIONS_TTL = 180; // Reduced to 3 minutes for fresher data
  *
  * @returns Array of latest completions
  */
-export async function getLatestCompletionsFromCache(): Promise<
+export async function getLatestCompletionsFromCache({ force }: RefreshOptions = {}): Promise<
   Array<{
     steamid: string;
     name: string;
@@ -388,6 +390,7 @@ export async function getLatestCompletionsFromCache(): Promise<
 > {
   return cachedFetch(LATEST_COMPLETIONS_KEY, LATEST_COMPLETIONS_TTL, getLatestCompletionsInternal, {
     lock: true,
+    force,
     onError: (error) => {
       logger.error(`[CompletionsCache] Failed to fetch completions: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
       return [];
@@ -411,85 +414,21 @@ const fetchTotalsInternal = async () => {
 };
 
 const TOTALS_KEY = 'surfstats:totals:data';
-const TOTALS_TTL = 300; // 5 minutes
+const TOTALS_TTL = 900; // 3x the 5min totals refresh
 
 /**
  * Get totals from Valkey cache
  */
-export async function getTotalsFromCache(): Promise<{
+export async function getTotalsFromCache({ force }: RefreshOptions = {}): Promise<{
   totalMaps: number;
   totalBonuses: number;
   totalStages: number;
 }> {
   return cachedFetch(TOTALS_KEY, TOTALS_TTL, fetchTotalsInternal, {
+    force,
     onError: (error) => {
       logger.error(`[TotalsCache] Failed to fetch totals: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
       return { totalMaps: 0, totalBonuses: 0, totalStages: 0 };
     },
   });
-}
-
-// ============================================================
-// CACHE PREWARMING
-// ============================================================
-// Called once at startup via lib/startup.ts, so the first request is a cache hit.
-
-export async function prewarmCaches(): Promise<void> {
-  logger.info('[Cache] Pre-warming caches...');
-
-  // Pre-warm stats - populates the Valkey cache
-  try {
-    const startTime = Date.now();
-    await getStatsFromCache();
-    logger.info(`[Cache] Stats cache pre-warmed successfully (${Date.now() - startTime}ms)`);
-  } catch (error: unknown) {
-    logger.error('[Cache] Stats cache pre-warm failed');
-    logger.error(`[Cache] Error: ${getErrorMessage(error)}`);
-  }
-
-  // Pre-warm totals - populates the Valkey cache
-  try {
-    const startTime = Date.now();
-    const totals = await getTotalsFromCache();
-    const duration = Date.now() - startTime;
-    logger.info(
-      `[Cache] Totals cache pre-warmed successfully (maps=${totals.totalMaps}, bonuses=${totals.totalBonuses}, stages=${totals.totalStages}, ${duration}ms)`
-    );
-  } catch (error: unknown) {
-    logger.error('[Cache] Totals cache pre-warm failed');
-    logger.error(`[Cache] Error: ${getErrorMessage(error)}`);
-  }
-
-  // Pre-warm servers cache via Valkey
-  try {
-    const startTime = Date.now();
-    const { getServersFromCache } = await import('./valkey-server-cache');
-    await getServersFromCache();
-    logger.info(`[Cache] Servers cache pre-warmed successfully (${Date.now() - startTime}ms)`);
-  } catch (error: unknown) {
-    logger.error('[Cache] Servers cache pre-warm failed');
-    logger.error(`[Cache] Error: ${getErrorMessage(error)}`);
-  }
-
-  // Pre-warm map metadata cache (1-hour TTL)
-  try {
-    const startTime = Date.now();
-    const { getAllMapMetadataFromCache } = await import('./valkey-map-cache');
-    await getAllMapMetadataFromCache();
-    logger.info(`[Cache] Map metadata cache pre-warmed successfully (${Date.now() - startTime}ms)`);
-  } catch (error: unknown) {
-    logger.error('[Cache] Map metadata cache pre-warm failed');
-    logger.error(`[Cache] Error: ${getErrorMessage(error)}`);
-  }
-
-  // Pre-warm bonus/stage registry cache (1-hour TTL)
-  try {
-    const startTime = Date.now();
-    const { getAllBonusGroupsFromCache, getAllStagesFromCache } = await import('./valkey-registry-cache');
-    await Promise.all([getAllBonusGroupsFromCache(), getAllStagesFromCache()]);
-    logger.info(`[Cache] Registry cache pre-warmed successfully (${Date.now() - startTime}ms)`);
-  } catch (error: unknown) {
-    logger.error('[Cache] Registry cache pre-warm failed');
-    logger.error(`[Cache] Error: ${getErrorMessage(error)}`);
-  }
 }

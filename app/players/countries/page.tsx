@@ -1,5 +1,6 @@
 import { Globe } from 'lucide-react';
 import { getCountriesRankingFromCache, getCountriesStatsFromCache } from '@/lib/country-analytics';
+import { COUNTRIES_RANKING_DEFAULT } from '@/lib/cache-keys';
 import { getNumericCodeFromAlpha2, getPrimaryCountryName } from '@/lib/countries';
 import PanelHeader from '@/components/PanelHeader';
 import TopCountriesList, { type TopCountryEntry } from '@/app/components/countries/TopCountriesList';
@@ -15,8 +16,9 @@ export const metadata: Metadata = {
 export default async function CountriesPage() {
   // Pull a deep slice for the map (many countries shaded) plus the stats
   // headline. The Top-Countries list beside the map is the accessible twin.
+  const { sort, order, page, limit } = COUNTRIES_RANKING_DEFAULT;
   const [ranking, stats] = await Promise.all([
-    getCountriesRankingFromCache('players', 'desc', 1, 250),
+    getCountriesRankingFromCache(sort, order, page, limit),
     getCountriesStatsFromCache(),
   ]);
 

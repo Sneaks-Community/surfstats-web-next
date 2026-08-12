@@ -1,5 +1,4 @@
 import 'server-only';
-import client from './valkey';
 import logger from './logger';
 import {
   getCompletionsOverTimeFromCache,
@@ -11,7 +10,6 @@ import {
   getPercentileTimesFromCache,
 } from './valkey-map-stats-cache';
 import { getAllMapMetadataFromCache, getMapMetadataFromCache } from './valkey-map-cache';
-import { mapKey, MAP_STATS_SUFFIXES, wrCheckpointSuffix } from './cache-keys';
 import { getErrorMessage } from './errors';
 import { createBackgroundRefresh } from './background-refresh';
 
@@ -24,12 +22,9 @@ const MAX_CONCURRENT = 2;
 
 /**
  * Refresh all graph data points for a single map from the database.
- * Deletes the cached series first so the *FromCache calls cold-miss and
- * repopulate from the DB (rather than re-extending stale entries), and each
- * call writes its own key — no second write here.
- *
- * Deleted keys use the same suffixes the fetchers do, so a rename can't leave this
- * deleting nothing.
+ * Each series is refreshed in place: no `DEL` first, so there is no window where a
+ * visitor finds the key missing and pays for the query, and a failed refresh leaves
+ * the previous value being served.
  */
 async function precacheMapGraphs(mapname: string): Promise<void> {
   try {
@@ -38,22 +33,15 @@ async function precacheMapGraphs(mapname: string): Promise<void> {
     const stages = metadata?.stages || 0;
     const maxCheckpoint = checkpoints > 0 ? checkpoints : stages;
 
-    // Force a fresh DB read on the next fetch.
-    await client.del(
-      [...Object.values(MAP_STATS_SUFFIXES), wrCheckpointSuffix(maxCheckpoint)].map(suffix =>
-        mapKey(mapname, suffix)
-      )
-    );
-
-    // Each call reads from the DB (cache now empty) and writes its own key.
+    const force = { force: true };
     await Promise.all([
-      getCompletionsOverTimeFromCache(mapname),
-      getTimeOnMapDataFromCache(mapname),
-      getCheckpointStatsFromCache(mapname),
-      getWRCheckpointTimesFromCache(mapname, maxCheckpoint),
-      getFinishTimeDataFromCache(mapname),
-      getBonusCompletionsOverTimeFromCache(mapname),
-      getPercentileTimesFromCache(mapname),
+      getCompletionsOverTimeFromCache(mapname, force),
+      getTimeOnMapDataFromCache(mapname, force),
+      getCheckpointStatsFromCache(mapname, force),
+      getWRCheckpointTimesFromCache(mapname, maxCheckpoint, force),
+      getFinishTimeDataFromCache(mapname, force),
+      getBonusCompletionsOverTimeFromCache(mapname, force),
+      getPercentileTimesFromCache(mapname, force),
     ]);
 
     logger.debug(`[MapGraphPrecache] Cached graphs for ${mapname}`);

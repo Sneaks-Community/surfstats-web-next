@@ -12,9 +12,8 @@ export interface MapCachedFetchOptions<T> {
   /** Raw (unvalidated) map name from the caller. */
   mapname: string;
   /**
-   * Key part appended after the `surfstats:map:<validMapname>:` prefix. Precached
-   * series must use a suffix from `MAP_STATS_SUFFIXES` (`lib/cache-keys.ts`), not a
-   * literal, or the precache's `DEL` silently stops matching them.
+   * Key part appended after the `surfstats:map:<validMapname>:` prefix. Chart series
+   * use a suffix from `MAP_STATS_SUFFIXES` (`lib/cache-keys.ts`) rather than a literal.
    */
   keySuffix: string;
   /** Cache TTL in seconds. */
@@ -27,6 +26,8 @@ export interface MapCachedFetchOptions<T> {
   errorLabel: string;
   /** Run the loader under the expensive-query concurrency cap. Defaults to false. */
   expensive?: boolean;
+  /** Refresh in place: skip the read, run the loader, overwrite on success. */
+  force?: boolean;
   /** Log level for fetch errors. Defaults to 'error'. */
   errorLevel?: 'warn' | 'error';
 }
@@ -48,6 +49,7 @@ export function mapCachedFetch<T>({
   fetch,
   errorLabel,
   expensive = false,
+  force = false,
   errorLevel = 'error',
 }: MapCachedFetchOptions<T>): Promise<T> {
   const validMapname = validateMapName(mapname);
@@ -60,6 +62,7 @@ export function mapCachedFetch<T>({
   return cachedFetch<T>(key, ttl, () => fetch(validMapname), {
     lock: true,
     expensive,
+    force,
     onError: (error) => {
       const message = `[Cache] Failed to fetch ${errorLabel} for ${validMapname}: ${getErrorMessage(error)}`;
       if (errorLevel === 'warn') {

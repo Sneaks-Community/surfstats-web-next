@@ -37,6 +37,14 @@ export function normalizeToCachedShape<T>(value: T): T {
 }
 
 /**
+ * Trailing argument on the cache getters a background refresher owns, so the
+ * refresher can recompute a key without the read path changing shape.
+ */
+export interface RefreshOptions {
+  force?: boolean;
+}
+
+/**
  * Options for {@link cachedFetch}.
  */
 export interface CachedFetchOptions<T> {
@@ -60,6 +68,13 @@ export interface CachedFetchOptions<T> {
    * doesn't get pinned for the whole TTL. If omitted, the error propagates.
    */
   onError?: (error: unknown) => T;
+  /**
+   * Skip the read and run the loader, overwriting the key on success. For
+   * background refreshers: the old value keeps being served until the new one
+   * lands (no `DEL`, so no window where a visitor pays for the query) and a
+   * failed refresh is a no-op rather than a blank page for the whole interval.
+   */
+  force?: boolean;
 }
 
 /**
@@ -163,18 +178,21 @@ export async function cachedFetch<T>(
     throw new CacheUnavailableError();
   }
 
-  const { value: cached, ttlMs } = await cacheGetWithTtl<T>(key);
-  if (cached !== null) {
-    if (shouldRefreshEarly(ttlMs, ttl)) {
-      triggerBackgroundRefresh(key, ttl, fetchFn, options.expensive ?? false);
+  if (!options.force) {
+    const { value: cached, ttlMs } = await cacheGetWithTtl<T>(key);
+    if (cached !== null) {
+      if (shouldRefreshEarly(ttlMs, ttl)) {
+        triggerBackgroundRefresh(key, ttl, fetchFn, options.expensive ?? false);
+      }
+      return cached;
     }
-    return cached;
   }
 
   const load = async (): Promise<T> => {
     // Re-check inside the lock: a concurrent request may have populated the
-    // cache while we waited to acquire it.
-    if (options.lock) {
+    // cache while we waited to acquire it. A forced reload is the one caller
+    // that wants the loader regardless.
+    if (options.lock && !options.force) {
       const { value: rechecked } = await cacheGetWithTtl<T>(key);
       if (rechecked !== null) {
         return rechecked;
