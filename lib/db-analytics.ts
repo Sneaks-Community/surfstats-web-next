@@ -4,6 +4,7 @@ import logger from '@/lib/logger';
 import { wrapPoolQuery } from '@/lib/db-query-logger';
 import { getErrorMessage } from './errors';
 import { onShutdown } from './shutdown';
+import { applyStatementTimeout } from './timeout';
 
 // Track whether the analytics database connection is actually working
 let analyticsConnectionHealthy = false;
@@ -48,6 +49,10 @@ analyticsPool.on('enqueue', () => {
 
 // Wrap the pool with slow query logging using the shared utility
 wrapPoolQuery(analyticsPool, { prefix: 'Analytics DB', slowThresholdMs: 1000 });
+
+// Same server-side statement cap as the main pool. These queries have no
+// withTimeout wrapper at all, so this is their only limit.
+applyStatementTimeout(analyticsPool, 'Analytics DB');
 
 // How often to re-check the analytics connection health, in milliseconds.
 // Configurable via ANALYTICS_HEALTHCHECK_INTERVAL_MS (clamped to a 10s minimum so

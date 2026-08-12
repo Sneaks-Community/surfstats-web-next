@@ -86,6 +86,7 @@ Rate limiting uses [`rate-limiter-flexible`](https://github.com/animir/node-rate
 * `DB_CONNECTION_LIMIT`: Max pool connections (default: `20`).
 * `DB_QUEUE_LIMIT`: Max queued connection requests; `0` = unlimited (default: `100`).
 * `DB_CONNECT_TIMEOUT_MS`: Initial connection timeout in ms (default: `5000`).
+* `DB_STATEMENT_TIMEOUT_MS`: Server-side cap per statement, applied to every pooled connection (`max_statement_time` on MariaDB, `max_execution_time` on MySQL). A query that exceeds it is killed and its connection released, instead of running on after the client has given up; `0` disables (default: `30000`).
 * `PLAYERS_LIST_WARM_PAGES`: Leading players-list pages kept cache-hot (default: `10`).
 * `PLAYERS_LIST_WARM_INTERVAL_MS`: How often to refresh them, in ms (default: `300000`).
 

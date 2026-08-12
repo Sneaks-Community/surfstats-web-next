@@ -48,6 +48,8 @@ const optionalSchema = z.object({
   DB_CONNECTION_LIMIT: z.coerce.number().int().positive().optional(),
   DB_QUEUE_LIMIT: z.coerce.number().int().nonnegative().optional(),
   DB_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
+  // Server-side per-statement cap (see lib/timeout.ts). 0 disables it.
+  DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().nonnegative().optional(),
   // Background warmer for the default players-list pages.
   PLAYERS_LIST_WARM_PAGES: z.coerce.number().int().positive().optional(),
   PLAYERS_LIST_WARM_INTERVAL_MS: z.coerce.number().int().positive().optional(),

@@ -4,6 +4,7 @@ import logger from '@/lib/logger';
 import { wrapPoolQuery } from '@/lib/db-query-logger';
 import { validateEnv } from '@/lib/env';
 import { onShutdown } from '@/lib/shutdown';
+import { applyStatementTimeout } from '@/lib/timeout';
 
 // Check if in build phase - skip validation during build
 const isBuildPhase = process.env.npm_lifecycle_event === 'build' ||
@@ -51,6 +52,9 @@ pool.on('enqueue', () => {
 
 // Wrap the pool with slow query logging
 wrapPoolQuery(pool, { prefix: 'DB' });
+
+// Cap statements server-side so a timed-out query releases its connection
+applyStatementTimeout(pool, 'DB');
 
 // Initialize database connection and pre-warm caches at server startup
 async function initializeDatabase() {
