@@ -3,9 +3,8 @@ import { fetchServersFromGame } from './cache';
 import { cacheSet } from './valkey-cache';
 import logger from './logger';
 import { createBackgroundRefresh } from './background-refresh';
+import { SERVER_CACHE_KEY, SERVER_CACHE_TTL } from './cache-keys';
 
-const SERVER_CACHE_KEY = 'surfstats:server:all';
-const SERVER_CACHE_TTL = 30; // 30 seconds
 const REFRESH_INTERVAL_MS = 30_000; // 30 seconds
 
 const { start: startServerBackgroundRefresh } = createBackgroundRefresh({

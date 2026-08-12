@@ -11,27 +11,25 @@ import {
   getPercentileTimesFromCache,
 } from './valkey-map-stats-cache';
 import { getAllMapMetadataFromCache, getMapMetadataFromCache } from './valkey-map-cache';
+import { mapKey, MAP_STATS_SUFFIXES, wrCheckpointSuffix } from './cache-keys';
 import { getErrorMessage } from './errors';
-import { onShutdown } from './shutdown';
+import { createBackgroundRefresh } from './background-refresh';
 
-// Configuration
+// Pacing: all seven series run under the expensive-query semaphore, so keep the
+// sweep's share of it small enough that page renders still get connections.
 const BATCH_SIZE = 20;
-const BATCH_DELAY_MS = 50;
+const BATCH_DELAY_MS = 1_000;
 const REFRESH_INTERVAL_MS = 43200_000; // 12 hours
-const REFRESH_JITTER_MS = 300_000; // +/- 5 minutes jitter
-const MAX_CONCURRENT = 5;
-
-// Refresh timers per map (for background refresh)
-const refreshTimers = new Map<string, ReturnType<typeof setTimeout>>();
-
-// Guards startMapGraphPrecache against re-running if the module re-initializes.
-let precacheStarted = false;
+const MAX_CONCURRENT = 2;
 
 /**
  * Refresh all graph data points for a single map from the database.
  * Deletes the cached series first so the *FromCache calls cold-miss and
  * repopulate from the DB (rather than re-extending stale entries), and each
  * call writes its own key — no second write here.
+ *
+ * Deleted keys use the same suffixes the fetchers do, so a rename can't leave this
+ * deleting nothing.
  */
 async function precacheMapGraphs(mapname: string): Promise<void> {
   try {
@@ -41,15 +39,11 @@ async function precacheMapGraphs(mapname: string): Promise<void> {
     const maxCheckpoint = checkpoints > 0 ? checkpoints : stages;
 
     // Force a fresh DB read on the next fetch.
-    await client.del([
-      `surfstats:map:${mapname}:stats:completions`,
-      `surfstats:map:${mapname}:stats:time-on-map`,
-      `surfstats:map:${mapname}:stats:checkpoints`,
-      `surfstats:map:${mapname}:stats:wr-checkpoint:${maxCheckpoint}`,
-      `surfstats:map:${mapname}:stats:finish-time`,
-      `surfstats:map:${mapname}:stats:bonus-time`,
-      `surfstats:map:${mapname}:stats:percentiles`,
-    ]);
+    await client.del(
+      [...Object.values(MAP_STATS_SUFFIXES), wrCheckpointSuffix(maxCheckpoint)].map(suffix =>
+        mapKey(mapname, suffix)
+      )
+    );
 
     // Each call reads from the DB (cache now empty) and writes its own key.
     await Promise.all([
@@ -66,29 +60,6 @@ async function precacheMapGraphs(mapname: string): Promise<void> {
   } catch (error) {
     logger.warn(`[MapGraphPrecache] Failed to cache graphs for ${mapname}: ${getErrorMessage(error)}`);
   }
-}
-
-/**
- * Start background refresh for a single map with jitter.
- * Called after initial precache and periodically thereafter.
- */
-function startMapRefresh(mapname: string): void {
-  // Clear existing timer if any
-  const existing = refreshTimers.get(mapname);
-  if (existing) {
-    clearTimeout(existing);
-  }
-
-  // Random jitter: 11.5 to 12.5 hours
-  const jitter = (Math.random() * 2 - 1) * REFRESH_JITTER_MS;
-  const interval = REFRESH_INTERVAL_MS + jitter;
-
-  const timer = setTimeout(async () => {
-    await precacheMapGraphs(mapname);
-    startMapRefresh(mapname); // Reschedule
-  }, interval);
-
-  refreshTimers.set(mapname, timer);
 }
 
 /**
@@ -109,58 +80,32 @@ async function processBatch(mapNames: string[]): Promise<void> {
 }
 
 /**
- * Start the map graph precache at application startup.
- * - Fetches all map names from cache
- * - Processes them in rate-limited batches
- * - Starts background refresh timers for each map
- * - Non-blocking: server is ready immediately
+ * Refresh every map's chart series once, in paced batches. One sweep per interval
+ * replaces a ~1,000-timer per-map tree; the batch pacing already spreads the load.
  */
-export function startMapGraphPrecache(): void {
-  if (precacheStarted) {
-    logger.debug('[MapGraphPrecache] Precache already started');
-    return;
-  }
-  precacheStarted = true;
+async function precacheAllMapGraphs(): Promise<void> {
+  const metadata = await getAllMapMetadataFromCache();
+  const mapNames = Array.from(metadata.keys());
+  logger.info(`[MapGraphPrecache] Refreshing graphs for ${mapNames.length} maps`);
 
-  logger.info('[MapGraphPrecache] Starting map graph precache...');
+  for (let i = 0; i < mapNames.length; i += BATCH_SIZE) {
+    await processBatch(mapNames.slice(i, i + BATCH_SIZE));
 
-  // Fire and forget - don't block server readiness
-  (async () => { // eslint-disable-line @typescript-eslint/no-floating-promises
-    try {
-      const metadata = await getAllMapMetadataFromCache();
-      const mapNames = Array.from(metadata.keys());
-      logger.info(`[MapGraphPrecache] Found ${mapNames.length} maps to precache`);
-
-      // Process in batches with delay between each batch
-      for (let i = 0; i < mapNames.length; i += BATCH_SIZE) {
-        const batch = mapNames.slice(i, i + BATCH_SIZE);
-        await processBatch(batch);
-
-        // Delay between batches (except after the last one)
-        if (i + BATCH_SIZE < mapNames.length) {
-          await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
-        }
-      }
-
-      logger.info(`[MapGraphPrecache] Precache complete for ${mapNames.length} maps`);
-
-      // Start background refresh timers for each map
-      for (const mapname of mapNames) {
-        startMapRefresh(mapname);
-      }
-
-      logger.info(`[MapGraphPrecache] Background refresh started for ${mapNames.length} maps`);
-    } catch (error) {
-      logger.error(`[MapGraphPrecache] Failed to start precache: ${getErrorMessage(error)}`);
+    // Delay between batches (except after the last one)
+    if (i + BATCH_SIZE < mapNames.length) {
+      await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
     }
-  })();
+  }
+
+  logger.info(`[MapGraphPrecache] Precache complete for ${mapNames.length} maps`);
 }
 
-// Graceful shutdown: clear all refresh timers.
-onShutdown('map-graph-precache', () => {
-  for (const [mapname, timer] of refreshTimers) {
-    clearTimeout(timer);
-    refreshTimers.delete(mapname);
-  }
-  logger.info('[MapGraphPrecache] All refresh timers cleared');
+const { start: startMapGraphPrecache } = createBackgroundRefresh({
+  name: 'MapGraphPrecache',
+  intervalMs: REFRESH_INTERVAL_MS,
+  task: precacheAllMapGraphs,
+  startupDetail: `every ${REFRESH_INTERVAL_MS / 3600_000}h`,
 });
+
+/** Non-blocking: the first sweep runs in the background, then every 12 hours. */
+export { startMapGraphPrecache };

@@ -6,8 +6,13 @@ import type { RowDataPacket } from 'mysql2';
 import { getMapMetadataFromCache } from './valkey-map-cache';
 import { isStagedMap } from './map-cache';
 import { validateMapName } from './validators';
+import { MAP_STATS_SUFFIXES, wrCheckpointSuffix } from './cache-keys';
 
 const STATS_CACHE_TTL = 43200; // 12 hours
+
+// Every fetcher here aggregates over ck_playertimes/ck_checkpoints/ck_bonus, so all
+// of them pass `expensive: true`; otherwise the precache floods the 20-connection
+// pool with concurrent aggregates while page renders wait.
 
 interface CompletionsOverTimeData extends RowDataPacket {
   date: string;
@@ -85,10 +90,11 @@ export async function getWRCheckpointTimesFromCache(
 
   return mapCachedFetch<Array<{ checkpoint: number; time: number }> | undefined>({
     mapname,
-    keySuffix: `stats:wr-checkpoint:${maxCheckpoint}`,
+    keySuffix: wrCheckpointSuffix(maxCheckpoint),
     ttl: STATS_CACHE_TTL,
     empty: undefined,
     errorLabel: 'WR checkpoint times',
+    expensive: true,
     errorLevel: 'warn',
     fetch: async (validMapname) => {
       const mapMetadata = await getMapMetadataFromCache(validMapname);
@@ -151,7 +157,7 @@ export async function getWRCheckpointTimesFromCache(
 export async function getCheckpointStatsFromCache(mapname: string): Promise<CheckpointStatsResult> {
   return mapCachedFetch<CheckpointStatsResult>({
     mapname,
-    keySuffix: 'stats:checkpoints',
+    keySuffix: MAP_STATS_SUFFIXES.checkpoints,
     ttl: STATS_CACHE_TTL,
     empty: { checkpointAvgTimes: [] },
     errorLabel: 'checkpoint stats',
@@ -205,10 +211,11 @@ export async function getBonusCompletionsOverTimeFromCache(
 ): Promise<Record<number, Array<{ date: string; count: number }>>> {
   return mapCachedFetch<Record<number, Array<{ date: string; count: number }>>>({
     mapname,
-    keySuffix: 'stats:bonus-time',
+    keySuffix: MAP_STATS_SUFFIXES.bonusTime,
     ttl: STATS_CACHE_TTL,
     empty: {},
     errorLabel: 'bonus completions over time',
+    expensive: true,
     errorLevel: 'warn',
     fetch: async (validMapname) => {
       const [bonusRows] = await pool.query<BonusTimeSeriesData[]>(`
@@ -246,10 +253,11 @@ export async function getBonusCompletionsOverTimeFromCache(
 export async function getCompletionsOverTimeFromCache(mapname: string): Promise<Array<{ date: string; count: number }>> {
   return mapCachedFetch<Array<{ date: string; count: number }>>({
     mapname,
-    keySuffix: 'stats:completions',
+    keySuffix: MAP_STATS_SUFFIXES.completions,
     ttl: STATS_CACHE_TTL,
     empty: [],
     errorLabel: 'completions over time',
+    expensive: true,
     errorLevel: 'warn',
     fetch: async (validMapname) => {
       const [completionsRows] = await pool.query<CompletionsOverTimeData[]>(`
@@ -286,7 +294,7 @@ export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<
 
   return mapCachedFetch<Array<{ date: string; totalDuration: number }>>({
     mapname,
-    keySuffix: 'stats:time-on-map',
+    keySuffix: MAP_STATS_SUFFIXES.timeOnMap,
     ttl: STATS_CACHE_TTL,
     empty: [],
     errorLabel: 'time on map data',
@@ -323,10 +331,11 @@ export async function getTimeOnMapDataFromCache(mapname: string): Promise<Array<
 export async function getFinishTimeDataFromCache(mapname: string): Promise<{ avgTime: number | null; wrTime: number | null }> {
   return mapCachedFetch<{ avgTime: number | null; wrTime: number | null }>({
     mapname,
-    keySuffix: 'stats:finish-time',
+    keySuffix: MAP_STATS_SUFFIXES.finishTime,
     ttl: STATS_CACHE_TTL,
     empty: { avgTime: null, wrTime: null },
     errorLabel: 'finish time data',
+    expensive: true,
     errorLevel: 'warn',
     fetch: async (validMapname) => {
       const [finishRows] = await pool.query<RowDataPacket[]>(`
@@ -369,10 +378,11 @@ export async function getPercentileTimesFromCache(
     avgTime: number | null;
   } | null>({
     mapname,
-    keySuffix: 'stats:percentiles',
+    keySuffix: MAP_STATS_SUFFIXES.percentiles,
     ttl: STATS_CACHE_TTL,
     empty: null,
     errorLabel: 'percentile times',
+    expensive: true,
     errorLevel: 'warn',
     fetch: async (validMapname) => {
       // First, get count, min (WR), and avg in a single query

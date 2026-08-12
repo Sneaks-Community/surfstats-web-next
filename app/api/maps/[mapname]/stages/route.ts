@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { validateSearchQuery } from '@/lib/validators';
-import { resolveMapnameParam, parsePageParams, apiError, SEARCH_CACHE_CONTROL, RECORDS_CACHE_CONTROL } from '@/lib/api-utils';
+import { resolveMapnameParam, parsePageParams, apiError, SEARCH_CACHE_CONTROL, RECORDS_CACHE_CONTROL, RECORDS_PAGE_SIZE } from '@/lib/api-utils';
 import { parseIntParam } from '@/lib/utils';
 import { getStageRecordsFromCache, searchStageRecordsFromCache } from '@/lib/valkey-map-records-cache';
 import { getStagesByMapFromCache } from '@/lib/valkey-registry-cache';
-
-const DEFAULT_PAGE_SIZE = 100;
-const MAX_PAGE_SIZE = 100;
 
 export async function GET(
   request: NextRequest,
@@ -45,7 +42,7 @@ export async function GET(
     }
   }
 
-  const { page, pageSize } = parsePageParams(searchParams, DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE);
+  const { page, pageSize } = parsePageParams(searchParams, RECORDS_PAGE_SIZE, RECORDS_PAGE_SIZE);
   const offset = (page - 1) * pageSize;
 
   if (!stageExists) {

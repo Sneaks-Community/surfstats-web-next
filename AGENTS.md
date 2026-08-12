@@ -38,6 +38,7 @@ components/     Shared UI (nav, search, filters, badges, pagination, tables, cha
 hooks/          Client hooks (useDebounce, usePagination)
 lib/            Server logic: db, caching, analytics, steam, validators, theme, env
 types/          Type defs
+instrumentation.ts  Startup hook (runs once per server): defers to lib/startup.ts
 proxy.ts        Next proxy (middleware): rate limit, origin guard, cache-readiness gate for /api/* and pages
 sql/            Reference schema (surf85.sql) + performance-index migrations; add new index migrations here
 ```
@@ -50,7 +51,9 @@ API routes: `maps/[mapname]/{records,bonuses,stages}`, `players/[steamid]/{maps,
 
 **Database.** Use the pools in [`lib/db.ts`](lib/db.ts) (main ckSurf DB, default `cksurf`) and [`lib/db-analytics.ts`](lib/db-analytics.ts) (optional `player_analytics_surf`, degrades gracefully if absent). Both wrap queries via [`wrapPoolQuery`](lib/db-query-logger.ts) for slow-query logging. Parameterized queries only. Expensive scans go through the semaphore in [`lib/db-semaphore.ts`](lib/db-semaphore.ts). Never query the DB directly from components — use cached lib functions.
 
-**Caching.** Valkey (Redis-compatible), cache-aside. Client in [`lib/valkey.ts`](lib/valkey.ts); per-domain caches in `lib/valkey-*.ts` and `lib/*-cache.ts`. All keys use the `surfstats:` prefix. If Valkey is unreachable, `proxy.ts` serves a "temporarily unavailable" page rather than running uncached queries.
+**Caching.** Valkey (Redis-compatible), cache-aside. Client in [`lib/valkey.ts`](lib/valkey.ts); per-domain caches in `lib/valkey-*.ts` and `lib/*-cache.ts`. All keys use the `surfstats:` prefix. Keys or TTLs that more than one module has to agree on live in [`lib/cache-keys.ts`](lib/cache-keys.ts); build them from there, never as a second literal. If Valkey is unreachable, `proxy.ts` serves a "temporarily unavailable" page rather than running uncached queries.
+
+**Startup and background work.** Nothing starts at module scope: [`instrumentation.ts`](instrumentation.ts) → [`lib/startup.ts`](lib/startup.ts) is the single hook (env validation, DB probe + cache pre-warm, then the background tasks). Every recurring task goes through [`createBackgroundRefresh`](lib/background-refresh.ts), which is idempotent across module re-evaluations and clears its timer via [`onShutdown`](lib/shutdown.ts).
 
 **Validation.** Zod schemas in [`lib/validators.ts`](lib/validators.ts) (`validateMapName`, `validateSteamId`, `validateSearchQuery`, `validatePlayerName`). Never hand-roll sanitization. Env is validated at boot in [`lib/env.ts`](lib/env.ts).
 

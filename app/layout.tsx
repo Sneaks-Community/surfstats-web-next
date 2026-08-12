@@ -4,25 +4,11 @@ import { Navigation } from '@/components/navigation';
 import { MapImagesUrlProvider } from '@/lib/MapImagesUrlContext';
 import { ThemeProvider } from '@/lib/theme-context';
 import { generateThemeStyles } from '@/lib/theme-config';
-import { validateEnv } from '@/lib/env';
 import { getSiteUrl } from '@/lib/site-url';
 import { getMapImagesUrl } from '@/lib/utils';
-import { startServerBackgroundRefresh } from '@/lib/server-background-refresh';
-import { startMapGraphPrecache } from '@/lib/map-graph-precache';
-import { startPlayersListBackgroundRefresh } from '@/lib/players-list-background-refresh';
 
-// Validate environment configuration at startup (fail fast on missing required
-// vars; warn on unset optional features).
-validateEnv();
-
-// Start background server refresh on server startup
-startServerBackgroundRefresh();
-
-// Start map graph precache at server startup (fire-and-forget, non-blocking)
-startMapGraphPrecache();
-
-// Keep the most-browsed players-list pages warm so they're always a cache hit
-startPlayersListBackgroundRefresh();
+// Startup work lives in instrumentation.ts -> lib/startup.ts; a layout module is
+// not a startup hook (it can be evaluated more than once per process).
 
 // Force dynamic rendering to read environment variables at runtime, not build time
 export const dynamic = 'force-dynamic';

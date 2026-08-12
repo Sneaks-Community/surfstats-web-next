@@ -4,6 +4,7 @@ import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
 import { getCountryNamesFromCode, getCountryCodeFromName, UNKNOWN_COUNTRY_CODE } from '@/lib/countries';
 import { cachedFetch } from './cached-fetch';
+import { PLAYERS_PAGE_SIZE } from './player-cache';
 import { getErrorCode, getErrorMessage } from './errors';
 
 /**
@@ -234,7 +235,7 @@ function countryWhereClause(countryNames: string[]): string {
 const getCountryPlayersInternal = async (
   countryCode: string,
   page = 1,
-  limit = 20,
+  limit = PLAYERS_PAGE_SIZE,
   sort: PlayerSortKey = 'rank',
   order: SortOrder = 'desc'
 ): Promise<{ players: CountryPlayer[]; total: number; totalPages: number; countryName: string }> => {
@@ -315,7 +316,7 @@ const COUNTRIES_PLAYERS_TTL = 86400; // 24 hours — matches country ranking/sta
 export async function getCountryPlayers(
   countryCode: string,
   page = 1,
-  limit = 20,
+  limit = PLAYERS_PAGE_SIZE,
   sort: PlayerSortKey = 'rank',
   order: SortOrder = 'desc'
 ): Promise<{ players: CountryPlayer[]; total: number; totalPages: number; countryName: string }> {

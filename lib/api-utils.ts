@@ -48,6 +48,13 @@ export function resolveSteamIdParam(raw: string): string | NextResponse {
 export const MAX_PAGE = 10000;
 
 /**
+ * Rows per page (and the max) for the record/stage/bonus endpoints; keeps cache
+ * entries under 2MB. The map page's first page and the client's load-all loop
+ * use the same value, so all four sites have to agree.
+ */
+export const RECORDS_PAGE_SIZE = 100;
+
+/**
  * Parse and clamp `page`/`pageSize` search params. NaN/negative/oversized inputs
  * fall back or clamp rather than producing invalid offsets. `page` is capped at
  * `maxPage` (default {@link MAX_PAGE}).

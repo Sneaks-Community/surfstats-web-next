@@ -1,6 +1,7 @@
 import 'server-only';
 import logger from '@/lib/logger';
 import { cacheGet, cacheSet } from './valkey-cache';
+import { steamAvatarKey, STEAM_AVATAR_TTL } from './cache-keys';
 import { getErrorMessage } from './errors';
 
 /**
@@ -95,8 +96,6 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
   }
 }
 
-const STEAM_AVATAR_TTL = 604800; // 7 days
-
 /**
  * Get Steam profiles from Valkey cache
  * @param steamIds - Array of SteamIDs to fetch avatars for
@@ -116,8 +115,7 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
     // Check cache for each SteamID first
     const uncachedSteamIds: string[] = [];
     for (const steamId of steamIds) {
-      const cacheKey = `surfstats:steam:avatar:${steamId}`;
-      const cached = await cacheGet<SteamAvatarSet>(cacheKey);
+      const cached = await cacheGet<SteamAvatarSet>(steamAvatarKey(steamId));
       if (cached) {
         result.set(steamId, cached);
       } else {
@@ -158,8 +156,7 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
           result.set(originalSteamId, avatarData);
           
           // Cache the result
-          const cacheKey = `surfstats:steam:avatar:${originalSteamId}`;
-          await cacheSet(cacheKey, avatarData, STEAM_AVATAR_TTL);
+          await cacheSet(steamAvatarKey(originalSteamId), avatarData, STEAM_AVATAR_TTL);
         }
       }
     }

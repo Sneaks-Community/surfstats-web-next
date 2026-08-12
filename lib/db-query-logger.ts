@@ -9,16 +9,22 @@ export interface DbQueryLoggerOptions {
   slowThresholdMs?: number;
 }
 
+/** Marker so a re-evaluated module can't nest a second wrapper on one pool. */
+const WRAPPED = Symbol.for('surfstats.queryLoggerWrapped');
+
 /**
- * Wraps a MySQL pool's query method with slow query logging.
- * 
+ * Wraps a MySQL pool's `query` and `execute` with slow query logging.
+ *
  * Logs all queries at debug level.
  * Logs slow queries (>threshold) at both debug AND warn level.
  * Does NOT include query parameters in logs.
- * 
+ *
+ * Idempotent: re-wrapping a pool is a no-op (see WRAPPED), so a re-evaluated
+ * module can't make every query log twice.
+ *
  * @param pool - The MySQL pool to wrap
  * @param options - Configuration options
- * 
+ *
  * @example
  * wrapPoolQuery(pool, { prefix: 'DB' });
  * wrapPoolQuery(analyticsPool, { prefix: 'Analytics DB' });
@@ -28,41 +34,53 @@ export function wrapPoolQuery(
   options: DbQueryLoggerOptions
 ): void {
   const { prefix, slowThresholdMs = 1000 } = options;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const originalQuery = pool.query.bind(pool) as any;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  pool.query = async (...args: any[]) => {
-    const queryPreview = typeof args[0] === 'string'
-      ? args[0].substring(0, 600) + (args[0].length > 600 ? '...' : '')
-      : 'prepared statement';
+  const marked = pool as mysql.Pool & { [WRAPPED]?: boolean };
+  if (marked[WRAPPED]) {
+    logger.debug(`[${prefix}] Query logging already installed`);
+    return;
+  }
+  marked[WRAPPED] = true;
 
-    try {
-      const startTime = Date.now();
-      const result = await originalQuery(...args);
-      const duration = Date.now() - startTime;
-
-      // Log all queries at debug level
-      logger.debug(`[${prefix}] Query executed in ${duration}ms: ${queryPreview}`);
-
-      // Log slow queries as warning
-      if (duration > slowThresholdMs) {
-        logger.warn(`[${prefix}] Slow query detected (${duration}ms): ${queryPreview}`);
-      }
-
-      return result;
+  // `execute` is a separate mysql2 code path; wrapping only `query` would lose
+  // logging for prepared-statement call sites.
+  for (const method of ['query', 'execute'] as const) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) {
-      const errorCode = error.code || 'UNKNOWN';
-      const errorMessage = error.message || 'Unknown error';
+    const original = pool[method].bind(pool) as any;
 
-      // Log all errors with context
-      logger.error(`[${prefix}] Database error (${errorCode}): ${errorMessage}`);
-      logger.error(`[${prefix}] Query: ${queryPreview}`);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (pool as any)[method] = async (...args: any[]) => {
+      const queryPreview = typeof args[0] === 'string'
+        ? args[0].substring(0, 600) + (args[0].length > 600 ? '...' : '')
+        : 'prepared statement';
 
-      // Rethrow all errors to allow callers to handle or propagate them
-      // Returning empty arrays silently masks failures and causes incorrect cached data
-      throw error;
-    }
-  };
+      try {
+        const startTime = Date.now();
+        const result = await original(...args);
+        const duration = Date.now() - startTime;
+
+        // Log all queries at debug level
+        logger.debug(`[${prefix}] Query executed in ${duration}ms: ${queryPreview}`);
+
+        // Log slow queries as warning
+        if (duration > slowThresholdMs) {
+          logger.warn(`[${prefix}] Slow query detected (${duration}ms): ${queryPreview}`);
+        }
+
+        return result;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (error: any) {
+        const errorCode = error.code || 'UNKNOWN';
+        const errorMessage = error.message || 'Unknown error';
+
+        // Log all errors with context
+        logger.error(`[${prefix}] Database error (${errorCode}): ${errorMessage}`);
+        logger.error(`[${prefix}] Query: ${queryPreview}`);
+
+        // Rethrow all errors to allow callers to handle or propagate them
+        // Returning empty arrays silently masks failures and causes incorrect cached data
+        throw error;
+      }
+    };
+  }
 }

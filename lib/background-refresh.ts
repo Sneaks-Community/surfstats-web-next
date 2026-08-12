@@ -7,9 +7,9 @@ import { onShutdown } from './shutdown';
  * Configuration for {@link createBackgroundRefresh}.
  */
 export interface BackgroundRefreshConfig {
-  /** Log prefix / identifier, e.g. "ServerRefresh". */
+  /** Log prefix / identifier, e.g. "ServerRefresh". Also the registry key. */
   name: string;
-  /** Refresh interval in milliseconds. */
+  /** Refresh interval in ms; `<= 0` runs the task once at startup, no timer. */
   intervalMs: number;
   /**
    * The refresh work. May throw — errors are caught and logged so a transient
@@ -31,10 +31,18 @@ export interface BackgroundRefresh {
   start: () => void;
 }
 
+// Timers live on globalThis: Next evaluates lib modules in several bundles per
+// process, so a module-scoped handle would let each copy start its own refresher.
+// Same shape as the registry in lib/shutdown.ts.
+const globalForRefresh = globalThis as unknown as {
+  __surfstatsRefreshTimers?: Map<string, ReturnType<typeof setInterval> | 'once'>;
+};
+
+const timers = (globalForRefresh.__surfstatsRefreshTimers ??= new Map());
+
 /**
- * Factory for the "run a task now, then on a fixed interval, and clear the timer
- * on shutdown" pattern shared by the server-status and players-list warmers.
- * Extracted from the two near-identical background-refresh modules.
+ * Run a task now, then on a fixed interval, clearing the timer on shutdown.
+ * Every background task in the app goes through here.
  */
 export function createBackgroundRefresh({
   name,
@@ -42,8 +50,6 @@ export function createBackgroundRefresh({
   task,
   startupDetail,
 }: BackgroundRefreshConfig): BackgroundRefresh {
-  let refreshTimer: ReturnType<typeof setInterval> | null = null;
-
   const runTask = async (): Promise<void> => {
     try {
       await task();
@@ -53,15 +59,23 @@ export function createBackgroundRefresh({
   };
 
   const start = (): void => {
-    if (refreshTimer) {
+    if (timers.has(name)) {
       logger.debug(`[${name}] Background refresh already running`);
       return;
     }
 
+    // Claim the slot before the first run so a double-call can't start two copies.
+    timers.set(name, 'once');
+
     // Immediate initial run so data is hot right away (runTask swallows errors).
     void runTask();
 
-    refreshTimer = setInterval(() => void runTask(), intervalMs);
+    if (intervalMs <= 0) {
+      logger.info(`[${name}] Ran once at startup, periodic refresh disabled`);
+      return;
+    }
+
+    timers.set(name, setInterval(() => void runTask(), intervalMs));
 
     logger.info(
       `[${name}] Background refresh started${startupDetail ? ` (${startupDetail})` : ''}`
@@ -69,9 +83,10 @@ export function createBackgroundRefresh({
   };
 
   onShutdown(`background-refresh:${name}`, () => {
-    if (refreshTimer) {
-      clearInterval(refreshTimer);
-      refreshTimer = null;
+    const timer = timers.get(name);
+    timers.delete(name);
+    if (timer && timer !== 'once') {
+      clearInterval(timer);
       logger.info(`[${name}] Background refresh stopped`);
     }
   });

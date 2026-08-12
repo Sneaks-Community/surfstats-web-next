@@ -56,12 +56,14 @@ wrapPoolQuery(pool, { prefix: 'DB' });
 // Cap statements server-side so a timed-out query releases its connection
 applyStatementTimeout(pool, 'DB');
 
-// Initialize database connection and pre-warm caches at server startup
-async function initializeDatabase() {
+/**
+ * Probe the connection and pre-warm the caches. Called once from `lib/startup.ts`,
+ * never at module scope (a lib module can be evaluated in several bundles).
+ *
+ * @returns whether the probe succeeded; gates the map-graph precache.
+ */
+export async function initializeDatabase(): Promise<boolean> {
   logger.info('[DB] Initializing database connection...');
-
-  // Validate env vars at runtime (fail fast if missing)
-  validateEnv();
 
   try {
     // Test connection
@@ -76,6 +78,7 @@ async function initializeDatabase() {
     await prewarmCaches();
     
     logger.info('[DB] Initialization complete');
+    return true;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     const errorCode = error.code || 'UNKNOWN';
@@ -91,26 +94,16 @@ async function initializeDatabase() {
     } else if (error.code === 'ER_BAD_DB_ERROR') {
       logger.error('[DB] Hint: Verify the database name and ensure it exists');
     }
+    return false;
   }
 }
 
-// Run initialization only at runtime, not during build
-// This prevents connection errors during Docker builds when MySQL isn't available
-if (!isBuildPhase) {
-  if (typeof window === 'undefined') {
-    setImmediate(() => {
-      initializeDatabase().catch((err: unknown) => {
-        const message = err instanceof Error ? err.message : String(err);
-        logger.error({ msg: '[DB] Deferred initialization failed', error: message });
-      });
-    });
-
-    // Graceful shutdown: drain the pool so open connections close cleanly.
-    onShutdown('db-pool', async () => {
-      await pool.end();
-      logger.info('[DB] Connection pool closed');
-    });
-  }
+// Graceful shutdown: drain the pool so open connections close cleanly.
+if (!isBuildPhase && typeof window === 'undefined') {
+  onShutdown('db-pool', async () => {
+    await pool.end();
+    logger.info('[DB] Connection pool closed');
+  });
 }
 
 export default pool;

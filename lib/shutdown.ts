@@ -41,21 +41,31 @@ async function runShutdown(signal: string): Promise<void> {
   if (registry.shuttingDown) return;
   registry.shuttingDown = true;
 
-  const handlers = [...registry.handlers.values()];
+  const handlers = [...registry.handlers.entries()];
   logger.info(`[Shutdown] Received ${signal}, running ${handlers.length} cleanup handler(s)...`);
 
+  let failed = 0;
   await Promise.allSettled(
-    handlers.map(async (handler) => {
+    handlers.map(async ([name, handler]) => {
       try {
         await handler();
       } catch (error) {
-        logger.error(`[Shutdown] Cleanup handler failed: ${getErrorMessage(error)}`);
+        failed++;
+        logger.error(`[Shutdown] Cleanup handler "${name}" failed: ${getErrorMessage(error)}`);
       }
     })
   );
 
-  logger.info('[Shutdown] Cleanup complete, exiting');
-  process.exit(0);
+  // Non-zero exit so an orchestrator can tell an unclean shutdown from a clean one.
+  if (failed > 0) {
+    logger.error(`[Shutdown] ${failed} cleanup handler(s) failed, exiting uncleanly`);
+  } else {
+    logger.info('[Shutdown] Cleanup complete, exiting');
+  }
+
+  // process.exit truncates pino's buffer; flush the line above first.
+  logger.flush();
+  process.exit(failed > 0 ? 1 : 0);
 }
 
 /**

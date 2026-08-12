@@ -432,8 +432,7 @@ export async function getTotalsFromCache(): Promise<{
 // ============================================================
 // CACHE PREWARMING
 // ============================================================
-// This function is called from the root layout to pre-warm caches
-// on first request.
+// Called once at startup via lib/startup.ts, so the first request is a cache hit.
 
 export async function prewarmCaches(): Promise<void> {
   logger.info('[Cache] Pre-warming caches...');

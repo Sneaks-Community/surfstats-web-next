@@ -5,9 +5,14 @@ import { wrapPoolQuery } from '@/lib/db-query-logger';
 import { getErrorMessage } from './errors';
 import { onShutdown } from './shutdown';
 import { applyStatementTimeout } from './timeout';
+import { createBackgroundRefresh } from './background-refresh';
 
-// Track whether the analytics database connection is actually working
-let analyticsConnectionHealthy = false;
+// Health flag on globalThis: only one module evaluation wins the shared probe slot
+// (lib/background-refresh.ts), so other copies must read its result instead of
+// their own permanently-false flag.
+const globalForAnalytics = globalThis as unknown as {
+  __surfstatsAnalyticsHealthy?: boolean;
+};
 
 // Analytics is opt-in: it needs one of its own env vars. Falling back to
 // MYSQL_HOST/MYSQL_DATABASE made this always true (they are required to boot),
@@ -75,7 +80,6 @@ function resolveHealthCheckIntervalMs(): number {
 
 const HEALTHCHECK_INTERVAL_MS = resolveHealthCheckIntervalMs();
 
-let healthCheckTimer: ReturnType<typeof setInterval> | null = null;
 // Tracks the last state we logged so a steady connection doesn't spam the log —
 // we only emit on the first probe and on each subsequent up<->down transition.
 let lastLoggedHealthy: boolean | null = null;
@@ -88,13 +92,13 @@ async function checkAnalyticsConnection(): Promise<void> {
     const connection = await analyticsPool.getConnection();
     await connection.ping();
     connection.release();
-    analyticsConnectionHealthy = true;
+    globalForAnalytics.__surfstatsAnalyticsHealthy = true;
     if (lastLoggedHealthy !== true) {
       logger.info('[Analytics DB] Database connection is healthy - analytics features enabled');
       lastLoggedHealthy = true;
     }
   } catch (error: unknown) {
-    analyticsConnectionHealthy = false;
+    globalForAnalytics.__surfstatsAnalyticsHealthy = false;
     if (lastLoggedHealthy !== false) {
       logger.warn(
         `[Analytics DB] Database connection unavailable: ${getErrorMessage(error)} - analytics features disabled until it recovers`
@@ -104,47 +108,30 @@ async function checkAnalyticsConnection(): Promise<void> {
   }
 }
 
-// Start the analytics health monitor: one immediate probe at startup, then a
-// periodic re-probe on the configured interval. Idempotent - safe to call more
-// than once.
-function startAnalyticsHealthCheck(): void {
-  // Skip entirely if not configured
+// Shared background-refresh mechanism, for its idempotency and shutdown cleanup.
+const analyticsHealthCheck = createBackgroundRefresh({
+  name: 'Analytics DB',
+  intervalMs: HEALTHCHECK_INTERVAL_MS,
+  task: checkAnalyticsConnection,
+  startupDetail: `health probe every ${HEALTHCHECK_INTERVAL_MS}ms`,
+});
+
+/**
+ * One immediate probe so {@link isAnalyticsAvailable} is accurate right away, then
+ * a re-probe every ANALYTICS_HEALTHCHECK_INTERVAL_MS (`<=0` disables it).
+ */
+export function startAnalyticsHealthCheck(): void {
   if (!isAnalyticsConfigured) {
     logger.info('[Analytics DB] Not configured - analytics features disabled');
     return;
   }
 
-  if (healthCheckTimer) {
-    logger.debug('[Analytics DB] Health check already running');
-    return;
-  }
-
   logger.info('[Analytics DB] Initializing database connection...');
-
-  // Immediate probe so isAnalyticsAvailable() is accurate right away
-  checkAnalyticsConnection(); // eslint-disable-line @typescript-eslint/no-floating-promises
-
-  if (HEALTHCHECK_INTERVAL_MS <= 0) {
-    logger.info('[Analytics DB] Periodic health re-check disabled (ANALYTICS_HEALTHCHECK_INTERVAL_MS<=0)');
-    return;
-  }
-
-  healthCheckTimer = setInterval(() => {
-    checkAnalyticsConnection(); // eslint-disable-line @typescript-eslint/no-floating-promises
-  }, HEALTHCHECK_INTERVAL_MS);
-  logger.info(`[Analytics DB] Periodic health re-check enabled (every ${HEALTHCHECK_INTERVAL_MS}ms)`);
+  analyticsHealthCheck.start();
 }
 
-// Start monitoring on module load
-startAnalyticsHealthCheck();
-
-// Graceful shutdown: stop the health monitor and drain the pool.
+// Graceful shutdown: drain the pool (background-refresh clears the probe timer).
 onShutdown('analytics-pool', async () => {
-  if (healthCheckTimer) {
-    clearInterval(healthCheckTimer);
-    healthCheckTimer = null;
-    logger.info('[Analytics DB] Health check stopped');
-  }
   await analyticsPool.end();
   logger.info('[Analytics DB] Connection pool closed');
 });
@@ -156,5 +143,5 @@ export default analyticsPool;
  * Returns true only if configured AND connection is working
  */
 export function isAnalyticsAvailable(): boolean {
-  return isAnalyticsConfigured && analyticsConnectionHealthy;
+  return isAnalyticsConfigured && globalForAnalytics.__surfstatsAnalyticsHealthy === true;
 }

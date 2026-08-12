@@ -1,6 +1,7 @@
 import 'server-only';
 import { cachedFetch } from './cached-fetch';
 import { validateMapName } from './validators';
+import { mapKey } from './cache-keys';
 import logger from './logger';
 import { getErrorMessage } from './errors';
 
@@ -10,7 +11,11 @@ import { getErrorMessage } from './errors';
 export interface MapCachedFetchOptions<T> {
   /** Raw (unvalidated) map name from the caller. */
   mapname: string;
-  /** Key part appended after the `surfstats:map:<validMapname>:` prefix. */
+  /**
+   * Key part appended after the `surfstats:map:<validMapname>:` prefix. Precached
+   * series must use a suffix from `MAP_STATS_SUFFIXES` (`lib/cache-keys.ts`), not a
+   * literal, or the precache's `DEL` silently stops matching them.
+   */
   keySuffix: string;
   /** Cache TTL in seconds. */
   ttl: number;
@@ -50,7 +55,7 @@ export function mapCachedFetch<T>({
     logger.warn(`[Cache] Invalid map name: ${mapname}`);
     return Promise.resolve(empty);
   }
-  const key = `surfstats:map:${validMapname}:${keySuffix}`;
+  const key = mapKey(validMapname, keySuffix);
 
   return cachedFetch<T>(key, ttl, () => fetch(validMapname), {
     lock: true,

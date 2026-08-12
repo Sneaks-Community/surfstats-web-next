@@ -12,9 +12,7 @@ import { isStagedMap } from '@/lib/map-cache';
 import { getMapMetadataFromCache } from '@/lib/valkey-map-cache';
 import { getMapRecordsFromCache } from '@/lib/valkey-map-records-cache';
 import { getMapChartDataFromCache } from '@/lib/valkey-map-stats-cache';
-
-// Default page size - keeps cache entry under 2MB (each record ~200 bytes, 100 records ~20KB)
-const DEFAULT_PAGE_SIZE = 100;
+import { RECORDS_PAGE_SIZE } from '@/lib/api-utils';
 
 export async function generateMetadata({ params }: { params: Promise<{ mapname: string }> }) {
   const { mapname } = await params;
@@ -66,7 +64,7 @@ export default async function MapProfilePage({
 
   const [map, recordsData, chartData] = await Promise.all([
     getMapMetadataFromCache(validMapname),
-    getMapRecordsFromCache(validMapname, 1, DEFAULT_PAGE_SIZE),
+    getMapRecordsFromCache(validMapname, 1, RECORDS_PAGE_SIZE),
     getMapChartDataFromCache(validMapname)
   ]);
   

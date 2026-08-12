@@ -6,6 +6,7 @@ import { getPlayerCountFromCache } from '@/lib/valkey-registry-cache';
 import { validateSearchQuery } from './validators';
 import { cachedFetch } from './cached-fetch';
 import { cacheSet } from './valkey-cache';
+import { playersListKey, PLAYERS_LIST_TTL } from './cache-keys';
 import { getErrorCode, getErrorMessage } from './errors';
 
 /**
@@ -148,9 +149,6 @@ async function fetchPlayersInternal(
   return { players: rows, total, totalPages: Math.ceil(total / limit) };
 }
 
-const PLAYERS_LIST_KEY = 'surfstats:players:list';
-const PLAYERS_LIST_TTL = 3600; // 1 hour
-
 /**
  * Get paginated players list from Valkey cache
  */
@@ -167,10 +165,8 @@ export async function getPlayersFromCache(
   const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
   const safeSearch = validateSearchQuery(search);
 
-  const cacheKey = `${PLAYERS_LIST_KEY}:${safePage}:${safeSearch}`;
-
   return cachedFetch(
-    cacheKey,
+    playersListKey(safePage, safeSearch),
     PLAYERS_LIST_TTL,
     () => fetchPlayersInternal(safePage, safeSearch),
     {
@@ -225,8 +221,8 @@ export async function warmPlayersListCache(pageCount: number): Promise<void> {
   for (let page = 1; page <= pageCount; page++) {
     const players = ranked.slice((page - 1) * pageSize, page * pageSize);
     if (players.length === 0) break; // fewer players than requested pages
-    // Key must match getPlayersFromCache's empty-search key exactly.
-    await cacheSet(`${PLAYERS_LIST_KEY}:${page}:`, { players, total, totalPages }, PLAYERS_LIST_TTL);
+    // Same builder as the read path, so the empty-search key can't drift.
+    await cacheSet(playersListKey(page, ''), { players, total, totalPages }, PLAYERS_LIST_TTL);
   }
 
   logger.debug(`[PlayerCache] Warmed ${Math.min(pageCount, Math.ceil(ranked.length / pageSize))} players-list page(s) from top ${ranked.length} players`);

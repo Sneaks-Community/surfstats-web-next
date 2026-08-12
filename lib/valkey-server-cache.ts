@@ -2,11 +2,9 @@ import 'server-only';
 import { cachedFetch } from './cached-fetch';
 import { fetchServersFromGame } from './cache';
 import type { ServerStatus } from './cache';
+import { SERVER_CACHE_KEY, SERVER_CACHE_TTL } from './cache-keys';
 
 export type { ServerStatus };
-
-const SERVER_CACHE_KEY = 'surfstats:server:all';
-const SERVER_CACHE_TTL = 30; // 30 seconds
 
 /**
  * Get server status from Valkey cache with request deduplication
