@@ -1,4 +1,5 @@
 import type {Metadata} from 'next';
+import { headers } from 'next/headers';
 import './globals.css'; // Global styles
 import { Navigation } from '@/components/navigation';
 import { MapImagesUrlProvider } from '@/lib/MapImagesUrlContext';
@@ -43,16 +44,20 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
-export default function RootLayout({children}: {children: React.ReactNode}) {
+export default async function RootLayout({children}: {children: React.ReactNode}) {
   const mapImagesUrl = getMapImagesUrl();
   const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats';
   const themeStyles = generateThemeStyles();
-  
+  // Set by proxy.ts. Next nonces its own scripts from the CSP header, but not
+  // one written by hand, so the theme bootstrap below needs it explicitly.
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
+
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <style dangerouslySetInnerHTML={{ __html: themeStyles }} />
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html: `
 (function() {

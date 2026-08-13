@@ -4,6 +4,15 @@ import { checkRateLimit } from '@/lib/rate-limit';
 import { isTrustedRequest } from '@/lib/origin-guard';
 import { waitForCacheReady } from '@/lib/valkey';
 import { cacheUnavailableHtml, tooManyRequestsHtml } from '@/lib/cache-unavailable-page';
+import { STATIC_SECURITY_HEADERS, contentSecurityPolicy } from '@/lib/security-headers';
+
+// `next.config.ts`'s headers() only runs for routes the app renders, so every
+// short-circuit below has to carry the security headers itself. None of them
+// contains a script, hence no nonce.
+const shortCircuitHeaders: Record<string, string> = {
+  ...STATIC_SECURITY_HEADERS,
+  'Content-Security-Policy': contentSecurityPolicy(),
+};
 
 // Runs on the Node.js runtime so it can reuse the node-redis Valkey client
 // (unavailable on Edge).
@@ -32,12 +41,13 @@ export async function proxy(request: NextRequest) {
     if (isApi) {
       return NextResponse.json(
         { error: 'Service temporarily unavailable' },
-        { status: 503, headers: { 'Retry-After': '5' } }
+        { status: 503, headers: { ...shortCircuitHeaders, 'Retry-After': '5' } }
       );
     }
     return new NextResponse(cacheUnavailableHtml(), {
       status: 503,
       headers: {
+        ...shortCircuitHeaders,
         'content-type': 'text/html; charset=utf-8',
         'Retry-After': '5',
         'X-Robots-Tag': 'noindex',
@@ -48,7 +58,7 @@ export async function proxy(request: NextRequest) {
   // The origin guard is API-only: pages must stay publicly reachable (direct
   // navigation and crawlers send no same-origin Referer/Origin).
   if (isApi && !isTrustedRequest(request)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: shortCircuitHeaders });
   }
 
   // Pages too, not just the API: they run the same user-parameterized heavy
@@ -68,6 +78,7 @@ export async function proxy(request: NextRequest) {
 
   if (!result.allowed) {
     const rateLimitHeaders = {
+      ...shortCircuitHeaders,
       'X-RateLimit-Limit': String(result.limit),
       'X-RateLimit-Remaining': '0',
       'Retry-After': String(result.resetSeconds),
@@ -90,7 +101,17 @@ export async function proxy(request: NextRequest) {
     });
   }
 
-  const response = NextResponse.next();
+  // A fresh nonce per request, forwarded on the request so Next can stamp it
+  // onto the scripts it emits (and so `app/layout.tsx` can read it back for the
+  // theme bootstrap), and set on the response so the browser enforces it.
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
+  const csp = contentSecurityPolicy(nonce);
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set('x-nonce', nonce);
+  requestHeaders.set('Content-Security-Policy', csp);
+
+  const response = NextResponse.next({ request: { headers: requestHeaders } });
+  response.headers.set('Content-Security-Policy', csp);
   response.headers.set('X-RateLimit-Limit', String(result.limit));
   response.headers.set('X-RateLimit-Remaining', String(result.remaining));
   return response;

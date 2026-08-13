@@ -84,7 +84,7 @@ Analytics DB: `player_analytics` (connection/time-on-server tracking).
 
 ## Config
 
-Env template in `.env.example` (validated by `lib/env.ts`). Required: `MYSQL_*`. Optional: `ANALYTICS_MYSQL_*`, `VALKEY_*`, `STEAM_API_KEY` (avatars/names), `SERVERS_JSON` (live status), `MAP_IMAGES_URL`, `RATE_LIMIT_*`, `ALLOWED_ORIGINS`, `DB_*` pool tuning, `PLAYERS_LIST_WARM_*`, `THEME_*`, `NEXT_PUBLIC_*`, `LOG_LEVEL`, `MAX_TIER`. Deploy via Docker (`output: 'standalone'`); security headers/CSP set in [`next.config.ts`](next.config.ts).
+Env template in `.env.example` (validated by `lib/env.ts`). Required: `MYSQL_*`. Optional: `ANALYTICS_MYSQL_*`, `VALKEY_*`, `STEAM_API_KEY` (avatars/names), `SERVERS_JSON` (live status), `MAP_IMAGES_URL`, `RATE_LIMIT_*`, `ALLOWED_ORIGINS`, `DB_*` pool tuning, `PLAYERS_LIST_WARM_*`, `THEME_*`, `NEXT_PUBLIC_*`, `LOG_LEVEL`, `MAX_TIER`. Deploy via Docker (`output: 'standalone'`); security headers live in [`lib/security-headers.ts`](lib/security-headers.ts), applied by [`next.config.ts`](next.config.ts) to rendered routes and by [`proxy.ts`](proxy.ts) to its short-circuit responses (which `headers()` never reaches). The CSP is per-request and nonce-based, so there is no `'unsafe-inline'` for scripts: any hand-written inline `<script>` must carry `nonce={(await headers()).get('x-nonce')}` or it will not run.
 
 <!-- BEGIN:nextjs-agent-rules -->
 

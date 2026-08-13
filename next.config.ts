@@ -1,43 +1,11 @@
 import type {NextConfig} from 'next';
+import { STATIC_SECURITY_HEADERS } from './lib/security-headers';
 
-const isDevelopment = process.env.NODE_ENV === 'development';
-
-// Content Security Policy for XSS protection
-// Note: 'unsafe-inline' is required for React/Next.js client components due to useTransition and state management
-const ContentSecurityPolicy = `
-  default-src 'self';
-  script-src 'self' 'unsafe-inline'${isDevelopment ? " 'unsafe-eval'" : ''};
-  style-src 'self' 'unsafe-inline';
-  img-src 'self' blob: data: https:;
-  font-src 'self';
-  connect-src 'self' https://api.steampowered.com;
-  frame-ancestors 'none';
-  base-uri 'self';
-  form-action 'self';
-`.replace(/\n/g, '').trim();
-
-const securityHeaders = [
-  {
-    key: 'Content-Security-Policy',
-    value: ContentSecurityPolicy,
-  },
-  {
-    key: 'X-Content-Type-Options',
-    value: 'nosniff',
-  },
-  {
-    key: 'X-Frame-Options',
-    value: 'DENY',
-  },
-  {
-    key: 'Referrer-Policy',
-    value: 'strict-origin-when-cross-origin',
-  },
-  {
-    key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=()',
-  },
-];
+// The CSP is not here: it carries a per-request nonce and is set by proxy.ts.
+const securityHeaders = Object.entries(STATIC_SECURITY_HEADERS).map(([key, value]) => ({
+  key,
+  value,
+}));
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
