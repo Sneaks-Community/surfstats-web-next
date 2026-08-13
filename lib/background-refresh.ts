@@ -12,10 +12,13 @@ export interface BackgroundRefreshConfig {
   /** Refresh interval in ms; `<= 0` runs the task once at startup, no timer. */
   intervalMs: number;
   /**
-   * The refresh work. May throw — errors are caught and logged so a transient
-   * failure never crashes the timer or leaves an unhandled rejection.
+   * The refresh work. Receives `startup: true` on the one immediate run at boot
+   * and `false` on every periodic tick, so a task can read-first on startup
+   * (skip keys still within TTL) but force in-place refresh on the interval.
+   * May throw — errors are caught and logged so a transient failure never
+   * crashes the timer or leaves an unhandled rejection.
    */
-  task: () => Promise<void>;
+  task: (ctx: { startup: boolean }) => Promise<void>;
   /** Optional extra detail appended to the "started" log line (e.g. page counts). */
   startupDetail?: string;
 }
@@ -50,9 +53,9 @@ export function createBackgroundRefresh({
   task,
   startupDetail,
 }: BackgroundRefreshConfig): BackgroundRefresh {
-  const runTask = async (): Promise<void> => {
+  const runTask = async (startup: boolean): Promise<void> => {
     try {
-      await task();
+      await task({ startup });
     } catch (error) {
       logger.error(`[${name}] Background refresh failed: ${getErrorMessage(error)}`);
     }
@@ -68,14 +71,14 @@ export function createBackgroundRefresh({
     timers.set(name, 'once');
 
     // Immediate initial run so data is hot right away (runTask swallows errors).
-    void runTask();
+    void runTask(true);
 
     if (intervalMs <= 0) {
       logger.info(`[${name}] Ran once at startup, periodic refresh disabled`);
       return;
     }
 
-    timers.set(name, setInterval(() => void runTask(), intervalMs));
+    timers.set(name, setInterval(() => void runTask(false), intervalMs));
 
     logger.info(
       `[${name}] Background refresh started${startupDetail ? ` (${startupDetail})` : ''}`

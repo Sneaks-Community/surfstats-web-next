@@ -26,14 +26,16 @@ const MAX_CONCURRENT = 2;
  * visitor finds the key missing and pays for the query, and a failed refresh leaves
  * the previous value being served.
  */
-async function precacheMapGraphs(mapname: string): Promise<void> {
+async function precacheMapGraphs(mapname: string, startup: boolean): Promise<void> {
   try {
     const metadata = await getMapMetadataFromCache(mapname);
     const checkpoints = metadata?.checkpoints || 0;
     const stages = metadata?.stages || 0;
     const maxCheckpoint = checkpoints > 0 ? checkpoints : stages;
 
-    const force = { force: true };
+    // Startup reads first (skip series still within their 36h TTL); interval
+    // sweeps force an in-place refresh.
+    const force = { force: !startup };
     await Promise.all([
       getCompletionsOverTimeFromCache(mapname, force),
       getTimeOnMapDataFromCache(mapname, force),
@@ -54,7 +56,7 @@ async function precacheMapGraphs(mapname: string): Promise<void> {
  * Process a batch of maps for precaching with concurrency limiting.
  * Returns a promise that resolves when the batch is complete.
  */
-async function processBatch(mapNames: string[]): Promise<void> {
+async function processBatch(mapNames: string[], startup: boolean): Promise<void> {
   // Split into concurrent groups
   const groups: string[][] = [];
   for (let i = 0; i < mapNames.length; i += MAX_CONCURRENT) {
@@ -63,7 +65,7 @@ async function processBatch(mapNames: string[]): Promise<void> {
 
   // Process each group sequentially, maps within a group run in parallel
   for (const group of groups) {
-    await Promise.all(group.map(name => precacheMapGraphs(name)));
+    await Promise.all(group.map(name => precacheMapGraphs(name, startup)));
   }
 }
 
@@ -71,13 +73,13 @@ async function processBatch(mapNames: string[]): Promise<void> {
  * Refresh every map's chart series once, in paced batches. One sweep per interval
  * replaces a ~1,000-timer per-map tree; the batch pacing already spreads the load.
  */
-async function precacheAllMapGraphs(): Promise<void> {
+async function precacheAllMapGraphs(startup: boolean): Promise<void> {
   const metadata = await getAllMapMetadataFromCache();
   const mapNames = Array.from(metadata.keys());
   logger.info(`[MapGraphPrecache] Refreshing graphs for ${mapNames.length} maps`);
 
   for (let i = 0; i < mapNames.length; i += BATCH_SIZE) {
-    await processBatch(mapNames.slice(i, i + BATCH_SIZE));
+    await processBatch(mapNames.slice(i, i + BATCH_SIZE), startup);
 
     // Delay between batches (except after the last one)
     if (i + BATCH_SIZE < mapNames.length) {
@@ -91,7 +93,7 @@ async function precacheAllMapGraphs(): Promise<void> {
 const { start: startMapGraphPrecache } = createBackgroundRefresh({
   name: 'MapGraphPrecache',
   intervalMs: REFRESH_INTERVAL_MS,
-  task: precacheAllMapGraphs,
+  task: ({ startup }) => precacheAllMapGraphs(startup),
   startupDetail: `every ${REFRESH_INTERVAL_MS / 3600_000}h`,
 });
 

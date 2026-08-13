@@ -85,19 +85,22 @@ const refreshers = [
   createBackgroundRefresh({
     name: 'RecentProfilesRefresh',
     intervalMs: PROFILES_INTERVAL_MS,
-    task: warmRecentProfiles,
+    task: ({ startup }) => warmRecentProfiles(startup),
   }),
 ];
 
 /** The six keys a profile page's server render awaits. The tab data stays on demand. */
-async function refreshProfile(steamid: string): Promise<void> {
+async function refreshProfile(steamid: string, startup: boolean): Promise<void> {
+  // Startup reads first (skip profiles still within their 1h TTL); interval
+  // sweeps force an in-place refresh.
+  const opts = { force: !startup };
   await Promise.all([
-    getPlayerOverviewFromCache(steamid, force),
-    getPlayerWrPerformanceFromCache(steamid, force),
-    getLinearVsStagedPerTierFromCache(steamid, force),
-    getPlayerTimeOnServerFromCache(steamid, force),
-    getActivityHeatmapFromCache(steamid, force),
-    getPlayerMapEngagementFromCache(steamid, force),
+    getPlayerOverviewFromCache(steamid, opts),
+    getPlayerWrPerformanceFromCache(steamid, opts),
+    getLinearVsStagedPerTierFromCache(steamid, opts),
+    getPlayerTimeOnServerFromCache(steamid, opts),
+    getActivityHeatmapFromCache(steamid, opts),
+    getPlayerMapEngagementFromCache(steamid, opts),
   ]);
 }
 
@@ -106,13 +109,13 @@ async function refreshProfile(steamid: string): Promise<void> {
  * are already parallel, and pacing at one profile keeps the sweep off the
  * expensive-query semaphore that page renders share.
  */
-async function warmRecentProfiles(): Promise<void> {
+async function warmRecentProfiles(startup: boolean): Promise<void> {
   const steamids = await listRecentProfiles();
   if (steamids.length === 0) return;
 
   for (const steamid of steamids) {
     try {
-      await refreshProfile(steamid);
+      await refreshProfile(steamid, startup);
     } catch (error) {
       logger.warn(`[RecentProfilesRefresh] Failed to warm ${steamid}: ${getErrorMessage(error)}`);
     }
