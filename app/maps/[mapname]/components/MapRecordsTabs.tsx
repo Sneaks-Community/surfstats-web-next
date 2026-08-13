@@ -90,12 +90,12 @@ interface SortableRecord {
 
 /**
  * The three tabs sort by the same fields and differ only in what the time column
- * is called. `newestFirst` preserves the stage tab's opposite date order.
+ * is called. Date sorts newest-first on all three: the stage tab used to be the
+ * opposite, which was a slip rather than a decision (owner's call, 2026-08-13).
  */
 function compareRecords<T extends SortableRecord>(
   field: SortField,
-  time: (record: T) => number,
-  newestFirst = true
+  time: (record: T) => number
 ) {
   return (a: T, b: T): number => {
     switch (field) {
@@ -111,10 +111,9 @@ function compareRecords<T extends SortableRecord>(
       }
       case 'wrDiff':
         return wrDiff(time(a), a.wr_time) - wrDiff(time(b), b.wr_time);
-      case 'date': {
-        const diff = new Date(a.date).getTime() - new Date(b.date).getTime();
-        return newestFirst ? -diff : diff;
-      }
+      case 'date':
+        // Newest first, so the ascending comparator is the reverse chronological one.
+        return new Date(b.date).getTime() - new Date(a.date).getTime();
       default:
         return a.rank - b.rank;
     }
@@ -541,14 +540,13 @@ export default function MapRecordsTabs({
   }, [allBonusRecords, bonusSearch.debouncedQuery, sortField, sortDirection]);
 
   // Stage records arrive sorted by rank (runtime ASC); sorting is client-side
-  // from there. `rank` sorts by runtime, and the date order is the opposite of
-  // the other two tabs, both as they have always been.
+  // from there. `rank` sorts by runtime, since stage ranks are shared on a tie.
   const sortedStageRecords = useMemo(
     () =>
       sortRecords(
         allStageRecords,
         sortDirection,
-        compareRecords(sortField === 'rank' ? 'time' : sortField, (r) => r.runtime, false)
+        compareRecords(sortField === 'rank' ? 'time' : sortField, (r) => r.runtime)
       ),
     [allStageRecords, sortField, sortDirection]
   );

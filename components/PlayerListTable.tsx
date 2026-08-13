@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import SortLink from '@/components/SortLink';
-import { formatDate } from '@/lib/utils';
+import { formatDate, getDisplayTz } from '@/lib/utils';
 
 /** Minimal shape both `PlayerRank` and `CountryPlayer` satisfy structurally. */
 export interface PlayerListEntry {
@@ -101,7 +101,7 @@ function Row({ player, avatar }: { player: PlayerListEntry; avatar?: { avatarmed
       <div className="w-20 text-right text-sm text-text tabular-nums">{player.points.toLocaleString()}</div>
       <div className="w-16 text-right text-sm text-text tabular-nums">{player.finishedmaps.toLocaleString()}</div>
       <div className="w-24 text-right text-sm text-text-muted">
-        {player.lastseen ? formatDate(player.lastseen) : 'Never'}
+        {player.lastseen ? formatDate(player.lastseen, getDisplayTz()) : 'Never'}
       </div>
     </div>
   );

@@ -54,6 +54,56 @@ export async function cacheGetWithTtl<T>(
 }
 
 /**
+ * Get many values in one round trip, in the order the keys were given.
+ *
+ * A per-key {@link cacheGet} loop costs one round trip each, which is what made a
+ * 20-row page's avatar lookup 20 serial hops inside the request. Missing and
+ * unparseable entries come back as `null`, so callers treat them as misses.
+ */
+export async function cacheGetMany<T>(keys: string[]): Promise<Array<T | null>> {
+  if (keys.length === 0) return [];
+
+  try {
+    const cached = await client.mGet(keys);
+    return cached.map((value) => {
+      if (!value) return null;
+      try {
+        return JSON.parse(value) as T;
+      } catch {
+        return null;
+      }
+    });
+  } catch {
+    // Treat a cache failure as a miss for every key, same as cacheGet.
+    return keys.map(() => null);
+  }
+}
+
+/**
+ * Set many values in one round trip, all with the same TTL.
+ *
+ * Pipelined rather than awaited one at a time, for the same reason as
+ * {@link cacheGetMany}.
+ */
+export async function cacheSetMany(
+  entries: ReadonlyArray<{ key: string; value: unknown }>,
+  ttl: number
+): Promise<void> {
+  if (entries.length === 0) return;
+
+  try {
+    const multi = client.multi();
+    for (const { key, value } of entries) {
+      multi.setEx(key, ttl, JSON.stringify(value));
+    }
+    await multi.exec();
+    logger.debug(`[Cache] SET ${entries.length} keys with TTL ${ttl}s`);
+  } catch {
+    // Silently fail - cache is optional
+  }
+}
+
+/**
  * Set a value in cache
  */
 export async function cacheSet(key: string, value: unknown, ttl: number): Promise<void> {

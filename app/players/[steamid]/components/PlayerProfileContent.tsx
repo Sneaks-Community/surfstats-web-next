@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { getSteamProfileUrl, type SteamAvatarSet } from '@/lib/steam';
 import { Trophy, Activity, Clock } from 'lucide-react';
 import Image from 'next/image';
-import { formatDate } from '@/lib/utils';
+import { formatDate, getDisplayTz } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import CountryBadge from '@/components/CountryBadge';
 import { getCountryCodeFromName, UNKNOWN_COUNTRY_CODE } from '@/lib/countries';
@@ -173,7 +173,7 @@ export default async function PlayerProfileContent({
                     );
                   })()
                 )}
-                <span>Last Seen: {player.lastseen ? formatDate(player.lastseen) : 'Unknown'}</span>
+                <span>Last Seen: {player.lastseen ? formatDate(player.lastseen, getDisplayTz()) : 'Unknown'}</span>
               </div>
             </div>
           </div>

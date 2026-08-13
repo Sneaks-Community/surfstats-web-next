@@ -2,6 +2,8 @@
 
 import { useMemo } from 'react';
 import ChartEmptyState from '@/components/ChartEmptyState';
+import { HEATMAP_MAX_SESSIONS } from '@/lib/utils';
+import { useDisplayTz } from '@/lib/ClientConfigContext';
 
 interface HeatmapDataPoint {
   dayOfWeek: number; // 0=Sunday, 1=Monday, ..., 6=Saturday
@@ -49,6 +51,7 @@ const getCellColor = (count: number, maxCount: number): string => {
 };
 
 export default function ActivityHeatmapChart({ data }: ActivityHeatmapChartProps) {
+  const displayTz = useDisplayTz();
   const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
 
   const heatmapGrid = useMemo(() => {
@@ -83,15 +86,22 @@ export default function ActivityHeatmapChart({ data }: ActivityHeatmapChartProps
 
   return (
     <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-text">Activity Heatmap</h3>
+      <div className="flex items-start justify-between mb-3 gap-3">
+        <div>
+          <h3 className="text-sm font-semibold text-text">Activity Heatmap</h3>
+          {/* The query keeps only the newest N connections, so say so rather than
+              presenting a truncated history as the whole of it. */}
+          <p className="text-xs text-text-muted">
+            Last {HEATMAP_MAX_SESSIONS.toLocaleString()} sessions • times in {displayTz}
+          </p>
+        </div>
         {peakTime && (
-          <div className="flex items-center gap-3 text-xs text-text-muted">
+          <div className="flex items-center gap-3 text-xs text-text-muted whitespace-nowrap">
             <span>Peak: <span className="text-text font-medium">{peakTime.day} {peakTime.hour}</span></span>
           </div>
         )}
       </div>
-      
+
       <div className="flex-1 min-h-[200px]">
         {/* Main grid container */}
         <div className="flex" style={{ height: 'calc(100% - 30px)' }}>

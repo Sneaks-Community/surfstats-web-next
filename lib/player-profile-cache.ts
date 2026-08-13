@@ -558,6 +558,19 @@ export async function getIncompleteBonusesFromCache(steamid: string): Promise<In
  * Stages the player has NOT completed (anti-join against the full stage list).
  * Expensive — gated behind the Times → Stage sub-tab.
  *
+ * Building the stage universe from `ck_zones` needs two corrections, both
+ * verified against the live DB (see AGENTS.md's zone model):
+ *
+ * - `zonetypeid` is 0-based stage *ordering* (id 0 = Stage 1) while
+ *   `ck_stages.stage` is 1-based, so the join needs `zonetypeid + 1`. It is
+ *   contiguous `0..N-1` on every map, and `min` is always 0.
+ * - A staged map's final stage ends at the map end zone, so it has no
+ *   `zonetype = 3` row at all. Stage `N + 1` therefore has to be added per map,
+ *   which is the same `COUNT(*) + 1` {@link fetchAllMapMetadata} counts.
+ *
+ * Without both, Stage 1 was excluded, every remaining stage was reported one
+ * lower than its real number, and the last stage of every map was invisible.
+ *
  * @param steamid - The player's SteamID
  * @returns Incomplete-stages list (empty on invalid id / error)
  */
@@ -574,13 +587,21 @@ export async function getIncompleteStagesFromCache(steamid: string): Promise<Inc
     async () => {
       const [rows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
-          SELECT
-            z.mapname as map,
-            z.zonetypeid as stage
-          FROM ck_zones z
-          LEFT JOIN ck_stages sr ON z.mapname = sr.map AND z.zonetypeid = sr.stage AND sr.steamid = ?
-          WHERE z.zonetype = 3 AND z.zonegroup = 0 AND z.zonetypeid > 0 AND sr.map IS NULL
-          ORDER BY z.mapname ASC, z.zonetypeid ASC
+          SELECT all_stages.map, all_stages.stage
+          FROM (
+            SELECT mapname AS map, zonetypeid + 1 AS stage
+            FROM ck_zones
+            WHERE zonetype = 3 AND zonegroup = 0
+            UNION ALL
+            SELECT mapname AS map, MAX(zonetypeid) + 2 AS stage
+            FROM ck_zones
+            WHERE zonetype = 3 AND zonegroup = 0
+            GROUP BY mapname
+          ) all_stages
+          LEFT JOIN ck_stages sr
+            ON all_stages.map = sr.map AND all_stages.stage = sr.stage AND sr.steamid = ?
+          WHERE sr.map IS NULL
+          ORDER BY all_stages.map ASC, all_stages.stage ASC
         `, [validSteamId]),
         QUERY_TIMEOUT_MS,
         'Query timeout exceeded'

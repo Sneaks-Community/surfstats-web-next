@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { createPortal } from 'react-dom';
 import MapImage from './MapImage';
-import { useMapImagesUrl } from '@/lib/MapImagesUrlContext';
+import { useMapImagesUrl } from '@/lib/ClientConfigContext';
 import { mapImageUrl } from '@/lib/utils';
 
 interface MapLinkWithPreviewProps {

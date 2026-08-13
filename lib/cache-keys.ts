@@ -41,15 +41,6 @@ export function playersListKey(page: number, search: string): string {
 
 export const PLAYERS_LIST_TTL = 3600; // 1 hour
 
-// Countries ranking: the page asks for one deep slice and the warmer has to ask for
-// the same one, since the sort/order/page/limit are all part of the key.
-export const COUNTRIES_RANKING_DEFAULT = {
-  sort: 'players',
-  order: 'desc',
-  page: 1,
-  limit: 250,
-} as const;
-
 // Recently-viewed profiles: a capped sorted set written by the profile read path
 // and read by the warmer, which keeps exactly these profiles' keys fresh.
 export const RECENT_PROFILES_KEY = 'surfstats:player:recent';

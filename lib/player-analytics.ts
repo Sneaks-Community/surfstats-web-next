@@ -5,6 +5,7 @@ import { convertSteamId2ToSteamId3Numeric } from '@/lib/steam';
 import logger from '@/lib/logger';
 import { cachedFetch, type RefreshOptions } from './cached-fetch';
 import { getErrorMessage } from './errors';
+import { getDisplayTz, HEATMAP_MAX_SESSIONS } from './utils';
 
 interface PlayerTimeData extends RowDataPacket {
   total_duration: number | null;
@@ -92,6 +93,43 @@ interface HeatmapDataPoint {
 }
 
 /**
+ * Bucket a connection instant into a day-of-week / hour-of-day pair in the
+ * configured display timezone.
+ *
+ * `Date#getDay`/`getHours` would use the *container's* TZ, so the same data
+ * rendered a different chart depending on where the process happened to run.
+ * `connect_time` is a Unix epoch (`int`), so the instant itself is unambiguous;
+ * only the bucketing needs a zone. `en-US` with `weekday: 'short'` is used rather
+ * than arithmetic because DST offsets are not whole-day shifts.
+ */
+const bucketFormatter = new Map<string, Intl.DateTimeFormat>();
+
+function bucketParts(date: Date, timeZone: string): { dayOfWeek: number; hour: number } | null {
+  let formatter = bucketFormatter.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone,
+      weekday: 'short',
+      hour: 'numeric',
+      hour12: false,
+    });
+    bucketFormatter.set(timeZone, formatter);
+  }
+
+  const parts = formatter.formatToParts(date);
+  const weekday = parts.find((p) => p.type === 'weekday')?.value;
+  const hourValue = parts.find((p) => p.type === 'hour')?.value;
+  if (!weekday || hourValue === undefined) return null;
+
+  const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(weekday);
+  // hour12: false yields 24 for midnight in some ICU versions.
+  const hour = Number(hourValue) % 24;
+  if (dayOfWeek === -1 || !Number.isInteger(hour)) return null;
+
+  return { dayOfWeek, hour };
+}
+
+/**
  * Fetch player connection activity heatmap data
  * Returns a grid of day-of-week vs hour-of-day connection counts
  * @param steamId - SteamID2 format (e.g., STEAM_1:0:95515509)
@@ -121,7 +159,7 @@ async function getPlayerActivityHeatmapInternal(
       FROM player_analytics
       WHERE steamid3 = ?
       ORDER BY connect_time DESC
-      LIMIT 10000
+      LIMIT ${HEATMAP_MAX_SESSIONS}
     `, [steamId3Numeric]);
 
     logger.debug(`[Analytics] Found ${rows.length} connection records for ${steamId}`);
@@ -131,7 +169,8 @@ async function getPlayerActivityHeatmapInternal(
       return [];
     }
 
-    // Aggregate by day of week and hour
+    // Aggregate by day of week and hour, in the configured display timezone.
+    const timeZone = getDisplayTz();
     const aggregated = new Map<string, number>();
 
     for (const row of rows) {
@@ -153,10 +192,10 @@ async function getPlayerActivityHeatmapInternal(
         continue;
       }
 
-      const dayOfWeek = date.getDay(); // 0=Sunday, 6=Saturday
-      const hour = date.getHours();
-      const key = `${dayOfWeek}-${hour}`;
+      const bucket = bucketParts(date, timeZone);
+      if (!bucket) continue;
 
+      const key = `${bucket.dayOfWeek}-${bucket.hour}`;
       aggregated.set(key, (aggregated.get(key) || 0) + 1);
     }
 

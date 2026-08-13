@@ -48,27 +48,20 @@ export type CountrySortKey = 'rank' | 'country' | 'points' | 'players';
 export type SortOrder = 'asc' | 'desc';
 
 /**
- * Internal function for getting countries ranking with aggregation
+ * Internal function for getting the full countries ranking.
  *
- * Query optimization notes:
- * - Fetches all country data and aggregates in JavaScript for proper normalization
- * - Country names are normalized to ISO codes BEFORE grouping to avoid duplicates
- * - Supports sorting by rank, country name, points, or player count
- * - Pagination applied after sorting
+ * Returns *every* country, deduplicated by ISO code and ranked by points. Sorting
+ * and pagination are deliberately NOT done here: they are pure functions of this
+ * array (see {@link sortCountries}), so caching one key and sorting at the call
+ * site replaces the dozens of keys that each re-ran this whole aggregation.
  *
  * IMPORTANT: Country names in the database may have variations (e.g., "Thailand", "thailand", "THAILAND").
  * We normalize them to ISO codes BEFORE grouping to avoid duplicate entries.
  */
-const getCountriesRankingInternal = async (
-  sort: CountrySortKey = 'points',
-  order: SortOrder = 'desc',
-  page = 1,
-  limit = 50
-): Promise<{ countries: CountryRank[]; total: number; totalPages: number }> => {
-  logger.debug(`[CountryCache] Fetching countries ranking (sort: ${sort}, order: ${order}, page: ${page})`);
+const getCountriesRankingInternal = async (): Promise<CountryRank[]> => {
+  logger.debug('[CountryCache] Fetching countries ranking');
 
   // Throws on failure; the fallback lives in the caller's `onError`, uncached.
-  const offset = (page - 1) * limit;
 
   // Use SQL GROUP BY for efficient aggregation instead of loading all rows into memory
   // This is O(n) on the database side instead of O(n) in JavaScript with n = total players
@@ -124,48 +117,46 @@ const getCountriesRankingInternal = async (
     countriesArray[i].rank = currentRank;
   }
 
-  // Apply user-requested sort
-  const sortColumn = sort === 'rank' ? 'rank' :
-                      sort === 'country' ? 'country' :
-                      sort === 'points' ? 'total_points' : 'player_count';
+  logger.debug(`[CountryCache] Retrieved ${countriesArray.length} countries`);
 
-  countriesArray.sort((a, b) => {
-    let comparison: number;
-    if (sortColumn === 'country') {
-      comparison = a.country.localeCompare(b.country);
-    } else if (sortColumn === 'player_count') {
-      comparison = a.player_count - b.player_count;
-    } else if (sortColumn === 'rank') {
-      comparison = a.rank - b.rank;
-    } else {
-      comparison = a.total_points - b.total_points;
-    }
-    return order === 'asc' ? comparison : -comparison;
-  });
-
-  // Get total count
-  const total = countriesArray.length;
-
-  // Apply pagination
-  const paginatedCountries = countriesArray.slice(offset, offset + limit);
-
-  logger.debug(`[CountryCache] Retrieved ${paginatedCountries.length} countries (page ${page} of ${Math.ceil(total / limit)})`);
-
-  return {
-    countries: paginatedCountries,
-    total,
-    totalPages: Math.ceil(total / limit),
-  };
+  return countriesArray;
 };
 
 /**
- * Get countries ranking with aggregation
+ * Sort a cached countries ranking. Pure, so every sort/order the UI offers is a
+ * few microseconds over the one cached array rather than another 24h cache key
+ * paying for the full `GROUP BY country` aggregation.
  *
- * Query optimization notes:
- * - Uses SQL GROUP BY for efficient aggregation on the database side
- * - Country names are normalized to ISO codes in application code after aggregation
- * - Supports sorting by rank, country name, points, or player count
- * - Pagination applied after sorting
+ * `rank` is already assigned by points, so it is not re-derived here.
+ *
+ * @param countries - The cached ranking (not mutated)
+ * @param sort - Column to sort by
+ * @param order - 'asc' or 'desc'
+ * @returns A new sorted array
+ */
+export function sortCountries(
+  countries: readonly CountryRank[],
+  sort: CountrySortKey,
+  order: SortOrder
+): CountryRank[] {
+  const comparator = (a: CountryRank, b: CountryRank): number => {
+    switch (sort) {
+      case 'country':
+        return a.country.localeCompare(b.country);
+      case 'players':
+        return a.player_count - b.player_count;
+      case 'rank':
+        return a.rank - b.rank;
+      default:
+        return a.total_points - b.total_points;
+    }
+  };
+
+  return [...countries].sort((a, b) => (order === 'asc' ? comparator(a, b) : -comparator(a, b)));
+}
+
+/**
+ * Get the full countries ranking from Valkey cache.
  *
  * IMPORTANT: Country names in the database may have variations (e.g., "Thailand", "thailand", "THAILAND").
  * We normalize them to ISO codes in application code to avoid duplicate entries.
@@ -178,33 +169,33 @@ const getCountriesRankingInternal = async (
 // silently dropped — the old payload must not be served.
 // v4: `player_count` now counts only players with points > 0, matching the
 // per-country page's total and the players list.
-const COUNTRIES_RANKING_SCHEMA_VERSION = 4;
+// v5: the key is no longer parameterized by sort/order/page/limit — it holds the
+// whole ranked array and callers sort/slice it. The old suffixed keys are
+// orphaned and expire within 24h.
+const COUNTRIES_RANKING_SCHEMA_VERSION = 5;
 const COUNTRIES_RANKING_KEY = `surfstats:countries:ranking:v${COUNTRIES_RANKING_SCHEMA_VERSION}`;
 const COUNTRIES_RANKING_TTL = 86400; // 24 hours
 
 /**
- * Get countries ranking from Valkey cache
+ * Get the full countries ranking from Valkey cache.
+ *
+ * One key for every caller: sorting and paging are pure functions of this array
+ * (see {@link sortCountries}), so an alternate sort or a deep page costs no DB
+ * work and mints no new key. `lock: true` keeps a cold start from stampeding the
+ * aggregation.
  */
 export async function getCountriesRankingFromCache(
-  sort: CountrySortKey = 'points',
-  order: SortOrder = 'desc',
-  page = 1,
-  limit = 50,
   { force }: RefreshOptions = {}
-): Promise<{ countries: CountryRank[]; total: number; totalPages: number }> {
-  const cacheKey = `${COUNTRIES_RANKING_KEY}:${sort}:${order}:${page}:${limit}`;
-
-  return cachedFetch(cacheKey, COUNTRIES_RANKING_TTL, () =>
-    getCountriesRankingInternal(sort, order, page, limit),
-    {
-      expensive: true,
-      force,
-      onError: (error) => {
-        logger.error(`[CountryCache] Failed to fetch countries ranking: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
-        return { countries: [], total: 0, totalPages: 0 };
-      },
-    }
-  );
+): Promise<CountryRank[]> {
+  return cachedFetch(COUNTRIES_RANKING_KEY, COUNTRIES_RANKING_TTL, getCountriesRankingInternal, {
+    lock: true,
+    expensive: true,
+    force,
+    onError: (error) => {
+      logger.error(`[CountryCache] Failed to fetch countries ranking: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
+      return [];
+    },
+  });
 }
 
 /**
@@ -394,12 +385,12 @@ function getPlayerOrderByClause(sort: PlayerSortKey, order: SortOrder): string {
   
   const column = columnMap[sort];
   const direction = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
-  
-  // For text columns, use COLLATE for case-insensitive sorting
-  if (sort === 'player') {
-    return `${column} COLLATE utf8mb4_general_ci ${direction}`;
-  }
-  
+
+  // Name sorting relies on the column's own collation, which is already
+  // case-insensitive in the ckSurf schema. An explicit `COLLATE utf8mb4_*` here
+  // would raise "not valid for CHARACTER SET" on a latin1 `name` column, and
+  // ckSurf schemas are not uniformly utf8mb4.
+
   // For lastseen, handle NULL values (never seen players sort last)
   if (sort === 'lastseen') {
     if (order === 'desc') {
@@ -457,6 +448,7 @@ const COUNTRIES_STATS_TTL = 86400; // 24 hours
  */
 export async function getCountriesStatsFromCache({ force }: RefreshOptions = {}): Promise<{ totalCountries: number; totalPlayers: number }> {
   return cachedFetch(COUNTRIES_STATS_KEY, COUNTRIES_STATS_TTL, getCountriesStatsInternal, {
+    lock: true,
     expensive: true,
     force,
     onError: (error) => {

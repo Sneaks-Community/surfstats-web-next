@@ -153,14 +153,18 @@ export async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
 
 /**
  * Get totals for progress bars (maps, bonuses, stages)
+ *
+ * Counts the cached metadata blob rather than re-running the five-way join, so
+ * the two never disagree and the join runs once per its own TTL. Same reasoning
+ * as {@link getTierDistributionFromCache}; derived, so there's no nested lock.
  */
 export async function getTotals(): Promise<{
   totalMaps: number;
   totalBonuses: number;
   totalStages: number;
 }> {
-  const allMetadata = await fetchAllMapMetadata();
-  
+  const allMetadata = await getAllMapMetadataFromCache();
+
   let totalBonuses = 0;
   let totalStages = 0;
   

@@ -7,6 +7,16 @@ import { withTimeout } from './timeout';
 import logger from './logger';
 import { getErrorMessage } from './errors';
 
+/**
+ * Every paginated/ranked query here orders by `runtime…, date ASC, steamid ASC`.
+ * Without a tiebreak, rows sharing a time have no guaranteed order, so a player
+ * can appear on two pages or on none as the plan or the data shifts. `steamid` is
+ * unique per (map[, zonegroup]), so the three keys are a total order; `date`
+ * comes first to match the "earliest run wins" rule the WR tiebreak uses.
+ *
+ * The stage queries instead use `DENSE_RANK` over `runtime, date`, where ties
+ * deliberately *share* a rank — do not add `steamid` to those windows.
+ */
 const RECORDS_CACHE_TTL = 300; // 5 minutes
 const RECORDS_COUNTS_TTL = 300; // 5 minutes
 const STAGES_CACHE_TTL = 300; // 5 minutes
@@ -163,11 +173,11 @@ export async function getLeaderboardRecordsFromCache(
         pool.query<MapRecord[]>(`
           SELECT
             steamid, name, runtimepro, date, startspeed,
-            ROW_NUMBER() OVER (ORDER BY runtimepro ASC) as \`rank\`,
+            ROW_NUMBER() OVER (ORDER BY runtimepro ASC, date ASC, steamid ASC) as \`rank\`,
             ? as wr_time
           FROM ck_playertimes
           WHERE mapname = ?
-          ORDER BY runtimepro ASC
+          ORDER BY runtimepro ASC, date ASC, steamid ASC
           LIMIT ? OFFSET ?
         `, [localWrTime, validMapname, pageSize, offset]),
         QUERY_TIMEOUT_MS,
@@ -343,11 +353,11 @@ export async function getBonusRecordsFromCache(
         pool.query<BonusRecord[]>(`
           SELECT
             b.steamid, b.name, b.zonegroup, b.runtime, b.date, b.startspeed,
-            ROW_NUMBER() OVER (ORDER BY b.runtime ASC) as \`rank\`,
+            ROW_NUMBER() OVER (ORDER BY b.runtime ASC, b.date ASC, b.steamid ASC) as \`rank\`,
             (SELECT MIN(runtime) FROM ck_bonus WHERE mapname = b.mapname AND zonegroup = b.zonegroup) as wr_time
           FROM ck_bonus b
           WHERE b.mapname = ? AND b.zonegroup = ?
-          ORDER BY b.runtime ASC
+          ORDER BY b.runtime ASC, b.date ASC, b.steamid ASC
           LIMIT ? OFFSET ?
         `, [validMapname, bonus, pageSize, offset]),
         QUERY_TIMEOUT_MS,
@@ -407,12 +417,12 @@ export async function searchLeaderboardRecordsFromCache(
                   ranked.\`rank\`, ? AS wr_time
            FROM (
              SELECT steamid, name, runtimepro, date, startspeed,
-                    ROW_NUMBER() OVER (ORDER BY runtimepro ASC) AS \`rank\`
+                    ROW_NUMBER() OVER (ORDER BY runtimepro ASC, date ASC, steamid ASC) AS \`rank\`
              FROM ck_playertimes
              WHERE mapname = ?
            ) ranked
            WHERE ranked.name LIKE ? OR ranked.steamid LIKE ?
-           ORDER BY ranked.runtimepro ASC
+           ORDER BY ranked.runtimepro ASC, ranked.date ASC, ranked.steamid ASC
            LIMIT ?`,
           [wr_time, validMapname, likePattern, likePattern, SEARCH_MAX_RESULTS]
         ),
@@ -506,12 +516,12 @@ export async function searchBonusRecordsFromCache(
                   (SELECT MIN(runtime) FROM ck_bonus WHERE mapname = ? AND zonegroup = ranked.zonegroup) AS wr_time
            FROM (
              SELECT b.steamid, b.name, b.zonegroup, b.runtime, b.date, b.startspeed,
-                    ROW_NUMBER() OVER (ORDER BY b.runtime ASC) AS \`rank\`
+                    ROW_NUMBER() OVER (ORDER BY b.runtime ASC, b.date ASC, b.steamid ASC) AS \`rank\`
              FROM ck_bonus b
              WHERE b.mapname = ? AND b.zonegroup = ?
            ) ranked
            WHERE ranked.name LIKE ? OR ranked.steamid LIKE ?
-           ORDER BY ranked.runtime ASC
+           ORDER BY ranked.runtime ASC, ranked.date ASC, ranked.steamid ASC
            LIMIT ?`,
           [validMapname, validMapname, bonus, likePattern, likePattern, SEARCH_MAX_RESULTS]
         ),

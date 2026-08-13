@@ -65,7 +65,7 @@ API routes: `maps/[mapname]/{records,bonuses,stages}`, `players/[steamid]/{maps,
 
 **Types.** Interfaces for all data shapes; extend `RowDataPacket` for query rows.
 
-**Theme.** Theme-aware Tailwind tokens only (`text-text`, `text-text-muted`, `bg-surface`, `bg-background-secondary`, `border-border`); no hardcoded colors. Support light and dark (`dark:` prefix), WCAG AA contrast. Colors are injected as CSS vars from env: `THEME_PRIMARY`, `THEME_SECONDARY`, `THEME_DARK_BACKGROUND`, `THEME_DARK_SURFACE`, `THEME_LIGHT_BACKGROUND`, `THEME_LIGHT_SURFACE`. See [`lib/theme-config.ts`](lib/theme-config.ts).
+**Theme.** Theme-aware Tailwind tokens only (`text-text`, `text-text-muted`, `bg-surface`, `bg-background-secondary`, `border-border`); no hardcoded colors. Support light and dark (`dark:` prefix), WCAG AA contrast. Colors are injected as CSS vars from env: `THEME_PRIMARY`, `THEME_SECONDARY`, and the per-mode `THEME_{LIGHT,DARK}_{PRIMARY,SECONDARY,BACKGROUND}` overrides. Surface, border and text tokens are derived from the background family, so there is no `THEME_*_SURFACE` var. See [`lib/theme-config.ts`](lib/theme-config.ts).
 
 **Responsive.** Mobile-first; Tailwind breakpoints; >=44px touch targets; horizontal scroll for tables.
 

@@ -1,7 +1,6 @@
 import 'server-only';
 import logger from './logger';
 import { createBackgroundRefresh } from './background-refresh';
-import { COUNTRIES_RANKING_DEFAULT } from './cache-keys';
 import { getErrorMessage } from './errors';
 import {
   getDashboardStatsFromCache,
@@ -77,9 +76,8 @@ const refreshers = [
     name: 'CountriesRefresh',
     intervalMs: COUNTRIES_INTERVAL_MS,
     task: async () => {
-      const { sort, order, page, limit } = COUNTRIES_RANKING_DEFAULT;
       await Promise.all([
-        getCountriesRankingFromCache(sort, order, page, limit, force),
+        getCountriesRankingFromCache(force),
         getCountriesStatsFromCache(force),
       ]);
     },

@@ -10,6 +10,9 @@ import {
   sortRecords,
   wrDiff,
   formatTimeDiff,
+  isValidTimeZone,
+  getDisplayTz,
+  DEFAULT_DISPLAY_TZ,
 } from '../lib/utils';
 
 // SEC-1/DRY-9: every page route clamps `?page=` through this. A NaN reaching an
@@ -54,16 +57,54 @@ describe('formatPlaytime', () => {
   });
 });
 
-// Pinned to UTC so a server component and the client's re-render agree.
+// COR-8: the zone is an explicit argument, so a server render and the client's
+// re-render cannot disagree by silently falling back to different defaults.
 describe('formatDate', () => {
-  it('formats in UTC and survives bad input', () => {
+  it('formats in the given zone and survives bad input', () => {
     // month and day are both 'numeric', so neither is zero-padded
-    expect(formatDate('2026-02-24T19:15:18.000Z')).toBe('2/24/2026');
-    expect(formatDate(new Date('2026-01-01T00:00:00.000Z'))).toBe('1/1/2026');
-    expect(formatDate('2026-12-31T23:59:59.000Z')).toBe('12/31/2026');
-    expect(formatDate(null)).toBe('N/A');
-    expect(formatDate('')).toBe('N/A');
-    expect(formatDate('not a date')).toBe('N/A');
+    expect(formatDate('2026-02-24T19:15:18.000Z', 'UTC')).toBe('2/24/2026');
+    expect(formatDate(new Date('2026-01-01T00:00:00.000Z'), 'UTC')).toBe('1/1/2026');
+    expect(formatDate('2026-12-31T23:59:59.000Z', 'UTC')).toBe('12/31/2026');
+    expect(formatDate(null, 'UTC')).toBe('N/A');
+    expect(formatDate('', 'UTC')).toBe('N/A');
+    expect(formatDate('not a date', 'UTC')).toBe('N/A');
+  });
+
+  it('renders the same instant on a different calendar day per zone', () => {
+    // 00:30 UTC is still the previous evening in New York.
+    expect(formatDate('2026-03-10T00:30:00.000Z', 'UTC')).toBe('3/10/2026');
+    expect(formatDate('2026-03-10T00:30:00.000Z', 'America/New_York')).toBe('3/9/2026');
+  });
+
+  it('falls back to N/A rather than throwing on an unknown zone', () => {
+    expect(formatDate('2026-02-24T19:15:18.000Z', 'Not/AZone')).toBe('N/A');
+  });
+});
+
+describe('isValidTimeZone / getDisplayTz', () => {
+  it('accepts real IANA zones and rejects junk', () => {
+    expect(isValidTimeZone('UTC')).toBe(true);
+    expect(isValidTimeZone('America/New_York')).toBe(true);
+    expect(isValidTimeZone('Not/AZone')).toBe(false);
+    expect(isValidTimeZone('')).toBe(false);
+  });
+
+  it('reads DISPLAY_TZ, falling back to UTC when unset or unknown', () => {
+    const original = process.env.DISPLAY_TZ;
+    try {
+      delete process.env.DISPLAY_TZ;
+      expect(getDisplayTz()).toBe(DEFAULT_DISPLAY_TZ);
+
+      process.env.DISPLAY_TZ = 'Europe/Berlin';
+      expect(getDisplayTz()).toBe('Europe/Berlin');
+
+      // An invalid value would otherwise throw inside a render.
+      process.env.DISPLAY_TZ = 'Not/AZone';
+      expect(getDisplayTz()).toBe(DEFAULT_DISPLAY_TZ);
+    } finally {
+      if (original === undefined) delete process.env.DISPLAY_TZ;
+      else process.env.DISPLAY_TZ = original;
+    }
   });
 });
 

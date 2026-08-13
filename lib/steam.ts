@@ -1,6 +1,6 @@
 import 'server-only';
 import logger from '@/lib/logger';
-import { cacheGet, cacheSet } from './valkey-cache';
+import { cacheGetMany, cacheSetMany } from './valkey-cache';
 import { steamAvatarKey, STEAM_AVATAR_TTL } from './cache-keys';
 import { getErrorMessage } from './errors';
 
@@ -36,6 +36,20 @@ export interface SteamAvatarSet {
   avatarfull: string;
 }
 
+/** Steam's documented cap for `GetPlayerSummaries`; more IDs are silently dropped. */
+const STEAM_IDS_PER_REQUEST = 100;
+
+/**
+ * Strip the API key out of anything about to be logged.
+ *
+ * The key travels in the query string, and some undici/fetch failures put the
+ * request URL in the error message, which would write a live credential into the
+ * logs at `error` level.
+ */
+function redactApiKey(message: string): string {
+  return message.replace(/([?&]key=)[^&\s]+/gi, '$1***');
+}
+
 /**
  * Fetch player data directly from Steam API
  * This is the core function that makes the actual Steam API call
@@ -48,6 +62,11 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
 
   if (!apiKey) {
     logger.error('[Steam API] STEAM_API_KEY not configured');
+    return [];
+  }
+
+  if (steamId64s.length > STEAM_IDS_PER_REQUEST) {
+    logger.error(`[Steam API] Refusing to request ${steamId64s.length} IDs in one call (max ${STEAM_IDS_PER_REQUEST}); caller must chunk`);
     return [];
   }
 
@@ -82,8 +101,8 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
     const duration = Date.now() - startTime;
     const err = error as { code?: string; message?: string };
     const errorCode = err.code || 'UNKNOWN';
-    const errorMessage = getErrorMessage(error);
-    
+    const errorMessage = redactApiKey(getErrorMessage(error));
+
     if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
       logger.error(`[Steam API] Network error - unable to reach Steam API servers (${errorCode})`);
     } else if (err.code === 'ETIMEDOUT') {
@@ -112,22 +131,24 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
   logger.debug(`[Steam] Fetching profiles for ${steamIds.length} SteamIDs`);
   
   try {
-    // Check cache for each SteamID first
+    // One round trip for every SteamID, not one per ID.
+    const cached = await cacheGetMany<SteamAvatarSet>(steamIds.map(steamAvatarKey));
+
     const uncachedSteamIds: string[] = [];
-    for (const steamId of steamIds) {
-      const cached = await cacheGet<SteamAvatarSet>(steamAvatarKey(steamId));
-      if (cached) {
-        result.set(steamId, cached);
+    steamIds.forEach((steamId, i) => {
+      const hit = cached[i];
+      if (hit) {
+        result.set(steamId, hit);
       } else {
         uncachedSteamIds.push(steamId);
       }
-    }
+    });
 
     // Fetch uncached profiles from Steam API
     if (uncachedSteamIds.length > 0) {
       const uncachedSteamId64s: string[] = [];
       const uncachedSteamId64Map = new Map<string, string>();
-      
+
       for (const steamId of uncachedSteamIds) {
         const steamId64 = convertSteamIdTo64(steamId);
         if (steamId64) {
@@ -143,8 +164,16 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
         return result;
       }
 
-      const players = await fetchSteamPlayerData(uncachedSteamId64s);
-      
+      // Steam caps GetPlayerSummaries at 100 IDs and drops the rest silently, so
+      // chunk rather than trusting every caller to stay under a page size.
+      const chunks: string[][] = [];
+      for (let i = 0; i < uncachedSteamId64s.length; i += STEAM_IDS_PER_REQUEST) {
+        chunks.push(uncachedSteamId64s.slice(i, i + STEAM_IDS_PER_REQUEST));
+      }
+
+      const players = (await Promise.all(chunks.map(fetchSteamPlayerData))).flat();
+
+      const toCache: Array<{ key: string; value: SteamAvatarSet }> = [];
       for (const player of players) {
         const originalSteamId = uncachedSteamId64Map.get(player.steamid);
         if (originalSteamId) {
@@ -154,13 +183,14 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
             avatarfull: player.avatarfull || ''
           };
           result.set(originalSteamId, avatarData);
-          
-          // Cache the result
-          await cacheSet(steamAvatarKey(originalSteamId), avatarData, STEAM_AVATAR_TTL);
+          toCache.push({ key: steamAvatarKey(originalSteamId), value: avatarData });
         }
       }
+
+      // Pipelined, for the same reason the reads are.
+      await cacheSetMany(toCache, STEAM_AVATAR_TTL);
     }
-    
+
     const duration = Date.now() - startTime;
     logger.debug(`[Steam] Profile fetch complete: ${result.size}/${steamIds.length} profiles retrieved (${duration}ms)`);
     

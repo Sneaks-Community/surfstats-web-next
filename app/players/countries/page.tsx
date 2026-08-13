@@ -1,6 +1,5 @@
 import { Globe } from 'lucide-react';
-import { getCountriesRankingFromCache, getCountriesStatsFromCache } from '@/lib/country-cache';
-import { COUNTRIES_RANKING_DEFAULT } from '@/lib/cache-keys';
+import { getCountriesRankingFromCache, getCountriesStatsFromCache, sortCountries } from '@/lib/country-cache';
 import { getNumericCodeFromAlpha2, getPrimaryCountryName } from '@/lib/countries';
 import PanelHeader from '@/components/PanelHeader';
 import TopCountriesList, { type TopCountryEntry } from '@/app/components/countries/TopCountriesList';
@@ -14,16 +13,16 @@ export const metadata: Metadata = {
 };
 
 export default async function CountriesPage() {
-  // Pull a deep slice for the map (many countries shaded) plus the stats
-  // headline. The Top-Countries list beside the map is the accessible twin.
-  const { sort, order, page, limit } = COUNTRIES_RANKING_DEFAULT;
+  // The whole ranking, so every country can be shaded, plus the stats headline.
+  // The Top-Countries list beside the map is the accessible twin.
   const [ranking, stats] = await Promise.all([
-    getCountriesRankingFromCache(sort, order, page, limit),
+    getCountriesRankingFromCache(),
     getCountriesStatsFromCache(),
   ]);
+  const byPlayers = sortCountries(ranking, 'players', 'desc');
 
   // World map: players per country, matched to map features by ISO numeric code.
-  const worldData: WorldReachDatum[] = ranking.countries
+  const worldData: WorldReachDatum[] = byPlayers
     .map((c) => {
       const numeric = getNumericCodeFromAlpha2(c.country_code);
       if (!numeric) return null;
@@ -38,7 +37,7 @@ export default async function CountriesPage() {
     .filter((d): d is WorldReachDatum => d !== null);
 
   // Top countries by player count (positional rank within this list).
-  const topCountries: TopCountryEntry[] = ranking.countries.slice(0, 10).map((c, i) => ({
+  const topCountries: TopCountryEntry[] = byPlayers.slice(0, 10).map((c, i) => ({
     code: c.country_code,
     name: c.country,
     players: c.player_count,

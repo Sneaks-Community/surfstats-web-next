@@ -1,16 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const cacheGet = vi.fn();
-const cacheSet = vi.fn();
+const cacheGetMany = vi.fn();
+const cacheSetMany = vi.fn();
 
 vi.mock('../lib/valkey-cache', () => ({
-  cacheGet: (key: string) => cacheGet(key),
-  cacheSet: (key: string, value: unknown, ttl: number) => cacheSet(key, value, ttl),
+  cacheGetMany: (keys: string[]) => cacheGetMany(keys),
+  cacheSetMany: (entries: unknown, ttl: number) => cacheSetMany(entries, ttl),
+  cacheGet: vi.fn(),
+  cacheSet: vi.fn(),
   cacheGetWithTtl: vi.fn(),
 }));
 vi.mock('../lib/logger', () => ({
   default: { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
+
+const { default: logger } = await import('../lib/logger');
+
+/** The request URL of the nth fetch call, whichever form it was passed in. */
+const fetchUrl = (index: number): string => {
+  const arg = vi.mocked(fetch).mock.calls[index][0];
+  if (typeof arg === 'string') return arg;
+  return arg instanceof URL ? arg.href : arg.url;
+};
 
 const {
   convertSteamId2ToSteamId3Numeric,
@@ -63,15 +74,15 @@ describe('getSteamProfilesFromCache', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn());
-    cacheGet.mockResolvedValue(null);
-    cacheSet.mockResolvedValue(undefined);
+    cacheGetMany.mockImplementation((keys: string[]) => Promise.resolve(keys.map(() => null)));
+    cacheSetMany.mockResolvedValue(undefined);
   });
 
   it('returns an empty map without touching the cache or Steam', async () => {
     const result = await getSteamProfilesFromCache([]);
 
     expect(result.size).toBe(0);
-    expect(cacheGet).not.toHaveBeenCalled();
+    expect(cacheGetMany).not.toHaveBeenCalled();
     expect(fetch).not.toHaveBeenCalled();
   });
 
@@ -84,12 +95,59 @@ describe('getSteamProfilesFromCache', () => {
 
   it('serves cached avatars without calling Steam', async () => {
     const avatars = { avatar: 'a', avatarmedium: 'm', avatarfull: 'f' };
-    cacheGet.mockResolvedValue(avatars);
+    cacheGetMany.mockResolvedValue([avatars]);
 
     const result = await getSteamProfilesFromCache(['STEAM_1:0:12345']);
 
     expect(result.get('STEAM_1:0:12345')).toEqual(avatars);
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  // PERF-2: one round trip for the whole page, not one per row.
+  it('reads every SteamID in a single cache call', async () => {
+    const ids = ['STEAM_1:0:1', 'STEAM_1:0:2', 'STEAM_1:0:3'];
+    await getSteamProfilesFromCache(ids);
+
+    expect(cacheGetMany).toHaveBeenCalledTimes(1);
+    expect(cacheGetMany).toHaveBeenCalledWith(ids.map((id) => `surfstats:steam:avatar:${id}`));
+  });
+
+  // PERF-2: results are matched back by position, so a partial hit must not
+  // shift avatars onto the wrong players.
+  it('maps a partial cache hit back to the right SteamIDs', async () => {
+    const second = { avatar: 'b', avatarmedium: 'b', avatarfull: 'b' };
+    cacheGetMany.mockResolvedValue([null, second, null]);
+    process.env.STEAM_API_KEY = 'test-key';
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ response: { players: [] } }),
+    } as unknown as Response);
+
+    const result = await getSteamProfilesFromCache(['STEAM_1:0:1', 'STEAM_1:0:2', 'STEAM_1:0:3']);
+
+    expect(result.get('STEAM_1:0:2')).toEqual(second);
+    expect(result.has('STEAM_1:0:1')).toBe(false);
+    expect(result.has('STEAM_1:0:3')).toBe(false);
+    // Only the two misses are asked of Steam.
+    expect(fetchUrl(0)).toContain('steamids=76561197960265730,76561197960265734');
+  });
+
+  // PERF-3: Steam caps GetPlayerSummaries at 100 IDs and drops the remainder.
+  it('chunks more than 100 uncached IDs into separate requests', async () => {
+    process.env.STEAM_API_KEY = 'test-key';
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ response: { players: [] } }),
+    } as unknown as Response);
+
+    const ids = Array.from({ length: 250 }, (_, i) => `STEAM_1:0:${i + 1}`);
+    await getSteamProfilesFromCache(ids);
+
+    expect(vi.mocked(fetch)).toHaveBeenCalledTimes(3);
+    for (let i = 0; i < vi.mocked(fetch).mock.calls.length; i++) {
+      const count = fetchUrl(i).split('steamids=')[1].split(',').length;
+      expect(count).toBeLessThanOrEqual(100);
+    }
   });
 
   it('fetches, maps back to the original SteamID, and caches the result', async () => {
@@ -118,11 +176,43 @@ describe('getSteamProfilesFromCache', () => {
       avatarmedium: 'm',
       avatarfull: 'f',
     });
-    expect(vi.mocked(fetch).mock.calls[0][0]).toContain('steamids=76561197960290418');
-    expect(cacheSet).toHaveBeenCalledWith(
-      'surfstats:steam:avatar:STEAM_1:0:12345',
-      { avatar: 'a', avatarmedium: 'm', avatarfull: 'f' },
+    expect(fetchUrl(0)).toContain('steamids=76561197960290418');
+    expect(cacheSetMany).toHaveBeenCalledWith(
+      [
+        {
+          key: 'surfstats:steam:avatar:STEAM_1:0:12345',
+          value: { avatar: 'a', avatarmedium: 'm', avatarfull: 'f' },
+        },
+      ],
       604800
     );
+  });
+});
+
+// PERF-4: the key travels in the query string, and some fetch failures put the
+// request URL in the error message.
+describe('Steam API key redaction', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    cacheGetMany.mockImplementation((keys: string[]) => Promise.resolve(keys.map(() => null)));
+    cacheSetMany.mockResolvedValue(undefined);
+  });
+
+  it('never writes the key into a log line', async () => {
+    process.env.STEAM_API_KEY = 'super-secret-key';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockRejectedValue(
+        new Error(
+          'request to https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=super-secret-key&steamids=1 failed'
+        )
+      )
+    );
+
+    await getSteamProfilesFromCache(['STEAM_1:0:12345']);
+
+    const logged = vi.mocked(logger.error).mock.calls.map((c) => String(c[0])).join('\n');
+    expect(logged).not.toContain('super-secret-key');
+    expect(logged).toContain('key=***');
   });
 });

@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { getCountriesRankingFromCache, getCountriesStatsFromCache } from '@/lib/country-cache';
+import { getCountriesRankingFromCache, getCountriesStatsFromCache, sortCountries } from '@/lib/country-cache';
 import type { CountrySortKey, SortOrder } from '@/lib/country-cache';
 import CountryBadge from '@/components/CountryBadge';
 import Pagination from '@/components/Pagination';
@@ -37,14 +37,19 @@ export default async function CountriesListPage({
   // Validate order
   const validatedOrder: SortOrder = order === 'asc' ? 'asc' : 'desc';
 
-  // Stats first: `totalCountries` is the ranking length, so it gives the real
-  // ceiling. Clamping here stops an out-of-range `?page=` minting a 24h key.
-  const stats = await getCountriesStatsFromCache();
-  const pageCeiling = Math.max(1, Math.ceil(stats.totalCountries / COUNTRIES_PER_PAGE));
-  const page = parseIntParam(params.page, { max: pageCeiling });
+  // Both reads are one fixed cache key each, so an out-of-range `?page=` can no
+  // longer mint a key and the two no longer have to be sequential. `page` is
+  // still clamped, now against the ranking itself rather than a second query.
+  const [ranking, stats] = await Promise.all([
+    getCountriesRankingFromCache(),
+    getCountriesStatsFromCache(),
+  ]);
 
-  // Fetch countries ranking
-  const { countries, totalPages } = await getCountriesRankingFromCache(validatedSort, validatedOrder, page, COUNTRIES_PER_PAGE);
+  const sorted = sortCountries(ranking, validatedSort, validatedOrder);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / COUNTRIES_PER_PAGE));
+  const page = parseIntParam(params.page, { max: totalPages });
+  const offset = (page - 1) * COUNTRIES_PER_PAGE;
+  const countries = sorted.slice(offset, offset + COUNTRIES_PER_PAGE);
 
   // Build query params for pagination
   const queryParams: Record<string, string> = {};

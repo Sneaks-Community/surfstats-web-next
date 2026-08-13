@@ -2,11 +2,11 @@ import type {Metadata} from 'next';
 import { headers } from 'next/headers';
 import './globals.css'; // Global styles
 import { Navigation } from '@/components/navigation';
-import { MapImagesUrlProvider } from '@/lib/MapImagesUrlContext';
+import { ClientConfigProvider } from '@/lib/ClientConfigContext';
 import { ThemeProvider } from '@/lib/theme-context';
 import { generateThemeStyles } from '@/lib/theme-config';
 import { getSiteUrl } from '@/lib/site-url';
-import { getMapImagesUrl } from '@/lib/utils';
+import { getMapImagesUrl, getDisplayTz } from '@/lib/utils';
 
 // Startup work lives in instrumentation.ts -> lib/startup.ts; a layout module is
 // not a startup hook (it can be evaluated more than once per process).
@@ -46,6 +46,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({children}: {children: React.ReactNode}) {
   const mapImagesUrl = getMapImagesUrl();
+  const displayTz = getDisplayTz();
   const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats';
   const themeStyles = generateThemeStyles();
   // Set by proxy.ts. Next nonces its own scripts from the CSP header, but not
@@ -81,7 +82,7 @@ export default async function RootLayout({children}: {children: React.ReactNode}
       </head>
       <body className="bg-gradient-radial grid-pattern bg-background text-text min-h-screen flex flex-col antialiased" suppressHydrationWarning>
         <ThemeProvider>
-          <MapImagesUrlProvider url={mapImagesUrl}>
+          <ClientConfigProvider mapImagesUrl={mapImagesUrl} displayTz={displayTz}>
             <Navigation siteName={siteName} />
             <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 glow-effect">
               {children}
@@ -102,7 +103,7 @@ export default async function RootLayout({children}: {children: React.ReactNode}
               </svg>
             </a>
           </footer>
-          </MapImagesUrlProvider>
+          </ClientConfigProvider>
         </ThemeProvider>
       </body>
     </html>

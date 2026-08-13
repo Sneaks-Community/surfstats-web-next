@@ -2,6 +2,7 @@ import 'server-only';
 import { z } from 'zod';
 import logger from './logger';
 import { COLOR_FAMILIES, BACKGROUND_FAMILIES } from './theme-config';
+import { isValidTimeZone } from './utils';
 
 /**
  * Centralized, boot-time environment validation.
@@ -62,6 +63,13 @@ const optionalSchema = z.object({
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
     .optional(),
   MAP_IMAGES_URL: z.url('MAP_IMAGES_URL must be a valid URL').optional(),
+  // IANA timezone every rendered date and the activity heatmap's day/hour
+  // buckets are computed in. Defaults to UTC. Rejected at boot if the runtime
+  // does not know the zone, since an unknown one makes Intl throw on render.
+  DISPLAY_TZ: z
+    .string()
+    .refine(isValidTimeZone, 'DISPLAY_TZ must be a valid IANA timezone (e.g. UTC, America/New_York)')
+    .optional(),
   // Highest tier shown on the player Tier Distribution radar.
   MAX_TIER: z.coerce.number().int().positive().optional(),
   // Theme palette families. Injected as CSS vars from the root layout, so an

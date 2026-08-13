@@ -5,6 +5,7 @@ import Pagination from '@/components/Pagination';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import SortableTh from '@/components/SortableTh';
 import { formatTime, formatDate, formatTimeDiff, type SortDirection } from '@/lib/utils';
+import { useDisplayTz } from '@/lib/ClientConfigContext';
 import { validatePlayerName } from '@/lib/validators';
 import { MIN_SEARCH_LENGTH, type LoadError } from '@/hooks/useRecordSearch';
 
@@ -39,7 +40,10 @@ const RankBadge = ({ rank }: { rank: number }) => (
   </span>
 );
 
-const RecordRow = ({ row }: { row: LeaderboardRow }) => (
+const RecordRow = ({ row }: { row: LeaderboardRow }) => {
+  const displayTz = useDisplayTz();
+
+  return (
   <tr className="hover:bg-surface-hover/50 transition-colors">
     <td className="px-2 sm:px-4 py-2 whitespace-nowrap">
       <RankBadge rank={row.rank} />
@@ -69,10 +73,11 @@ const RecordRow = ({ row }: { row: LeaderboardRow }) => (
       )}
     </td>
     <td className="px-2 sm:px-4 py-2 whitespace-nowrap text-right text-sm text-text-muted">
-      {formatDate(row.date)}
+      {formatDate(row.date, displayTz)}
     </td>
   </tr>
-);
+  );
+};
 
 /** Full-width message row, so every state below occupies the table body. */
 const MessageRow = ({ children }: { children: React.ReactNode }) => (

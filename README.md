@@ -65,6 +65,7 @@ Analytics is opt-in: it is enabled only when `ANALYTICS_MYSQL_HOST` or `ANALYTIC
 * `SERVERS_JSON`: A JSON array defining your game servers for the live status page. Each entry needs `name`, `ip`, and `port`; the whole list is ignored (with a logged error) if any entry is malformed.
   * Example: `'[{"name":"Main Surf Server","ip":"192.168.1.100","port":27015}]'`
 * `MAP_IMAGES_URL`: Base URL for map thumbnails. Defaults to GameTracker's image repository.
+* `DISPLAY_TZ`: IANA timezone for every rendered date and for the activity heatmap's day/hour buckets (default: `UTC`). Boot fails with a clear error if the zone is unknown to the runtime. Note the MySQL driver reads `timestamp` columns using the *container's* `TZ`, so for dates to render correctly the container's timezone must match the database server's (both UTC by default). `DISPLAY_TZ` then chooses what is shown.
 * `MAX_TIER`: Highest tier shown on the player Tier Distribution radar (default: `10`). Caps the axes so a junk placeholder tier doesn't distort the chart.
 * `LOG_LEVEL`: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, or `silent` (default: `warn`).
 

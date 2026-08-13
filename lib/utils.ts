@@ -3,26 +3,71 @@
  * These functions are safe to use in both client and server components
  */
 
-// Pre-created formatter for better performance (avoids creating new Intl.DateTimeFormat on each call)
-// timeZone: 'UTC' keeps output stable regardless of the server's TZ, avoiding
-// hydration mismatches when a server component's formatted date is compared
-// against the client's re-render in a different timezone.
-const dateFormatter = new Intl.DateTimeFormat('en-US', {
-  year: 'numeric',
-  month: 'numeric',
-  day: 'numeric',
-  timeZone: 'UTC',
-});
+/** Display timezone used when `DISPLAY_TZ` is unset or unknown to the runtime. */
+export const DEFAULT_DISPLAY_TZ = 'UTC';
+
+/**
+ * True when this runtime's `Intl` recognises the IANA zone.
+ *
+ * Used by boot-time env validation so an unknown `DISPLAY_TZ` fails loudly at
+ * startup instead of throwing inside a render.
+ */
+export function isValidTimeZone(timeZone: string): boolean {
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The configured display timezone (`DISPLAY_TZ`), or UTC.
+ *
+ * Server-side only: `process.env.DISPLAY_TZ` is undefined in the browser, so
+ * client components must take the value from `useDisplayTz()` instead of calling
+ * this — otherwise the server and the client would format the same date in two
+ * different zones and hydration would mismatch.
+ */
+export function getDisplayTz(): string {
+  const configured = process.env.DISPLAY_TZ;
+  return configured && isValidTimeZone(configured) ? configured : DEFAULT_DISPLAY_TZ;
+}
+
+// Formatters are cached per timezone: constructing Intl.DateTimeFormat is the
+// expensive part, and there is only ever one zone in practice.
+const dateFormatters = new Map<string, Intl.DateTimeFormat>();
+
+function dateFormatter(timeZone: string): Intl.DateTimeFormat {
+  let formatter = dateFormatters.get(timeZone);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      timeZone,
+    });
+    dateFormatters.set(timeZone, formatter);
+  }
+  return formatter;
+}
 
 /**
  * Format a date string into localized format
+ *
+ * `timeZone` is required rather than defaulting: a client component that fell
+ * back to UTC while the server used `DISPLAY_TZ` would render a different day
+ * either side of hydration. Server callers pass {@link getDisplayTz}, client
+ * callers pass `useDisplayTz()`.
+ *
  * @param date - Date string or Date object
+ * @param timeZone - IANA timezone to render in
  * @returns Formatted date string (e.g., "1/15/2024")
  */
-export function formatDate(date: string | Date | null | undefined): string {
+export function formatDate(date: string | Date | null | undefined, timeZone: string): string {
   if (!date) return 'N/A';
   try {
-    return dateFormatter.format(new Date(date));
+    return dateFormatter(timeZone).format(new Date(date));
   } catch {
     return 'N/A';
   }
@@ -63,6 +108,13 @@ export const ITEMS_PER_PAGE = 20;
  * `server-only` `api-utils`, so the value lives here and is re-exported there.
  */
 export const RECORDS_PAGE_SIZE = 100;
+
+/**
+ * Newest connections the activity heatmap considers. Lives here, not in the
+ * `server-only` analytics module, because the chart states the cap in its
+ * subtitle and a client component cannot import that module.
+ */
+export const HEATMAP_MAX_SESSIONS = 10000;
 
 export type SortDirection = 'asc' | 'desc';
 

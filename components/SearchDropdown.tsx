@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Search, User, Map } from 'lucide-react';
-import { useMapImagesUrl } from '@/lib/MapImagesUrlContext';
+import { useMapImagesUrl } from '@/lib/ClientConfigContext';
 import { mapImageUrl } from '@/lib/utils';
 import { clientError } from '@/lib/client-logger';
 import { getErrorMessage, isAbortError } from '@/lib/errors';

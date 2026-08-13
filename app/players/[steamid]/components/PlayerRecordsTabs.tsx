@@ -9,6 +9,7 @@ import SortIcon from '@/components/SortIcon';
 import RecordSearchInput from '@/components/RecordSearchInput';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { formatTime, formatDate, sortRecords, matchesQuery, parseIntParam, wrDiff, ITEMS_PER_PAGE, type SortDirection } from '@/lib/utils';
+import { useDisplayTz } from '@/lib/ClientConfigContext';
 import { validatePlayerName } from '@/lib/validators';
 import TierBadge from '@/components/TierBadge';
 import { ZoneGroupBadge, StageBadge } from '@/components/RecordBadges';
@@ -90,6 +91,7 @@ type StatusFilter = 'finished' | 'incomplete';
 type SortField = 'map' | 'rank' | 'time' | 'wrDiff' | 'date' | 'tier' | 'wrTime' | 'mapType';
 
 export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabsProps) {
+  const displayTz = useDisplayTz();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -763,7 +765,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                         )}
                         {(!wrTimeDiff || wrTimeDiff <= 0) && <div className="sm:w-20 hidden sm:block" />}
                         <div className="sm:w-24 text-left sm:text-right text-text-muted">
-                          {formatDate(record.date)}
+                          {formatDate(record.date, displayTz)}
                         </div>
                       </div>
                     </div>
@@ -792,7 +794,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                       </div>
                       <div className="sm:w-20 hidden sm:block" />
                       <div className="sm:w-24 text-left sm:text-right text-text-muted">
-                        {formatDate(record.date)}
+                        {formatDate(record.date, displayTz)}
                       </div>
                     </div>
                   </div>
@@ -820,7 +822,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                       </div>
                       <div className="sm:w-20 hidden sm:block" />
                       <div className="sm:w-24 text-left sm:text-right text-text-muted">
-                        {formatDate(record.date)}
+                        {formatDate(record.date, displayTz)}
                       </div>
                     </div>
                   </div>
