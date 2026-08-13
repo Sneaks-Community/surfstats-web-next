@@ -26,23 +26,70 @@ const registry: ShutdownRegistry = (globalForShutdown.__surfstatsShutdown ??= {
   shuttingDown: false,
 });
 
+type SignalListener = (signal: string) => void;
+
+// Bounded so a connection that never drains cannot cost the pools their close.
+// Kept under Docker's default 10s stop_grace_period, which is the real deadline.
+const DRAIN_TIMEOUT_MS = 8000;
+
 /**
- * Run every registered handler once, then exit. Installing a SIGTERM/SIGINT
- * listener removes Node's default "terminate on signal" behavior, so this is
- * responsible for exiting the process itself.
+ * Hand the signal to the listeners that were already installed (Next's: it stops
+ * accepting connections, finishes in-flight requests and runs pending `after()`
+ * callbacks), and resolve when they try to exit.
  *
- * There is intentionally no internal timeout: the connection drains
+ * Next's cleanup ends in `process.exit()` and awaits nothing this app
+ * registered, which is why every handler below used to be skipped. Swapping
+ * `process.exit` for a resolve while it runs turns that exit into "the server is
+ * drained, carry on".
+ */
+async function drainRequests(signal: string, listeners: SignalListener[]): Promise<void> {
+  if (listeners.length === 0) return;
+
+  const realExit = process.exit.bind(process);
+  let timer: NodeJS.Timeout | undefined;
+
+  try {
+    await new Promise<void>(resolve => {
+      timer = setTimeout(() => {
+        logger.warn(`[Shutdown] Requests still draining after ${DRAIN_TIMEOUT_MS}ms, continuing`);
+        resolve();
+      }, DRAIN_TIMEOUT_MS);
+
+      process.exit = ((code?: number) => {
+        logger.debug(`[Shutdown] Server drained (suppressed exit ${code})`);
+        resolve();
+      }) as typeof process.exit;
+
+      listeners.forEach(listener => {
+        listener(signal);
+      });
+    });
+  } finally {
+    clearTimeout(timer);
+    process.exit = realExit;
+  }
+}
+
+/**
+ * Drain the HTTP server, then run every registered handler once, then exit.
+ * Installing a SIGTERM/SIGINT listener removes Node's default "terminate on
+ * signal" behavior, so this is responsible for exiting the process itself.
+ *
+ * The handlers themselves have no internal timeout: the connection drains
  * (`pool.end()`, `client.quit()`) return promptly when dependencies are
  * reachable and only stall when the sockets are already dead — in which case the
  * platform's post-`stop_grace_period` SIGKILL is the backstop, rather than a
  * hand-tuned constant here.
  */
-async function runShutdown(signal: string): Promise<void> {
+async function runShutdown(signal: string, inherited: SignalListener[]): Promise<void> {
   if (registry.shuttingDown) return;
   registry.shuttingDown = true;
 
+  logger.info(`[Shutdown] Received ${signal}, draining requests...`);
+  await drainRequests(signal, inherited);
+
   const handlers = [...registry.handlers.entries()];
-  logger.info(`[Shutdown] Received ${signal}, running ${handlers.length} cleanup handler(s)...`);
+  logger.info(`[Shutdown] Running ${handlers.length} cleanup handler(s)...`);
 
   let failed = 0;
   await Promise.allSettled(
@@ -88,7 +135,18 @@ export function onShutdown(name: string, handler: ShutdownHandler): void {
 
   if (!registry.listenersRegistered) {
     registry.listenersRegistered = true;
-    process.once('SIGTERM', () => void runShutdown('SIGTERM'));
-    process.once('SIGINT', () => void runShutdown('SIGINT'));
+    takeOverSignal('SIGTERM');
+    takeOverSignal('SIGINT');
   }
+}
+
+/**
+ * Become the only listener for `signal`, keeping whatever was installed before
+ * (Next registers its own during server start, ahead of `instrumentation.ts`) to
+ * run first inside {@link drainRequests}.
+ */
+function takeOverSignal(signal: 'SIGTERM' | 'SIGINT'): void {
+  const inherited = process.listeners(signal) as SignalListener[];
+  process.removeAllListeners(signal);
+  process.once(signal, () => void runShutdown(signal, inherited));
 }

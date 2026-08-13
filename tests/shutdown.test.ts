@@ -74,6 +74,30 @@ describe('shutdown', () => {
     expect(current).toHaveBeenCalledTimes(1);
   });
 
+  // Next's listener is installed before instrumentation.ts runs and its cleanup
+  // ends in process.exit(143), so without the takeover nothing below ever ran.
+  it('lets an inherited listener drain first, and survives its exit', async () => {
+    delete (globalThis as Global).__surfstatsShutdown;
+    process.removeAllListeners('SIGTERM');
+    const nextCleanup = vi.fn(() => {
+      setTimeout(() => process.exit(143), 0);
+    });
+    process.on('SIGTERM', nextCleanup);
+    vi.resetModules();
+    const { onShutdown } = await import('../lib/shutdown');
+    const handler = vi.fn();
+    onShutdown('db-pool', handler);
+
+    process.emit('SIGTERM');
+    await settle();
+    await settle();
+
+    expect(nextCleanup).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledTimes(1);
+    expect(exit).toHaveBeenCalledWith(0);
+  });
+
   it('ignores a second signal once shutdown is under way', async () => {
     const { onShutdown } = await freshShutdown();
     const handler = vi.fn();
