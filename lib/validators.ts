@@ -86,15 +86,25 @@ export function validateMapName(mapname: string): string | null {
 }
 
 /**
+ * A search term that has been through {@link validateSearchQuery}. Cache
+ * functions take this rather than `string`, so the compiler enforces what the
+ * repeated runtime calls used to approximate.
+ */
+export type SearchQuery = string & { readonly __brand: 'SearchQuery' };
+
+/**
  * Validate and sanitize a search query.
  * @param query - The search query to sanitize
  * @returns Sanitized search query or empty string
  */
-export function validateSearchQuery(query: string | undefined): string {
-  if (!query || typeof query !== 'string') return '';
+export function validateSearchQuery(query: string | undefined): SearchQuery {
+  if (!query || typeof query !== 'string') return '' as SearchQuery;
   const result = searchQuerySchema.safeParse(query);
-  return result.success ? result.data : '';
+  return (result.success ? result.data : '') as SearchQuery;
 }
+
+/** The no-search listing, minted rather than cast so `''` needs no exception. */
+export const EMPTY_SEARCH = validateSearchQuery('');
 
 /**
  * Sanitize a player name for display.

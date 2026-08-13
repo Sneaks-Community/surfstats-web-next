@@ -7,7 +7,7 @@ export default function Loading() {
       {/* Back link */}
       <Skeleton className="h-4 w-40 rounded" />
 
-      {/* Country header */}
+      {/* Country header: flag beside the title, so not PageHeaderSkeleton */}
       <div className="flex items-center gap-4">
         <Skeleton className="h-12 w-12 rounded-md" />
         <div className="space-y-2">
@@ -16,7 +16,6 @@ export default function Loading() {
         </div>
       </div>
 
-      {/* Table */}
       <PlayersTableSkeleton />
     </SkeletonScreen>
   );

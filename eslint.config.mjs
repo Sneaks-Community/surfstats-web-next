@@ -109,4 +109,16 @@ export default defineConfig(
       "no-useless-escape": "warn",
     },
   },
+  // Off globally for untyped mysql2 rows, but nothing in app/ or components/ sees
+  // one: they consume typed lib results, so `any` there is a real slip.
+  {
+    files: ["app/**/*.ts", "app/**/*.tsx", "components/**/*.ts", "components/**/*.tsx"],
+    rules: {
+      "@typescript-eslint/no-unsafe-assignment": "error",
+      "@typescript-eslint/no-unsafe-member-access": "error",
+      "@typescript-eslint/no-unsafe-call": "error",
+      "@typescript-eslint/no-unsafe-argument": "error",
+      "@typescript-eslint/no-unsafe-return": "error",
+    },
+  },
 );

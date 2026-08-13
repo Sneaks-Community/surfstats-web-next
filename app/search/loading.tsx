@@ -1,9 +1,9 @@
-import { Skeleton, SkeletonScreen } from '@/components/Skeleton';
+import { PanelSkeleton, Skeleton, SkeletonScreen } from '@/components/Skeleton';
 
 export default function Loading() {
   return (
     <SkeletonScreen label="Loading search results..." className="space-y-8 max-w-4xl mx-auto">
-      {/* Search header */}
+      {/* Search header: centred and oversized, so not PageHeaderSkeleton */}
       <div className="text-center space-y-4 py-8">
         <Skeleton className="h-10 w-40 rounded-md mx-auto" />
         <Skeleton className="h-14 w-full max-w-2xl rounded-xl mx-auto" />
@@ -17,13 +17,13 @@ export default function Loading() {
               <Skeleton className="h-6 w-24 rounded" />
               <Skeleton className="h-4 w-16 rounded" />
             </div>
-            <div className="bg-surface border border-border rounded-xl overflow-hidden divide-y divide-border">
+            <PanelSkeleton className="divide-y divide-border">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="h-16 p-4">
                   <Skeleton className="h-full w-full rounded" />
                 </div>
               ))}
-            </div>
+            </PanelSkeleton>
           </div>
         ))}
       </div>

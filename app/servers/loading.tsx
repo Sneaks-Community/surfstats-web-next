@@ -1,13 +1,9 @@
-import { Skeleton, SkeletonScreen } from '@/components/Skeleton';
+import { PageHeaderSkeleton, Skeleton, SkeletonScreen } from '@/components/Skeleton';
 
 export default function Loading() {
   return (
     <SkeletonScreen label="Loading servers..." className="space-y-6">
-      {/* Header */}
-      <div className="space-y-2">
-        <Skeleton className="h-8 w-40 rounded-md" />
-        <Skeleton className="h-4 w-64 rounded" />
-      </div>
+      <PageHeaderSkeleton titleWidth="w-40" subtitleWidth="w-64" />
 
       {/* Server cards */}
       <div className="flex flex-col gap-4">

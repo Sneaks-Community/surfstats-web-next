@@ -53,7 +53,7 @@ export default function ActivityHeatmapChart({ data }: ActivityHeatmapChartProps
 
   const heatmapGrid = useMemo(() => {
     // Create 7x24 grid
-    const grid: number[][] = Array.from({ length: 7 }, () => Array(24).fill(0));
+    const grid: number[][] = Array.from({ length: 7 }, () => Array.from({ length: 24 }, () => 0));
     
     let maxCount = 0;
     for (const point of safeData) {

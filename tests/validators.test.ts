@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  EMPTY_SEARCH,
   validateMapName,
   validatePlayerName,
   validateSearchQuery,
@@ -57,6 +58,12 @@ describe('validateSearchQuery', () => {
     expect(validateSearchQuery('')).toBe('');
     expect(validateSearchQuery('a'.repeat(101))).toBe('');
     expect(validateSearchQuery('café')).toBe('');
+  });
+
+  // The warmer writes playersListKey(page, ''); the read path writes
+  // playersListKey(page, EMPTY_SEARCH). Drift here warms pages nobody reads.
+  it('mints an empty branded term equal to the warmer key', () => {
+    expect(EMPTY_SEARCH).toBe('');
   });
 });
 

@@ -1,9 +1,9 @@
-import { Skeleton, SkeletonScreen } from '@/components/Skeleton';
+import { PanelSkeleton, Skeleton, SkeletonScreen } from '@/components/Skeleton';
 
 export default function Loading() {
   return (
     <SkeletonScreen label="Loading dashboard..." className="max-w-7xl mx-auto space-y-6">
-      {/* Header */}
+      {/* Oversized hero heading, so not PageHeaderSkeleton */}
       <div className="space-y-2">
         <Skeleton className="h-10 w-80 max-w-full rounded-md" />
         <Skeleton className="h-6 w-96 max-w-full rounded" />
@@ -23,10 +23,7 @@ export default function Loading() {
       {/* Records + completions side by side */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {Array.from({ length: 2 }).map((_, col) => (
-          <div key={col} className="bg-surface border border-border rounded-xl overflow-hidden">
-            <div className="px-4 py-3 border-b border-border bg-surface/50">
-              <Skeleton className="h-5 w-40 rounded" />
-            </div>
+          <PanelSkeleton key={col} headerWidth="w-40">
             <div className="divide-y divide-border">
               {Array.from({ length: 6 }).map((_, i) => (
                 <div key={i} className="px-4 py-3 flex items-center justify-between">
@@ -44,7 +41,7 @@ export default function Loading() {
                 </div>
               ))}
             </div>
-          </div>
+          </PanelSkeleton>
         ))}
       </div>
     </SkeletonScreen>

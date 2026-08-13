@@ -1,10 +1,10 @@
-import { Skeleton, SkeletonScreen } from '@/components/Skeleton';
+import { PanelSkeleton, Skeleton, SkeletonScreen } from '@/components/Skeleton';
 
 export default function Loading() {
   return (
     <SkeletonScreen label="Loading player profile..." className="space-y-4">
       {/* Profile header */}
-      <div className="bg-surface border border-border rounded-xl overflow-hidden">
+      <PanelSkeleton>
         <div className="h-20 bg-surface-hover animate-pulse" />
         <div className="px-4 sm:px-6 pb-4">
           <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-end -mt-8 sm:-mt-10 mb-4">
@@ -35,7 +35,7 @@ export default function Loading() {
             </div>
           </div>
         </div>
-      </div>
+      </PanelSkeleton>
 
       {/* Tab bar */}
       <div className="flex gap-2">

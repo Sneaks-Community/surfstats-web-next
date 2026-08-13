@@ -3,7 +3,7 @@ import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
 import { getPlayerCountFromCache } from '@/lib/registry-cache';
-import { validateSearchQuery } from './validators';
+import type { SearchQuery } from './validators';
 import { cachedFetch } from './cached-fetch';
 import { cacheSet } from './valkey-cache';
 import { playersListKey, PLAYERS_LIST_TTL } from './cache-keys';
@@ -69,15 +69,12 @@ export async function getPlayerPageCeiling(pageSize = PLAYERS_PAGE_SIZE): Promis
  */
 async function fetchPlayersInternal(
   page: number,
-  search: string
+  sanitizedSearch: SearchQuery
 ): Promise<PlayersResult> {
-  logger.debug(`[PlayerCache] Fetching players list (page: ${page}, search: "${search || 'none'}")`);
+  logger.debug(`[PlayerCache] Fetching players list (page: ${page}, search: "${sanitizedSearch || 'none'}")`);
 
   const limit = PLAYERS_PAGE_SIZE;
   const offset = (page - 1) * limit;
-
-  // Sanitize search query to prevent SQL injection via LIKE wildcards
-  const sanitizedSearch = validateSearchQuery(search);
 
   // Use window function for rank calculation (much more efficient than correlated subquery)
   // RANK() OVER (ORDER BY points DESC) calculates rank based on points
@@ -154,21 +151,20 @@ async function fetchPlayersInternal(
  */
 export async function getPlayersFromCache(
   page: number,
-  search: string
+  search: SearchQuery
 ): Promise<{
   players: PlayerRank[];
   total: number;
   totalPages: number;
 }> {
-  // Normalize inputs before they reach the cache key so malformed/unbounded
-  // values can't spawn arbitrary distinct redis keys
+  // The term is sanitized by its type; the page still needs bounding so a
+  // malformed value can't spawn arbitrary distinct redis keys.
   const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
-  const safeSearch = validateSearchQuery(search);
 
   return cachedFetch(
-    playersListKey(safePage, safeSearch),
+    playersListKey(safePage, search),
     PLAYERS_LIST_TTL,
-    () => fetchPlayersInternal(safePage, safeSearch),
+    () => fetchPlayersInternal(safePage, search),
     {
       lock: true,
       expensive: true,
@@ -233,10 +229,7 @@ export async function warmPlayersListCache(pageCount: number): Promise<void> {
  *
  * Throws on failure; the fallback lives in the caller's `onError`, uncached.
  */
-async function searchPlayersInternal(query: string): Promise<PlayerSearchResult[]> {
-  // Sanitize search query to prevent SQL injection via LIKE wildcards
-  const sanitizedQuery = validateSearchQuery(query);
-
+async function searchPlayersInternal(sanitizedQuery: string): Promise<PlayerSearchResult[]> {
   // An empty term would issue `LIKE '%%'`, a full scan of ck_playerrank that
   // matches every row. Callers bound the length, this backstops them.
   if (!sanitizedQuery) {
@@ -268,7 +261,9 @@ const PLAYER_SEARCH_TTL = 300; // 5 minutes
  * Search players from Valkey cache
  * Used by the search page to find players matching a query
  */
-export async function searchPlayersFromCache(query: string): Promise<PlayerSearchResult[]> {
+export async function searchPlayersFromCache(query: SearchQuery): Promise<PlayerSearchResult[]> {
+  // Lowercasing preserves every property the schema enforces, so the key below
+  // is still built from a sanitized term.
   const normalizedQuery = query.toLowerCase();
   const cacheKey = `${PLAYER_SEARCH_KEY}:${normalizedQuery}`;
 

@@ -9,8 +9,9 @@ import {
 import { getMapImagesUrl } from '@/lib/utils';
 import { getStatsFromCache, getLatestCompletionsFromCache } from '@/lib/dashboard-cache';
 import { getPlayersFromCache } from '@/lib/player-cache';
-import { getSteamProfilesFromCache } from '@/lib/steam';
-import { getAllMapMetadataFromCache } from '@/lib/map-cache';
+import { EMPTY_SEARCH } from '@/lib/validators';
+import { getSteamProfilesFromCache, type SteamAvatarSet } from '@/lib/steam';
+import { getAllMapMetadataFromCache, type MapMetadata } from '@/lib/map-cache';
 import logger from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
 import StatTile from '@/components/StatTile';
@@ -38,8 +39,8 @@ export default async function Home() {
   const [stats, latestCompletions, topPlayersResult, mapMeta] = await Promise.all([
     safe('stats', getStatsFromCache, null),
     safe('latest completions', getLatestCompletionsFromCache, []),
-    safe('top players', () => getPlayersFromCache(1, ''), { players: [], total: 0, totalPages: 0 }),
-    safe('map metadata', getAllMapMetadataFromCache, new Map()),
+    safe('top players', () => getPlayersFromCache(1, EMPTY_SEARCH), { players: [], total: 0, totalPages: 0 }),
+    safe('map metadata', getAllMapMetadataFromCache, new Map<string, MapMetadata>()),
   ]);
 
   const mapImagesUrl = getMapImagesUrl();
@@ -51,7 +52,7 @@ export default async function Home() {
   const avatars = await safe(
     'top player avatars',
     () => getSteamProfilesFromCache(topPlayerRows.map((p) => p.steamid)),
-    new Map()
+    new Map<string, SteamAvatarSet>()
   );
 
   const topPlayers: TopPlayerEntry[] = topPlayerRows.map((p) => ({
