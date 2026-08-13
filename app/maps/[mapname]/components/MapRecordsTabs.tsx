@@ -52,7 +52,6 @@ interface StageRecord {
 }
 
 interface MapRecordsTabsProps {
-  records: MapRecord[];
   totalRecords: number;
   mapname: string;
   numBonuses: number;
@@ -154,7 +153,6 @@ const toStageRow = (r: StageRecord): LeaderboardRow => ({
 });
 
 export default function MapRecordsTabs({
-  records,
   totalRecords,
   mapname,
   numBonuses,
@@ -183,8 +181,8 @@ export default function MapRecordsTabs({
   const [sortField, setSortField] = useState<SortField>(initialSortField);
   const [sortDirection, setSortDirection] = useState<SortDirection>(initialSortDir);
 
-  // Records loaded from the API, page by page
-  const [allLeaderboardRecords, setAllLeaderboardRecords] = useState<MapRecord[]>(records);
+  // Starts empty; page 1 is fetched on mount (Times activation), not server-rendered.
+  const [allLeaderboardRecords, setAllLeaderboardRecords] = useState<MapRecord[]>([]);
   // Pages already merged into the above, so arbitrary page navigation can skip refetching.
   const loadedPagesRef = useRef<Set<number>>(new Set());
   // Client-side cache of fetched bonus pages, keyed "${bonus}-${page}".
@@ -198,7 +196,7 @@ export default function MapRecordsTabs({
   const [totalBonusRecords, setTotalBonusRecords] = useState(0);
   const [isLoadingBonuses, setIsLoadingBonuses] = useState(false);
 
-  const allLeaderboardLoadedRef = useRef<boolean>(totalRecords <= records.length);
+  const allLeaderboardLoadedRef = useRef<boolean>(totalRecords <= 0);
   const [isLoadingAllLeaderboard, setIsLoadingAllLeaderboard] = useState(false);
   const allBonusLoadedRef = useRef<Set<number>>(new Set());
   const [isLoadingAllBonus, setIsLoadingAllBonus] = useState(false);
@@ -231,14 +229,10 @@ export default function MapRecordsTabs({
 
   // Reset state when map changes - only depends on mapname to avoid pagination issues
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing state with incoming records prop on map change
-    setAllLeaderboardRecords(records);
-    const initialLoadedPage = Math.ceil(records.length / ITEMS_PER_PAGE);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Reset on map change; the load effect refetches page 1
+    setAllLeaderboardRecords([]);
     loadedPagesRef.current = new Set();
-    for (let i = 1; i <= initialLoadedPage; i++) {
-      loadedPagesRef.current.add(i);
-    }
-    allLeaderboardLoadedRef.current = totalRecords <= records.length;
+    allLeaderboardLoadedRef.current = totalRecords <= 0;
     allBonusLoadedRef.current = new Set();
     setLeaderboardPage(1);
     bonusCacheRef.current = new Map();
@@ -249,6 +243,40 @@ export default function MapRecordsTabs({
     setLoadError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapname]);
+
+  // Fetch the current rank page for the map tab if not loaded. On mount this is
+  // the deferred page-1 load. Non-rank sorts and search use their own paths.
+  useEffect(() => {
+    if (activeTab !== 'map' || sortField !== 'rank' || mapSearch.active) return;
+    if (loadedPagesRef.current.has(leaderboardPage)) return;
+
+    const controller = new AbortController();
+    void (async () => {
+      setIsLoadingAllLeaderboard(true);
+      setLoadError(null);
+      try {
+        const data = await fetchJson<RecordsResponse>(
+          `/api/maps/${mapname}/records?page=${leaderboardPage}&pageSize=${ITEMS_PER_PAGE}`,
+          { signal: controller.signal }
+        );
+        const loaded = data.records ?? [];
+        if (loaded.length > 0) {
+          setAllLeaderboardRecords((prev) => {
+            const existingIds = new Set(prev.map((r) => r.steamid + r.date));
+            return [...prev, ...loaded.filter((r) => !existingIds.has(r.steamid + r.date))];
+          });
+        }
+        loadedPagesRef.current.add(leaderboardPage);
+      } catch (err: unknown) {
+        if (isAbortError(err)) return;
+        clientError(`Failed to load records: ${getErrorMessage(err)}`);
+        setLoadError({ message: getErrorMessage(err), retry: () => setRetryToken((t) => t + 1) });
+      } finally {
+        if (!controller.signal.aborted) setIsLoadingAllLeaderboard(false);
+      }
+    })();
+    return () => controller.abort();
+  }, [activeTab, sortField, mapSearch.active, leaderboardPage, mapname, retryToken]);
 
   // Load stage records when the selected stage changes (sort is handled
   // client-side). The API returns all 100 records sorted by rank. Cancellation

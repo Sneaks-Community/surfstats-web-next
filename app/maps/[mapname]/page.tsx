@@ -8,13 +8,12 @@ import { validateMapName, validatePlayerName } from '@/lib/validators';
 import { mapImageUrl, getMapImagesUrl } from '@/lib/utils';
 import logger from '@/lib/logger';
 import MapRecordsTabs from './components/MapRecordsTabs';
+import MapPageTabs from './components/MapPageTabs';
 import TierBadge from '@/components/TierBadge';
 import MapChartGrid from './components/charts/MapChartGrid';
 import { isStagedMap } from '@/lib/map-cache';
 import { getMapMetadataFromCache } from '@/lib/map-cache';
-import { getMapRecordsFromCache } from '@/lib/map-records-cache';
 import { getMapChartDataFromCache } from '@/lib/map-stats-cache';
-import { RECORDS_PAGE_SIZE } from '@/lib/api-utils';
 
 export async function generateMetadata({ params }: { params: Promise<{ mapname: string }> }) {
   const { mapname } = await params;
@@ -81,19 +80,16 @@ export default async function MapProfilePage({
     notFound();
   }
 
-  const [map, recordsData] = await Promise.all([
-    getMapMetadataFromCache(validMapname),
-    getMapRecordsFromCache(validMapname, 1, RECORDS_PAGE_SIZE),
-  ]);
-  
+  const map = await getMapMetadataFromCache(validMapname);
+
   logger.debug(`[Map Page] Map data for ${validMapname}: stages=${map?.stages}, checkpoints=${map?.checkpoints}`);
-  
+
   if (!map) {
     notFound();
   }
 
-  const leaderboard = recordsData.leaderboard;
-  const total = recordsData.counts.leaderboardTotal;
+  // Cheap cached count; avoids the expensive records query on page render.
+  const total = map.completions;
 
   const mapImagesUrl = getMapImagesUrl();
 
@@ -190,18 +186,20 @@ export default async function MapProfilePage({
         </div>
       </div>
 
-      {/* Chart Grid */}
-      <Suspense fallback={<ChartGridSkeleton />}>
-        <ChartGrid mapname={validMapname} />
-      </Suspense>
-
-      {/* Leaderboard with Tabs */}
-      <MapRecordsTabs
-        records={leaderboard}
-        totalRecords={total}
-        mapname={map.mapname}
-        numBonuses={map.bonuses}
-        numStages={map.stages}
+      <MapPageTabs
+        overview={
+          <Suspense fallback={<ChartGridSkeleton />}>
+            <ChartGrid mapname={validMapname} />
+          </Suspense>
+        }
+        times={
+          <MapRecordsTabs
+            totalRecords={total}
+            mapname={map.mapname}
+            numBonuses={map.bonuses}
+            numStages={map.stages}
+          />
+        }
       />
     </div>
   );

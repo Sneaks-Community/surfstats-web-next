@@ -2,10 +2,7 @@ import 'server-only';
 import { mapCachedFetch } from './map-cached-fetch';
 import pool from './db';
 import type { RowDataPacket } from 'mysql2';
-import { validateMapName } from './validators';
 import { withTimeout } from './timeout';
-import logger from './logger';
-import { getErrorMessage } from './errors';
 
 /**
  * Every paginated/ranked query here orders by `runtime…, date ASC, steamid ASC`.
@@ -187,40 +184,6 @@ export async function getLeaderboardRecordsFromCache(
       return { records: leaderboardRows, wr_time: localWrTime };
     },
   });
-}
-
-/**
- * Get map records (leaderboard, counts, WR time) by composing the two
- * underlying sub-caches (counts+WR and the paginated leaderboard).
- */
-export async function getMapRecordsFromCache(
-  mapname: string,
-  page = 1,
-  pageSize = 100
-): Promise<{
-  leaderboard: MapRecord[];
-  counts: RecordCounts;
-  wr_time: number | null;
-}> {
-  const validMapname = validateMapName(mapname);
-  if (!validMapname) {
-    logger.warn(`[Cache] Invalid map name: ${mapname}`);
-    return { leaderboard: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
-  }
-
-  try {
-    const { counts, wr_time } = await getRecordCountsAndWRFromCache(validMapname);
-    const { records: leaderboard } = await getLeaderboardRecordsFromCache(validMapname, page, pageSize, wr_time);
-
-    return {
-      leaderboard,
-      counts,
-      wr_time,
-    };
-  } catch (error: unknown) {
-    logger.error(`[Cache] Failed to fetch map records for ${validMapname}: ${getErrorMessage(error)}`);
-    return { leaderboard: [], counts: { leaderboardTotal: 0, bonusesTotal: 0, stagesTotal: 0 }, wr_time: null };
-  }
 }
 
 /**
