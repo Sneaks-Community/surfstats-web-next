@@ -1,19 +1,17 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
 import { Map as MapIcon, Target, Layers, CheckCircle, Circle } from 'lucide-react';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import Pagination from '@/components/Pagination';
 import SortIcon from '@/components/SortIcon';
 import RecordSearchInput from '@/components/RecordSearchInput';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { formatTime, formatDate, sortRecords, matchesQuery, parseIntParam, wrDiff, ITEMS_PER_PAGE, type SortDirection } from '@/lib/utils';
+import { formatTime, formatDate, sortRecords, matchesQuery, wrDiff, ITEMS_PER_PAGE, type SortDirection } from '@/lib/utils';
 import { useDisplayTz } from '@/lib/ClientConfigContext';
 import { validatePlayerName } from '@/lib/validators';
 import TierBadge from '@/components/TierBadge';
 import { ZoneGroupBadge, StageBadge } from '@/components/RecordBadges';
-import { useDebounce } from '@/hooks/useDebounce';
 import { clientError } from '@/lib/client-logger';
 import { getErrorMessage, isAbortError } from '@/lib/errors';
 import { fetchJson } from '@/lib/fetch-json';
@@ -92,8 +90,6 @@ type SortField = 'map' | 'rank' | 'time' | 'wrDiff' | 'date' | 'tier' | 'wrTime'
 
 export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabsProps) {
   const displayTz = useDisplayTz();
-  const router = useRouter();
-  const searchParams = useSearchParams();
 
   // Per-section data, fetched on tab activation. Null = not loaded yet.
   const [mapsData, setMapsData] = useState<MapsSection | null>(null);
@@ -118,36 +114,12 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
   const stages = useMemo(() => stagesData?.records ?? [], [stagesData]);
   const incompleteStages = useMemo(() => stagesData?.incomplete ?? [], [stagesData]);
 
-  // Get initial state from URL
-  const initialTab = (searchParams.get('tab') as TabType | null) ?? 'maps';
-  const initialStatus = (searchParams.get('status') as StatusFilter | null) ?? 'finished';
-  const initialMapPage = parseIntParam(searchParams.get('mapPage'));
-  const initialBonusPage = parseIntParam(searchParams.get('bonusPage'));
-  const initialStagePage = parseIntParam(searchParams.get('stagePage'));
-  const initialMapSearch = searchParams.get('mapSearch') ?? '';
-  const initialBonusSearch = searchParams.get('bonusSearch') ?? '';
-  const initialStageSearch = searchParams.get('stageSearch') ?? '';
-  const initialSortField = (searchParams.get('sort') as SortField | null) ?? 'map';
-  const initialSortDir = (searchParams.get('dir') as SortDirection | null) ?? 'asc';
-
-  // State
-  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatus);
-  const [pages, setPages] = useState({
-    maps: initialMapPage,
-    bonuses: initialBonusPage,
-    stages: initialStagePage,
-  });
-  const [searchQueries, setSearchQueries] = useState({
-    maps: initialMapSearch,
-    bonuses: initialBonusSearch,
-    stages: initialStageSearch,
-  });
-  const [sortField, setSortField] = useState<SortField>(initialSortField);
-  const [sortDirection, setSortDirection] = useState<SortDirection>(initialSortDir);
-
-  // Debounced search for URL updates
-  const debouncedSearch = useDebounce(searchQueries[activeTab], 300);
+  const [activeTab, setActiveTab] = useState<TabType>('maps');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('finished');
+  const [pages, setPages] = useState({ maps: 1, bonuses: 1, stages: 1 });
+  const [searchQueries, setSearchQueries] = useState({ maps: '', bonuses: '', stages: '' });
+  const [sortField, setSortField] = useState<SortField>('map');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   // Fetch the active section's full list on activation. Nothing fetches on the
   // initial page render: this component only mounts once the user opens the
@@ -199,24 +171,6 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
     return () => controller.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, steamid, retryToken]);
-
-  // Update URL when state changes
-  useEffect(() => {
-    const params = new URLSearchParams();
-    params.set('tab', activeTab);
-    params.set('status', statusFilter);
-    params.set('mapPage', pages.maps.toString());
-    params.set('bonusPage', pages.bonuses.toString());
-    params.set('stagePage', pages.stages.toString());
-    if (searchQueries.maps) params.set('mapSearch', searchQueries.maps);
-    if (searchQueries.bonuses) params.set('bonusSearch', searchQueries.bonuses);
-    if (searchQueries.stages) params.set('stageSearch', searchQueries.stages);
-    if (sortField !== 'map') params.set('sort', sortField);
-    if (sortDirection !== 'asc') params.set('dir', sortDirection);
-
-    router.replace(`?${params.toString()}`, { scroll: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, statusFilter, pages.maps, pages.bonuses, pages.stages, debouncedSearch, sortField, sortDirection, router]);
 
   // Handle tab change
   const handleTabChange = (tab: TabType) => {
