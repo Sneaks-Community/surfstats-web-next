@@ -1,8 +1,8 @@
 import { cache } from 'react';
 import Link from 'next/link';
-import { getCountryPlayers, getCountryPlayerCount } from '@/lib/country-analytics';
+import { getCountryPlayers, getCountryPlayerCount } from '@/lib/country-cache';
 import { PLAYERS_PAGE_SIZE } from '@/lib/player-cache';
-import type { PlayerSortKey, SortOrder } from '@/lib/country-analytics';
+import type { PlayerSortKey, SortOrder } from '@/lib/country-cache';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import { isValidCountryCode, getPrimaryCountryName } from '@/lib/countries';
 import CountryBadge from '@/components/CountryBadge';

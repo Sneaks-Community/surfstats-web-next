@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
+import { getAllMapMetadataFromCache } from '@/lib/map-cache';
 import { getSiteUrl } from '@/lib/site-url';
 import { getErrorMessage } from '@/lib/errors';
 import logger from '@/lib/logger';

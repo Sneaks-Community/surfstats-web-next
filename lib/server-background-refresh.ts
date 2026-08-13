@@ -1,5 +1,5 @@
 import 'server-only';
-import { fetchServersFromGame } from './cache';
+import { fetchServersFromGame } from './server-status';
 import { cacheSet } from './valkey-cache';
 import logger from './logger';
 import { createBackgroundRefresh } from './background-refresh';

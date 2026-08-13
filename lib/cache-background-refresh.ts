@@ -7,11 +7,14 @@ import {
   getDashboardStatsFromCache,
   getRecentRecordsFromCache,
   getLatestCompletionsFromCache,
+} from './dashboard-cache';
+import {
+  getAllMapMetadataFromCache,
+  getTierDistributionFromCache,
   getTotalsFromCache,
-} from './cache';
-import { getAllMapMetadataFromCache, getTierDistributionFromCache } from './valkey-map-cache';
-import { getAllRegistryDataFromCache } from './valkey-registry-cache';
-import { getCountriesRankingFromCache, getCountriesStatsFromCache } from './country-analytics';
+} from './map-cache';
+import { getAllRegistryDataFromCache } from './registry-cache';
+import { getCountriesRankingFromCache, getCountriesStatsFromCache } from './country-cache';
 import {
   getPlayerOverviewFromCache,
   getPlayerWrPerformanceFromCache,

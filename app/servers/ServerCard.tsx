@@ -6,7 +6,7 @@ import Link from 'next/link';
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { mapImageUrl } from '@/lib/utils';
-import type { ServerStatus, Player } from '@/lib/cache';
+import type { ServerStatus, Player } from '@/lib/server-status';
 
 function formatTime(seconds?: number) {
   if (typeof seconds !== 'number' || isNaN(seconds)) return 'Unknown';

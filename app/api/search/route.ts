@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { searchPlayersFromCache } from '@/lib/player-cache';
-import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
+import { getAllMapMetadataFromCache } from '@/lib/map-cache';
 import { validateSearchQuery } from '@/lib/validators';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import { apiError } from '@/lib/api-utils';

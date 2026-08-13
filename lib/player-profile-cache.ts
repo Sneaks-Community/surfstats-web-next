@@ -230,7 +230,7 @@ export async function getPlayerWrPerformanceFromCache(steamid: string, { force }
     `${PLAYER_WR_PERF_KEY}:${validSteamId}`,
     PLAYER_PROFILE_TTL,
     async () => {
-      const { getAllMapMetadataFromCache } = await import('@/lib/valkey-map-cache');
+      const { getAllMapMetadataFromCache } = await import('@/lib/map-cache');
 
       const [rows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
@@ -293,7 +293,7 @@ export async function getPlayerMapTimesFromCache(steamid: string): Promise<Playe
     `${PLAYER_MAP_TIMES_KEY}:${validSteamId}`,
     PLAYER_PROFILE_TTL,
     async () => {
-      const { getAllMapMetadataFromCache } = await import('@/lib/valkey-map-cache');
+      const { getAllMapMetadataFromCache } = await import('@/lib/map-cache');
       const allMapMetadata = await getAllMapMetadataFromCache();
 
       const [maps] = await withTimeout(
@@ -454,7 +454,7 @@ export async function getIncompleteMapsFromCache(steamid: string): Promise<Incom
     `${PLAYER_INCOMPLETE_MAPS_KEY}:${validSteamId}`,
     PLAYER_PROFILE_TTL,
     async () => {
-      const { getAllMapMetadataFromCache } = await import('@/lib/valkey-map-cache');
+      const { getAllMapMetadataFromCache } = await import('@/lib/map-cache');
 
       const [rows] = await withTimeout(
         pool.query<RowDataPacket[]>(`

@@ -10,7 +10,7 @@ import { getTierColor } from '@/lib/tierColors';
 import { mapImageUrl, getMapImagesUrl, parseIntParam } from '@/lib/utils';
 import Pagination from '@/components/Pagination';
 import { isStagedMap, type MapMetadata } from '@/lib/map-cache';
-import { getAllMapMetadataFromCache, getTierDistributionFromCache } from '@/lib/valkey-map-cache';
+import { getAllMapMetadataFromCache, getTierDistributionFromCache } from '@/lib/map-cache';
 import { validateSearchQuery } from '@/lib/validators';
 import type { Metadata } from 'next';
 

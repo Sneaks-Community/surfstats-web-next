@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import { getCountriesRankingFromCache, getCountriesStatsFromCache } from '@/lib/country-analytics';
-import type { CountrySortKey, SortOrder } from '@/lib/country-analytics';
+import { getCountriesRankingFromCache, getCountriesStatsFromCache } from '@/lib/country-cache';
+import type { CountrySortKey, SortOrder } from '@/lib/country-cache';
 import CountryBadge from '@/components/CountryBadge';
 import Pagination from '@/components/Pagination';
 import SortableTableHeader from '@/components/SortableTableHeader';

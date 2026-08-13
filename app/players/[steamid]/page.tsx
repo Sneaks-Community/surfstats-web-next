@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import { validateSteamId } from '@/lib/validators';
-import { getTotalsFromCache } from '@/lib/cache';
+import { getTotalsFromCache } from '@/lib/map-cache';
 import { getPlayerTimeOnServerFromCache, getActivityHeatmapFromCache, getPlayerMapEngagementFromCache } from '@/lib/player-analytics';
-import { getTierDistributionFromCache } from '@/lib/valkey-map-cache';
+import { getTierDistributionFromCache } from '@/lib/map-cache';
 import { getPlayerNameFromCache } from '@/lib/player-cache';
 import { getPlayerOverviewFromCache, getPlayerWrPerformanceFromCache, getLinearVsStagedPerTierFromCache } from '@/lib/player-profile-cache';
 import type { TierDistributionRow } from '@/lib/player-profile-cache';

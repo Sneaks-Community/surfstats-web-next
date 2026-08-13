@@ -25,7 +25,7 @@ vi.mock('../lib/db-analytics', () => ({
   default: { query: (...args: unknown[]) => query(...args) },
   isAnalyticsAvailable: () => true,
 }));
-vi.mock('../lib/valkey-map-cache', () => ({
+vi.mock('../lib/map-cache', () => ({
   getMapMetadataFromCache: () =>
     Promise.resolve({ checkpoints: 3, stages: 0, wr_holder_steamid: 'STEAM_1:0:1' }),
 }));
@@ -33,7 +33,7 @@ vi.mock('../lib/logger', () => ({
   default: { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-const stats = await import('../lib/valkey-map-stats-cache');
+const stats = await import('../lib/map-stats-cache');
 
 const MAP = 'surf_test';
 

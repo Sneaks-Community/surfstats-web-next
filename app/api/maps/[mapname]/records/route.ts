@@ -6,7 +6,7 @@ import {
   getRecordCountsAndWRFromCache,
   getLeaderboardRecordsFromCache,
   searchLeaderboardRecordsFromCache,
-} from '@/lib/valkey-map-records-cache';
+} from '@/lib/map-records-cache';
 
 export async function GET(
   request: NextRequest,

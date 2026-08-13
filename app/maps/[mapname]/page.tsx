@@ -11,9 +11,9 @@ import MapRecordsTabs from './components/MapRecordsTabs';
 import TierBadge from '@/components/TierBadge';
 import MapChartGrid from './components/charts/MapChartGrid';
 import { isStagedMap } from '@/lib/map-cache';
-import { getMapMetadataFromCache } from '@/lib/valkey-map-cache';
-import { getMapRecordsFromCache } from '@/lib/valkey-map-records-cache';
-import { getMapChartDataFromCache } from '@/lib/valkey-map-stats-cache';
+import { getMapMetadataFromCache } from '@/lib/map-cache';
+import { getMapRecordsFromCache } from '@/lib/map-records-cache';
+import { getMapChartDataFromCache } from '@/lib/map-stats-cache';
 import { RECORDS_PAGE_SIZE } from '@/lib/api-utils';
 
 export async function generateMetadata({ params }: { params: Promise<{ mapname: string }> }) {

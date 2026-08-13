@@ -7,10 +7,10 @@ import {
   Layers,
 } from 'lucide-react';
 import { getMapImagesUrl } from '@/lib/utils';
-import { getStatsFromCache, getLatestCompletionsFromCache } from '@/lib/cache';
+import { getStatsFromCache, getLatestCompletionsFromCache } from '@/lib/dashboard-cache';
 import { getPlayersFromCache } from '@/lib/player-cache';
 import { getSteamProfilesFromCache } from '@/lib/steam';
-import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
+import { getAllMapMetadataFromCache } from '@/lib/map-cache';
 import logger from '@/lib/logger';
 import { getErrorMessage } from '@/lib/errors';
 import StatTile from '@/components/StatTile';

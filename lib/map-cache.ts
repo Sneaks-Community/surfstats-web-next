@@ -3,7 +3,10 @@ import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
 import { withTimeout } from '@/lib/timeout';
-import { getErrorMessage } from './errors';
+import { cachedFetch, type RefreshOptions } from './cached-fetch';
+import { mapKey } from './cache-keys';
+import { getErrorCode, getErrorMessage } from './errors';
+import { validateMapName } from './validators';
 
 // Types for map metadata
 export interface MapMetadata {
@@ -171,4 +174,67 @@ export async function getTotals(): Promise<{
     totalBonuses,
     totalStages,
   };
+}
+
+const MAP_METADATA_KEY = 'surfstats:map:metadata';
+const MAP_METADATA_TTL = 7200; // 2 hours, comfortably over the 30min refresh
+
+const TOTALS_KEY = 'surfstats:totals:data';
+const TOTALS_TTL = 900; // 3x the 5min totals refresh
+
+/** Stored as a plain object for JSON serialization, rehydrated on read. */
+export async function getAllMapMetadataFromCache({ force }: RefreshOptions = {}): Promise<Map<string, MapMetadata>> {
+  const stored = await cachedFetch(
+    MAP_METADATA_KEY,
+    MAP_METADATA_TTL,
+    async () => Object.fromEntries(await fetchAllMapMetadata()),
+    { lock: true, force }
+  );
+
+  return new Map(Object.entries(stored));
+}
+
+/** Namespaced: unsuffixed, a map called `metadata` would collide with the full blob. */
+export async function getMapMetadataFromCache(mapname: string): Promise<MapMetadata | null> {
+  const validMapname = validateMapName(mapname);
+  if (!validMapname) return null;
+
+  return cachedFetch(
+    mapKey(validMapname, 'metadata'),
+    MAP_METADATA_TTL,
+    async () => (await getAllMapMetadataFromCache()).get(validMapname) ?? null
+  );
+}
+
+export async function getTierDistributionFromCache({ force }: RefreshOptions = {}): Promise<Map<number, number>> {
+  const stored = await cachedFetch(
+    `${MAP_METADATA_KEY}:tier_distribution`,
+    MAP_METADATA_TTL,
+    async () => {
+      // Derived from the cached blob, not the DB, so there's no nested lock.
+      const metadata = await getAllMapMetadataFromCache();
+      const distribution: Record<number, number> = {};
+      for (const map of metadata.values()) {
+        distribution[map.tier] = (distribution[map.tier] || 0) + 1;
+      }
+      return distribution;
+    },
+    { force }
+  );
+
+  return new Map(Object.entries(stored).map(([k, v]) => [Number(k), v]));
+}
+
+export async function getTotalsFromCache({ force }: RefreshOptions = {}): Promise<{
+  totalMaps: number;
+  totalBonuses: number;
+  totalStages: number;
+}> {
+  return cachedFetch(TOTALS_KEY, TOTALS_TTL, getTotals, {
+    force,
+    onError: (error) => {
+      logger.error(`[TotalsCache] Failed to fetch totals: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
+      return { totalMaps: 0, totalBonuses: 0, totalStages: 0 };
+    },
+  });
 }

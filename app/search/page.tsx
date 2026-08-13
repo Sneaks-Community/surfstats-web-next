@@ -5,7 +5,7 @@ import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTierTextColor } from '@/lib/tierColors';
 import { mapImageUrl, getMapImagesUrl } from '@/lib/utils';
 import { validateSearchQuery, validatePlayerName } from '@/lib/validators';
-import { getAllMapMetadataFromCache } from '@/lib/valkey-map-cache';
+import { getAllMapMetadataFromCache } from '@/lib/map-cache';
 import { searchPlayersFromCache } from '@/lib/player-cache';
 import type { PlayerSearchResult } from '@/lib/player-cache';
 import logger from '@/lib/logger';

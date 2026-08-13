@@ -36,7 +36,7 @@ export interface MapCachedFetchOptions<T> {
  * Shared skeleton for every per-map Valkey cache: validate the map name, build
  * the `surfstats:map:<map>:<suffix>` key, and run {@link cachedFetch} with the
  * standard lock + onError-logging wiring. Extracted from ~14 near-identical
- * copies across `valkey-map-records-cache.ts` and `valkey-map-stats-cache.ts`.
+ * copies across `map-records-cache.ts` and `map-stats-cache.ts`.
  *
  * On an invalid map name it logs a warning and resolves to `empty` without
  * touching the cache; on a fetch failure `empty` is returned (never cached).

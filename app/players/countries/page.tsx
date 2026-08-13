@@ -1,5 +1,5 @@
 import { Globe } from 'lucide-react';
-import { getCountriesRankingFromCache, getCountriesStatsFromCache } from '@/lib/country-analytics';
+import { getCountriesRankingFromCache, getCountriesStatsFromCache } from '@/lib/country-cache';
 import { COUNTRIES_RANKING_DEFAULT } from '@/lib/cache-keys';
 import { getNumericCodeFromAlpha2, getPrimaryCountryName } from '@/lib/countries';
 import PanelHeader from '@/components/PanelHeader';
@@ -28,7 +28,7 @@ export default async function CountriesPage() {
       const numeric = getNumericCodeFromAlpha2(c.country_code);
       if (!numeric) return null;
       return {
-        // country-analytics uses the ISO code as the identifier, so resolve a
+        // country-cache uses the ISO code as the identifier, so resolve a
         // human-readable name for the map tooltip (falls back to the code).
         numeric,
         name: getPrimaryCountryName(c.country_code) ?? c.country,

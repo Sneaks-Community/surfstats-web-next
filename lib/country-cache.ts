@@ -65,7 +65,7 @@ const getCountriesRankingInternal = async (
   page = 1,
   limit = 50
 ): Promise<{ countries: CountryRank[]; total: number; totalPages: number }> => {
-  logger.debug(`[CountryAnalytics] Fetching countries ranking (sort: ${sort}, order: ${order}, page: ${page})`);
+  logger.debug(`[CountryCache] Fetching countries ranking (sort: ${sort}, order: ${order}, page: ${page})`);
 
   // Throws on failure; the fallback lives in the caller's `onError`, uncached.
   const offset = (page - 1) * limit;
@@ -149,7 +149,7 @@ const getCountriesRankingInternal = async (
   // Apply pagination
   const paginatedCountries = countriesArray.slice(offset, offset + limit);
 
-  logger.debug(`[CountryAnalytics] Retrieved ${paginatedCountries.length} countries (page ${page} of ${Math.ceil(total / limit)})`);
+  logger.debug(`[CountryCache] Retrieved ${paginatedCountries.length} countries (page ${page} of ${Math.ceil(total / limit)})`);
 
   return {
     countries: paginatedCountries,
@@ -200,7 +200,7 @@ export async function getCountriesRankingFromCache(
       expensive: true,
       force,
       onError: (error) => {
-        logger.error(`[CountryAnalytics] Failed to fetch countries ranking: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
+        logger.error(`[CountryCache] Failed to fetch countries ranking: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
         return { countries: [], total: 0, totalPages: 0 };
       },
     }
@@ -241,7 +241,7 @@ const getCountryPlayersInternal = async (
   sort: PlayerSortKey = 'rank',
   order: SortOrder = 'desc'
 ): Promise<{ players: CountryPlayer[]; total: number; totalPages: number; countryName: string }> => {
-  logger.debug(`[CountryAnalytics] Fetching players for country: ${countryCode} (page: ${page}, sort: ${sort}, order: ${order})`);
+  logger.debug(`[CountryCache] Fetching players for country: ${countryCode} (page: ${page}, sort: ${sort}, order: ${order})`);
 
   // Throws on failure; the fallback lives in the caller's `onError`, uncached.
   // Get all possible country name variations for this code
@@ -249,7 +249,7 @@ const getCountryPlayersInternal = async (
 
   // An unresolvable country code is a real (cacheable) result, not a failure.
   if (countryNames.length === 0) {
-    logger.warn(`[CountryAnalytics] Invalid country code: ${countryCode}`);
+    logger.warn(`[CountryCache] Invalid country code: ${countryCode}`);
     return { players: [], total: 0, totalPages: 0, countryName: countryCode };
   }
 
@@ -289,7 +289,7 @@ const getCountryPlayersInternal = async (
   // Use the first country name as the display name (most common variation)
   const countryName = countryNames[0];
 
-  logger.debug(`[CountryAnalytics] Retrieved ${rows.length} players for ${countryName} (page ${page} of ${Math.ceil(total / limit)})`);
+  logger.debug(`[CountryCache] Retrieved ${rows.length} players for ${countryName} (page ${page} of ${Math.ceil(total / limit)})`);
 
   return {
     players: rows,
@@ -332,7 +332,7 @@ export async function getCountryPlayers(
       lock: true,
       expensive: true,
       onError: (error) => {
-        logger.error(`[CountryAnalytics] Failed to fetch players for country ${countryCode}: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
+        logger.error(`[CountryCache] Failed to fetch players for country ${countryCode}: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
         return { players: [], total: 0, totalPages: 0, countryName: countryCode };
       },
     }
@@ -373,7 +373,7 @@ export async function getCountryPlayerCount(countryCode: string): Promise<number
     {
       lock: true,
       onError: (error) => {
-        logger.error(`[CountryAnalytics] Failed to count players for country ${countryCode}: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
+        logger.error(`[CountryCache] Failed to count players for country ${countryCode}: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
         return 0;
       },
     }
@@ -460,7 +460,7 @@ export async function getCountriesStatsFromCache({ force }: RefreshOptions = {})
     expensive: true,
     force,
     onError: (error) => {
-      logger.error(`[CountryAnalytics] Failed to fetch countries stats: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
+      logger.error(`[CountryCache] Failed to fetch countries stats: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
       return { totalCountries: 0, totalPlayers: 0 };
     },
   });

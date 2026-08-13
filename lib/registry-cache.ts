@@ -2,6 +2,7 @@ import 'server-only';
 import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
+import { cachedFetch, type RefreshOptions } from './cached-fetch';
 import { getErrorMessage } from './errors';
 
 // Types for bonus and stage registries
@@ -73,4 +74,46 @@ export async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stag
     logger.error(`[RegistryCache] Error: ${getErrorMessage(error)}`);
     throw error;
   }
+}
+
+const REGISTRY_DATA_KEY = 'surfstats:registry:data';
+const REGISTRY_CACHE_TTL = 7200; // 2 hours, comfortably over the 30min refresh
+
+export async function getAllRegistryDataFromCache({ force }: RefreshOptions = {}): Promise<{
+  bonuses: BonusGroup[];
+  stages: StageGroup[];
+  playerCount: number;
+}> {
+  return cachedFetch(REGISTRY_DATA_KEY, REGISTRY_CACHE_TTL, fetchRegistryData, { lock: true, force });
+}
+
+export async function getAllBonusGroupsFromCache(): Promise<BonusGroup[]> {
+  const data = await getAllRegistryDataFromCache();
+  return data.bonuses;
+}
+
+export async function getAllStagesFromCache(): Promise<StageGroup[]> {
+  const data = await getAllRegistryDataFromCache();
+  return data.stages;
+}
+
+export async function getPlayerCountFromCache(): Promise<number> {
+  const data = await getAllRegistryDataFromCache();
+  return data.playerCount;
+}
+
+export async function getBonusGroupsByMapFromCache(mapname: string): Promise<number[]> {
+  const data = await getAllRegistryDataFromCache();
+  return data.bonuses
+    .filter((b) => b.mapname === mapname)
+    .map((b) => b.zonegroup)
+    .sort((a, b) => a - b);
+}
+
+export async function getStagesByMapFromCache(mapname: string): Promise<number[]> {
+  const data = await getAllRegistryDataFromCache();
+  return data.stages
+    .filter((s) => s.map === mapname)
+    .map((s) => s.stage)
+    .sort((a, b) => a - b);
 }

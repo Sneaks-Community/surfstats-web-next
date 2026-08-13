@@ -2,7 +2,7 @@ import 'server-only';
 import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
-import { getPlayerCountFromCache } from '@/lib/valkey-registry-cache';
+import { getPlayerCountFromCache } from '@/lib/registry-cache';
 import { validateSearchQuery } from './validators';
 import { cachedFetch } from './cached-fetch';
 import { cacheSet } from './valkey-cache';

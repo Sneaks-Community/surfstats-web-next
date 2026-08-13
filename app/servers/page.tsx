@@ -1,5 +1,5 @@
 import { Server } from 'lucide-react';
-import { getServersFromCache, type ServerStatus } from '@/lib/valkey-server-cache';
+import { getServersFromCache, type ServerStatus } from '@/lib/server-status';
 import ServerCard from './ServerCard';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';

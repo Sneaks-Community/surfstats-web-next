@@ -8,8 +8,8 @@ import {
   getFinishTimeDataFromCache,
   getBonusCompletionsOverTimeFromCache,
   getPercentileTimesFromCache,
-} from './valkey-map-stats-cache';
-import { getAllMapMetadataFromCache, getMapMetadataFromCache } from './valkey-map-cache';
+} from './map-stats-cache';
+import { getAllMapMetadataFromCache, getMapMetadataFromCache } from './map-cache';
 import { getErrorMessage } from './errors';
 import { createBackgroundRefresh } from './background-refresh';
 
