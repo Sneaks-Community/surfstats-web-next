@@ -8,6 +8,8 @@ import {
   matchesQuery,
   parseIntParam,
   sortRecords,
+  wrDiff,
+  formatTimeDiff,
 } from '../lib/utils';
 
 // SEC-1/DRY-9: every page route clamps `?page=` through this. A NaN reaching an
@@ -88,5 +90,26 @@ describe('sortRecords and matchesQuery', () => {
   it('matches case-insensitively across fields', () => {
     expect(matchesQuery('UTOPIA', 'surf_utopia', 'author')).toBe(true);
     expect(matchesQuery('nope', 'surf_utopia', 'author')).toBe(false);
+  });
+});
+
+// DRY-2: this arithmetic was written out at five call sites across the two
+// record tables, three of them as sort comparators.
+describe('wrDiff and formatTimeDiff', () => {
+  it('sorts records with no WR last, whichever direction', () => {
+    const rows = [
+      { time: 70, wr: 60 },
+      { time: 65, wr: null },
+      { time: 61, wr: 60 },
+    ];
+    const sorted = sortRecords(rows, 'asc', (a, b) => wrDiff(a.time, a.wr) - wrDiff(b.time, b.wr));
+
+    expect(sorted.map(r => r.time)).toEqual([61, 70, 65]);
+  });
+
+  it('renders the gap, and a dash for the record itself', () => {
+    expect(formatTimeDiff(70, 60)).toBe('+0:10.000');
+    expect(formatTimeDiff(60, 60)).toBe('-');
+    expect(formatTimeDiff(70, null)).toBe('-');
   });
 });

@@ -39,6 +39,31 @@ export function formatTime(seconds: number): string {
   return `${mins}:${secs.padStart(6, '0')}`;
 }
 
+/**
+ * Seconds behind the world record, or `Infinity` when there is none, so records
+ * without a WR sort last instead of first.
+ */
+export function wrDiff(time: number, wrTime: number | null): number {
+  return wrTime ? time - wrTime : Infinity;
+}
+
+/** The same gap rendered: `+M:SS.mmm`, or `-` for the WR itself and no-WR rows. */
+export function formatTimeDiff(time: number, wrTime: number | null): string {
+  if (!wrTime || time === wrTime) return '-';
+  return `+${formatTime(time - wrTime)}`;
+}
+
+/** Rows per page in the client-side record tables (map, bonus, stage, player). */
+export const ITEMS_PER_PAGE = 20;
+
+/**
+ * Rows per page (and the max) for the record/stage/bonus endpoints; keeps cache
+ * entries under 2MB. The map page's first page, those routes and the client's
+ * load-all loop all have to agree, and a client component cannot import the
+ * `server-only` `api-utils`, so the value lives here and is re-exported there.
+ */
+export const RECORDS_PAGE_SIZE = 100;
+
 export type SortDirection = 'asc' | 'desc';
 
 /**

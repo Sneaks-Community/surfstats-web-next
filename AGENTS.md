@@ -35,7 +35,7 @@ E.g. zonetype 1 / zonegroup 0 = map start; zonetype 2 / zonegroup 4 = Bonus 4 en
 ```
 app/            App Router: pages, app/api/* routes, app/components/* (home, countries)
 components/     Shared UI (nav, search, filters, badges, pagination, tables, charts scaffolding)
-hooks/          Client hooks (useDebounce, usePagination)
+hooks/          Client hooks (useDebounce, usePagination, useRecordSearch)
 lib/            Server logic: db, caching, analytics, steam, validators, theme, env
 types/          Type defs
 instrumentation.ts  Startup hook (runs once per server): defers to lib/startup.ts
@@ -69,7 +69,7 @@ API routes: `maps/[mapname]/{records,bonuses,stages}`, `players/[steamid]/{maps,
 
 **Responsive.** Mobile-first; Tailwind breakpoints; >=44px touch targets; horizontal scroll for tables.
 
-**Reuse & efficiency.** Prefer existing queries/caches/functions over new ones; keep queries lean.
+**Reuse & efficiency.** Prefer existing queries/caches/functions over new ones; keep queries lean. Record tables share [`useRecordSearch`](hooks/useRecordSearch.ts) (debounced server-side player search: query state, cancellation, its own error and retry, result pagination) and, on the map page, [`LeaderboardTable`](app/maps/[mapname]/components/LeaderboardTable.tsx) for the columns and the too-short/error/loading/empty ladder. Page sizes are `ITEMS_PER_PAGE` and `RECORDS_PAGE_SIZE` in [`lib/utils.ts`](lib/utils.ts), never a second literal.
 
 ## Key DB tables (ckSurf)
 

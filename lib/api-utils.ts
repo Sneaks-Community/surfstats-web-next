@@ -47,12 +47,9 @@ export function resolveSteamIdParam(raw: string): string | NextResponse {
 /** Absolute backstop on `page`; routes with a known row count clamp tighter. */
 export const MAX_PAGE = 10000;
 
-/**
- * Rows per page (and the max) for the record/stage/bonus endpoints; keeps cache
- * entries under 2MB. The map page's first page and the client's load-all loop
- * use the same value, so all four sites have to agree.
- */
-export const RECORDS_PAGE_SIZE = 100;
+// Defined in `utils` because the client's load-all loop needs the same value and
+// cannot import this module; re-exported so server callers keep one import.
+export { RECORDS_PAGE_SIZE } from './utils';
 
 /**
  * Parse and clamp `page`/`pageSize` search params. NaN/negative/oversized inputs

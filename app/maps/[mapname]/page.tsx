@@ -1,5 +1,7 @@
+import { Suspense } from 'react';
 import { getSteamProfileUrl } from '@/lib/steam';
 import { notFound } from 'next/navigation';
+import { Skeleton } from '@/components/Skeleton';
 import { Map as MapIcon, Users, Layers, Target, Download } from 'lucide-react';
 import MapImage from '@/components/MapImage';
 import { validateMapName, validatePlayerName } from '@/lib/validators';
@@ -48,6 +50,23 @@ export async function generateMetadata({ params }: { params: Promise<{ mapname: 
   };
 }
 
+/**
+ * Seven cached aggregates, all below the fold. Behind a Suspense boundary so the
+ * header and the leaderboard stream first instead of waiting on them; on a cold
+ * key that wait is seconds, not milliseconds.
+ */
+async function ChartGrid({ mapname }: { mapname: string }) {
+  return <MapChartGrid data={await getMapChartDataFromCache(mapname)} />;
+}
+
+const ChartGridSkeleton = () => (
+  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    {Array.from({ length: 4 }).map((_, i) => (
+      <Skeleton key={i} className="rounded-xl h-72" />
+    ))}
+  </div>
+);
+
 export default async function MapProfilePage({
   params,
 }: {
@@ -62,10 +81,9 @@ export default async function MapProfilePage({
     notFound();
   }
 
-  const [map, recordsData, chartData] = await Promise.all([
+  const [map, recordsData] = await Promise.all([
     getMapMetadataFromCache(validMapname),
     getMapRecordsFromCache(validMapname, 1, RECORDS_PAGE_SIZE),
-    getMapChartDataFromCache(validMapname)
   ]);
   
   logger.debug(`[Map Page] Map data for ${validMapname}: stages=${map?.stages}, checkpoints=${map?.checkpoints}`);
@@ -173,7 +191,9 @@ export default async function MapProfilePage({
       </div>
 
       {/* Chart Grid */}
-      <MapChartGrid data={chartData} />
+      <Suspense fallback={<ChartGridSkeleton />}>
+        <ChartGrid mapname={validMapname} />
+      </Suspense>
 
       {/* Leaderboard with Tabs */}
       <MapRecordsTabs

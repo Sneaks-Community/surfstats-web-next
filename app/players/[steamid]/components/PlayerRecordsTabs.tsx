@@ -8,7 +8,7 @@ import Pagination from '@/components/Pagination';
 import SortIcon from '@/components/SortIcon';
 import RecordSearchInput from '@/components/RecordSearchInput';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
-import { formatTime, formatDate, sortRecords, matchesQuery, parseIntParam, type SortDirection } from '@/lib/utils';
+import { formatTime, formatDate, sortRecords, matchesQuery, parseIntParam, wrDiff, ITEMS_PER_PAGE, type SortDirection } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import TierBadge from '@/components/TierBadge';
 import { ZoneGroupBadge, StageBadge } from '@/components/RecordBadges';
@@ -88,8 +88,6 @@ interface StagesSection {
 type TabType = 'maps' | 'bonuses' | 'stages';
 type StatusFilter = 'finished' | 'incomplete';
 type SortField = 'map' | 'rank' | 'time' | 'wrDiff' | 'date' | 'tier' | 'wrTime' | 'mapType';
-
-const ITEMS_PER_PAGE = 20;
 
 export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabsProps) {
   const router = useRouter();
@@ -281,11 +279,8 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
           return a.player_rank - b.player_rank;
         case 'time':
           return a.runtimepro - b.runtimepro;
-        case 'wrDiff': {
-          const aDiff = a.wr_time ? a.runtimepro - a.wr_time : Infinity;
-          const bDiff = b.wr_time ? b.runtimepro - b.wr_time : Infinity;
-          return aDiff - bDiff;
-        }
+        case 'wrDiff':
+          return wrDiff(a.runtimepro, a.wr_time) - wrDiff(b.runtimepro, b.wr_time);
         case 'date':
           return new Date(a.date).getTime() - new Date(b.date).getTime();
         case 'tier':
