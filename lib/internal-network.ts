@@ -41,8 +41,9 @@ function isPrivateIp(ip: string): boolean {
  * public reverse proxy. Assumes the deployment is only reachable through a proxy
  * that sets `x-forwarded-for` for public traffic (see the origin/rate-limit
  * notes): a request lacking any forwarding header came straight over the private
- * network (container healthcheck, internal monitoring), and a forwarded request
- * is internal only if its client IP is itself private/allow-listed.
+ * network, and is accepted only when addressed to a loopback Host (the container
+ * healthcheck). A forwarded request is internal only if its client IP is itself
+ * private/allow-listed.
  *
  * Uses the right-most XFF hop — the address the proxy observed and appended,
  * which a client cannot forge — so a public caller can't spoof a private source
@@ -52,11 +53,17 @@ export function isInternalRequest(request: NextRequest): boolean {
   const xff = request.headers.get('x-forwarded-for');
   const realIp = request.headers.get('x-real-ip');
 
-  if (!xff && !realIp) return true;
+  if (!xff && !realIp) {
+    // Docker's HEALTHCHECK wgets http://localhost:3000/api/health, so the only
+    // unforwarded caller we owe access to targets a loopback Host. Anything else
+    // arriving with no forwarding header reached the app around the proxy.
+    const host = request.headers.get('host') ?? '';
+    return /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host);
+  }
 
   const parts = xff?.split(',') ?? [];
   const clientIp = (parts[parts.length - 1]?.trim() || realIp?.trim() || '');
-  if (!clientIp) return true;
+  if (!clientIp) return false; // An empty forwarding header proves nothing.
   if (TRUSTED_INTERNAL_IPS.includes(clientIp)) return true;
   return isPrivateIp(clientIp);
 }

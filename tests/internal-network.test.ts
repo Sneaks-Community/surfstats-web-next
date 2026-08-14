@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
 
-// Only the two headers are read, so a bare Headers object stands in for the request.
+// Only headers are read, so a bare Headers object stands in for the request.
 function request(headers: Record<string, string>): NextRequest {
   return { headers: new Headers(headers) } as unknown as NextRequest;
 }
@@ -19,7 +19,20 @@ describe('isInternalRequest', () => {
   it('treats an unforwarded request as internal', async () => {
     const { isInternalRequest } = await load();
 
-    expect(isInternalRequest(request({}))).toBe(true);
+    expect(isInternalRequest(request({ host: 'localhost:3000' }))).toBe(true);
+  });
+
+  it('rejects an unforwarded request not addressed to loopback', async () => {
+    const { isInternalRequest } = await load();
+
+    expect(isInternalRequest(request({ host: 'surfstats.example.com' }))).toBe(false);
+    expect(isInternalRequest(request({}))).toBe(false);
+  });
+
+  it('rejects an empty forwarding header', async () => {
+    const { isInternalRequest } = await load();
+
+    expect(isInternalRequest(request({ 'x-forwarded-for': ',', host: 'localhost:3000' }))).toBe(false);
   });
 
   it('classifies forwarded public addresses as external', async () => {
