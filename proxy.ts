@@ -21,6 +21,11 @@ export const config = {
     // Unconditional: must not use the dot-excluding pattern below, or a dotted
     // path segment (`/api/maps/foo.bar/records`) skips every gate.
     '/api/:path*',
+    // Metadata routes
+    '/sitemap.xml',
+    '/robots.txt',
+    // Image optimizer
+    '/_next/image',
     // Pages: all but Next internals and static files (anything with a dot).
     '/((?!_next/static|_next/image|.*\\..*).*)',
   ],
