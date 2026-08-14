@@ -135,14 +135,9 @@ export async function getPlayerOverviewFromCache(steamid: string, { force }: Ref
     return null;
   }
 
-  // Every profile view calls this first, and nothing else does, so it is where the
-  // warm set is fed. Skipped on a forced refresh: that is the warmer itself, and
-  // re-recording would keep the same 100 profiles in the set forever.
-  if (!force) recordProfileView(validSteamId);
-
   // A null overview (player not found / query error) is never cached, so
   // subsequent requests keep retrying rather than pinning the absence.
-  return cachedFetch<PlayerOverview | null>(
+  const overview = await cachedFetch<PlayerOverview | null>(
     `${PLAYER_OVERVIEW_KEY}:${validSteamId}`,
     PLAYER_PROFILE_TTL,
     async () => {
@@ -203,6 +198,14 @@ export async function getPlayerOverviewFromCache(steamid: string, { force }: Ref
       },
     }
   );
+
+  // Every profile view calls this, and nothing else does, so it is where the warm
+  // set is fed. Recorded only for a player that exists: recording first let a
+  // sweep of made-up numeric ids evict all 100 real profiles. Skipped on a forced
+  // refresh: that is the warmer itself, and re-recording would keep the same 100
+  // profiles in the set forever.
+  if (!force && overview) recordProfileView(validSteamId);
+  return overview;
 }
 
 /**

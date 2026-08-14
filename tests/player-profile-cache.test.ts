@@ -42,4 +42,12 @@ describe('getPlayerOverviewFromCache', () => {
 
     expect(recordProfileView).not.toHaveBeenCalled();
   });
+
+  it('does not record a player that does not exist', async () => {
+    query.mockResolvedValueOnce([[]]);
+
+    await getPlayerOverviewFromCache('99999999999999999');
+
+    expect(recordProfileView).not.toHaveBeenCalled();
+  });
 });
