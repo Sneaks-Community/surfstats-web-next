@@ -56,6 +56,12 @@ const optionalSchema = z.object({
   PLAYERS_LIST_WARM_INTERVAL_MS: z.coerce.number().int().positive().optional(),
   // Comma-separated extra origins allowed to call the API (own origin always allowed).
   ALLOWED_ORIGINS: z.string().optional(),
+  // Client-IP header (see lib/client-ip.ts). A typo would collapse every caller
+  // into one rate-limit bucket, so shape-check it.
+  TRUSTED_CLIENT_IP_HEADER: z
+    .string()
+    .regex(/^[A-Za-z0-9-]+$/, 'TRUSTED_CLIENT_IP_HEADER must be a valid HTTP header name')
+    .optional(),
   // Canonical public base URL (e.g. https://stats.example.com). Used for
   // robots.txt / sitemap.xml absolute URLs; falls back to the request host.
   NEXT_PUBLIC_SITE_URL: z.url('NEXT_PUBLIC_SITE_URL must be a valid URL').optional(),

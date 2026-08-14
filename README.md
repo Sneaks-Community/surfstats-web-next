@@ -27,7 +27,7 @@ A modern, fast, and responsive web interface for displaying player statistics, m
 
 * **MySQL** database populated by the ckSurf timer plugin.
 * **Valkey** (or Redis). Every query is served through the cache, and when Valkey is unreachable the app serves a "temporarily unavailable" page instead of running uncached queries against your database.
-* **A reverse proxy** in front of the app, setting `x-forwarded-for`.
+* **A reverse proxy** in front of the app, setting `x-forwarded-for` (or another client-IP header named by `TRUSTED_CLIENT_IP_HEADER`).
 * **Node.js >= 24** for a non-Docker deployment (see `.nvmrc`).
 
 ## Configuration
@@ -72,12 +72,13 @@ Analytics is opt-in: it is enabled only when `ANALYTICS_MYSQL_HOST` or `ANALYTIC
 ### Security and limits
 
 * `ALLOWED_ORIGINS`: Comma-separated extra origins allowed to call `/api/*`. The site's own origin is always allowed.
+* `TRUSTED_CLIENT_IP_HEADER`: Header your proxy sets with the client IP, used for rate-limit keys (default: `x-forwarded-for`). Set it to `cf-connecting-ip` (or `true-client-ip`) when a CDN, not your local proxy, is the trust boundary; otherwise the right-most `x-forwarded-for` hop is the CDN edge and every visitor shares one rate-limit bucket. `x-real-ip` is used as a fallback when the named header is absent. Only set this to a header your proxy always overwrites, since a client can send any header it likes.
 * `RATE_LIMIT_MAX`: Max `/api/*` requests per window per IP (default: `120`).
 * `RATE_LIMIT_PAGE_MAX`: Max page requests per window per IP (default: `300`). Counted separately from the API budget.
 * `RATE_LIMIT_PREFETCH_MAX`: Max router link prefetches per window per IP (default: `900`). Own budget, since one page view prefetches every viewport `<Link>`.
 * `RATE_LIMIT_WINDOW_SECONDS`: Window length in seconds (default: `60`).
 * `RATE_LIMIT_BLOCK_SECONDS`: Extra seconds an over-budget IP stays blocked past the end of its window (default: `0`, disabled). Use it to make sustained abuse expensive without lowering the budget for everyone.
-* `HEALTH_INTERNAL_IPS`: Comma-separated extra source IPs treated as internal, so they receive the detailed `/api/health` payload. Loopback and RFC1918 addresses always count as internal.
+`/api/health` is a public liveness probe that returns `{"status":"ok"}` and nothing else. It has no configuration. It deliberately does not check MySQL or Valkey: a failing Docker `HEALTHCHECK` restarts the web container, which cannot fix a database outage and would only flap while the app is otherwise serving its graceful "temporarily unavailable" page. Each dependency has its own healthcheck for that. Note that "healthy" means the process is answering, not that the cache has finished warming.
 
 Rate limiting uses [`rate-limiter-flexible`](https://github.com/animir/node-rate-limiter-flexible) against Valkey, keyed `surfstats:ratelimit:<scope>:<ip>`. If Valkey is unreachable it falls back to an in-process counter with the same budget, so an outage degrades the limiter to per-instance accounting rather than dropping it.
 

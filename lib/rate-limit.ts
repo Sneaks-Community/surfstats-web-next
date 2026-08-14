@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { RateLimiterMemory, RateLimiterRedis, RateLimiterRes } from 'rate-limiter-flexible';
 import client from './valkey';
 import logger from './logger';
+import { getClientIp } from './client-ip';
 
 /**
  * Fixed-window, per-IP rate limiter backed by Valkey, implemented with
@@ -117,23 +118,6 @@ export interface RateLimitResult {
   resetSeconds: number;
 }
 
-/**
- * Best-effort client IP from proxy headers. Reads the right-most `x-forwarded-for`
- * hop — the address the edge proxy (Traefik) actually observed and appended, which
- * a client cannot forge — rather than the spoofable left-most entry. Assumes a
- * single trusted proxy hop and that the app is only reachable through it; add a
- * hop for each additional proxy placed in front of Traefik.
- */
-function getClientIp(request: NextRequest): string {
-  const xff = request.headers.get('x-forwarded-for');
-  if (xff) {
-    const parts = xff.split(',');
-    const last = parts[parts.length - 1]?.trim();
-    if (last) return last;
-  }
-  return request.headers.get('x-real-ip')?.trim() || 'unknown';
-}
-
 /** `Retry-After` is whole seconds and must never be 0, or clients retry instantly. */
 function toResetSeconds(msBeforeNext: number): number {
   return Math.max(1, Math.ceil(msBeforeNext / 1000));
@@ -157,7 +141,8 @@ export async function checkRateLimit(
   request: NextRequest,
   scope: RateLimitScope = 'api'
 ): Promise<RateLimitResult> {
-  const ip = getClientIp(request);
+  // An unidentifiable caller shares one bucket rather than escaping the limit.
+  const ip = getClientIp(request) || 'unknown';
   const limit = MAX_BY_SCOPE[scope];
 
   try {

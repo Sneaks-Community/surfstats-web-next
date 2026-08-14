@@ -52,7 +52,9 @@ ENV PORT=3000
 # set hostname to localhost
 ENV HOSTNAME="0.0.0.0"
 
+# 127.0.0.1, not localhost: wget resolves localhost to ::1 and HOSTNAME above
+# binds IPv4 only, so the probe would never connect.
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD wget --no-verbose --spider http://localhost:3000/api/health || exit 1
+  CMD wget --no-verbose --spider http://127.0.0.1:3000/api/health || exit 1
 
 CMD ["node", "server.js"]

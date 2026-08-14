@@ -35,7 +35,10 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isApi = pathname.startsWith('/api/');
 
-  // Health endpoint reports status itself; never gate it.
+  // Exempt before every gate, primarily the origin guard: the healthcheck's wget
+  // sends no Origin or Sec-Fetch-*, so that guard would 403 it. The route touches
+  // nothing, and metering it would cost a Valkey round-trip to serve a constant.
+  // Exact match, never a prefix.
   if (pathname === '/api/health') {
     return NextResponse.next();
   }
