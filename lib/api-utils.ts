@@ -2,7 +2,7 @@ import 'server-only';
 import { NextResponse } from 'next/server';
 import logger from './logger';
 import { validateMapName, validateSteamId } from './validators';
-import { parseIntParam } from './utils';
+import { parseIntParam, ITEMS_PER_PAGE, RECORDS_PAGE_SIZE } from './utils';
 import { getErrorMessage, CacheUnavailableError } from './errors';
 
 /** Cache-Control header used by the map search endpoints. */
@@ -49,7 +49,7 @@ export const MAX_PAGE = 10000;
 
 // Defined in `utils` because the client's load-all loop needs the same value and
 // cannot import this module; re-exported so server callers keep one import.
-export { RECORDS_PAGE_SIZE } from './utils';
+export { RECORDS_PAGE_SIZE };
 
 /**
  * Parse and clamp `page`/`pageSize` search params. NaN/negative/oversized inputs
@@ -63,11 +63,14 @@ export function parsePageParams(
   maxPage: number = MAX_PAGE
 ): { page: number; pageSize: number } {
   const page = parseIntParam(searchParams.get('page'), { fallback: 1, min: 1, max: maxPage });
-  const pageSize = parseIntParam(searchParams.get('pageSize'), {
+  const raw = parseIntParam(searchParams.get('pageSize'), {
     fallback: defaultPageSize,
     min: 1,
     max: maxPageSize,
   });
+  // Snapped to the only two sizes the UI requests. Anything else is pure
+  // cache-key churn, and `pageSize=1` multiplies the clamped page count by 100.
+  const pageSize = raw <= ITEMS_PER_PAGE ? ITEMS_PER_PAGE : RECORDS_PAGE_SIZE;
   return { page, pageSize };
 }
 

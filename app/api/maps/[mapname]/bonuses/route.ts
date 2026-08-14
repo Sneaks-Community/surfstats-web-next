@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { validateSearchQuery } from '@/lib/validators';
 import { resolveMapnameParam, parsePageParams, apiError, SEARCH_CACHE_CONTROL, RECORDS_CACHE_CONTROL, RECORDS_PAGE_SIZE } from '@/lib/api-utils';
 import { parseIntParam } from '@/lib/utils';
-import { getBonusRecordsFromCache, searchBonusRecordsFromCache } from '@/lib/map-records-cache';
+import { getBonusRecordsFromCache, searchBonusRecordsFromCache, getRecordCountsAndWRFromCache } from '@/lib/map-records-cache';
 import { getBonusGroupsByMapFromCache } from '@/lib/registry-cache';
 
 export async function GET(
@@ -56,7 +56,13 @@ export async function GET(
   }
 
   try {
-    const data = await getBonusRecordsFromCache(validMapname, bonus, page, pageSize);
+    // Clamp page like records/route.ts: bounds cache keys and OFFSET size. This
+    // count covers every zonegroup on the map rather than just this one, so it
+    // over-estimates and can never truncate a real page — and the records tab
+    // already warms the key, so no new query shape enters the system.
+    const { counts } = await getRecordCountsAndWRFromCache(validMapname);
+    const totalPages = Math.max(1, Math.ceil(counts.bonusesTotal / pageSize));
+    const data = await getBonusRecordsFromCache(validMapname, bonus, Math.min(page, totalPages), pageSize);
 
     return NextResponse.json({
       ...data,
