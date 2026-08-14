@@ -7,6 +7,7 @@ import {
   getLeaderboardRecordsFromCache,
   searchLeaderboardRecordsFromCache,
 } from '@/lib/map-records-cache';
+import { getMapMetadataFromCache } from '@/lib/map-cache';
 
 export async function GET(
   request: NextRequest,
@@ -15,6 +16,13 @@ export async function GET(
   const { mapname } = await params;
   const validMapname = resolveMapnameParam(mapname);
   if (validMapname instanceof NextResponse) return validMapname;
+
+  // Cache-only existence check: the map page warms this key for every real map
+  // and a miss writes nothing, since cachedFetch never caches null. The stage and
+  // bonus siblings get this from their registry lookup.
+  if (!(await getMapMetadataFromCache(validMapname))) {
+    return NextResponse.json({ error: 'Map not found' }, { status: 404 });
+  }
 
   const searchParams = request.nextUrl.searchParams;
   const rawQuery = searchParams.get('q');
