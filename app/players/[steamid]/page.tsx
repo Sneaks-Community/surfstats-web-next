@@ -99,7 +99,7 @@ export default async function PlayerProfilePage({
 
   const [totals, steamAvatars, playtimeData, linearVsStagedRaw, activityHeatmap, tierDistribution, wrPerformanceData, mapEngagement] = await Promise.all([
     getTotalsFromCache(),
-    getSteamProfilesFromCache([decodedSteamId]),
+    getSteamProfilesFromCache([validSteamId]),
     getPlayerTimeOnServerFromCache(validSteamId),
     getLinearVsStagedPerTierFromCache(validSteamId),
     getActivityHeatmapFromCache(validSteamId),

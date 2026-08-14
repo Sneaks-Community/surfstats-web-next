@@ -75,6 +75,16 @@ interface StagesResponse {
 
 type TabType = 'map' | 'bonus' | 'stages';
 
+const TABS: readonly TabType[] = ['map', 'bonus', 'stages'];
+const SORT_FIELDS: readonly SortField[] = ['rank', 'player', 'time', 'speed', 'wrDiff', 'date'];
+const SORT_DIRS: readonly SortDirection[] = ['asc', 'desc'];
+
+// URL params are cast, not parsed, so an unknown `?sort=` used to read as "not
+// rank" and arm the load-all fan-out from a crafted link.
+function oneOf<T extends string>(allowed: readonly T[], raw: string | null, fallback: T): T {
+  return allowed.includes(raw as T) ? (raw as T) : fallback;
+}
+
 const MAX_STAGE_RECORDS = 100;
 // The stages API returns all 100 records at once, paginated client-side.
 const MAX_STAGE_PAGES = Math.ceil(MAX_STAGE_RECORDS / ITEMS_PER_PAGE);
@@ -162,14 +172,14 @@ export default function MapRecordsTabs({
   const searchParams = useSearchParams();
 
   // Get initial state from URL
-  const initialTab = (searchParams.get('tab') as TabType | null) ?? 'map';
+  const initialTab = oneOf(TABS, searchParams.get('tab'), 'map');
   const initialPage = parseIntParam(searchParams.get('page'));
   const initialBonus = parseIntParam(searchParams.get('bonus'));
   const initialBonusPage = parseIntParam(searchParams.get('bonusPage'));
   const initialStage = parseIntParam(searchParams.get('stage'));
   const initialStagePage = parseIntParam(searchParams.get('stagePage'));
-  const initialSortField = (searchParams.get('sort') as SortField | null) ?? 'rank';
-  const initialSortDir = (searchParams.get('dir') as SortDirection | null) ?? 'asc';
+  const initialSortField = oneOf(SORT_FIELDS, searchParams.get('sort'), 'rank');
+  const initialSortDir = oneOf(SORT_DIRS, searchParams.get('dir'), 'asc');
 
   // State - Map tab uses client-side sorting, Stages tab uses server-side sorting
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
