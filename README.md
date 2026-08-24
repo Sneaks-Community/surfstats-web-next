@@ -85,6 +85,7 @@ Rate limiting uses [`rate-limiter-flexible`](https://github.com/animir/node-rate
 ### Database load
 
 * `DB_MAX_CONCURRENT_EXPENSIVE`: Max concurrent expensive scans, so a burst can't starve page rendering (default: `6`).
+* `DB_MAX_QUEUED_EXPENSIVE`: Max callers queued for one of those slots; past it the request is shed with a 503 (default: twice the above).
 * `DB_CONNECTION_LIMIT`: Max pool connections (default: `20`).
 * `DB_QUEUE_LIMIT`: Max queued connection requests; `0` = unlimited (default: `100`).
 * `DB_CONNECT_TIMEOUT_MS`: Initial connection timeout in ms (default: `5000`).

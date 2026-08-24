@@ -51,3 +51,15 @@ export class CacheUnavailableError extends Error {
     this.name = 'CacheUnavailableError';
   }
 }
+
+/**
+ * Thrown by `withExpensiveQueryLimit` when the expensive-query queue is full;
+ * `apiError` turns it into a 503. Shedding load beats queueing behind a
+ * multi-second scan the caller has most likely already given up on.
+ */
+export class DbBusyError extends Error {
+  constructor() {
+    super('Database busy');
+    this.name = 'DbBusyError';
+  }
+}
