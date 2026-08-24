@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { ArrowLeft } from 'lucide-react';
 import { getCountriesRankingFromCache, getCountriesStatsFromCache, sortCountries } from '@/lib/country-cache';
 import type { CountrySortKey, SortOrder } from '@/lib/country-cache';

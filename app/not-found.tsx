@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 
 /**
  * Root 404 boundary. Rendered by `notFound()` from anywhere in the tree and by

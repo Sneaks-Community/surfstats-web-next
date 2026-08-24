@@ -99,6 +99,13 @@ export async function proxy(request: NextRequest) {
       );
     }
 
+    // Only a real navigation gets the HTML page. An RSC request (prefetch or
+    // client-side navigation) cannot parse HTML as flight data, so the router
+    // throws and retries; a bodyless 429 makes it drop the prefetch quietly.
+    if (!isNavigation) {
+      return new NextResponse(null, { status: 429, headers: rateLimitHeaders });
+    }
+
     return new NextResponse(tooManyRequestsHtml(result.resetSeconds), {
       status: 429,
       headers: {

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { Trophy, Clock } from 'lucide-react';
 import MapImage from '@/components/MapImage';
 import { formatTime, mapImageUrl } from '@/lib/utils';

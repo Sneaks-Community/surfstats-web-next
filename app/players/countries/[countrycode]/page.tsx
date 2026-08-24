@@ -1,5 +1,5 @@
 import { cache } from 'react';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { getCountryPlayers, getCountryPlayerCount } from '@/lib/country-cache';
 import { PLAYERS_PAGE_SIZE } from '@/lib/player-cache';
 import type { PlayerSortKey, SortOrder } from '@/lib/country-cache';

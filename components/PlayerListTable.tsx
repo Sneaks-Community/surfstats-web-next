@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import Image from 'next/image';
 import SortLink from '@/components/SortLink';
 import { formatDate, getDisplayTz } from '@/lib/utils';
@@ -92,7 +92,6 @@ function Row({ player, avatar }: { player: PlayerListEntry; avatar?: { avatarmed
         )}
         <Link
           href={`/players/${player.steamid}`}
-          prefetch={false}
           className="text-primary hover:text-primary font-medium transition-colors truncate"
         >
           {player.name || 'Unknown'}

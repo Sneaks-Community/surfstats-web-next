@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ReactNode } from 'react';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { createPortal } from 'react-dom';
 import MapImage from './MapImage';
 import { useMapImagesUrl } from '@/lib/ClientConfigContext';

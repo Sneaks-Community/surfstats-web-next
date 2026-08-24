@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Activity, Search, Menu, X, ChevronDown } from 'lucide-react';

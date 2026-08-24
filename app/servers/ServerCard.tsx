@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Server, Users, ChevronDown, Clock, Check, Copy } from 'lucide-react';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { mapImageUrl } from '@/lib/utils';

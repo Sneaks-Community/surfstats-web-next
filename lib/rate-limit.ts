@@ -179,8 +179,13 @@ export async function checkRateLimit(
     // Only the store-side rejection carries a point count; the in-process block
     // list reports 0. That makes this exactly one line per IP per window.
     if (err.consumedPoints > 0) {
+      // How fast the budget went, and which page emitted the requests: a runaway
+      // client spends it in seconds off a single referer, heavy-but-real browsing
+      // spends it across most of the window.
+      const spentMs = Math.max(0, WINDOW_SECONDS * 1000 - err.msBeforeNext);
+      const referer = request.headers.get('referer') || 'none';
       logger.warn(
-        `[RateLimit] ${ip} exceeded the ${scope} budget (${limit}/${WINDOW_SECONDS}s) on ${path}, blocked for ${resetSeconds}s`
+        `[RateLimit] ${ip} exceeded the ${scope} budget (${limit}/${WINDOW_SECONDS}s) in ${spentMs}ms on ${path} (referer ${referer}), blocked for ${resetSeconds}s`
       );
     } else {
       logger.debug(

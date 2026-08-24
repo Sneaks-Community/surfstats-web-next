@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { Map as MapIcon, Layers, Target, Users, Flag } from 'lucide-react';
 import { Suspense } from 'react';
 import MapImage from '@/components/MapImage';

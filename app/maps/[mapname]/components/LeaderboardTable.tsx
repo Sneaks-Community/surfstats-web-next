@@ -1,6 +1,6 @@
 'use client';
 
-import Link from 'next/link';
+import Link from '@/components/Link';
 import Pagination from '@/components/Pagination';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import SortableTh from '@/components/SortableTh';
@@ -52,7 +52,6 @@ const RecordRow = ({ row }: { row: LeaderboardRow }) => {
       <Link
         href={`/players/${row.steamid}`}
         className="text-primary hover:text-primary font-medium transition-colors text-base"
-        prefetch={false}
       >
         {validatePlayerName(row.name)}
       </Link>

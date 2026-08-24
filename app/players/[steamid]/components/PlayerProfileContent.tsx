@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/Link';
 import { getSteamProfileUrl, type SteamAvatarSet } from '@/lib/steam';
 import { Trophy, Activity, Clock } from 'lucide-react';
 import Image from 'next/image';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import Link from 'next/link';
+import Link from '@/components/Link';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Search, User, Map } from 'lucide-react';
@@ -261,7 +261,6 @@ export function SearchDropdown({
                 <Link
                   key={player.steamid}
                   href={`/players/${player.steamid}`}
-                  prefetch={false}
                   onClick={() => setIsOpen(false)}
                   className={`flex items-center gap-2 px-3 py-1.5 hover:bg-surface-hover transition-colors ${
                     selectedIndex === index ? 'bg-surface-hover' : ''
@@ -307,7 +306,6 @@ export function SearchDropdown({
                   <Link
                     key={map.mapname}
                     href={`/maps/${map.mapname}`}
-                    prefetch={false}
                     onClick={() => setIsOpen(false)}
                     className={`flex items-center gap-2 px-3 py-1.5 hover:bg-surface-hover transition-colors ${
                       selectedIndex === itemIndex ? 'bg-surface-hover' : ''
