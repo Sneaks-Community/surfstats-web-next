@@ -132,7 +132,9 @@ function toResetSeconds(msBeforeNext: number): number {
  * see whether a blocked caller backs off or keeps hammering). Because blocked
  * callers are rejected from the in-process block list, the debug line cannot
  * report how many requests they have made since — only that they are still
- * coming.
+ * coming; the last quarter of each budget is logged at `debug` too, since the
+ * warn alone names the request that crossed the line but not the fan-out that
+ * spent the budget.
  *
  * @param request - The incoming request (for client-IP resolution)
  * @param scope - Which budget to charge; each scope counts separately
@@ -144,9 +146,17 @@ export async function checkRateLimit(
   // An unidentifiable caller shares one bucket rather than escaping the limit.
   const ip = getClientIp(request) || 'unknown';
   const limit = MAX_BY_SCOPE[scope];
+  const path = request.nextUrl.pathname;
 
   try {
     const res = await limiters[scope].consume(ip);
+    // The last quarter of a budget, so the log shows what ate it. Without this
+    // the only trace is the one request that crossed the line.
+    if (res.remainingPoints < limit / 4) {
+      logger.debug(
+        `[RateLimit] ${ip} down to ${res.remainingPoints}/${limit} ${scope} points: ${path}`
+      );
+    }
     return {
       allowed: true,
       limit,
@@ -166,7 +176,6 @@ export async function checkRateLimit(
     }
 
     const resetSeconds = toResetSeconds(err.msBeforeNext);
-    const path = request.nextUrl.pathname;
     // Only the store-side rejection carries a point count; the in-process block
     // list reports 0. That makes this exactly one line per IP per window.
     if (err.consumedPoints > 0) {
