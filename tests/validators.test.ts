@@ -40,8 +40,8 @@ describe('validateSearchQuery', () => {
     expect(validateSearchQuery('surf_1day')).toBe('surf_1day');
   });
 
-  // COR-4: length was checked before sanitizing, so junk that sanitized away
-  // reached the DB as LIKE '%%' and matched every row in ck_playerrank.
+  // Junk that sanitizes away must not reach the DB as LIKE '%%', which matches
+  // every row in ck_playerrank.
   it('strips dangerous characters, which can empty the query entirely', () => {
     expect(validateSearchQuery('<<<<')).toBe('');
     expect(validateSearchQuery('&&&&&')).toBe('');

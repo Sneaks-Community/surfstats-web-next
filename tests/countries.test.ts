@@ -34,8 +34,8 @@ describe('getCountryCodeFromName', () => {
     expect(getCountryCodeFromName('   ')).toBe(UNKNOWN_COUNTRY_CODE);
   });
 
-  // COR-7: the override table is a plain object, so a truthiness lookup would
-  // hand back an inherited Function and the `string` return type would lie.
+  // The override table is a plain object, so a truthiness lookup would hand back
+  // an inherited Function and the `string` return type would lie.
   it('does not resolve Object.prototype members', () => {
     for (const name of ['constructor', 'toString', 'valueOf', 'hasOwnProperty', '__proto__']) {
       const code = getCountryCodeFromName(name);

@@ -68,8 +68,7 @@ describe('getSteamProfileUrl', () => {
   });
 });
 
-// DRY-1: the redundant first conversion pass was deleted. These lock in the
-// behaviour that pass was providing.
+// Lock in the SteamID conversion behaviour the cache lookup depends on.
 describe('getSteamProfilesFromCache', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -103,7 +102,7 @@ describe('getSteamProfilesFromCache', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
-  // PERF-2: one round trip for the whole page, not one per row.
+  // One round trip for the whole page, not one per row.
   it('reads every SteamID in a single cache call', async () => {
     const ids = ['STEAM_1:0:1', 'STEAM_1:0:2', 'STEAM_1:0:3'];
     await getSteamProfilesFromCache(ids);
@@ -112,7 +111,7 @@ describe('getSteamProfilesFromCache', () => {
     expect(cacheGetMany).toHaveBeenCalledWith(ids.map((id) => `surfstats:steam:avatar:${id}`));
   });
 
-  // PERF-2: results are matched back by position, so a partial hit must not
+  // Results are matched back by position, so a partial hit must not
   // shift avatars onto the wrong players.
   it('maps a partial cache hit back to the right SteamIDs', async () => {
     const second = { avatar: 'b', avatarmedium: 'b', avatarfull: 'b' };
@@ -132,7 +131,7 @@ describe('getSteamProfilesFromCache', () => {
     expect(fetchUrl(0)).toContain('steamids=76561197960265730,76561197960265734');
   });
 
-  // PERF-3: Steam caps GetPlayerSummaries at 100 IDs and drops the remainder.
+  // Steam caps GetPlayerSummaries at 100 IDs and drops the remainder.
   it('chunks more than 100 uncached IDs into separate requests', async () => {
     process.env.STEAM_API_KEY = 'test-key';
     vi.mocked(fetch).mockResolvedValue({
@@ -189,7 +188,7 @@ describe('getSteamProfilesFromCache', () => {
   });
 });
 
-// PERF-4: the key travels in the query string, and some fetch failures put the
+// The key travels in the query string, and some fetch failures put the
 // request URL in the error message.
 describe('Steam API key redaction', () => {
   beforeEach(() => {

@@ -15,8 +15,8 @@ afterEach(() => {
   delete process.env.SERVERS_JSON;
 });
 
-// DRY-12: these values reach GameDig.query() as a host and port, so a malformed
-// entry must never get through.
+// These values reach GameDig.query() as a host and port, so a malformed entry
+// must never get through.
 describe('getServerConfigs', () => {
   it('parses a valid list and coerces a string port', async () => {
     expect(await configs('[{"name":"EU","ip":"1.2.3.4","port":27015}]')).toEqual([

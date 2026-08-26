@@ -8,7 +8,7 @@ function directive(csp: string, name: string): string {
 }
 
 describe('contentSecurityPolicy', () => {
-  // The whole point of SEC-4: an inline <script> an attacker injects must not run.
+  // An inline <script> an attacker injects must not run.
   it('allows inline scripts only by nonce', () => {
     const csp = contentSecurityPolicy('abc123');
 

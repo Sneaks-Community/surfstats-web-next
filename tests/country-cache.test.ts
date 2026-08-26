@@ -27,8 +27,8 @@ const RANKING = [
 
 const codes = (rows: CountryRank[]) => rows.map((r) => r.country_code);
 
-// PERF-6: these four sorts used to be four cache keys, each re-running the full
-// `GROUP BY country` aggregation. They are pure functions of the one cached array.
+// These four sorts are pure functions of the one cached array, not four cache
+// keys each re-running the full `GROUP BY country` aggregation.
 describe('sortCountries', () => {
   it('sorts by points, players, country and rank', () => {
     expect(codes(sortCountries(RANKING, 'points', 'desc'))).toEqual(['US', 'DE', 'FR', 'AU']);

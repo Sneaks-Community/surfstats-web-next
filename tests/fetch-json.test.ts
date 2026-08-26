@@ -20,8 +20,8 @@ describe('fetchJson', () => {
     expect(await fetchJson<{ records: number[] }>('/api/x')).toEqual({ records: [1, 2] });
   });
 
-  // REL-2: these bodies are valid JSON, so a bare .json() resolved and the
-  // caller's `?? []` rendered an empty table instead of an error.
+  // These bodies are valid JSON, so a bare .json() would resolve and the caller's
+  // `?? []` would render an empty table instead of an error.
   it('throws HttpError carrying the status and the server message', async () => {
     for (const [status, message] of [
       [400, 'Invalid map name'],

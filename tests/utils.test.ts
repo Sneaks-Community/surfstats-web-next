@@ -15,8 +15,8 @@ import {
   DEFAULT_DISPLAY_TZ,
 } from '../lib/utils';
 
-// SEC-1/DRY-9: every page route clamps `?page=` through this. A NaN reaching an
-// OFFSET calculation was the bug.
+// Every page route clamps `?page=` through this; a NaN must never reach an
+// OFFSET calculation.
 describe('parseIntParam', () => {
   it('falls back on missing or non-numeric input', () => {
     expect(parseIntParam(undefined)).toBe(1);
@@ -57,7 +57,7 @@ describe('formatPlaytime', () => {
   });
 });
 
-// COR-8: the zone is an explicit argument, so a server render and the client's
+// The zone is an explicit argument, so a server render and the client's
 // re-render cannot disagree by silently falling back to different defaults.
 describe('formatDate', () => {
   it('formats in the given zone and survives bad input', () => {
@@ -134,8 +134,7 @@ describe('sortRecords and matchesQuery', () => {
   });
 });
 
-// DRY-2: this arithmetic was written out at five call sites across the two
-// record tables, three of them as sort comparators.
+// Shared by both record tables, three of those call sites as sort comparators.
 describe('wrDiff and formatTimeDiff', () => {
   it('sorts records with no WR last, whichever direction', () => {
     const rows = [

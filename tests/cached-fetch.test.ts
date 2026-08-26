@@ -40,8 +40,8 @@ describe('cachedFetch', () => {
     expect(cacheSet).not.toHaveBeenCalled();
   });
 
-  // REL-1: the whole point of onError. A transient DB failure must not pin an
-  // empty result for the full TTL.
+  // The whole point of onError: a transient DB failure must not pin an empty
+  // result for the full TTL.
   it('never writes the onError fallback to the cache', async () => {
     const fallback = { players: [], total: 0 };
 
@@ -69,8 +69,8 @@ describe('cachedFetch', () => {
     expect(cacheSet).not.toHaveBeenCalled();
   });
 
-  // REL-5: the readiness gate is awaited, and onError must not swallow it —
-  // serving a fallback would hide a cache outage behind empty pages.
+  // The readiness gate is awaited, and onError must not swallow it: serving a
+  // fallback would hide a cache outage behind empty pages.
   it('throws CacheUnavailableError past onError when the cache is down', async () => {
     waitForCacheReady.mockResolvedValue(false);
     const loader = vi.fn();
@@ -120,7 +120,7 @@ describe('cachedFetch', () => {
     expect(cacheSet).toHaveBeenCalledTimes(1);
   });
 
-  // COR-9: the miss path must hand back the same shape the hit path does.
+  // The miss path must hand back the same shape the hit path does.
   it('normalizes the fetched value to its cached shape', async () => {
     const date = new Date('2026-02-24T19:15:18.000Z');
 

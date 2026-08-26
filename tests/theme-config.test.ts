@@ -23,8 +23,8 @@ afterEach(() => {
   for (const name of THEME_VARS) process.env[name] = '';
 });
 
-// SEC-3: these values are injected as CSS from the root layout, so an unknown
-// family used to throw a TypeError and 500 every route.
+// These values are injected as CSS from the root layout, so an unknown family
+// must not throw a TypeError and 500 every route.
 describe('generateThemeStyles', () => {
   it('emits the emerald/cyan defaults with nothing set', async () => {
     const css = await styles();
