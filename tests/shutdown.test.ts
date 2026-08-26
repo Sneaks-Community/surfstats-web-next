@@ -60,18 +60,32 @@ describe('shutdown', () => {
     expect(logger.error.mock.calls[0][0]).toContain('"broken" failed');
   });
 
-  it('replaces a handler registered under the same name instead of duplicating it', async () => {
+  // AV-6: proxy and server bundles both register "valkey-client", each owning a
+  // live client. Keying by name dropped one, leaving its connection to be reset.
+  it('runs both handlers when two module instances register the same name', async () => {
     const { onShutdown } = await freshShutdown();
-    const stale = vi.fn();
-    const current = vi.fn();
-    onShutdown('db-pool', stale);
-    onShutdown('db-pool', current);
+    const proxyInstance = vi.fn();
+    const serverInstance = vi.fn();
+    onShutdown('valkey-client', proxyInstance);
+    onShutdown('valkey-client', serverInstance);
 
     process.emit('SIGTERM');
     await settle();
 
-    expect(stale).not.toHaveBeenCalled();
-    expect(current).toHaveBeenCalledTimes(1);
+    expect(proxyInstance).toHaveBeenCalledTimes(1);
+    expect(serverInstance).toHaveBeenCalledTimes(1);
+  });
+
+  it('registers the same callback once however often it is passed', async () => {
+    const { onShutdown } = await freshShutdown();
+    const handler = vi.fn();
+    onShutdown('db-pool', handler);
+    onShutdown('db-pool', handler);
+
+    process.emit('SIGTERM');
+    await settle();
+
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 
   // Next's listener is installed before instrumentation.ts runs and its cleanup

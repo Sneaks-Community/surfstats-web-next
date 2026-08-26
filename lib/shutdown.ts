@@ -5,7 +5,8 @@ import { getErrorMessage } from './errors';
 type ShutdownHandler = () => void | Promise<void>;
 
 interface ShutdownRegistry {
-  handlers: Map<string, ShutdownHandler>;
+  /** Keyed by handler identity, valued by log label. See {@link onShutdown}. */
+  handlers: Map<ShutdownHandler, string>;
   listenersRegistered: boolean;
   shuttingDown: boolean;
 }
@@ -93,7 +94,7 @@ async function runShutdown(signal: string, inherited: SignalListener[]): Promise
 
   let failed = 0;
   await Promise.allSettled(
-    handlers.map(async ([name, handler]) => {
+    handlers.map(async ([handler, name]) => {
       try {
         await handler();
       } catch (error) {
@@ -118,20 +119,21 @@ async function runShutdown(signal: string, inherited: SignalListener[]): Promise
 /**
  * Register a cleanup callback to run once on process shutdown (SIGTERM/SIGINT).
  *
- * Handlers are keyed by `name` in a process-global registry, so registering the
- * same name again (a re-evaluated module) replaces the previous entry rather
- * than accumulating duplicates, and all instances share a single pair of signal
- * listeners. Handlers may be async and are awaited concurrently; a
- * throwing/rejecting one is logged and skipped so a single failure doesn't block
- * the rest. No-op outside the server.
+ * Handlers are keyed by identity in a process-global registry, so the same
+ * callback registered twice runs once while two coexisting module instances
+ * (the proxy and server bundles, a dev HMR reload) each keep their own entry —
+ * keying by `name` would drop one instance's client on the floor unclosed. All
+ * instances share a single pair of signal listeners. Handlers may be async and
+ * are awaited concurrently; a throwing/rejecting one is logged and skipped so a
+ * single failure doesn't block the rest. No-op outside the server.
  *
- * @param name - Stable identifier for this handler (e.g. "db-pool").
+ * @param name - Log label for this handler (e.g. "db-pool"); not an identity.
  * @param handler - Cleanup callback.
  */
 export function onShutdown(name: string, handler: ShutdownHandler): void {
   if (typeof window !== 'undefined') return;
 
-  registry.handlers.set(name, handler);
+  registry.handlers.set(handler, name);
 
   if (!registry.listenersRegistered) {
     registry.listenersRegistered = true;
