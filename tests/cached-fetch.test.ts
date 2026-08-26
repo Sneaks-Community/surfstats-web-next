@@ -100,6 +100,26 @@ describe('cachedFetch', () => {
     expect(cacheSet).not.toHaveBeenCalled();
   });
 
+  // AV-5: refresh and miss must share a lock key, or an entry expiring mid-refresh
+  // starts a second identical query. ttlMs 0 makes the early-refresh roll certain.
+  it('lets a miss join an in-flight background refresh instead of re-querying', async () => {
+    let release: (value: { n: number }) => void = () => undefined;
+    const loader = vi.fn(() => new Promise<{ n: number }>((resolve) => (release = resolve)));
+
+    cacheGetWithTtl.mockResolvedValue({ value: { n: 1 }, ttlMs: 0 });
+    expect(await cachedFetch('k', 60, loader, { lock: true })).toEqual({ n: 1 });
+    expect(loader).toHaveBeenCalledTimes(1);
+
+    cacheGetWithTtl.mockResolvedValue(miss);
+    const joined = cachedFetch('k', 60, loader, { lock: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    release({ n: 2 });
+
+    expect(await joined).toEqual({ n: 2 });
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(cacheSet).toHaveBeenCalledTimes(1);
+  });
+
   // COR-9: the miss path must hand back the same shape the hit path does.
   it('normalizes the fetched value to its cached shape', async () => {
     const date = new Date('2026-02-24T19:15:18.000Z');
