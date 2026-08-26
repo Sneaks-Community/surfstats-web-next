@@ -617,6 +617,7 @@ export async function getIncompleteStagesFromCache(steamid: string): Promise<Inc
     },
     {
       lock: true,
+      expensive: true,
       onError: (error) => {
         logger.error(`[PlayerProfileCache] Failed to fetch incomplete stages for ${validSteamId}: ${getErrorMessage(error)}`);
         return [];
