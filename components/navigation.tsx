@@ -23,7 +23,6 @@ const navLinks = [
 
 export function Navigation({ siteName }: { siteName: string }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [mobilePlayersExpanded, setMobilePlayersExpanded] = useState(false);
   const pathname = usePathname();
 
@@ -52,13 +51,8 @@ export function Navigation({ siteName }: { siteName: string }) {
               <div className="flex items-baseline space-x-4">
                 {navLinks.map((link) => (
                   link.children ? (
-                    // Dropdown menu for items with children
-                    <div
-                      key={link.href}
-                      className="relative"
-                      onMouseEnter={() => setOpenDropdown(link.href)}
-                      onMouseLeave={() => setOpenDropdown(null)}
-                    >
+                    // Hover plus focus-within, so the panel is reachable by Tab
+                    <div key={link.href} className="group relative">
                       <Link
                         href={link.href}
                         className={`inline-flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -71,27 +65,25 @@ export function Navigation({ siteName }: { siteName: string }) {
                         <ChevronDown className="h-4 w-4" />
                       </Link>
                       
-                      {/* Dropdown panel */}
-                      {openDropdown === link.href && (
-                        <div className="absolute left-0 mt-0 w-48 rounded-md shadow-lg bg-surface border border-border ring-1 ring-black ring-opacity-5">
-                          <div className="py-1" role="menu" aria-orientation="vertical">
-                            {link.children.map((child) => (
-                              <Link
-                                key={child.href}
-                                href={child.href}
-                                className={`block px-4 py-2 text-sm transition-colors ${
-                                  isActive(child.href)
-                                    ? 'text-primary bg-surface-hover'
-                                    : 'text-text-muted hover:bg-surface-hover hover:text-text'
-                                }`}
-                                role="menuitem"
-                              >
-                                {child.label}
-                              </Link>
-                            ))}
-                          </div>
+                      {/* Dropdown panel: hidden by visibility, so its links leave the tab order until shown */}
+                      <div className="invisible absolute left-0 mt-0 w-48 rounded-md shadow-lg bg-surface border border-border ring-1 ring-black ring-opacity-5 group-hover:visible group-focus-within:visible">
+                        <div className="py-1">
+                          {link.children.map((child) => (
+                            <Link
+                              key={child.href}
+                              href={child.href}
+                              aria-current={isActive(child.href) ? 'page' : undefined}
+                              className={`block px-4 py-2 text-sm transition-colors ${
+                                isActive(child.href)
+                                  ? 'text-primary bg-surface-hover'
+                                  : 'text-text-muted hover:bg-surface-hover hover:text-text'
+                              }`}
+                            >
+                              {child.label}
+                            </Link>
+                          ))}
                         </div>
-                      )}
+                      </div>
                     </div>
                   ) : (
                     // Regular link for items without children
