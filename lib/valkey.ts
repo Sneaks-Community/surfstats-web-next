@@ -59,14 +59,29 @@ client.on('close', () => {
 // await the initial attempt instead of racing it — otherwise the very first
 // request after startup sees isReady === false and gets a 503 before the
 // handshake has had a chance to complete.
+//
+// VALKEY_CONNECT_TIMEOUT caps one socket attempt, not connect(), which retries
+// forever — bound the whole wait so callers fail closed instead of hanging.
 const initialConnect: Promise<void> = (async () => {
-  if (!client.isOpen) {
-    try {
-      await client.connect();
-    } catch (err) {
-      const error = err as { message?: string };
-      logger.error(`[Valkey] Failed to connect: ${error.message || 'Unknown error'}`);
-    }
+  if (client.isOpen) {
+    return;
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      client.connect(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(`Timed out after ${valkeyConnectTimeout}ms`)),
+          valkeyConnectTimeout
+        );
+      }),
+    ]);
+  } catch (err) {
+    const error = err as { message?: string };
+    logger.error(`[Valkey] Failed to connect: ${error.message || 'Unknown error'}`);
+  } finally {
+    clearTimeout(timer);
   }
 })();
 
@@ -81,9 +96,9 @@ onShutdown('valkey-client', async () => {
 
 /**
  * Await the initial connection attempt, then report readiness. Use this on
- * request paths that would otherwise reject before startup finishes; the
- * attempt is bounded by VALKEY_CONNECT_TIMEOUT. Steady-state reconnects are
- * handled internally by node-redis, so this only matters for the first hit.
+ * request paths that would otherwise reject before startup finishes; the wait
+ * is bounded (see initialConnect). Steady-state reconnects are handled
+ * internally by node-redis, so this only matters for the first hit.
  */
 export async function waitForCacheReady(): Promise<boolean> {
   if (!client.isReady) {
