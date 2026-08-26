@@ -33,13 +33,24 @@ describe('sortCountries', () => {
   it('sorts by points, players, country and rank', () => {
     expect(codes(sortCountries(RANKING, 'points', 'desc'))).toEqual(['US', 'DE', 'FR', 'AU']);
     expect(codes(sortCountries(RANKING, 'players', 'desc'))).toEqual(['DE', 'AU', 'US', 'FR']);
-    expect(codes(sortCountries(RANKING, 'country', 'asc'))).toEqual(['AU', 'DE', 'FR', 'US']);
+    expect(codes(sortCountries(RANKING, 'country', 'asc'))).toEqual(['AU', 'FR', 'DE', 'US']);
     expect(codes(sortCountries(RANKING, 'rank', 'asc'))).toEqual(['US', 'DE', 'FR', 'AU']);
   });
 
   it('reverses on the opposite order', () => {
     expect(codes(sortCountries(RANKING, 'players', 'asc'))).toEqual(['FR', 'US', 'AU', 'DE']);
-    expect(codes(sortCountries(RANKING, 'country', 'desc'))).toEqual(['US', 'FR', 'DE', 'AU']);
+    expect(codes(sortCountries(RANKING, 'country', 'desc'))).toEqual(['US', 'DE', 'FR', 'AU']);
+  });
+
+  // DC-7: the column shows the name CountryBadge renders, so sorting the code
+  // put Sweden above Slovakia.
+  it('sorts by the rendered country name, not the ISO code', () => {
+    const rows = [
+      { country: 'SE', country_code: 'SE', total_points: 2, player_count: 1, rank: 1 },
+      { country: 'SK', country_code: 'SK', total_points: 1, player_count: 1, rank: 2 },
+    ] as unknown as CountryRank[];
+
+    expect(codes(sortCountries(rows, 'country', 'asc'))).toEqual(['SK', 'SE']);
   });
 
   // The array is the shared cached payload; mutating it would corrupt every

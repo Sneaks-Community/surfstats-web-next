@@ -2,7 +2,7 @@ import 'server-only';
 import pool from '@/lib/db';
 import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
-import { getCountryNamesFromCode, getCountryCodeFromName, UNKNOWN_COUNTRY_CODE } from '@/lib/countries';
+import { getCountryNamesFromCode, getCountryCodeFromName, getPrimaryCountryName, UNKNOWN_COUNTRY_CODE } from '@/lib/countries';
 import { cachedFetch, type RefreshOptions } from './cached-fetch';
 import { PLAYERS_PAGE_SIZE } from './player-cache';
 import { getErrorCode, getErrorMessage } from './errors';
@@ -139,10 +139,15 @@ export function sortCountries(
   sort: CountrySortKey,
   order: SortOrder
 ): CountryRank[] {
+  // Sort on what CountryBadge renders, not the ISO code behind it: by code,
+  // Sweden (SE) precedes Slovakia (SK), which reads as broken in the list.
+  const displayName = (c: CountryRank): string =>
+    getPrimaryCountryName(c.country_code) ?? c.country_code;
+
   const comparator = (a: CountryRank, b: CountryRank): number => {
     switch (sort) {
       case 'country':
-        return a.country.localeCompare(b.country);
+        return displayName(a).localeCompare(displayName(b), 'en');
       case 'players':
         return a.player_count - b.player_count;
       case 'rank':
