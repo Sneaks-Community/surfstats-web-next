@@ -100,8 +100,8 @@ describe('cachedFetch', () => {
     expect(cacheSet).not.toHaveBeenCalled();
   });
 
-  // AV-5: refresh and miss must share a lock key, or an entry expiring mid-refresh
-  // starts a second identical query. ttlMs 0 makes the early-refresh roll certain.
+  // Refresh and miss share a lock key, so an entry expiring mid-refresh joins the
+  // query in flight. ttlMs 0 makes the early-refresh roll certain.
   it('lets a miss join an in-flight background refresh instead of re-querying', async () => {
     let release: (value: { n: number }) => void = () => undefined;
     const loader = vi.fn(() => new Promise<{ n: number }>((resolve) => (release = resolve)));

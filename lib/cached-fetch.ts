@@ -104,14 +104,11 @@ function shouldRefreshEarly(remainingTtlMs: number, ttlSeconds: number): boolean
 /**
  * Kick off a background refresh of `key` without blocking the caller.
  *
- * Wrapped in {@link cacheLock} so that, within this process, only one refresh
- * runs per key no matter how many requests trip the early-expiration roll while
- * it's in flight. Locks on `key` itself, the same key the miss path uses: if the
- * entry expires mid-refresh, the foreground miss joins this query instead of
- * starting a second identical one. Errors are logged and swallowed — the current
- * (still-valid) cached value has already been returned to the user, so a failed
- * refresh is non-fatal; the entry simply gets another chance on the next request
- * or its eventual hard expiry.
+ * Wrapped in {@link cacheLock} under `key` itself, so only one refresh runs per
+ * key and a foreground miss at expiry joins it rather than querying again.
+ * Errors are logged and swallowed — the current (still-valid) cached value has
+ * already been returned to the user, so a failed refresh is non-fatal; the entry
+ * simply gets another chance on the next request or its eventual hard expiry.
  */
 function triggerBackgroundRefresh<T>(
   key: string,
@@ -122,8 +119,8 @@ function triggerBackgroundRefresh<T>(
   void cacheLock
     .acquire(key, async () => {
       const fetched = await (expensive ? withExpensiveQueryLimit(fetchFn) : fetchFn());
-      // Mirror the foreground path: a joining miss gets the same shape it would
-      // have got from the cache, and never persist null/undefined.
+      // Mirror the foreground path: same shape for a joining miss, and never
+      // persist null/undefined.
       const value = normalizeToCachedShape(fetched);
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       if (value !== null && value !== undefined) {

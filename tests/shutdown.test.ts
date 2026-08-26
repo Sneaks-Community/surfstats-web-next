@@ -60,8 +60,8 @@ describe('shutdown', () => {
     expect(logger.error.mock.calls[0][0]).toContain('"broken" failed');
   });
 
-  // AV-6: proxy and server bundles both register "valkey-client", each owning a
-  // live client. Keying by name dropped one, leaving its connection to be reset.
+  // Proxy and server bundles each register "valkey-client" for their own live
+  // client, so both handlers have to run.
   it('runs both handlers when two module instances register the same name', async () => {
     const { onShutdown } = await freshShutdown();
     const proxyInstance = vi.fn();

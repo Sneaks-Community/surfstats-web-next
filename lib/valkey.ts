@@ -61,7 +61,7 @@ client.on('close', () => {
 // handshake has had a chance to complete.
 //
 // VALKEY_CONNECT_TIMEOUT caps one socket attempt, not connect(), which retries
-// forever — bound the whole wait so callers fail closed instead of hanging.
+// forever, so bound the whole wait or callers hang instead of failing closed.
 const initialConnect: Promise<void> = (async () => {
   if (client.isOpen) {
     return;

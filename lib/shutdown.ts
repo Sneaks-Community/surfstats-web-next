@@ -119,13 +119,12 @@ async function runShutdown(signal: string, inherited: SignalListener[]): Promise
 /**
  * Register a cleanup callback to run once on process shutdown (SIGTERM/SIGINT).
  *
- * Handlers are keyed by identity in a process-global registry, so the same
- * callback registered twice runs once while two coexisting module instances
- * (the proxy and server bundles, a dev HMR reload) each keep their own entry —
- * keying by `name` would drop one instance's client on the floor unclosed. All
- * instances share a single pair of signal listeners. Handlers may be async and
- * are awaited concurrently; a throwing/rejecting one is logged and skipped so a
- * single failure doesn't block the rest. No-op outside the server.
+ * Handlers are keyed by identity in a process-global registry: the same callback
+ * registered twice runs once, while two coexisting module instances (proxy and
+ * server bundles, a dev HMR reload) each keep their own entry. All instances
+ * share a single pair of signal listeners. Handlers may be async and are awaited
+ * concurrently; a throwing/rejecting one is logged and skipped so a single
+ * failure doesn't block the rest. No-op outside the server.
  *
  * @param name - Log label for this handler (e.g. "db-pool"); not an identity.
  * @param handler - Cleanup callback.

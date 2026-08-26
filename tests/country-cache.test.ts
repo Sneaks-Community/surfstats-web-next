@@ -42,8 +42,7 @@ describe('sortCountries', () => {
     expect(codes(sortCountries(RANKING, 'country', 'desc'))).toEqual(['US', 'DE', 'FR', 'AU']);
   });
 
-  // DC-7: the column shows the name CountryBadge renders, so sorting the code
-  // put Sweden above Slovakia.
+  // The column shows the name CountryBadge renders, so the sort must follow it.
   it('sorts by the rendered country name, not the ISO code', () => {
     const rows = [
       { country: 'SE', country_code: 'SE', total_points: 2, player_count: 1, rank: 1 },
