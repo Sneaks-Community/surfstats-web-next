@@ -1,5 +1,3 @@
-'use client';
-
 import * as React from 'react';
 import { hasFlag } from 'country-flag-icons';
 import * as Flags from 'country-flag-icons/react/3x2';
