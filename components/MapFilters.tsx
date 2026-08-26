@@ -193,7 +193,6 @@ function MapFiltersForm({
               key={tier.tier}
               type="button"
               onClick={() => toggleTier(tier.tier)}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && toggleTier(tier.tier)}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[44px] min-w-[44px] rounded-md text-sm font-medium cursor-pointer transition-colors ${
                 selectedTiers.includes(tier.tier)
                   ? 'bg-primary/20 text-primary border border-primary/50'
