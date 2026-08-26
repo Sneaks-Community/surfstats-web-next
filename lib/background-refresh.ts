@@ -53,11 +53,22 @@ export function createBackgroundRefresh({
   task,
   startupDetail,
 }: BackgroundRefreshConfig): BackgroundRefresh {
+  let running = false;
+
   const runTask = async (startup: boolean): Promise<void> => {
+    // Skip the tick rather than stack sweeps: a slow run compounds DB load
+    // exactly when the DB is already slow.
+    if (running) {
+      logger.warn(`[${name}] Previous refresh still in flight, skipping this tick`);
+      return;
+    }
+    running = true;
     try {
       await task({ startup });
     } catch (error) {
       logger.error(`[${name}] Background refresh failed: ${getErrorMessage(error)}`);
+    } finally {
+      running = false;
     }
   };
 

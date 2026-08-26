@@ -61,6 +61,21 @@ describe('createBackgroundRefresh', () => {
     expect(task).toHaveBeenCalledTimes(1);
   });
 
+  it('skips ticks while the previous run is still in flight', async () => {
+    let release: () => void = () => undefined;
+    const task = vi.fn(() => new Promise<void>((resolve) => (release = resolve)));
+    createBackgroundRefresh({ name: 'overlapping', intervalMs: 1000, task }).start();
+
+    // Startup run never settles across three ticks.
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(task).toHaveBeenCalledTimes(1);
+    expect(logger.warn.mock.calls[0][0]).toContain('still in flight');
+
+    release();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(task).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the loop alive when the task throws', async () => {
     const task = vi.fn().mockRejectedValue(new Error('transient'));
     createBackgroundRefresh({ name: 'throwing', intervalMs: 1000, task }).start();
