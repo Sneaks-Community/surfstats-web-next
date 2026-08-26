@@ -36,6 +36,7 @@ function MapFiltersForm({
   initialTiers: number[];
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
   const [isExpanded, setIsExpanded] = useState(false);
   
@@ -56,11 +57,20 @@ function MapFiltersForm({
     if (bonuses !== 'all') params.set('bonuses', bonuses);
     if (selectedTiers.length > 0) params.set('tiers', selectedTiers.join(','));
     
+    params.sort();
     const queryString = params.toString();
+
+    // Push only on a real filter change: the mount run would otherwise drop
+    // `?page=N` from a shared link and cost a redundant RSC round trip.
+    const current = new URLSearchParams(searchParams);
+    current.delete('page');
+    current.sort();
+    if (current.toString() === queryString) return;
+
     startTransition(() => {
       router.push(queryString ? `/maps?${queryString}` : '/maps');
     });
-  }, [debouncedSearch, debouncedMapper, type, bonuses, selectedTiers, router]);
+  }, [debouncedSearch, debouncedMapper, type, bonuses, selectedTiers, router, searchParams]);
 
   const toggleTier = (tier: number) => {
     setSelectedTiers(prev =>
