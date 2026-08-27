@@ -13,7 +13,7 @@ export const TierDistributionChart = dynamic(() => import('./TierDistributionCha
   ssr: false,
   loading,
 });
-export const WRPerformanceChart = dynamic(() => import('./WRPerformanceChart'), {
+export const CompletionPercentileChart = dynamic(() => import('./CompletionPercentileChart'), {
   ssr: false,
   loading,
 });

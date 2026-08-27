@@ -25,7 +25,7 @@ ChartJS.register(
   Filler,
 );
 
-interface WRPerformanceData {
+interface CompletionPercentileData {
   mapname: string;
   wrPercentage: number; // percentage of WR time (higher is better)
   tier: number;
@@ -38,8 +38,8 @@ interface AggregatedDataPoint {
   count: number;
 }
 
-interface WRPerformanceChartProps {
-  data: WRPerformanceData[];
+interface CompletionPercentileChartProps {
+  data: CompletionPercentileData[];
 }
 
 /**
@@ -81,6 +81,10 @@ const formatDateLabel = (dateInput: string | Date, granularity: AggregationGranu
   }
 };
 
+/** Local YYYY-MM-DD, so buckets follow the viewer's calendar rather than UTC. */
+const ymd = (date: Date): string =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
 /**
  * Get color based on WR percentage
  */
@@ -102,7 +106,7 @@ const getMovingAvgWindowSize = (granularity: AggregationGranularity): number => 
   }
 };
 
-export default function WRPerformanceChart({ data }: WRPerformanceChartProps) {
+export default function CompletionPercentileChart({ data }: CompletionPercentileChartProps) {
   const safeData = useMemo(() => {
     if (!Array.isArray(data)) return [];
     // Sort by date ascending (oldest first)
@@ -134,13 +138,13 @@ export default function WRPerformanceChart({ data }: WRPerformanceChartProps) {
       let key: string;
       switch (gran) {
         case 'day':
-          key = date.toISOString().split('T')[0];
+          key = ymd(date);
           break;
         case 'week': {
-          // Get start of week (Monday)
+          // Monday start; getDay() is 0 on Sunday, which belongs to the week before.
           const weekStart = new Date(date);
-          weekStart.setDate(date.getDate() - date.getDay() + 1);
-          key = weekStart.toISOString().split('T')[0];
+          weekStart.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+          key = ymd(weekStart);
           break;
         }
         case 'month':
@@ -164,7 +168,9 @@ export default function WRPerformanceChart({ data }: WRPerformanceChartProps) {
     for (const [key, { total, count }] of dataMap) {
       result.push({ date: key, avgWR: total / count, count });
     }
-    result.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Every key shape is zero-padded and chronological as a string; quarter keys
+    // like "2024-Q1" are not parseable dates and sorted by NaN here.
+    result.sort((a, b) => a.date.localeCompare(b.date));
     
     return { granularity: gran, aggregatedData: result, earliestDate: earliest, latestDate: latest };
   }, [safeData]);
@@ -220,6 +226,12 @@ export default function WRPerformanceChart({ data }: WRPerformanceChartProps) {
       ],
     };
   }, [aggregatedData, granularity, movingAvg]);
+
+  // A hard floor of 50 clips anyone averaging below half of WR pace.
+  const yMin = useMemo(
+    () => Math.min(50, Math.floor(Math.min(100, ...aggregatedData.map((d) => d.avgWR), ...movingAvg) / 10) * 10),
+    [aggregatedData, movingAvg]
+  );
 
   const options: ChartOptions<'line'> = useMemo(() => ({
     responsive: true,
@@ -284,7 +296,7 @@ export default function WRPerformanceChart({ data }: WRPerformanceChartProps) {
         },
       },
       y: {
-        min: 50,
+        min: yMin,
         max: 100,
         grid: {
           color: 'rgba(148, 163, 184, 0.15)',
@@ -299,7 +311,7 @@ export default function WRPerformanceChart({ data }: WRPerformanceChartProps) {
         },
       },
     },
-  }), []);
+  }), [yMin]);
 
   // Calculate summary stats
   const summaryStats = useMemo(() => {

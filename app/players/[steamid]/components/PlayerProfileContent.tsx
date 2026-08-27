@@ -14,7 +14,7 @@ import PlayerTimeDisplay from './PlayerTimeDisplay';
 import ActivityHeatmapChart from './ActivityHeatmapChart';
 import {
   TierDistributionChart,
-  WRPerformanceChart,
+  CompletionPercentileChart,
   CompletionBreakdownChart,
   CareerTimelineChart,
   MapEngagementChart,
@@ -225,7 +225,7 @@ export default async function PlayerProfileContent({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:col-span-3">
         <div className="h-[280px] lg:h-auto">
           {wrPerformanceData.length > 0 ? (
-            <WRPerformanceChart data={wrPerformanceData} />
+            <CompletionPercentileChart data={wrPerformanceData} />
           ) : (
             <ChartEmptyState title="Completion Percentile" message="No completions" />
           )}
