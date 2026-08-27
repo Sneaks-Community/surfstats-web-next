@@ -56,9 +56,9 @@ const PREFETCH_MAX_REQUESTS = Math.max(
   parseInt(process.env.RATE_LIMIT_PREFETCH_MAX || '900', 10) || 900
 );
 /**
- * Optional penalty: keep an IP blocked this many seconds after it blows a
- * budget, instead of letting it back in when the window rolls over. Unset (0)
- * disables it, which is the default and matches pre-library behavior.
+ * Optional penalty: keep an IP blocked this many seconds from the moment it
+ * blows a budget, replacing (not extending) the window reset. Unset (0)
+ * disables it, which is the default.
  */
 const BLOCK_SECONDS = Math.max(
   0,
@@ -185,7 +185,7 @@ export async function checkRateLimit(
       const spentMs = Math.max(0, WINDOW_SECONDS * 1000 - err.msBeforeNext);
       const referer = request.headers.get('referer') || 'none';
       logger.warn(
-        `[RateLimit] ${ip} exceeded the ${scope} budget (${limit}/${WINDOW_SECONDS}s) in ${spentMs}ms on ${path} (referer ${referer}), blocked for ${resetSeconds}s`
+        `[RateLimit] ${ip} exceeded the ${scope} budget (${limit}/${WINDOW_SECONDS}s) in ${spentMs}ms on ${path} (referer ${referer}), blocked for ${resetSeconds}s${BLOCK_SECONDS ? ' (penalty)' : ' (window reset)'}`
       );
     } else {
       logger.debug(
