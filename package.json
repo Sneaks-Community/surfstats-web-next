@@ -23,7 +23,7 @@
     "gamedig": "^5.3.3",
     "i18n-iso-countries": "^7.14.0",
     "lucide-react": "^1.31.0",
-    "mysql2": "^3.23.3",
+    "mysql2": "^3.23.4",
     "next": "^16.3.1",
     "pino": "^10.3.1",
     "rate-limiter-flexible": "^11.2.0",
