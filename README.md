@@ -72,7 +72,7 @@ Analytics is opt-in: it is enabled only when `ANALYTICS_MYSQL_HOST` or `ANALYTIC
 ### Security and limits
 
 * `ALLOWED_ORIGINS`: Comma-separated extra origins allowed to call `/api/*`. The site's own origin is always allowed.
-* `TRUSTED_CLIENT_IP_HEADER`: Header your proxy sets with the client IP, used for rate-limit keys (default: `x-forwarded-for`). Set it to `cf-connecting-ip` (or `true-client-ip`) when a CDN, not your local proxy, is the trust boundary; otherwise the right-most `x-forwarded-for` hop is the CDN edge and every visitor shares one rate-limit bucket. `x-real-ip` is used as a fallback when the named header is absent. Only set this to a header your proxy always overwrites, since a client can send any header it likes.
+* `TRUSTED_CLIENT_IP_HEADER`: Header your proxy sets with the client IP, used for rate-limit keys (default: `x-forwarded-for`). Set it to `cf-connecting-ip` (or `true-client-ip`) when a CDN, not your local proxy, is the trust boundary; otherwise the right-most `x-forwarded-for` hop is the CDN edge and every visitor shares one rate-limit bucket. `x-real-ip` is used as a fallback when the named header is absent, and a missing header is logged once per process at `warn`. Only set this to a header your proxy always overwrites, since a client can send any header it likes.
 * `RATE_LIMIT_MAX`: Max `/api/*` requests per window per IP (default: `120`).
 * `RATE_LIMIT_PAGE_MAX`: Max page requests per window per IP (default: `300`). Counted separately from the API budget.
 * `RATE_LIMIT_PREFETCH_MAX`: Max router link prefetches per window per IP (default: `900`). Own budget, since one page view prefetches every viewport `<Link>`.

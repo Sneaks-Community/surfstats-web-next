@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { NextRequest } from 'next/server';
 
+const logger = { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() };
+vi.mock('../lib/logger', () => ({ default: logger }));
+
 // Only headers are read, so a bare Headers object stands in for the request.
 function request(headers: Record<string, string>): NextRequest {
   return { headers: new Headers(headers) } as unknown as NextRequest;
@@ -14,6 +17,7 @@ async function load() {
 
 afterEach(() => {
   delete process.env.TRUSTED_CLIENT_IP_HEADER;
+  logger.warn.mockClear();
 });
 
 describe('getClientIp', () => {
@@ -55,5 +59,21 @@ describe('getClientIp', () => {
     expect(getClientIp(request({ host: 'localhost:3000' }))).toBeNull();
     expect(getClientIp(request({ 'x-forwarded-for': ',' }))).toBe('');
     expect(getClientIp(request({ 'x-real-ip': '  ' }))).toBe('');
+  });
+
+  it('warns once per process when the trusted header is missing', async () => {
+    process.env.TRUSTED_CLIENT_IP_HEADER = 'cf-connecting-ip';
+    const { getClientIp } = await load();
+
+    getClientIp(request({ 'cf-connecting-ip': '8.8.8.8' }));
+    expect(logger.warn).not.toHaveBeenCalled();
+
+    getClientIp(request({ 'x-real-ip': '203.0.113.5' }));
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+    expect(logger.warn.mock.calls[0][0]).toContain('x-real-ip');
+
+    // A sustained misconfiguration must not log per request.
+    getClientIp(request({ host: 'localhost:3000' }));
+    expect(logger.warn).toHaveBeenCalledTimes(1);
   });
 });
