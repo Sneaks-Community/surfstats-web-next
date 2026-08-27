@@ -26,8 +26,7 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
   // Unique per card so aria-controls resolves and ids don't collide across cards.
   const panelId = `server-details-${server.config.ip}-${server.config.port}`;
 
-  const copyAddress = async (e: React.MouseEvent | React.KeyboardEvent) => {
-    e.stopPropagation();
+  const copyAddress = async () => {
     try {
       await navigator.clipboard.writeText(address);
       setCopied(true);
@@ -39,15 +38,23 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
 
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden flex flex-col transition-all">
-      <button
-        type="button"
-        className={`px-4 py-3 flex items-center justify-between transition-colors w-full text-left ${server.online ? 'cursor-pointer hover:bg-surface-hover/50' : ''}`}
-        onClick={() => server.online && setExpanded(!expanded)}
-        aria-expanded={expanded}
-        aria-controls={panelId}
-        disabled={!server.online}
-      >
-        <div className="flex items-center gap-4">
+      <div className={`relative px-4 py-3 flex items-center justify-between transition-colors ${server.online ? 'cursor-pointer hover:bg-surface-hover/50' : ''}`}>
+        {/* Stretched toggle: keeps the whole header clickable without nesting
+            the copy/connect controls inside a button. */}
+        {server.online && (
+          <button
+            type="button"
+            className="absolute inset-0 w-full"
+            onClick={() => setExpanded(!expanded)}
+            aria-expanded={expanded}
+            aria-controls={panelId}
+          >
+            <span className="sr-only">
+              {expanded ? 'Hide' : 'Show'} details for {server.config.name}
+            </span>
+          </button>
+        )}
+        <div className="relative flex items-center gap-4 pointer-events-none">
           <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-surface-hover/50 border border-border/50 shrink-0">
             <Server className={`h-5 w-5 ${server.online ? 'text-primary' : 'text-text-placeholder'}`} />
           </div>
@@ -73,19 +80,12 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
                 )}
               </span>
             </div>
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={copyAddress}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  void copyAddress(e);
-                }
-              }}
+            <button
+              type="button"
+              onClick={() => void copyAddress()}
               title="Copy address to clipboard"
               aria-label={copied ? 'Address copied to clipboard' : `Copy ${address} to clipboard`}
-              className="group inline-flex items-center gap-1.5 text-xs text-text-placeholder hover:text-text font-mono mt-0.5 transition-colors cursor-pointer"
+              className="group pointer-events-auto inline-flex items-center gap-1.5 text-xs text-text-placeholder hover:text-text font-mono mt-0.5 transition-colors cursor-pointer"
             >
               <span>{address}</span>
               {copied ? (
@@ -93,14 +93,14 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
               ) : (
                 <Copy className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
               )}
-            </span>
+            </button>
           </div>
         </div>
         
         {server.online ? (
-          <div className="flex items-center gap-4 sm:gap-6">
+          <div className="relative flex items-center gap-4 sm:gap-6 pointer-events-none">
             <div className="hidden sm:block text-right">
-              <MapLinkWithPreview mapname={server.map ?? 'unknown'} className="text-sm font-medium text-primary hover:underline block" onClick={(e) => e.stopPropagation()}>
+              <MapLinkWithPreview mapname={server.map ?? 'unknown'} className="pointer-events-auto text-sm font-medium text-primary hover:underline block">
                 {server.map ?? 'Unknown Map'}
               </MapLinkWithPreview>
               <div className="text-[10px] uppercase tracking-wider text-text-placeholder mt-0.5">Map</div>
@@ -116,8 +116,7 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
             <div className="flex items-center gap-3">
               <a
                 href={`steam://connect/${server.config.ip}:${server.config.port}`}
-                className="hidden sm:inline-flex px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-md text-sm font-medium transition-colors"
-                onClick={(e) => e.stopPropagation()}
+                className="pointer-events-auto hidden sm:inline-flex px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-md text-sm font-medium transition-colors"
               >
                 Connect
               </a>
@@ -125,11 +124,11 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
             </div>
           </div>
         ) : (
-          <div className="text-sm font-medium text-text-placeholder uppercase tracking-wider">
+          <div className="relative text-sm font-medium text-text-placeholder uppercase tracking-wider">
             Offline
           </div>
         )}
-      </button>
+      </div>
       
       {expanded && server.online && (
         <div id={panelId} className="border-t border-border bg-surface/30">

@@ -14,6 +14,7 @@ import {
   type SortDirection,
 } from '@/lib/utils';
 import { useRecordSearch, type LoadError } from '@/hooks/useRecordSearch';
+import { useTabs } from '@/hooks/useTabs';
 import { clientError } from '@/lib/client-logger';
 import { getErrorMessage, isAbortError } from '@/lib/errors';
 import { fetchJson } from '@/lib/fetch-json';
@@ -189,6 +190,7 @@ export default function MapRecordsTabs({
   const [stagePage, setStagePage] = useState(initialStagePage);
   const [sortField, setSortField] = useState<SortField>(initialSortField);
   const [sortDirection, setSortDirection] = useState<SortDirection>(initialSortDir);
+  const { tablistProps, tabProps, panelProps } = useTabs(activeTab);
 
   // Starts empty; page 1 is fetched on mount (Times activation), not server-rendered.
   const [allLeaderboardRecords, setAllLeaderboardRecords] = useState<MapRecord[]>([]);
@@ -629,19 +631,19 @@ export default function MapRecordsTabs({
       {/* Tabs */}
       <div className="px-3 sm:px-6 py-3 border-b border-border bg-surface/50">
         <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-          <div className="flex gap-1">
-            <button onClick={() => handleTabChange('map')} className={tabButtonClass(activeTab === 'map')}>
+          <div className="flex gap-1" {...tablistProps}>
+            <button {...tabProps('map')} onClick={() => handleTabChange('map')} className={tabButtonClass(activeTab === 'map')}>
               <Trophy className="h-4 w-4" />
               Map
             </button>
             {numBonuses > 0 && (
-              <button onClick={() => handleTabChange('bonus')} className={tabButtonClass(activeTab === 'bonus')}>
+              <button {...tabProps('bonus')} onClick={() => handleTabChange('bonus')} className={tabButtonClass(activeTab === 'bonus')}>
                 <Target className="h-4 w-4" />
                 Bonus
               </button>
             )}
             {numStages > 1 && (
-              <button onClick={() => handleTabChange('stages')} className={tabButtonClass(activeTab === 'stages')}>
+              <button {...tabProps('stages')} onClick={() => handleTabChange('stages')} className={tabButtonClass(activeTab === 'stages')}>
                 <Layers className="h-4 w-4" />
                 Stages
               </button>
@@ -720,68 +722,70 @@ export default function MapRecordsTabs({
         )}
       </div>
 
-      {activeTab === 'map' && (
-        <LeaderboardTable
-          rows={mapRows.map(toMapRow)}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSort={handleSort}
-          query={mapSearch.query}
-          error={mapSearch.error ?? loadError}
-          loading={mapSearch.isSearching || isLoadingAllLeaderboard}
-          loadingLabel={mapSearch.isSearching ? 'Searching all completions...' : 'Sorting all completions...'}
-          emptyMessage={mapSearch.active ? 'No players found matching your search.' : 'No completions yet.'}
-          page={mapSearch.active ? mapSearch.page : leaderboardPage}
-          totalPages={mapSearch.active ? mapSearch.totalPages : Math.ceil(totalRecords / ITEMS_PER_PAGE)}
-          onPageChange={mapSearch.active ? mapSearch.setPage : handlePageChange}
-        />
-      )}
+      <div {...panelProps(activeTab)}>
+        {activeTab === 'map' && (
+          <LeaderboardTable
+            rows={mapRows.map(toMapRow)}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            query={mapSearch.query}
+            error={mapSearch.error ?? loadError}
+            loading={mapSearch.isSearching || isLoadingAllLeaderboard}
+            loadingLabel={mapSearch.isSearching ? 'Searching all completions...' : 'Sorting all completions...'}
+            emptyMessage={mapSearch.active ? 'No players found matching your search.' : 'No completions yet.'}
+            page={mapSearch.active ? mapSearch.page : leaderboardPage}
+            totalPages={mapSearch.active ? mapSearch.totalPages : Math.ceil(totalRecords / ITEMS_PER_PAGE)}
+            onPageChange={mapSearch.active ? mapSearch.setPage : handlePageChange}
+          />
+        )}
 
-      {activeTab === 'bonus' && numBonuses > 0 && (
-        <LeaderboardTable
-          rows={bonusRows.map(toBonusRow)}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSort={handleSort}
-          query={bonusSearch.query}
-          error={bonusSearch.error ?? loadError}
-          loading={bonusSearch.isSearching || isLoadingBonuses || isLoadingAllBonus}
-          loadingLabel={bonusSearch.isSearching ? 'Searching all completions...' : 'Loading bonus completions...'}
-          emptyMessage={
-            bonusSearch.active
-              ? 'No players found matching your search.'
-              : `No bonus completions for Bonus ${selectedBonus}.`
-          }
-          page={bonusSearch.active ? bonusSearch.page : bonusPage}
-          totalPages={bonusSearch.active ? bonusSearch.totalPages : Math.ceil(totalBonusRecords / ITEMS_PER_PAGE)}
-          onPageChange={bonusSearch.active ? bonusSearch.setPage : handlePageChange}
-        />
-      )}
+        {activeTab === 'bonus' && numBonuses > 0 && (
+          <LeaderboardTable
+            rows={bonusRows.map(toBonusRow)}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleSort}
+            query={bonusSearch.query}
+            error={bonusSearch.error ?? loadError}
+            loading={bonusSearch.isSearching || isLoadingBonuses || isLoadingAllBonus}
+            loadingLabel={bonusSearch.isSearching ? 'Searching all completions...' : 'Loading bonus completions...'}
+            emptyMessage={
+              bonusSearch.active
+                ? 'No players found matching your search.'
+                : `No bonus completions for Bonus ${selectedBonus}.`
+            }
+            page={bonusSearch.active ? bonusSearch.page : bonusPage}
+            totalPages={bonusSearch.active ? bonusSearch.totalPages : Math.ceil(totalBonusRecords / ITEMS_PER_PAGE)}
+            onPageChange={bonusSearch.active ? bonusSearch.setPage : handlePageChange}
+          />
+        )}
 
-      {activeTab === 'stages' && numStages > 1 && (
-        <LeaderboardTable
-          rows={stageRows.map(toStageRow)}
-          sortField={sortField}
-          sortDirection={sortDirection}
-          onSort={handleStageSort}
-          query={stageSearch.query}
-          error={stageSearch.error ?? loadError}
-          loading={stageSearch.isSearching || isLoadingStages}
-          loadingLabel={stageSearch.isSearching ? 'Searching all completions...' : 'Loading stage completions...'}
-          emptyMessage={
-            stageSearch.active
-              ? 'No players found matching your search.'
-              : `No stage completions for Stage ${selectedStage}.`
-          }
-          page={stageSearch.active ? stageSearch.page : stagePage}
-          totalPages={
-            stageSearch.active
-              ? stageSearch.totalPages
-              : Math.min(Math.ceil(totalStageRecords / ITEMS_PER_PAGE), MAX_STAGE_PAGES)
-          }
-          onPageChange={stageSearch.active ? stageSearch.setPage : handlePageChange}
-        />
-      )}
+        {activeTab === 'stages' && numStages > 1 && (
+          <LeaderboardTable
+            rows={stageRows.map(toStageRow)}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={handleStageSort}
+            query={stageSearch.query}
+            error={stageSearch.error ?? loadError}
+            loading={stageSearch.isSearching || isLoadingStages}
+            loadingLabel={stageSearch.isSearching ? 'Searching all completions...' : 'Loading stage completions...'}
+            emptyMessage={
+              stageSearch.active
+                ? 'No players found matching your search.'
+                : `No stage completions for Stage ${selectedStage}.`
+            }
+            page={stageSearch.active ? stageSearch.page : stagePage}
+            totalPages={
+              stageSearch.active
+                ? stageSearch.totalPages
+                : Math.min(Math.ceil(totalStageRecords / ITEMS_PER_PAGE), MAX_STAGE_PAGES)
+            }
+            onPageChange={stageSearch.active ? stageSearch.setPage : handlePageChange}
+          />
+        )}
+      </div>
     </div>
   );
 }

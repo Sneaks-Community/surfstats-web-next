@@ -119,7 +119,8 @@ export default function ActivityTicker({ records, completions, mapImagesUrl }: A
   const seq = (hidden: boolean) => (
     <div
       className={`ticker-seq flex items-stretch ${hidden ? 'ticker-dupe' : ''}`}
-      aria-hidden={hidden || undefined}
+      // inert covers both: hidden from the a11y tree and out of the tab order.
+      inert={hidden}
     >
       {items.map((item, i) => (
         <Chip key={`${item.kind}-${item.map}-${item.steamid}-${i}`} item={item} mapImagesUrl={mapImagesUrl} />

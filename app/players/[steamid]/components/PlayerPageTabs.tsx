@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { useTabs } from '@/hooks/useTabs';
 import { LayoutDashboard, Clock } from 'lucide-react';
 
 interface PlayerPageTabsProps {
@@ -25,6 +26,7 @@ type TopTab = 'overview' | 'times';
  */
 export default function PlayerPageTabs({ overview, times }: PlayerPageTabsProps) {
   const [activeTab, setActiveTab] = useState<TopTab>('overview');
+  const { tablistProps, tabProps, panelProps } = useTabs(activeTab);
   // Times mounts on its first activation and then stays mounted (CSS-toggled),
   // so switching back and forth doesn't refetch. It is never mounted until the
   // user clicks Times.
@@ -43,13 +45,14 @@ export default function PlayerPageTabs({ overview, times }: PlayerPageTabsProps)
   return (
     <div className="space-y-4">
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <div className="flex">
+        <div className="flex" {...tablistProps}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                {...tabProps(tab.id)}
                 onClick={() => selectTab(tab.id)}
                 className={`flex-1 px-4 py-3 flex items-center justify-center gap-2 transition-colors relative ${
                   isActive
@@ -66,9 +69,13 @@ export default function PlayerPageTabs({ overview, times }: PlayerPageTabsProps)
         </div>
       </div>
 
-      <div className={activeTab === 'overview' ? undefined : 'hidden'}>{overview}</div>
+      <div {...panelProps('overview')} className={activeTab === 'overview' ? undefined : 'hidden'}>
+        {overview}
+      </div>
       {timesActivated && (
-        <div className={activeTab === 'times' ? undefined : 'hidden'}>{times}</div>
+        <div {...panelProps('times')} className={activeTab === 'times' ? undefined : 'hidden'}>
+          {times}
+        </div>
       )}
     </div>
   );

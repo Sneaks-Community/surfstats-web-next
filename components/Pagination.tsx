@@ -154,7 +154,9 @@ export default function Pagination({
         : 'border-border text-text-muted hover:bg-surface-hover hover:border-primary/50'
     }`;
 
-    if (navigationMode === 'client' || !href) {
+    // A disabled control must be a real <button disabled>: an anchor stays
+    // tabbable and Enter still navigates, whatever pointer-events says.
+    if (navigationMode === 'client' || !href || disabled) {
       return (
         <button
           key={ariaLabel}

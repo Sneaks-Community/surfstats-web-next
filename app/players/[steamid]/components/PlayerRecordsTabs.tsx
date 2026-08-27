@@ -9,6 +9,7 @@ import RecordSearchInput from '@/components/RecordSearchInput';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { formatTime, formatDate, sortRecords, matchesQuery, wrDiff, ITEMS_PER_PAGE, type SortDirection } from '@/lib/utils';
 import { useDisplayTz } from '@/lib/ClientConfigContext';
+import { useTabs } from '@/hooks/useTabs';
 import { validatePlayerName } from '@/lib/validators';
 import TierBadge from '@/components/TierBadge';
 import { ZoneGroupBadge, StageBadge } from '@/components/RecordBadges';
@@ -115,6 +116,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
   const incompleteStages = useMemo(() => stagesData?.incomplete ?? [], [stagesData]);
 
   const [activeTab, setActiveTab] = useState<TabType>('maps');
+  const { tablistProps, tabProps, panelProps } = useTabs(activeTab);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('finished');
   const [pages, setPages] = useState({ maps: 1, bonuses: 1, stages: 1 });
   const [searchQueries, setSearchQueries] = useState({ maps: '', bonuses: '', stages: '' });
@@ -452,13 +454,14 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
       {/* Tab Bar */}
       <div className="flex flex-col sm:flex-row border-b border-border">
         {/* Main Tabs */}
-        <div className="flex border-b sm:border-b-0 border-border overflow-x-auto min-w-0 sm:min-w-0 flex-1">
+        <div className="flex border-b sm:border-b-0 border-border overflow-x-auto min-w-0 sm:min-w-0 flex-1" {...tablistProps}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                {...tabProps(tab.id)}
                 onClick={() => handleTabChange(tab.id)}
                 className={`flex-1 min-w-0 px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-center gap-1 sm:gap-2 transition-colors relative ${
                   isActive
@@ -520,7 +523,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
       </div>
 
       {/* Records List */}
-      <div className="min-h-[400px]">
+      <div {...panelProps(activeTab)} className="min-h-[400px]">
         {isActiveLoading ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20">
             <LoadingSpinner />

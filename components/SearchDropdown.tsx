@@ -200,6 +200,8 @@ export function SearchDropdown({
     }
   };
 
+  const optionId = (index: number) => `search-option-${index}`;
+
   const hasResults = results.players.length > 0 || results.maps.length > 0;
   const showDropdown = isOpen && query.length >= minChars && (hasResults || error !== null);
 
@@ -217,8 +219,11 @@ export function SearchDropdown({
           onChange={handleInputChange}
           onFocus={handleInputFocus}
           onKeyDown={handleKeyDown}
+          role="combobox"
           aria-label="Search players or maps"
           aria-controls="search-dropdown"
+          aria-expanded={showDropdown}
+          aria-activedescendant={selectedIndex >= 0 ? optionId(selectedIndex) : undefined}
           aria-autocomplete="list"
           className="block w-full pl-10 pr-3 py-2 border border-border rounded-md leading-5 bg-surface text-text placeholder-text-placeholder focus:outline-none focus:bg-background-secondary focus:border-border-focus focus:ring-1 focus:ring-border-focus sm:text-sm transition-colors"
           placeholder="Search players or maps..."
@@ -260,6 +265,7 @@ export function SearchDropdown({
               {results.players.map((player, index) => (
                 <Link
                   key={player.steamid}
+                  id={optionId(index)}
                   href={`/players/${player.steamid}`}
                   onClick={() => setIsOpen(false)}
                   className={`flex items-center gap-2 px-3 py-1.5 hover:bg-surface-hover transition-colors ${
@@ -305,6 +311,7 @@ export function SearchDropdown({
                 return (
                   <Link
                     key={map.mapname}
+                    id={optionId(itemIndex)}
                     href={`/maps/${map.mapname}`}
                     onClick={() => setIsOpen(false)}
                     className={`flex items-center gap-2 px-3 py-1.5 hover:bg-surface-hover transition-colors ${

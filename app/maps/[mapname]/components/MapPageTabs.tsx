@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
+import { useTabs } from '@/hooks/useTabs';
 import { LayoutDashboard, Clock } from 'lucide-react';
 
 interface MapPageTabsProps {
@@ -17,6 +18,7 @@ type TopTab = 'overview' | 'times';
  */
 export default function MapPageTabs({ overview, times }: MapPageTabsProps) {
   const [activeTab, setActiveTab] = useState<TopTab>('overview');
+  const { tablistProps, tabProps, panelProps } = useTabs(activeTab);
   const [timesActivated, setTimesActivated] = useState(false);
 
   const selectTab = (tab: TopTab) => {
@@ -32,13 +34,14 @@ export default function MapPageTabs({ overview, times }: MapPageTabsProps) {
   return (
     <div className="space-y-4">
       <div className="bg-surface border border-border rounded-xl overflow-hidden">
-        <div className="flex">
+        <div className="flex" {...tablistProps}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                {...tabProps(tab.id)}
                 onClick={() => selectTab(tab.id)}
                 className={`flex-1 px-4 py-3 flex items-center justify-center gap-2 transition-colors relative ${
                   isActive
@@ -55,9 +58,13 @@ export default function MapPageTabs({ overview, times }: MapPageTabsProps) {
         </div>
       </div>
 
-      <div className={activeTab === 'overview' ? undefined : 'hidden'}>{overview}</div>
+      <div {...panelProps('overview')} className={activeTab === 'overview' ? undefined : 'hidden'}>
+        {overview}
+      </div>
       {timesActivated && (
-        <div className={activeTab === 'times' ? undefined : 'hidden'}>{times}</div>
+        <div {...panelProps('times')} className={activeTab === 'times' ? undefined : 'hidden'}>
+          {times}
+        </div>
       )}
     </div>
   );
