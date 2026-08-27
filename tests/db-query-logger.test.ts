@@ -61,6 +61,20 @@ describe('wrapPoolQuery', () => {
     expect(logger.error.mock.calls[0][0]).toContain('PROTOCOL_CONNECTION_LOST');
   });
 
+  // mysql2 rejects with a plain, code-less Error here, which read as an
+  // anonymous "Database error (UNKNOWN)" and hid pool exhaustion.
+  it('names a full connection queue as a pool failure, not a query error', async () => {
+    const pool = fakePool();
+    (pool.query as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(
+      new Error('Queue limit reached.')
+    );
+    wrapPoolQuery(pool, { prefix: 'DB' });
+
+    await expect(pool.query('SELECT 1')).rejects.toThrow('Queue limit reached.');
+    expect(logger.error.mock.calls[0][0]).toContain('Connection queue full');
+    expect(logger.error.mock.calls[0][0]).not.toContain('UNKNOWN');
+  });
+
   it('warns on a query slower than the threshold', async () => {
     const pool = fakePool();
     (pool.query as unknown as ReturnType<typeof vi.fn>).mockImplementation(

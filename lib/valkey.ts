@@ -51,10 +51,6 @@ client.on('reconnecting', () => {
   logger.warn('[Valkey] Reconnecting...');
 });
 
-client.on('close', () => {
-  logger.warn('[Valkey] Connection closed');
-});
-
 // Force connection on import. Kept as a module-level promise so callers can
 // await the initial attempt instead of racing it — otherwise the very first
 // request after startup sees isReady === false and gets a 503 before the

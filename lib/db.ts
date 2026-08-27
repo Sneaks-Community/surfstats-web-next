@@ -47,7 +47,7 @@ pool.on('release', () => {
 });
 
 pool.on('enqueue', () => {
-  logger.warn('[DB] Queue limit reached, waiting for available connection');
+  logger.debug('[DB] All connections busy, request queued');
 });
 
 // Wrap the pool with slow query logging

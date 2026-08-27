@@ -73,8 +73,13 @@ export function wrapPoolQuery(
         const errorCode = error.code || 'UNKNOWN';
         const errorMessage = error.message || 'Unknown error';
 
-        // Log all errors with context
-        logger.error(`[${prefix}] Database error (${errorCode}): ${errorMessage}`);
+        if (errorMessage === 'Queue limit reached.') {
+          logger.error(
+            `[${prefix}] Connection queue full, request rejected before reaching MySQL; raise DB_CONNECTION_LIMIT/DB_QUEUE_LIMIT or shed load earlier`
+          );
+        } else {
+          logger.error(`[${prefix}] Database error (${errorCode}): ${errorMessage}`);
+        }
         logger.error(`[${prefix}] Query: ${queryPreview}`);
 
         // Rethrow all errors to allow callers to handle or propagate them
