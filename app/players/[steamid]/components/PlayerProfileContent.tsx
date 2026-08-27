@@ -6,7 +6,7 @@ import { formatDate, getDisplayTz } from '@/lib/utils';
 import { validatePlayerName } from '@/lib/validators';
 import CountryBadge from '@/components/CountryBadge';
 import { getCountryCodeFromName, UNKNOWN_COUNTRY_CODE } from '@/lib/countries';
-import PlayerPageTabs from './PlayerPageTabs';
+import PageTabs from '@/components/PageTabs';
 import PlayerRecordsTabs from './PlayerRecordsTabs';
 import ProgressBar from '@/components/ProgressBar';
 import ChartEmptyState from '@/components/ChartEmptyState';
@@ -276,7 +276,7 @@ export default async function PlayerProfileContent({
   return (
     <div className="space-y-4">
       {profileHeader}
-      <PlayerPageTabs overview={overviewSection} times={timesSection} />
+      <PageTabs overview={overviewSection} times={timesSection} />
     </div>
   );
 }

@@ -2,14 +2,9 @@ import 'server-only';
 import mysql from 'mysql2/promise';
 import logger from '@/lib/logger';
 import { wrapPoolQuery } from '@/lib/db-query-logger';
-import { validateEnv } from '@/lib/env';
+import { isBuildPhase, validateEnv } from '@/lib/env';
 import { onShutdown } from '@/lib/shutdown';
 import { applyStatementTimeout } from '@/lib/timeout';
-
-// Check if in build phase - skip validation during build
-const isBuildPhase = process.env.npm_lifecycle_event === 'build' ||
-                     process.env.NEXT_PHASE === 'build' ||
-                     process.env.NEXT_PHASE === 'phase-production-build';
 
 // queueLimit accepts 0 (mysql2's "unlimited"), so a plain `|| default` won't do —
 // only fall back when the var is unset/non-numeric.

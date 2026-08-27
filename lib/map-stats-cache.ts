@@ -38,6 +38,17 @@ interface CheckpointStatsResult {
 }
 
 /**
+ * `cp1..cpN` for a SELECT list. The count is bounded here so the names callers
+ * interpolate into SQL are always synthesized from a checked integer.
+ */
+function checkpointColumns(maxCheckpoint: number): string[] {
+  if (maxCheckpoint > 75 || maxCheckpoint < 0) {
+    throw new Error('Invalid checkpoint count');
+  }
+  return Array.from({ length: maxCheckpoint }, (_, i) => `cp${i + 1}`);
+}
+
+/**
  * Process checkpoint rows into average times statistics
  */
 function processCheckpointData(
@@ -109,20 +120,10 @@ export async function getWRCheckpointTimesFromCache(
         return undefined;
       }
 
-      const MAX_CHECKPOINTS = 75;
-      if (maxCheckpoint > MAX_CHECKPOINTS || maxCheckpoint < 0) {
-        throw new Error('Invalid checkpoint count');
-      }
-
-      // Safe to interpolate: every name is built from an integer already bounded
-      // by the check above.
-      const checkpointColumns: string[] = [];
-      for (let i = 1; i <= maxCheckpoint; i++) {
-        checkpointColumns.push(`cp${i}`);
-      }
+      const columns = checkpointColumns(maxCheckpoint);
 
       const [wrCheckpointRows] = await pool.query<RowDataPacket[]>(`
-        SELECT ${checkpointColumns.join(', ')}
+        SELECT ${columns.join(', ')}
         FROM ck_checkpoints
         WHERE mapname = ? AND steamid = ?
       `, [validMapname, wrSteamid]);
@@ -175,20 +176,10 @@ export async function getCheckpointStatsFromCache(
         return { checkpointAvgTimes: [] };
       }
 
-      const MAX_CHECKPOINTS = 75;
-      if (maxCheckpoint > MAX_CHECKPOINTS || maxCheckpoint < 0) {
-        throw new Error('Invalid checkpoint count');
-      }
-
-      // Safe to interpolate: every name is built from an integer already bounded
-      // by the check above.
-      const checkpointColumns: string[] = [];
-      for (let i = 1; i <= maxCheckpoint; i++) {
-        checkpointColumns.push(`cp${i}`);
-      }
+      const columns = checkpointColumns(maxCheckpoint);
 
       const [checkpointRows] = await pool.query<RowDataPacket[]>(`
-        SELECT ${checkpointColumns.join(', ')}
+        SELECT ${columns.join(', ')}
         FROM ck_checkpoints
         WHERE mapname = ?
       `, [validMapname]);

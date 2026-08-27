@@ -4,7 +4,7 @@ import { useState, type ReactNode } from 'react';
 import { useTabs } from '@/hooks/useTabs';
 import { LayoutDashboard, Clock } from 'lucide-react';
 
-interface PlayerPageTabsProps {
+interface PageTabsProps {
   overview: ReactNode;
   times: ReactNode;
 }
@@ -12,24 +12,17 @@ interface PlayerPageTabsProps {
 type TopTab = 'overview' | 'times';
 
 /**
- * Top-level Overview | Times tabs for the player page.
+ * Overview | Times tabs, shared by the map and player pages.
  *
  * Crawler-safety hard rule: the active tab hard-defaults to Overview and is
- * deliberately NOT initialized from the URL / searchParams. A sitemap or
- * internal link carrying a tab param must never auto-open (and, once Times
- * fetches on activation, auto-fetch) the expensive Times section under a
- * crawler's renderer.
- *
- * Times is conditionally *mounted* (not CSS-hidden) — it only enters the tree
- * once the user selects it, so its mount effects never run for a crawler that
- * renders only the default Overview.
+ * deliberately NOT initialized from the URL, so a link carrying a tab param can
+ * never auto-open (and auto-fetch) the expensive Times section under a crawler's
+ * renderer. Times is conditionally mounted until its first activation, then
+ * stays mounted and CSS-toggled so switching back and forth doesn't refetch.
  */
-export default function PlayerPageTabs({ overview, times }: PlayerPageTabsProps) {
+export default function PageTabs({ overview, times }: PageTabsProps) {
   const [activeTab, setActiveTab] = useState<TopTab>('overview');
   const { tablistProps, tabProps, panelProps } = useTabs(activeTab);
-  // Times mounts on its first activation and then stays mounted (CSS-toggled),
-  // so switching back and forth doesn't refetch. It is never mounted until the
-  // user clicks Times.
   const [timesActivated, setTimesActivated] = useState(false);
 
   const selectTab = (tab: TopTab) => {

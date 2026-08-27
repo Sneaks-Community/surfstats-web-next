@@ -16,8 +16,8 @@ import { isValidTimeZone } from './utils';
  * Call `validateEnv()` once at server startup.
  */
 
-// Validation is skipped during `next build` (env not present, no server running).
-const isBuildPhase =
+/** True during `next build`, where env vars are absent and no server runs. */
+export const isBuildPhase =
   process.env.npm_lifecycle_event === 'build' ||
   process.env.NEXT_PHASE === 'build' ||
   process.env.NEXT_PHASE === 'phase-production-build';

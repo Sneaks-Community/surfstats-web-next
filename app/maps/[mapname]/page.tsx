@@ -8,7 +8,7 @@ import { validateMapName, validatePlayerName } from '@/lib/validators';
 import { mapImageUrl, getMapImagesUrl } from '@/lib/utils';
 import logger from '@/lib/logger';
 import MapRecordsTabs from './components/MapRecordsTabs';
-import MapPageTabs from './components/MapPageTabs';
+import PageTabs from '@/components/PageTabs';
 import TierBadge from '@/components/TierBadge';
 import MapChartGrid from './components/charts/MapChartGrid';
 import { isStagedMap } from '@/lib/map-cache';
@@ -186,7 +186,7 @@ export default async function MapProfilePage({
         </div>
       </div>
 
-      <MapPageTabs
+      <PageTabs
         overview={
           <Suspense fallback={<ChartGridSkeleton />}>
             <ChartGrid mapname={validMapname} />

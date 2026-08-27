@@ -125,7 +125,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
 
   // Fetch the active section's full list on activation. Nothing fetches on the
   // initial page render: this component only mounts once the user opens the
-  // top-level Times tab (PlayerPageTabs conditionally mounts it), so a crawler
+  // top-level Times tab (PageTabs conditionally mounts it), so a crawler
   // that renders only the default Overview never triggers these queries.
   // A loaded section stays in state, which doubles as the client cache,
   // re-selecting a tab never refetches.
@@ -220,6 +220,17 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
     // Reset to page 1 when sort changes
     setPages((prev) => ({ ...prev, [activeTab]: 1 }));
   };
+
+  // Every header cell is the same button; only the field, label and width vary.
+  const sortButton = (field: SortField, label: string, className = '') => (
+    <button
+      onClick={() => handleSort(field)}
+      className={`flex items-center gap-1 hover:text-text transition-colors ${className}`}
+    >
+      {label}
+      <SortIcon field={field} sortField={sortField} sortDirection={sortDirection} />
+    </button>
+  );
 
 
   // Filter and sort records
@@ -547,71 +558,27 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
             {statusFilter === 'finished' && (
               <>
                 <div className="hidden sm:flex px-6 py-2 bg-surface-hover/50 border-b border-border items-center gap-4 text-sm font-medium text-text-muted">
-                  <button
-                    onClick={() => handleSort('map')}
-                    className="flex-1 min-w-0 flex items-center gap-1 hover:text-text transition-colors"
-                  >
-                    Map
-                    <SortIcon field="map" sortField={sortField} sortDirection={sortDirection} />
-                  </button>
-                  {activeTab === 'maps' && (
-                    <button
-                      onClick={() => handleSort('tier')}
-                      className="w-20 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
-                    >
-                      Tier
-                      <SortIcon field="tier" sortField={sortField} sortDirection={sortDirection} />
-                    </button>
-                  )}
-                  {activeTab !== 'maps' && <div className="w-20" />}
-                  <button
-                    onClick={() => handleSort('rank')}
-                    className="w-16 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
-                  >
-                    Rank
-                    <SortIcon field="rank" sortField={sortField} sortDirection={sortDirection} />
-                  </button>
-                  <button
-                    onClick={() => handleSort('time')}
-                    className="w-24 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
-                  >
-                    Time
-                    <SortIcon field="time" sortField={sortField} sortDirection={sortDirection} />
-                  </button>
-                  {activeTab === 'maps' && (
-                    <button
-                      onClick={() => handleSort('wrDiff')}
-                      className="w-20 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
-                    >
-                      WR Diff
-                      <SortIcon field="wrDiff" sortField={sortField} sortDirection={sortDirection} />
-                    </button>
-                  )}
-                  {activeTab !== 'maps' && <div className="w-20" />}
-                  <button
-                    onClick={() => handleSort('date')}
-                    className="w-24 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
-                  >
-                    Date
-                    <SortIcon field="date" sortField={sortField} sortDirection={sortDirection} />
-                  </button>
+                  {sortButton('map', 'Map', 'flex-1 min-w-0')}
+                  {activeTab === 'maps'
+                    ? sortButton('tier', 'Tier', 'w-20 justify-end text-right')
+                    : <div className="w-20" />}
+                  {sortButton('rank', 'Rank', 'w-16 justify-end text-right')}
+                  {sortButton('time', 'Time', 'w-24 justify-end text-right')}
+                  {activeTab === 'maps'
+                    ? sortButton('wrDiff', 'WR Diff', 'w-20 justify-end text-right')
+                    : <div className="w-20" />}
+                  {sortButton('date', 'Date', 'w-24 justify-end text-right')}
                 </div>
 
                 {/* Mobile Compact Header - only for finished records */}
                 <div className="sm:hidden px-3 py-2 bg-surface-hover/50 border-b border-border flex items-center justify-between text-xs font-medium text-text-muted">
-                  <button
-                    onClick={() => handleSort('map')}
-                    className="flex items-center gap-1 hover:text-text transition-colors"
-                  >
-                    Map
-                    <SortIcon field="map" sortField={sortField} sortDirection={sortDirection} />
-                  </button>
+                  {sortButton('map', 'Map')}
                   <div className="flex items-center gap-2">
-                    {activeTab === 'maps' && <button onClick={() => handleSort('tier')} className="flex items-center gap-1 hover:text-text transition-colors">Tier<SortIcon field="tier" sortField={sortField} sortDirection={sortDirection} /></button>}
-                    <button onClick={() => handleSort('rank')} className="flex items-center gap-1 hover:text-text transition-colors">Rk<SortIcon field="rank" sortField={sortField} sortDirection={sortDirection} /></button>
-                    <button onClick={() => handleSort('time')} className="flex items-center gap-1 hover:text-text transition-colors">Time<SortIcon field="time" sortField={sortField} sortDirection={sortDirection} /></button>
-                    {activeTab === 'maps' && <button onClick={() => handleSort('wrDiff')} className="flex items-center gap-1 hover:text-text transition-colors">WR<SortIcon field="wrDiff" sortField={sortField} sortDirection={sortDirection} /></button>}
-                    <button onClick={() => handleSort('date')} className="flex items-center gap-1 hover:text-text transition-colors">Date<SortIcon field="date" sortField={sortField} sortDirection={sortDirection} /></button>
+                    {activeTab === 'maps' && sortButton('tier', 'Tier')}
+                    {sortButton('rank', 'Rk')}
+                    {sortButton('time', 'Time')}
+                    {activeTab === 'maps' && sortButton('wrDiff', 'WR')}
+                    {sortButton('date', 'Date')}
                   </div>
                 </div>
               </>
@@ -622,61 +589,26 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
               <>
                 {/* Desktop Sortable Headers */}
                 <div className="hidden sm:flex px-6 py-2 bg-surface-hover/50 border-b border-border items-center gap-4 text-sm font-medium text-text-muted">
-                  <button
-                    onClick={() => handleSort('map')}
-                    className="flex-1 min-w-0 flex items-center gap-1 hover:text-text transition-colors"
-                  >
-                    Map
-                    <SortIcon field="map" sortField={sortField} sortDirection={sortDirection} />
-                  </button>
-                  {activeTab === 'maps' && (
+                  {sortButton('map', 'Map', 'flex-1 min-w-0')}
+                  {activeTab === 'maps' ? (
                     <>
-                      <button
-                        onClick={() => handleSort('tier')}
-                        className="w-20 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
-                      >
-                        Tier
-                        <SortIcon field="tier" sortField={sortField} sortDirection={sortDirection} />
-                      </button>
-                      <button
-                        onClick={() => handleSort('mapType')}
-                        className="w-20 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
-                      >
-                        Type
-                        <SortIcon field="mapType" sortField={sortField} sortDirection={sortDirection} />
-                      </button>
-                      <button
-                        onClick={() => handleSort('wrTime')}
-                        className="w-24 text-right flex items-center justify-end gap-1 hover:text-text transition-colors"
-                      >
-                        WR
-                        <SortIcon field="wrTime" sortField={sortField} sortDirection={sortDirection} />
-                      </button>
+                      {sortButton('tier', 'Tier', 'w-20 justify-end text-right')}
+                      {sortButton('mapType', 'Type', 'w-20 justify-end text-right')}
+                      {sortButton('wrTime', 'WR', 'w-24 justify-end text-right')}
                     </>
+                  ) : (
+                    <><div className="w-20" /><div className="w-20" /><div className="w-24" /></>
                   )}
-                  {activeTab !== 'maps' && <><div className="w-20" /><div className="w-20" /><div className="w-24" /></>}
                 </div>
 
                 {/* Mobile Compact Header */}
                 <div className="sm:hidden px-3 py-2 bg-surface-hover/50 border-b border-border flex items-center justify-between text-xs font-medium text-text-muted">
-                  <button
-                    onClick={() => handleSort('map')}
-                    className="flex items-center gap-1 hover:text-text transition-colors"
-                  >
-                    Map
-                    <SortIcon field="map" sortField={sortField} sortDirection={sortDirection} />
-                  </button>
+                  {sortButton('map', 'Map')}
                   {activeTab === 'maps' && (
                     <div className="flex items-center gap-2">
-                      <button onClick={() => handleSort('tier')} className="flex items-center gap-1 hover:text-text transition-colors">
-                        Tier<SortIcon field="tier" sortField={sortField} sortDirection={sortDirection} />
-                      </button>
-                      <button onClick={() => handleSort('mapType')} className="flex items-center gap-1 hover:text-text transition-colors">
-                        Type<SortIcon field="mapType" sortField={sortField} sortDirection={sortDirection} />
-                      </button>
-                      <button onClick={() => handleSort('wrTime')} className="flex items-center gap-1 hover:text-text transition-colors">
-                        WR<SortIcon field="wrTime" sortField={sortField} sortDirection={sortDirection} />
-                      </button>
+                      {sortButton('tier', 'Tier')}
+                      {sortButton('mapType', 'Type')}
+                      {sortButton('wrTime', 'WR')}
                     </div>
                   )}
                 </div>
