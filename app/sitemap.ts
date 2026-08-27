@@ -12,6 +12,10 @@ import logger from '@/lib/logger';
  * crawlable via `/players`, but listing every one would require a full-table
  * scan and a very large sitemap — deliberately out of scope here.
  */
+// Built per request: baking it at build time would freeze the map list to
+// whatever the cache held (usually nothing) during the build.
+export const dynamic = 'force-dynamic';
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = await getSiteUrl();
   const now = new Date();

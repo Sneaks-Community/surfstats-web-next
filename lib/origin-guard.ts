@@ -8,8 +8,9 @@ const ALLOWED_ORIGINS: readonly string[] = (process.env.ALLOWED_ORIGINS || '')
   .map((o) => o.trim())
   .filter(Boolean);
 
-// Canonical origin from config, if set. Preferred over the header-derived origin
-// because X-Forwarded-Host is client-spoofable (see C2).
+// The site's own origin, from the required NEXT_PUBLIC_SITE_URL. Never derived
+// from Host / X-Forwarded-Host: those are client-spoofable, so a header-derived
+// own-origin would let any caller name itself as trusted.
 const CONFIGURED_ORIGIN: string | null = (() => {
   const url = process.env.NEXT_PUBLIC_SITE_URL;
   if (!url) return null;
@@ -19,22 +20,6 @@ const CONFIGURED_ORIGIN: string | null = (() => {
     return null;
   }
 })();
-
-/**
- * The request's own public origin. Uses the configured canonical origin when
- * set; otherwise falls back to the (spoofable) proxy headers so a default
- * deployment works without extra config.
- */
-function ownOrigin(request: NextRequest): string | null {
-  if (CONFIGURED_ORIGIN) return CONFIGURED_ORIGIN;
-  const host = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim()
-    || request.headers.get('host');
-  if (!host) return null;
-  const proto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim()
-    || request.nextUrl.protocol.replace(':', '')
-    || 'https';
-  return `${proto}://${host}`;
-}
 
 /** Origin implied by the request's Origin or Referer header, if any. */
 function sourceOrigin(request: NextRequest): string | null {
@@ -58,8 +43,7 @@ function sourceOrigin(request: NextRequest): string | null {
  */
 export function isTrustedRequest(request: NextRequest): boolean {
   const trusted = new Set(ALLOWED_ORIGINS);
-  const own = ownOrigin(request);
-  if (own) trusted.add(own);
+  if (CONFIGURED_ORIGIN) trusted.add(CONFIGURED_ORIGIN);
 
   // Explicit Origin/Referer match wins, so a configured external front-end works
   // even when the browser reports the request as cross-site.

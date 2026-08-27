@@ -53,3 +53,41 @@ describe('getServerConfigs', () => {
     }
   });
 });
+
+// NEXT_PUBLIC_SITE_URL is required: unset, the origin guard and every absolute
+// link would fall back to the client-settable Host headers.
+describe('validateEnv', () => {
+  const REQUIRED = {
+    MYSQL_HOST: 'db',
+    MYSQL_USER: 'u',
+    MYSQL_PASSWORD: 'p',
+    MYSQL_DATABASE: 'cksurf',
+    NEXT_PUBLIC_SITE_URL: 'https://stats.example.com',
+  };
+
+  const ORIGINAL_ENV = process.env;
+
+  async function validate(overrides: Record<string, string | undefined> = {}) {
+    vi.resetModules();
+    process.env = { ...ORIGINAL_ENV, ...REQUIRED, ...overrides };
+    const { validateEnv } = await import('../lib/env');
+    return validateEnv();
+  }
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  it('passes with the required vars set', async () => {
+    await expect(validate()).resolves.toBeUndefined();
+  });
+
+  it('throws when NEXT_PUBLIC_SITE_URL is missing or not an absolute URL', async () => {
+    await expect(validate({ NEXT_PUBLIC_SITE_URL: undefined })).rejects.toThrow(
+      /NEXT_PUBLIC_SITE_URL is required/
+    );
+    await expect(validate({ NEXT_PUBLIC_SITE_URL: 'stats.example.com' })).rejects.toThrow(
+      /NEXT_PUBLIC_SITE_URL is required/
+    );
+  });
+});

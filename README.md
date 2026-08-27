@@ -71,6 +71,7 @@ Analytics is opt-in: it is enabled only when `ANALYTICS_MYSQL_HOST` or `ANALYTIC
 
 ### Security and limits
 
+* `NEXT_PUBLIC_SITE_URL` (**required**): Canonical public base URL, e.g. `https://stats.example.com` (`http://localhost:3000` for local development). Boot fails without it. It is the site's own origin for the `/api/*` origin guard and the base for absolute `robots.txt` / `sitemap.xml` / OpenGraph links. It is not derived from the request: `Host` and `X-Forwarded-Host` are client-settable, so deriving it would let any caller name itself trusted and let a fronting cache poison your canonical links.
 * `ALLOWED_ORIGINS`: Comma-separated extra origins allowed to call `/api/*`. The site's own origin is always allowed.
 * `TRUSTED_CLIENT_IP_HEADER`: Header your proxy sets with the client IP, used for rate-limit keys (default: `x-forwarded-for`). Set it to `cf-connecting-ip` (or `true-client-ip`) when a CDN, not your local proxy, is the trust boundary; otherwise the right-most `x-forwarded-for` hop is the CDN edge and every visitor shares one rate-limit bucket. `x-real-ip` is used as a fallback when the named header is absent, and a missing header is logged once per process at `warn`. Only set this to a header your proxy always overwrites, since a client can send any header it likes.
 * `RATE_LIMIT_MAX`: Max `/api/*` requests per window per IP (default: `120`).
@@ -95,10 +96,9 @@ Rate limiting uses [`rate-limiter-flexible`](https://github.com/animir/node-rate
 
 ### Site branding
 
-All are optional and public (baked into the client bundle at build time).
+All are optional and public (baked into the client bundle at build time). The required `NEXT_PUBLIC_SITE_URL` is documented under [Security and limits](#security-and-limits).
 
 * `NEXT_PUBLIC_SITE_TITLE`, `NEXT_PUBLIC_SITE_NAME`, `NEXT_PUBLIC_SITE_DESCRIPTION`
-* `NEXT_PUBLIC_SITE_URL`: Canonical public base URL, used for absolute `robots.txt` / `sitemap.xml` links. Falls back to the request host.
 * `NEXT_PUBLIC_MAIN_SITE_URL`, `NEXT_PUBLIC_MAIN_SITE_NAME`: Link back to your community's main site.
 * `NEXT_PUBLIC_FOOTER_LINK_URL`, `NEXT_PUBLIC_FOOTER_LINK_TEXT`: One extra footer link (e.g. Discord).
 * `NEXT_PUBLIC_MAP_DOWNLOAD_URL_PREFIX`, `NEXT_PUBLIC_MAP_DOWNLOAD_URL_SUFFIX`: Wrap a map name into a download URL. Leave the prefix blank to hide the download icon.

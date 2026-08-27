@@ -22,12 +22,19 @@ const isBuildPhase =
   process.env.NEXT_PHASE === 'build' ||
   process.env.NEXT_PHASE === 'phase-production-build';
 
-// Required for the app to function at all — the primary ckSurf database.
+// Required for the app to function at all — the primary ckSurf database, plus
+// the canonical public URL.
 const requiredSchema = z.object({
   MYSQL_HOST: z.string().min(1, 'MYSQL_HOST is required'),
   MYSQL_USER: z.string().min(1, 'MYSQL_USER is required'),
   MYSQL_PASSWORD: z.string().min(1, 'MYSQL_PASSWORD is required'),
   MYSQL_DATABASE: z.string().min(1, 'MYSQL_DATABASE is required'),
+  // Canonical public base URL (e.g. https://stats.example.com). Required, not
+  // defaulted: unset makes the origin guard and every absolute link fall back to
+  // the client-spoofable Host / X-Forwarded-Host headers.
+  NEXT_PUBLIC_SITE_URL: z.url(
+    'NEXT_PUBLIC_SITE_URL is required and must be an absolute URL (e.g. https://stats.example.com)'
+  ),
 });
 
 // Optional infra vars with safe fallbacks — validated for shape when present so
@@ -64,9 +71,6 @@ const optionalSchema = z.object({
     .string()
     .regex(/^[A-Za-z0-9-]+$/, 'TRUSTED_CLIENT_IP_HEADER must be a valid HTTP header name')
     .optional(),
-  // Canonical public base URL (e.g. https://stats.example.com). Used for
-  // robots.txt / sitemap.xml absolute URLs; falls back to the request host.
-  NEXT_PUBLIC_SITE_URL: z.url('NEXT_PUBLIC_SITE_URL must be a valid URL').optional(),
   LOG_LEVEL: z
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
     .optional(),

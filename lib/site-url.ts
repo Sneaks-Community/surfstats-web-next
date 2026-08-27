@@ -5,9 +5,9 @@ import { headers } from 'next/headers';
  * Resolve the site's canonical base URL (no trailing slash) for absolute links
  * in robots.txt / sitemap.xml.
  *
- * Prefers the explicit `NEXT_PUBLIC_SITE_URL` env var; otherwise derives the
- * origin from the incoming request headers (honoring the reverse proxy's
- * `x-forwarded-*`), so a default deployment works without extra config.
+ * `NEXT_PUBLIC_SITE_URL` is required at boot, so the header-derived origin below
+ * only applies to `next build` (where env validation is skipped) and to a
+ * misconfigured server; those headers are spoofable, hence not the normal path.
  */
 export async function getSiteUrl(): Promise<string> {
   const configured = process.env.NEXT_PUBLIC_SITE_URL;
