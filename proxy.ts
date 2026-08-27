@@ -18,16 +18,11 @@ const shortCircuitHeaders: Record<string, string> = {
 // (unavailable on Edge).
 export const config = {
   matcher: [
-    // Unconditional: must not use the dot-excluding pattern below, or a dotted
-    // path segment (`/api/maps/foo.bar/records`) skips every gate.
-    '/api/:path*',
-    // Metadata routes
-    '/sitemap.xml',
-    '/robots.txt',
-    // Image optimizer
-    '/_next/image',
-    // Pages: all but Next internals and static files (anything with a dot).
-    '/((?!_next/static|_next/image|.*\\..*).*)',
+    // Everything except Next's immutable build assets. Deliberately no
+    // dot-excluding pattern: a dotted path (`/players/1.1`, `/api/maps/a.b/records`)
+    // is a page or route like any other and must not skip the gates below.
+    // `/public` holds no files, so nothing else is served statically.
+    '/((?!_next/static).*)',
   ],
 };
 
