@@ -13,6 +13,7 @@ vi.mock('../lib/valkey', () => ({ waitForCacheReady: () => waitForCacheReady() }
 vi.mock('../lib/logger', () => ({ default: { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() } }));
 
 const { cachedFetch, normalizeToCachedShape, CacheUnavailableError } = await import('../lib/cached-fetch');
+const { DbBusyError } = await import('../lib/errors');
 
 const miss = { value: null, ttlMs: -1 };
 
@@ -53,6 +54,18 @@ describe('cachedFetch', () => {
     );
 
     expect(result).toBe(fallback);
+    expect(cacheSet).not.toHaveBeenCalled();
+  });
+
+  // Shedding is backpressure, not an answer: the empty fallback would render as
+  // a real "no results" page.
+  it('rethrows DbBusyError past onError', async () => {
+    const onError = vi.fn(() => ({ players: [], total: 0 }));
+
+    await expect(
+      cachedFetch('k', 60, () => Promise.reject(new DbBusyError()), { onError })
+    ).rejects.toBeInstanceOf(DbBusyError);
+    expect(onError).not.toHaveBeenCalled();
     expect(cacheSet).not.toHaveBeenCalled();
   });
 
