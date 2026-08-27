@@ -46,15 +46,16 @@ export async function withTimeout<T>(
  * `max_execution_time` (ms, SELECT only), and each rejects the other's name;
  * mysql2's handshake vendor flag picks which to try first, the other is the
  * fallback. Per-connection command serialization gets the SET in before the
- * acquirer's first query. `DB_STATEMENT_TIMEOUT_MS` (default 30000) is the
- * limit; 0 disables it.
+ * acquirer's first query. `DB_STATEMENT_TIMEOUT_MS` (default 8000) is the
+ * limit; 0 disables it. The cap doubles as backpressure: an expensive-query
+ * slot held for 30s stalls every caller queued behind it.
  *
  * @param pool - The pool to cap
  * @param prefix - Logger prefix, matching the pool's other log lines
  */
 export function applyStatementTimeout(pool: Pool, prefix: string): void {
   const parsed = parseInt(process.env.DB_STATEMENT_TIMEOUT_MS ?? '', 10);
-  const ms = Number.isNaN(parsed) ? 30000 : parsed;
+  const ms = Number.isNaN(parsed) ? 8000 : parsed;
 
   if (ms <= 0) {
     logger.warn(`[${prefix}] Server-side statement timeout disabled`);

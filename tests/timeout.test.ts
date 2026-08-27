@@ -39,7 +39,7 @@ describe('applyStatementTimeout', () => {
     applyStatementTimeout(pool, 'TEST');
     await connect();
 
-    expect(executed).toEqual(['SET SESSION max_statement_time=30']);
+    expect(executed).toEqual(['SET SESSION max_statement_time=8']);
   });
 
   it('uses MySQL milliseconds elsewhere, in one round trip', async () => {
@@ -48,7 +48,7 @@ describe('applyStatementTimeout', () => {
     applyStatementTimeout(pool, 'TEST');
     await connect();
 
-    expect(executed).toEqual(['SET SESSION max_execution_time=30000']);
+    expect(executed).toEqual(['SET SESSION max_execution_time=8000']);
   });
 
   // The vendor flag is a driver internal; if it ever disappears the fallback
@@ -60,8 +60,8 @@ describe('applyStatementTimeout', () => {
     await connect();
 
     expect(executed).toEqual([
-      'SET SESSION max_statement_time=30',
-      'SET SESSION max_execution_time=30000',
+      'SET SESSION max_statement_time=8',
+      'SET SESSION max_execution_time=8000',
     ]);
   });
 
