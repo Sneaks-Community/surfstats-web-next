@@ -14,6 +14,7 @@ import {
   Filler,
 } from 'chart.js';
 import { useMemo } from 'react';
+import { useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(
   CategoryScale,
@@ -62,6 +63,7 @@ const formatDate = (date: string): string => {
 };
 
 export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
+  const chartTheme = useChartTheme();
   const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
 
   const chartData = useMemo(() => {
@@ -96,10 +98,10 @@ export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
         display: false,
       },
       tooltip: {
-        backgroundColor: 'rgba(30, 41, 59, 0.95)',
-        titleColor: '#f8fafc',
-        bodyColor: '#e2e8f0',
-        borderColor: 'rgba(148, 163, 184, 0.5)',
+        backgroundColor: chartTheme.surface,
+        titleColor: chartTheme.text,
+        bodyColor: chartTheme.textMuted,
+        borderColor: chartTheme.border,
         borderWidth: 1,
         cornerRadius: 8,
         padding: 12,
@@ -129,7 +131,7 @@ export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
           display: false,
         },
         ticks: {
-          color: '#94a3b8',
+          color: chartTheme.textMuted,
           font: {
             size: 9,
           },
@@ -142,10 +144,10 @@ export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
       y: {
         beginAtZero: true,
         grid: {
-          color: 'rgba(148, 163, 184, 0.2)',
+          color: chartTheme.grid,
         },
         ticks: {
-          color: '#94a3b8',
+          color: chartTheme.textMuted,
           font: {
             size: 12,
           },
@@ -157,7 +159,7 @@ export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
       mode: 'index' as const,
       intersect: false,
     },
-  }), []);
+  }), [chartTheme]);
 
   if (safeData.length === 0) {
     return (

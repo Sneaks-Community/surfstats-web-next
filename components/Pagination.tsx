@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from '@/components/Link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react';
@@ -184,12 +184,14 @@ export default function Pagination({
     );
   };
 
-  // Validation for development mode
-  if (process.env.NODE_ENV === 'development' && navigationMode === 'none') {
-    clientError(
-      'Pagination requires either baseUrl (for server-side navigation) or onPageChange (for client-side navigation)'
-    );
-  }
+  // Validation for development mode, after commit so render stays pure.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development' && navigationMode === 'none') {
+      clientError(
+        'Pagination requires either baseUrl (for server-side navigation) or onPageChange (for client-side navigation)'
+      );
+    }
+  }, [navigationMode]);
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">

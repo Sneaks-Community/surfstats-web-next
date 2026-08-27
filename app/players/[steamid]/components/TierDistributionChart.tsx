@@ -13,6 +13,7 @@ import {
 } from 'chart.js';
 import { useMemo } from 'react';
 import ChartEmptyState from '@/components/ChartEmptyState';
+import { useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(
   RadialLinearScale,
@@ -35,6 +36,7 @@ interface TierDistributionChartProps {
 
 
 export default function TierDistributionChart({ data }: TierDistributionChartProps) {
+  const chartTheme = useChartTheme();
   // Ensure data is an array and handle edge cases
   const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
 
@@ -100,10 +102,10 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
         },
       },
       tooltip: {
-        backgroundColor: 'rgba(30, 41, 59, 0.95)',
-        titleColor: '#f8fafc',
-        bodyColor: '#e2e8f0',
-        borderColor: 'rgba(148, 163, 184, 0.5)',
+        backgroundColor: chartTheme.surface,
+        titleColor: chartTheme.text,
+        bodyColor: chartTheme.textMuted,
+        borderColor: chartTheme.border,
         borderWidth: 1,
         cornerRadius: 8,
         padding: 12,
@@ -130,13 +132,13 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
     scales: {
       r: {
         angleLines: {
-          color: 'rgba(148, 163, 184, 0.2)',
+          color: chartTheme.grid,
         },
         grid: {
-          color: 'rgba(148, 163, 184, 0.2)',
+          color: chartTheme.grid,
         },
         pointLabels: {
-          color: '#94a3b8',
+          color: chartTheme.textMuted,
           font: {
             size: 12,
           },
@@ -152,7 +154,7 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
         ) * 1.1, // Add 10% padding for visual clarity
       },
     },
-  }), [safeData]);
+  }), [safeData, chartTheme]);
 
   // Summary stats for the info panel
   const summaryInfo = useMemo(() => {

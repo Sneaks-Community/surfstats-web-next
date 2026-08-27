@@ -9,6 +9,7 @@ import {
   Legend,
 } from 'chart.js';
 import { useMemo, useState } from 'react';
+import { useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -30,6 +31,7 @@ const SEGMENTS = [
 ] as const;
 
 export default function CompletionBreakdownChart({ counts }: CompletionBreakdownChartProps) {
+  const chartTheme = useChartTheme();
   const values = useMemo(
     () => [counts.maps, counts.bonuses, counts.stages],
     [counts.maps, counts.bonuses, counts.stages]
@@ -50,7 +52,7 @@ export default function CompletionBreakdownChart({ counts }: CompletionBreakdown
           data: values,
           backgroundColor: SEGMENTS.map((s) => s.color),
           // 2px surface gap between segments (dataviz mark spec).
-          borderColor: 'rgba(30, 41, 59, 0)',
+          borderColor: 'transparent',
           borderWidth: 2,
           hoverOffset: 4,
         },
@@ -77,14 +79,14 @@ export default function CompletionBreakdownChart({ counts }: CompletionBreakdown
             boxHeight: 8,
             padding: 12,
             font: { size: 11 },
-            color: '#94a3b8',
+            color: chartTheme.textMuted,
           },
         },
         tooltip: {
-          backgroundColor: 'rgba(30, 41, 59, 0.95)',
-          titleColor: '#f8fafc',
-          bodyColor: '#e2e8f0',
-          borderColor: 'rgba(148, 163, 184, 0.5)',
+          backgroundColor: chartTheme.surface,
+          titleColor: chartTheme.text,
+          bodyColor: chartTheme.textMuted,
+          borderColor: chartTheme.border,
           borderWidth: 1,
           cornerRadius: 8,
           padding: 12,
@@ -100,7 +102,7 @@ export default function CompletionBreakdownChart({ counts }: CompletionBreakdown
         },
       },
     }),
-    [total]
+    [total, chartTheme]
   );
 
   return (

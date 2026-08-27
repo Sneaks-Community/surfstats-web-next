@@ -16,6 +16,7 @@ import {
   ArcElement,
 } from 'chart.js';
 import { useMemo } from 'react';
+import { useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(
   CategoryScale,
@@ -95,7 +96,11 @@ const hslToRgba = (hsl: string, opacity: number): string => {
   return `rgba(${r8}, ${g8}, ${b8}, ${opacity})`;
 };
 
+/** Year boundary for a `YYYY-MM-DD` bucket label. */
+const isJanuary = (label: string | undefined): boolean => label?.split('-')[1] === '01';
+
 export default function CompletionsOverTimeChart({ data, bonusData }: CompletionsOverTimeChartProps) {
+  const chartTheme = useChartTheme();
   const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
   const safeBonusData: BonusTimeSeriesData = useMemo(() => bonusData, [bonusData]);
 
@@ -195,7 +200,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
           display: true,
           position: 'top' as const,
           labels: {
-            color: '#94a3b8',
+            color: chartTheme.textMuted,
             font: {
               size: 12,
             },
@@ -204,10 +209,10 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
           },
         },
         tooltip: {
-          backgroundColor: 'rgba(30, 41, 59, 0.95)',
-          titleColor: '#f8fafc',
-          bodyColor: '#e2e8f0',
-          borderColor: 'rgba(148, 163, 184, 0.5)',
+          backgroundColor: chartTheme.surface,
+          titleColor: chartTheme.text,
+          bodyColor: chartTheme.textMuted,
+          borderColor: chartTheme.border,
           borderWidth: 1,
           cornerRadius: 8,
           padding: 12,
@@ -242,19 +247,20 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
       scales: {
         x: {
           grid: {
-            // Only show grid lines at year boundaries (every 12 months)
+            // Grid line at each January. Every-12th-index would only line up
+            // with year boundaries when the series happens to start in January.
             color: (ctx) => {
-              // Only draw grid line at year boundaries (index divisible by 12)
-              // Use any to access the index property since Chart.js types don't include it
+              // Chart.js types don't expose the tick index.
               const ctxAny = ctx as { tick?: { index?: number } };
-              if (ctxAny.tick && typeof ctxAny.tick.index === 'number' && ctxAny.tick.index % 12 === 0) {
-                return 'rgba(148, 163, 184, 0.2)';
+              const index = ctxAny.tick?.index;
+              if (typeof index === 'number' && isJanuary(labels[index])) {
+                return chartTheme.grid;
               }
               return 'transparent';
             },
           },
           ticks: {
-            color: '#94a3b8',
+            color: chartTheme.textMuted,
             font: {
               size: 12,
             },
@@ -271,17 +277,9 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
               if (parts.length !== 3) return date;
               const year = parseInt(parts[0], 10);
               
-              // Calculate total months in the dataset
-              const totalMonths = labels.length;
-              
-              // If more than ~24 months visible, show only years (once per year)
-              if (totalMonths > 24) {
-                // Show year label every 12 months (once per year)
-                // Index 0 is Jan 2017, index 12 is Jan 2018, etc.
-                if (index % 12 === 0) {
-                  return year.toString();
-                }
-                return '';
+              // Past ~24 months the months crowd, so label years only.
+              if (labels.length > 24) {
+                return isJanuary(date) ? year.toString() : '';
               }
               // Otherwise show month/year
               return formatDate(date);
@@ -293,10 +291,10 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
           min: 1,
           max: yAxisMax,
           grid: {
-            color: 'rgba(148, 163, 184, 0.2)',
+            color: chartTheme.grid,
           },
           ticks: {
-            color: '#94a3b8',
+            color: chartTheme.textMuted,
             font: {
               size: 12,
             },
@@ -322,7 +320,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
         intersect: false,
       },
     };
-  }, [chartData, labels.length, maxCount]);
+  }, [chartData, labels, maxCount, chartTheme]);
 
   if (safeData.length === 0) {
     return (

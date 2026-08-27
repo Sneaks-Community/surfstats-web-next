@@ -11,10 +11,19 @@ interface MapImageProps extends Omit<ImageProps, 'onError'> {
 
 export default function MapImage({ src, alt, fallbackSrc, unoptimized = false, ...props }: MapImageProps) {
   const [error, setError] = useState(false);
+  const [fallbackError, setFallbackError] = useState(false);
 
   if (error) {
-    if (fallbackSrc) {
-      return <Image src={fallbackSrc} alt={alt} unoptimized={unoptimized} {...props} />;
+    if (fallbackSrc && !fallbackError) {
+      return (
+        <Image
+          src={fallbackSrc}
+          alt={alt}
+          unoptimized={unoptimized}
+          onError={() => setFallbackError(true)}
+          {...props}
+        />
+      );
     }
     return <div className={`bg-zinc-800 flex items-center justify-center ${props.className || ''}`} style={props.style} />;
   }

@@ -15,6 +15,7 @@ import {
   ArcElement,
 } from 'chart.js';
 import { useMemo } from 'react';
+import { useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(
   CategoryScale,
@@ -50,6 +51,7 @@ interface CheckpointTimesChartProps {
 }
 
 export default function CheckpointTimesChart({ data, wrData, finishTime, isStageMap = false }: CheckpointTimesChartProps) {
+  const chartTheme = useChartTheme();
   const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
   const safeWRData = useMemo(() => Array.isArray(wrData) ? wrData : [], [wrData]);
   const safeFinishTime = useMemo(() => finishTime || { avgTime: null, wrTime: null }, [finishTime]);
@@ -133,7 +135,7 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
         display: true,
         position: 'top',
         labels: {
-          color: '#94a3b8',
+          color: chartTheme.textMuted,
           font: {
             size: 12,
           },
@@ -144,10 +146,10 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
         },
       },
       tooltip: {
-        backgroundColor: 'rgba(30, 41, 59, 0.95)',
-        titleColor: '#f8fafc',
-        bodyColor: '#e2e8f0',
-        borderColor: 'rgba(148, 163, 184, 0.5)',
+        backgroundColor: chartTheme.surface,
+        titleColor: chartTheme.text,
+        bodyColor: chartTheme.textMuted,
+        borderColor: chartTheme.border,
         borderWidth: 1,
         cornerRadius: 8,
         padding: 12,
@@ -201,7 +203,7 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
           display: false,
         },
         ticks: {
-          color: '#94a3b8',
+          color: chartTheme.textMuted,
           font: {
             size: 11,
           },
@@ -211,10 +213,10 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
       y: {
         beginAtZero: true,
         grid: {
-          color: 'rgba(148, 163, 184, 0.2)',
+          color: chartTheme.grid,
         },
         ticks: {
-          color: '#94a3b8',
+          color: chartTheme.textMuted,
           font: {
             size: 12,
           },
@@ -226,7 +228,7 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
       mode: 'index' as const,
       intersect: false,
     },
-  }), [wrData]);
+  }), [wrData, chartTheme]);
 
   if (safeData.length === 0) {
     return (

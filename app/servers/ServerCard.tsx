@@ -18,11 +18,20 @@ function formatTime(seconds?: number) {
   return `${hours}h ${remainingMins}m`;
 }
 
+/** Links the thumbnail only when the server reported a map. */
+function MapThumb({ href, className, children }: { href: string | null; className: string; children: React.ReactNode }) {
+  if (!href) return <div className={className}>{children}</div>;
+  return <Link href={href} className={className}>{children}</Link>;
+}
+
 export default function ServerCard({ server, mapImagesUrl }: { server: ServerStatus; mapImagesUrl: string }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const address = `${server.config.ip}:${server.config.port}`;
+  // gamedig can report an online server with no current map; a link built from
+  // it lands on /maps/undefined.
+  const mapHref = server.map ? `/maps/${server.map}` : null;
   // Unique per card so aria-controls resolves and ids don't collide across cards.
   const panelId = `server-details-${server.config.ip}-${server.config.port}`;
 
@@ -100,9 +109,13 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
         {server.online ? (
           <div className="relative flex items-center gap-4 sm:gap-6 pointer-events-none">
             <div className="hidden sm:block text-right">
-              <MapLinkWithPreview mapname={server.map ?? 'unknown'} className="pointer-events-auto text-sm font-medium text-primary hover:underline block">
-                {server.map ?? 'Unknown Map'}
-              </MapLinkWithPreview>
+              {server.map ? (
+                <MapLinkWithPreview mapname={server.map} className="pointer-events-auto text-sm font-medium text-primary hover:underline block">
+                  {server.map}
+                </MapLinkWithPreview>
+              ) : (
+                <span className="text-sm font-medium text-text-placeholder">Unknown Map</span>
+              )}
               <div className="text-[10px] uppercase tracking-wider text-text-placeholder mt-0.5">Map</div>
             </div>
             
@@ -136,9 +149,13 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
           <div className="sm:hidden flex items-center justify-between p-4 border-b border-border/50 bg-surface-hover/20">
             <div>
               <div className="text-[10px] uppercase tracking-wider text-text-placeholder mb-1">Map</div>
-              <Link href={`/maps/${server.map}`} className="text-sm font-medium text-primary hover:underline">
-                {server.map}
-              </Link>
+              {server.map ? (
+                <Link href={`/maps/${server.map}`} className="text-sm font-medium text-primary hover:underline">
+                  {server.map}
+                </Link>
+              ) : (
+                <span className="text-sm font-medium text-text-placeholder">Unknown</span>
+              )}
             </div>
             <div className="text-right">
               <div className="text-[10px] uppercase tracking-wider text-text-placeholder mb-1">Players</div>
@@ -151,7 +168,7 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
           {/* Map Image Section */}
           <div className="p-4 border-b border-border/50">
             <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <Link href={`/maps/${server.map}`} className="relative h-24 w-40 rounded-lg overflow-hidden border border-border/50 bg-surface-hover flex-shrink-0 hover:border-primary/50 transition-colors">
+              <MapThumb href={mapHref} className="relative h-24 w-40 rounded-lg overflow-hidden border border-border/50 bg-surface-hover flex-shrink-0 hover:border-primary/50 transition-colors">
                 <MapImage
                   src={mapImageUrl(mapImagesUrl, server.map)}
                   alt={server.map ?? 'Unknown Map'}
@@ -160,12 +177,16 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
                   className="object-cover"
                   referrerPolicy="no-referrer"
                 />
-              </Link>
+              </MapThumb>
               <div className="flex-1">
                 <div className="text-[10px] uppercase tracking-wider text-text-placeholder mb-1">Current Map</div>
-                <Link href={`/maps/${server.map}`} className="text-lg font-semibold text-primary hover:underline">
-                  {server.map}
-                </Link>
+                {server.map ? (
+                  <Link href={`/maps/${server.map}`} className="text-lg font-semibold text-primary hover:underline">
+                    {server.map}
+                  </Link>
+                ) : (
+                  <span className="text-lg font-semibold text-text-placeholder">Unknown Map</span>
+                )}
               </div>
             </div>
           </div>

@@ -85,11 +85,12 @@ export default function MapLinkWithPreview({
       timeoutRef.current = null;
     }
     
-    // Fade out
+    // Same ref as the show delay, so the unmount cleanup below clears
+    // whichever of the two is pending.
     setIsFadingIn(false);
-    // Wait for fade-out transition before removing from DOM
-    setTimeout(() => {
+    timeoutRef.current = setTimeout(() => {
       setIsVisible(false);
+      timeoutRef.current = null;
     }, 150);
   }, []);
 

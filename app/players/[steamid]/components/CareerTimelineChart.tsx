@@ -12,6 +12,7 @@ import {
 } from 'chart.js';
 import { useMemo } from 'react';
 import ChartEmptyState from '@/components/ChartEmptyState';
+import { useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -66,6 +67,7 @@ const bucketLabel = (index: number, gran: Granularity): string => {
 };
 
 export default function CareerTimelineChart({ data }: CareerTimelineChartProps) {
+  const chartTheme = useChartTheme();
   const { chartData, options } = useMemo(() => {
     const dated = data
       .map((d) => ({ tier: d.tier, date: new Date(d.date) }))
@@ -126,14 +128,14 @@ export default function CareerTimelineChart({ data }: CareerTimelineChartProps) 
             boxWidth: 8,
             boxHeight: 8,
             font: { size: 11 },
-            color: '#94a3b8',
+            color: chartTheme.textMuted,
           },
         },
         tooltip: {
-          backgroundColor: 'rgba(30, 41, 59, 0.95)',
-          titleColor: '#f8fafc',
-          bodyColor: '#e2e8f0',
-          borderColor: 'rgba(148, 163, 184, 0.5)',
+          backgroundColor: chartTheme.surface,
+          titleColor: chartTheme.text,
+          bodyColor: chartTheme.textMuted,
+          borderColor: chartTheme.border,
           borderWidth: 1,
           cornerRadius: 8,
           padding: 12,
@@ -153,19 +155,19 @@ export default function CareerTimelineChart({ data }: CareerTimelineChartProps) 
         x: {
           stacked: true,
           grid: { display: false },
-          ticks: { color: '#94a3b8', font: { size: 10 }, maxRotation: 0, maxTicksLimit: 12 },
+          ticks: { color: chartTheme.textMuted, font: { size: 10 }, maxRotation: 0, maxTicksLimit: 12 },
         },
         y: {
           stacked: true,
           beginAtZero: true,
-          grid: { color: 'rgba(148, 163, 184, 0.15)' },
-          ticks: { color: '#94a3b8', font: { size: 11 }, precision: 0 },
+          grid: { color: chartTheme.grid },
+          ticks: { color: chartTheme.textMuted, font: { size: 11 }, precision: 0 },
         },
       },
     };
 
     return { chartData, options };
-  }, [data]);
+  }, [data, chartTheme]);
 
   if (!chartData) {
     return <ChartEmptyState title="Career Timeline" message="No completions" />;

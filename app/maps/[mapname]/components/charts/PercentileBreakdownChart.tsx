@@ -10,6 +10,7 @@ import {
   Tooltip,
 } from 'chart.js';
 import { useMemo } from 'react';
+import { useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip);
 
@@ -53,6 +54,7 @@ const formatTime = (seconds: number): string => {
 };
 
 export default function PercentileBreakdownChart({ data }: PercentileBreakdownChartProps) {
+  const chartTheme = useChartTheme();
   const hasData = useMemo(() => {
     if (!data) return false;
     return data.wrTime !== null || data.p1Time !== null || data.p10Time !== null ||
@@ -89,10 +91,10 @@ export default function PercentileBreakdownChart({ data }: PercentileBreakdownCh
         display: false,
       },
       tooltip: {
-        backgroundColor: 'rgba(30, 41, 59, 0.95)',
-        titleColor: '#f8fafc',
-        bodyColor: '#e2e8f0',
-        borderColor: 'rgba(148, 163, 184, 0.5)',
+        backgroundColor: chartTheme.surface,
+        titleColor: chartTheme.text,
+        bodyColor: chartTheme.textMuted,
+        borderColor: chartTheme.border,
         borderWidth: 1,
         cornerRadius: 8,
         padding: 12,
@@ -122,10 +124,10 @@ export default function PercentileBreakdownChart({ data }: PercentileBreakdownCh
       x: {
         beginAtZero: true,
         grid: {
-          color: 'rgba(148, 163, 184, 0.15)',
+          color: chartTheme.grid,
         },
         ticks: {
-          color: '#94a3b8',
+          color: chartTheme.textMuted,
           font: {
             size: 11,
           },
@@ -135,7 +137,7 @@ export default function PercentileBreakdownChart({ data }: PercentileBreakdownCh
         title: {
           display: true,
           text: 'Time (seconds)',
-          color: '#94a3b8',
+          color: chartTheme.textMuted,
           font: {
             size: 12,
           },
@@ -146,7 +148,7 @@ export default function PercentileBreakdownChart({ data }: PercentileBreakdownCh
           display: false,
         },
         ticks: {
-          color: '#94a3b8',
+          color: chartTheme.textMuted,
           font: {
             size: 12,
             weight: 600,
@@ -154,7 +156,7 @@ export default function PercentileBreakdownChart({ data }: PercentileBreakdownCh
         },
       },
     },
-  }), []);
+  }), [chartTheme]);
 
   return (
     <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">

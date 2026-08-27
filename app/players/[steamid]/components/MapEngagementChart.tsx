@@ -11,6 +11,7 @@ import {
 } from 'chart.js';
 import { useMemo } from 'react';
 import type { MapEngagementPoint } from '@/lib/player-analytics';
+import { useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(LinearScale, PointElement, Tooltip, Legend);
 
@@ -27,6 +28,7 @@ const PALETTE = [
 ];
 
 export default function MapEngagementChart({ data }: MapEngagementChartProps) {
+  const chartTheme = useChartTheme();
   const chartData = useMemo(() => {
     const maxAvg = Math.max(...data.map((d) => d.avgMinutes), 1);
     return {
@@ -59,10 +61,10 @@ export default function MapEngagementChart({ data }: MapEngagementChartProps) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: 'rgba(30, 41, 59, 0.95)',
-          titleColor: '#f8fafc',
-          bodyColor: '#e2e8f0',
-          borderColor: 'rgba(148, 163, 184, 0.5)',
+          backgroundColor: chartTheme.surface,
+          titleColor: chartTheme.text,
+          bodyColor: chartTheme.textMuted,
+          borderColor: chartTheme.border,
           borderWidth: 1,
           cornerRadius: 8,
           padding: 12,
@@ -84,20 +86,20 @@ export default function MapEngagementChart({ data }: MapEngagementChartProps) {
       },
       scales: {
         x: {
-          title: { display: true, text: 'Sessions', color: '#94a3b8', font: { size: 11 } },
+          title: { display: true, text: 'Sessions', color: chartTheme.textMuted, font: { size: 11 } },
           beginAtZero: true,
-          grid: { color: 'rgba(148, 163, 184, 0.15)' },
-          ticks: { color: '#94a3b8', font: { size: 10 }, precision: 0 },
+          grid: { color: chartTheme.grid },
+          ticks: { color: chartTheme.textMuted, font: { size: 10 }, precision: 0 },
         },
         y: {
-          title: { display: true, text: 'Hours', color: '#94a3b8', font: { size: 11 } },
+          title: { display: true, text: 'Hours', color: chartTheme.textMuted, font: { size: 11 } },
           beginAtZero: true,
-          grid: { color: 'rgba(148, 163, 184, 0.15)' },
-          ticks: { color: '#94a3b8', font: { size: 10 } },
+          grid: { color: chartTheme.grid },
+          ticks: { color: chartTheme.textMuted, font: { size: 10 } },
         },
       },
     }),
-    [avgByMap]
+    [avgByMap, chartTheme]
   );
 
   return (

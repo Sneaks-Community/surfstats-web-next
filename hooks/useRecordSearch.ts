@@ -67,7 +67,7 @@ export function useRecordSearch<T>({
 }: RecordSearchOptions<T>): RecordSearch<T> {
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<T[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
+  const [settledUrl, setSettledUrl] = useState<string | null>(null);
   const [error, setError] = useState<LoadError | null>(null);
   const [page, setPage] = useState(1);
   const [retryToken, setRetryToken] = useState(0);
@@ -75,50 +75,56 @@ export function useRecordSearch<T>({
   const debouncedQuery = useDebounce(query, 400);
   const requestUrl = debouncedQuery.length >= MIN_SEARCH_LENGTH ? url(debouncedQuery) : null;
 
+  // Derived, not stored: typing "abcd" and deleting back to the loaded "abc"
+  // leaves the request URL unchanged, so an eagerly-set flag never cleared.
+  const isSearching =
+    query.length >= MIN_SEARCH_LENGTH && (query !== debouncedQuery || requestUrl !== settledUrl);
+
   useEffect(() => {
     if (!requestUrl) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- Clearing stale results when the query drops below the threshold
       setResults([]);
-      setIsSearching(false);
       return;
     }
 
     const controller = new AbortController();
-    setIsSearching(true);
     setError(null);
     fetchJson<RecordSearchResponse<T>>(requestUrl, { signal: controller.signal })
       .then((data) => {
         setResults(data[rowsKey] ?? []);
         setPage(1);
+        setSettledUrl(requestUrl);
       })
       .catch((err: unknown) => {
+        // An abort means a newer request is already in flight; leave the
+        // spinner to that one.
         if (!isAbortError(err)) {
           clientError(`[${label}] Search failed: ${getErrorMessage(err)}`);
           setResults([]);
-          setError({ message: getErrorMessage(err), retry: () => setRetryToken((t) => t + 1) });
+          setError({
+            message: getErrorMessage(err),
+            // Clearing settledUrl puts the spinner back for the retry.
+            retry: () => {
+              setSettledUrl(null);
+              setRetryToken((t) => t + 1);
+            },
+          });
+          setSettledUrl(requestUrl);
         }
-      })
-      .finally(() => setIsSearching(false));
+      });
     return () => controller.abort();
   }, [requestUrl, rowsKey, label, retryToken]);
 
   const onChange = (value: string) => {
     setQuery(value);
     setPage(1);
-    // Show the spinner on keypress; the debounced effect fires 400 ms later.
-    if (value.length >= MIN_SEARCH_LENGTH) {
-      setIsSearching(true);
-    } else {
-      setIsSearching(false);
-      setResults([]);
-    }
+    if (value.length < MIN_SEARCH_LENGTH) setResults([]);
   };
 
   const clear = () => {
     setQuery('');
     setPage(1);
     setResults([]);
-    setIsSearching(false);
   };
 
   return {

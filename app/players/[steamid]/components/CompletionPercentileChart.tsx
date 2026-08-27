@@ -14,6 +14,7 @@ import {
 } from 'chart.js';
 import { useMemo } from 'react';
 import ChartEmptyState from '@/components/ChartEmptyState';
+import { useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(
   CategoryScale,
@@ -107,6 +108,7 @@ const getMovingAvgWindowSize = (granularity: AggregationGranularity): number => 
 };
 
 export default function CompletionPercentileChart({ data }: CompletionPercentileChartProps) {
+  const chartTheme = useChartTheme();
   const safeData = useMemo(() => {
     if (!Array.isArray(data)) return [];
     // Sort by date ascending (oldest first)
@@ -251,14 +253,14 @@ export default function CompletionPercentileChart({ data }: CompletionPercentile
           font: {
             size: 11,
           },
-          color: '#94a3b8',
+          color: chartTheme.textMuted,
         },
       },
       tooltip: {
-        backgroundColor: 'rgba(30, 41, 59, 0.95)',
-        titleColor: '#f8fafc',
-        bodyColor: '#e2e8f0',
-        borderColor: 'rgba(148, 163, 184, 0.5)',
+        backgroundColor: chartTheme.surface,
+        titleColor: chartTheme.text,
+        bodyColor: chartTheme.textMuted,
+        borderColor: chartTheme.border,
         borderWidth: 1,
         cornerRadius: 8,
         padding: 12,
@@ -287,7 +289,7 @@ export default function CompletionPercentileChart({ data }: CompletionPercentile
           display: false,
         },
         ticks: {
-          color: '#94a3b8',
+          color: chartTheme.textMuted,
           font: {
             size: 10,
           },
@@ -299,10 +301,10 @@ export default function CompletionPercentileChart({ data }: CompletionPercentile
         min: yMin,
         max: 100,
         grid: {
-          color: 'rgba(148, 163, 184, 0.15)',
+          color: chartTheme.grid,
         },
         ticks: {
-          color: '#94a3b8',
+          color: chartTheme.textMuted,
           font: {
             size: 11,
           },
@@ -311,7 +313,7 @@ export default function CompletionPercentileChart({ data }: CompletionPercentile
         },
       },
     },
-  }), [yMin]);
+  }), [yMin, chartTheme]);
 
   // Calculate summary stats
   const summaryStats = useMemo(() => {
