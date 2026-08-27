@@ -84,14 +84,16 @@ export function apiError(
   clientMessage: string,
   status = 500
 ): NextResponse {
-  logger.error(`${logLabel}: ${getErrorMessage(error)}`);
-  // Cache down (mirrors the proxy's 503 for the post-gate race) or the DB
-  // queue full: both are "come back shortly", not a failure of this request.
+  // Cache down (mirrors the proxy's 503 for the post-gate race) or the DB queue
+  // full: both are "come back shortly", not a failure of this request. Not
+  // logged here, since a flood would write one line per rejection; the cache and
+  // the semaphore each report their own episode once, with a count.
   if (error instanceof CacheUnavailableError || error instanceof DbBusyError) {
     return NextResponse.json(
       { error: 'Service temporarily unavailable' },
       { status: 503, headers: { 'Retry-After': '5' } }
     );
   }
+  logger.error(`${logLabel}: ${getErrorMessage(error)}`);
   return NextResponse.json({ error: clientMessage }, { status });
 }
