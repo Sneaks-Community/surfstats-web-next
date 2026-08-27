@@ -90,8 +90,20 @@ export default defineConfig(
       "@typescript-eslint/no-unsafe-argument": "off",
       "@typescript-eslint/no-unsafe-return": "off",
 
-      "jsx-a11y/alt-text": "warn",
-      "jsx-a11y/aria-props": "warn",
+      // Hand-rolled interactive markup is the norm here, so the structural
+      // a11y rules are errors: they catch a div with onClick, a role missing
+      // its required props, and interactive elements nested inside a button.
+      "jsx-a11y/alt-text": "error",
+      "jsx-a11y/aria-props": "error",
+      "jsx-a11y/aria-role": "error",
+      "jsx-a11y/anchor-is-valid": "error",
+      "jsx-a11y/click-events-have-key-events": "error",
+      "jsx-a11y/interactive-supports-focus": "error",
+      "jsx-a11y/no-noninteractive-element-interactions": "error",
+      "jsx-a11y/no-redundant-roles": "error",
+      "jsx-a11y/no-static-element-interactions": "error",
+      "jsx-a11y/role-has-required-aria-props": "error",
+      "jsx-a11y/tabindex-no-positive": "error",
       "react/no-unescaped-entities": "off",
 
       "react-hooks/exhaustive-deps": "warn",
