@@ -65,6 +65,20 @@ const optionalSchema = z.object({
   PLAYERS_LIST_WARM_INTERVAL_MS: z.coerce.number().int().positive().optional(),
   // Comma-separated extra origins allowed to call the API (own origin always allowed).
   ALLOWED_ORIGINS: z.string().optional(),
+  // Valkey cache (see lib/valkey.ts). The cache is fail-closed, so a typo here
+  // reads as a whole-site outage unless it's caught at boot.
+  VALKEY_URL: z
+    .url({ protocol: /^rediss?$/, error: 'VALKEY_URL must be a redis:// or rediss:// URL' })
+    .optional(),
+  VALKEY_USERNAME: z.string().min(1).optional(),
+  VALKEY_PASSWORD: z.string().min(1).optional(),
+  // Read as `=== 'true'` / `!== 'false'`, so anything else silently means the
+  // opposite of what the operator wrote.
+  VALKEY_TLS: z.enum(['true', 'false'], "VALKEY_TLS must be 'true' or 'false'").optional(),
+  VALKEY_TLS_REJECT_UNAUTHORIZED: z
+    .enum(['true', 'false'], "VALKEY_TLS_REJECT_UNAUTHORIZED must be 'true' or 'false'")
+    .optional(),
+  VALKEY_CONNECT_TIMEOUT: z.coerce.number().int().positive().optional(),
   // Client-IP header (see lib/client-ip.ts). A typo would collapse every caller
   // into one rate-limit bucket, so shape-check it.
   TRUSTED_CLIENT_IP_HEADER: z

@@ -90,4 +90,17 @@ describe('validateEnv', () => {
       /NEXT_PUBLIC_SITE_URL is required/
     );
   });
+
+  // The cache is fail-closed, so a bad VALKEY_* value looks like a site outage
+  // rather than a config error unless it's rejected here.
+  it('rejects malformed VALKEY_* values', async () => {
+    await expect(validate({ VALKEY_URL: 'localhost:6379' })).rejects.toThrow(/VALKEY_URL/);
+    await expect(validate({ VALKEY_TLS: 'yes' })).rejects.toThrow(/VALKEY_TLS/);
+    await expect(validate({ VALKEY_CONNECT_TIMEOUT: 'soon' })).rejects.toThrow(
+      /VALKEY_CONNECT_TIMEOUT/
+    );
+    await expect(
+      validate({ VALKEY_URL: 'rediss://cache:6379', VALKEY_TLS: 'true', VALKEY_CONNECT_TIMEOUT: '2000' })
+    ).resolves.toBeUndefined();
+  });
 });
