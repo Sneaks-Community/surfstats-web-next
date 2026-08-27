@@ -1,14 +1,37 @@
 import 'server-only';
 import client from './valkey';
 import logger from './logger';
+import { getErrorMessage } from './errors';
 
-// ============================================================
-// CACHE OPERATIONS
-// ============================================================
+// A failing-but-connected cache sends every request to the DB uncached, so it
+// must be logged, but per-call would be one line per query.
+const FAILURE_LOG_WINDOW_MS = 60_000;
+const failures = new Map<string, { nextLogAt: number; suppressed: number }>();
 
-/**
- * Get a value from cache
- */
+/** Valkey replies lead with a code (OOM, READONLY); client errors only have a class name. */
+function failureKind(error: unknown): string {
+  const message = getErrorMessage(error);
+  return message.match(/^[A-Z]{3,}\b/)?.[0] ?? (error as { name?: string }).name ?? 'Unknown';
+}
+
+function logCacheFailure(op: string, error: unknown): void {
+  const kind = failureKind(error);
+  const now = Date.now();
+  const state = failures.get(kind) ?? { nextLogAt: 0, suppressed: 0 };
+
+  if (now < state.nextLogAt) {
+    state.suppressed++;
+    failures.set(kind, state);
+    return;
+  }
+
+  const also = state.suppressed
+    ? ` (+${state.suppressed} more in the last ${FAILURE_LOG_WINDOW_MS / 1000}s)`
+    : '';
+  failures.set(kind, { nextLogAt: now + FAILURE_LOG_WINDOW_MS, suppressed: 0 });
+  logger.warn(`[Cache] ${op} failed: ${getErrorMessage(error)}${also}`);
+}
+
 export async function cacheGet<T>(key: string): Promise<T | null> {
   try {
     const cached = await client.get(key);
@@ -20,18 +43,15 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
     const value = JSON.parse(cached) as T;
     logger.debug(`[Cache] Hit: ${key}`);
     return value;
-  } catch {
+  } catch (error) {
+    logCacheFailure('GET', error);
     return null;
   }
 }
 
 /**
- * Get a value from cache along with its remaining TTL (in milliseconds).
- *
- * Used by the early-expiration logic in {@link cachedFetch}, which needs to
- * know how close a hit is to expiring to decide whether to refresh it ahead
- * of time. `ttlMs` follows Valkey's PTTL convention: `-2` = key missing,
- * `-1` = key exists but has no expiry.
+ * Get a value plus its remaining TTL, for {@link cachedFetch}'s early refresh.
+ * `ttlMs` follows PTTL: `-2` = missing, `-1` = no expiry.
  */
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- T is the caller-supplied cached value shape, mirroring cacheGet<T>
 export async function cacheGetWithTtl<T>(
@@ -48,17 +68,15 @@ export async function cacheGetWithTtl<T>(
     }
     logger.debug(`[Cache] Hit: ${key}`);
     return { value: JSON.parse(cached) as T, ttlMs };
-  } catch {
+  } catch (error) {
+    logCacheFailure('GET+PTTL', error);
     return { value: null, ttlMs: -2 };
   }
 }
 
 /**
- * Get many values in one round trip, in the order the keys were given.
- *
- * A per-key {@link cacheGet} loop costs one round trip each, which is what made a
- * 20-row page's avatar lookup 20 serial hops inside the request. Missing and
- * unparseable entries come back as `null`, so callers treat them as misses.
+ * Get many values in one round trip, in key order. Missing and unparseable
+ * entries come back as `null`, so callers treat them as misses.
  */
 export async function cacheGetMany<T>(keys: string[]): Promise<Array<T | null>> {
   if (keys.length === 0) return [];
@@ -73,18 +91,13 @@ export async function cacheGetMany<T>(keys: string[]): Promise<Array<T | null>> 
         return null;
       }
     });
-  } catch {
-    // Treat a cache failure as a miss for every key, same as cacheGet.
+  } catch (error) {
+    logCacheFailure('MGET', error);
     return keys.map(() => null);
   }
 }
 
-/**
- * Set many values in one round trip, all with the same TTL.
- *
- * Pipelined rather than awaited one at a time, for the same reason as
- * {@link cacheGetMany}.
- */
+/** Set many values in one round trip, all with the same TTL. */
 export async function cacheSetMany(
   entries: ReadonlyArray<{ key: string; value: unknown }>,
   ttl: number
@@ -98,21 +111,18 @@ export async function cacheSetMany(
     }
     await multi.exec();
     logger.debug(`[Cache] SET ${entries.length} keys with TTL ${ttl}s`);
-  } catch {
-    // Silently fail - cache is optional
+  } catch (error) {
+    logCacheFailure('MSETEX', error);
   }
 }
 
-/**
- * Set a value in cache
- */
 export async function cacheSet(key: string, value: unknown, ttl: number): Promise<void> {
   try {
     const serialized = JSON.stringify(value);
     await client.setEx(key, ttl, serialized);
     logger.debug(`[Cache] SET ${key} with TTL ${ttl}s`);
-  } catch {
-    // Silently fail - cache is optional
+  } catch (error) {
+    logCacheFailure('SETEX', error);
   }
 }
 
