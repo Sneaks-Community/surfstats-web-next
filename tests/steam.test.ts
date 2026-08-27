@@ -186,6 +186,22 @@ describe('getSteamProfilesFromCache', () => {
       604800
     );
   });
+
+  // The key is in the query string, so a Next data-cache entry would persist a
+  // live credential in .next/cache.
+  it('opts out of the Next data cache so the key never lands on disk', async () => {
+    process.env.STEAM_API_KEY = 'test-key';
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ response: { players: [] } }),
+    } as unknown as Response);
+
+    await getSteamProfilesFromCache(['STEAM_1:0:12345']);
+
+    const init = vi.mocked(fetch).mock.calls[0][1] as RequestInit & { next?: unknown };
+    expect(init.cache).toBe('no-store');
+    expect(init.next).toBeUndefined();
+  });
 });
 
 // The key travels in the query string, and some fetch failures put the

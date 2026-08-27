@@ -73,7 +73,7 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
   try {
     const response = await fetch(
       `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${apiKey}&steamids=${steamId64s.join(',')}`,
-      { next: { revalidate: 604800 } } // Cache for 7 days
+      { cache: 'no-store' }
     );
 
     if (!response.ok) {
