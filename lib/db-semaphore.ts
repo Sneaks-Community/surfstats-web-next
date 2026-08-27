@@ -11,8 +11,8 @@ import logger from './logger';
  * burst into a growing backlog where request #200 waits behind ~33 rounds of
  * multi-second scans and answers a caller that timed out long ago, while still
  * holding its DB work in the queue. Past the bound we shed instead, throwing
- * {@link DbBusyError} for `apiError` to serve as a 503 (or for a `cachedFetch`
- * `onError` fallback), so the queries already running finish quickly.
+ * {@link DbBusyError}, which `apiError` serves as a 503 and `cachedFetch`
+ * rethrows past any `onError`, so the queries already running finish quickly.
  */
 
 const MAX_CONCURRENT = Math.max(
@@ -21,9 +21,9 @@ const MAX_CONCURRENT = Math.max(
 );
 
 /**
- * How many callers may wait for a slot. At the default 2x the concurrency, the
- * worst-case wait is ~2 query durations, which keeps the tail latency inside
- * what a client will still be listening for.
+ * How many callers may wait for a slot. At the default 2x the concurrency the
+ * worst-case wait is ~2 query durations, so the tail is only as bounded as
+ * `DB_STATEMENT_TIMEOUT_MS`: raise that and this queue grows the tail with it.
  */
 const MAX_QUEUED = Math.max(
   1,
@@ -32,8 +32,12 @@ const MAX_QUEUED = Math.max(
 
 let active = 0;
 const waiters: Array<() => void> = [];
-/** One warn per overload episode instead of one per shed request. */
+// Two warns per overload episode, not one per shed request: the open names the
+// episode, the close counts it. Nothing else logs a shed, since `DbBusyError`
+// travels past `onError` untouched.
 let shedding = false;
+let shedCount = 0;
+let shedStartedAt = 0;
 
 function acquire(): Promise<void> {
   if (active < MAX_CONCURRENT) {
@@ -43,10 +47,13 @@ function acquire(): Promise<void> {
   if (waiters.length >= MAX_QUEUED) {
     if (!shedding) {
       shedding = true;
+      shedCount = 0;
+      shedStartedAt = Date.now();
       logger.warn(
         `[DB] Expensive-query queue full (${active} running, ${waiters.length} waiting), shedding requests`
       );
     }
+    shedCount++;
     return Promise.reject(new DbBusyError());
   }
   return new Promise<void>((resolve) => {
@@ -61,7 +68,12 @@ function release(): void {
   active--;
   const next = waiters.shift();
   if (next) next();
-  if (waiters.length === 0) shedding = false;
+  if (waiters.length === 0 && shedding) {
+    shedding = false;
+    logger.warn(
+      `[DB] Expensive-query queue drained after ${Date.now() - shedStartedAt}ms, ${shedCount} request(s) shed`
+    );
+  }
 }
 
 /**

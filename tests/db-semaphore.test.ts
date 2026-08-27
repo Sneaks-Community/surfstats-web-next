@@ -1,8 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('../lib/logger', () => ({
-  default: { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() },
-}));
+const logger = { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() };
+vi.mock('../lib/logger', () => ({ default: logger }));
 
 // Read at import time, so they have to be set before the dynamic import below.
 process.env.DB_MAX_CONCURRENT_EXPENSIVE = '1';
@@ -39,6 +38,12 @@ describe('withExpensiveQueryLimit', () => {
 
     // Queue drained, so the next caller is served normally again.
     await expect(withExpensiveQueryLimit(() => Promise.resolve('later'))).resolves.toBe('later');
+
+    // The only per-request record of a shed: DbBusyError travels past onError,
+    // so an unreported count is a silently dropped request.
+    const warns = logger.warn.mock.calls.map((c) => String(c[0]));
+    expect(warns.some((w) => w.includes('shedding requests'))).toBe(true);
+    expect(warns.some((w) => /drained after \d+ms, 1 request\(s\) shed/.test(w))).toBe(true);
   });
 
   it('releases the slot when the query throws', async () => {
