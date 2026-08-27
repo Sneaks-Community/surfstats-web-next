@@ -44,7 +44,7 @@ function processCheckpointData(
   checkpointRows: RowDataPacket[],
   maxCheckpoint: number
 ): CheckpointStatsResult {
-  const checkpointStats = new Map<number, { reached: number; totalTime: number; sampleSize: number }>();
+  const checkpointStats = new Map<number, { totalTime: number; sampleSize: number }>();
 
   for (const row of checkpointRows) {
     for (let i = 1; i <= maxCheckpoint; i++) {
@@ -53,11 +53,10 @@ function processCheckpointData(
 
       if (cpTime !== null && cpTime !== undefined) {
         if (!checkpointStats.has(i)) {
-          checkpointStats.set(i, { reached: 0, totalTime: 0, sampleSize: 0 });
+          checkpointStats.set(i, { totalTime: 0, sampleSize: 0 });
         }
         const stats = checkpointStats.get(i);
         if (stats) {
-          stats.reached += 1;
           stats.totalTime += cpTime as number;
           stats.sampleSize += 1;
         }
@@ -115,18 +114,11 @@ export async function getWRCheckpointTimesFromCache(
         throw new Error('Invalid checkpoint count');
       }
 
-      const validColumns = new Set<string>();
-      for (let i = 1; i <= MAX_CHECKPOINTS; i++) {
-        validColumns.add(`cp${i}`);
-      }
-
+      // Safe to interpolate: every name is built from an integer already bounded
+      // by the check above.
       const checkpointColumns: string[] = [];
       for (let i = 1; i <= maxCheckpoint; i++) {
-        const colName = `cp${i}`;
-        if (!validColumns.has(colName)) {
-          throw new Error(`Invalid checkpoint column: ${colName}`);
-        }
-        checkpointColumns.push(colName);
+        checkpointColumns.push(`cp${i}`);
       }
 
       const [wrCheckpointRows] = await pool.query<RowDataPacket[]>(`
@@ -188,18 +180,11 @@ export async function getCheckpointStatsFromCache(
         throw new Error('Invalid checkpoint count');
       }
 
-      const validColumns = new Set<string>();
-      for (let i = 1; i <= MAX_CHECKPOINTS; i++) {
-        validColumns.add(`cp${i}`);
-      }
-
+      // Safe to interpolate: every name is built from an integer already bounded
+      // by the check above.
       const checkpointColumns: string[] = [];
       for (let i = 1; i <= maxCheckpoint; i++) {
-        const colName = `cp${i}`;
-        if (!validColumns.has(colName)) {
-          throw new Error(`Invalid checkpoint column: ${colName}`);
-        }
-        checkpointColumns.push(colName);
+        checkpointColumns.push(`cp${i}`);
       }
 
       const [checkpointRows] = await pool.query<RowDataPacket[]>(`

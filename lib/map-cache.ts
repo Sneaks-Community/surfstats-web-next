@@ -43,7 +43,7 @@ const QUERY_TIMEOUT_MS = 30000; // 30 seconds - prevents indefinite query hangin
  * Uses JOINs instead of correlated subqueries for better performance
  * Includes timeout protection to prevent indefinite query hanging
  */
-export async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
+async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
   const startTime = Date.now();
   
   try {
@@ -158,7 +158,7 @@ export async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
  * the two never disagree and the join runs once per its own TTL. Same reasoning
  * as {@link getTierDistributionFromCache}; derived, so there's no nested lock.
  */
-export async function getTotals(): Promise<{
+async function getTotals(): Promise<{
   totalMaps: number;
   totalBonuses: number;
   totalStages: number;
