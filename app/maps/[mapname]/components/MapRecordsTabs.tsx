@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import { Trophy, Target, Layers } from 'lucide-react';
 import RecordSearchInput from '@/components/RecordSearchInput';
 import {
@@ -168,7 +168,6 @@ export default function MapRecordsTabs({
   numBonuses,
   numStages,
 }: MapRecordsTabsProps) {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   // Get initial state from URL
@@ -457,9 +456,12 @@ export default function MapRecordsTabs({
     if (sortField !== 'rank') params.set('sort', sortField);
     if (sortDirection !== 'asc') params.set('dir', sortDirection);
 
-    router.replace(`?${params.toString()}`, { scroll: false });
+    const query = params.toString();
+    if (query !== window.location.search.slice(1)) {
+      window.history.replaceState(null, '', `?${query}`);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab, leaderboardPage, selectedBonus, bonusPage, selectedStage, stagePage, mapSearch.debouncedQuery, bonusSearch.debouncedQuery, stageSearch.debouncedQuery, sortField, sortDirection, router]);
+  }, [activeTab, leaderboardPage, selectedBonus, bonusPage, selectedStage, stagePage, mapSearch.debouncedQuery, bonusSearch.debouncedQuery, stageSearch.debouncedQuery, sortField, sortDirection]);
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
