@@ -242,7 +242,7 @@ async function searchPlayersInternal(sanitizedQuery: string): Promise<PlayerSear
   const [rows] = await pool.query<RowDataPacket[]>(`
     SELECT steamid, name, points
     FROM ck_playerrank
-    WHERE name LIKE ? OR steamid LIKE ?
+    WHERE points > 0 AND (name LIKE ? OR steamid LIKE ?)
     ORDER BY points DESC
     LIMIT 10
   `, [`%${sanitizedQuery}%`, `%${sanitizedQuery}%`]);

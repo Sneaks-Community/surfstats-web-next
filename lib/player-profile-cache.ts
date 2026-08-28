@@ -38,7 +38,8 @@ export interface PlayerBasicInfo {
   country: string;
   points: number;
   lastseen: string;
-  rank: number;
+  /** Null for 0-point players: they are excluded from every ranked listing. */
+  rank: number | null;
 }
 
 export interface PlayerMapTime {
@@ -120,10 +121,10 @@ export interface TierDistributionRow {
  *
  * Returns basic player info, the global rank, and per-section completion
  * COUNT(*)s — but none of the expensive full row lists or correlated rank
- * subqueries. The global rank uses `COUNT(DISTINCT points) + 1` (over the rows
- * with strictly more points), which reproduces `DENSE_RANK() OVER (ORDER BY
- * points DESC)` exactly (ties share a rank, no gaps) while scanning far less
- * than a full-table window.
+ * subqueries. The global rank uses `COUNT(*) + 1` over the rows with strictly
+ * more points, reproducing the players list's `RANK() OVER (ORDER BY points
+ * DESC)` (ties share a rank, gaps after) without a full-table window. Players
+ * with 0 points are absent from that list, so their rank is null (Unranked).
  *
  * @param steamid - The player's SteamID
  * @returns Overview data, or null if the SteamID is invalid / player not found
@@ -145,7 +146,9 @@ export async function getPlayerOverviewFromCache(steamid: string, { force }: Ref
         pool.query<RowDataPacket[]>(`
           SELECT
             pr.steamid, pr.name, pr.country, pr.points, pr.lastseen,
-            (SELECT COUNT(DISTINCT points) + 1 FROM ck_playerrank WHERE points > pr.points) as \`rank\`
+            CASE WHEN pr.points > 0
+              THEN (SELECT COUNT(*) + 1 FROM ck_playerrank WHERE points > pr.points)
+            END as \`rank\`
           FROM ck_playerrank pr
           WHERE pr.steamid = ?
         `, [validSteamId]),
@@ -165,9 +168,8 @@ export async function getPlayerOverviewFromCache(steamid: string, { force }: Ref
         country: row.country,
         points: Number(row.points) || 0,
         lastseen: row.lastseen,
-        // COUNT(...) can arrive as a string for BIGINT; coerce so callers get a
-        // real number matching the old DENSE_RANK() value.
-        rank: Number(row.rank) || 1,
+        // COUNT(...) can arrive as a string for BIGINT; null means unranked.
+        rank: row.rank === null ? null : Number(row.rank) || 1,
       };
 
       const [countRows] = await withTimeout(

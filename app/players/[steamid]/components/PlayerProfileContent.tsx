@@ -32,7 +32,7 @@ interface PlayerProfileContentProps {
       country: string;
       points: number;
       lastseen: string;
-      rank: number;
+      rank: number | null;
     };
     counts: {
       maps: number;
@@ -182,7 +182,7 @@ export default async function PlayerProfileContent({
           <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_1fr_2fr] gap-2">
             <div className="bg-surface border border-border rounded-xl p-3 flex flex-col items-center justify-center">
               <Trophy className="w-8 h-8 text-yellow-500 mb-2" />
-              <span className="text-2xl font-bold text-text">#{player.rank}</span>
+              <span className="text-2xl font-bold text-text">{player.rank === null ? 'Unranked' : `#${player.rank}`}</span>
               <span className="text-xs text-text-muted">Global Rank</span>
             </div>
             <div className="bg-surface border border-border rounded-xl p-3 flex flex-col items-center justify-center">

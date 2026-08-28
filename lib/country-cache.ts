@@ -415,15 +415,15 @@ function getPlayerOrderByClause(sort: PlayerSortKey, order: SortOrder): string {
 const getCountriesStatsInternal = async (): Promise<{ totalCountries: number; totalPlayers: number }> => {
   // Throws on failure; the fallback lives in the caller's `onError`, uncached.
   // Countries: distinct resolved ISO codes, matching the ranking list (raw
-  // DISTINCT names over-counted). Players: COUNT(*) over every row, including
-  // unresolved countries — the full player population.
+  // DISTINCT names over-counted). Players: every ranked player, including those
+  // with an unresolved country, matching the points > 0 universe used site-wide.
   const countriesQuery = `
     SELECT country, SUM(points) as total_points
     FROM ck_playerrank
-    WHERE country IS NOT NULL AND country != ''
+    WHERE points > 0 AND country IS NOT NULL AND country != ''
     GROUP BY country
   `;
-  const playersQuery = `SELECT COUNT(*) as total_players FROM ck_playerrank`;
+  const playersQuery = `SELECT COUNT(*) as total_players FROM ck_playerrank WHERE points > 0`;
 
   const [[countryRows], [playerRows]] = await Promise.all([
     pool.query<RowDataPacket[]>(countriesQuery),

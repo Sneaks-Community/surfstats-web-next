@@ -43,6 +43,16 @@ describe('getPlayerOverviewFromCache', () => {
     expect(recordProfileView).not.toHaveBeenCalled();
   });
 
+  // A 0-point player is absent from every ranked listing, so SQL returns a NULL
+  // rank; `Number(null) || 1` would have reported them as rank 1.
+  it('keeps a null rank null', async () => {
+    query.mockResolvedValue([[{ steamid: STEAM_ID, name: 'a', country: 'US', points: 0, lastseen: '', rank: null, maps: 0, bonuses: 0, stages: 0 }]]);
+
+    const overview = await getPlayerOverviewFromCache(STEAM_ID);
+
+    expect(overview?.player.rank).toBeNull();
+  });
+
   it('does not record a player that does not exist', async () => {
     query.mockResolvedValueOnce([[]]);
 
