@@ -119,9 +119,10 @@ export interface TierDistributionRow {
 /**
  * Cheap player overview for the server-rendered Overview tab.
  *
- * Returns basic player info, the global rank, and per-section completion
- * COUNT(*)s — but none of the expensive full row lists or correlated rank
- * subqueries. The global rank uses `COUNT(*) + 1` over the rows with strictly
+ * Returns basic player info, the global rank, and per-section completion counts
+ * in one round trip — but none of the expensive full row lists or correlated
+ * rank subqueries. Maps completed is `ck_playerrank.finishedmaps` off the row
+ * being read; bonuses and stages are scalar `COUNT(*)` subqueries. The global rank uses `COUNT(*) + 1` over the rows with strictly
  * more points, reproducing the players list's `RANK() OVER (ORDER BY points
  * DESC)` (ties share a rank, gaps after) without a full-table window. Players
  * with 0 points are absent from that list, so their rank is null (Unranked).
@@ -146,9 +147,12 @@ export async function getPlayerOverviewFromCache(steamid: string, { force }: Ref
         pool.query<RowDataPacket[]>(`
           SELECT
             pr.steamid, pr.name, pr.country, pr.points, pr.lastseen,
+            pr.finishedmaps as maps,
             CASE WHEN pr.points > 0
               THEN (SELECT COUNT(*) + 1 FROM ck_playerrank WHERE points > pr.points)
-            END as \`rank\`
+            END as \`rank\`,
+            (SELECT COUNT(*) FROM ck_bonus WHERE steamid = pr.steamid) as bonuses,
+            (SELECT COUNT(*) FROM ck_stages WHERE steamid = pr.steamid) as stages
           FROM ck_playerrank pr
           WHERE pr.steamid = ?
         `, [validSteamId]),
@@ -172,21 +176,10 @@ export async function getPlayerOverviewFromCache(steamid: string, { force }: Ref
         rank: row.rank === null ? null : Number(row.rank) || 1,
       };
 
-      const [countRows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT
-            (SELECT finishedmaps FROM ck_playerrank WHERE steamid = ?) as maps,
-            (SELECT COUNT(*) FROM ck_bonus WHERE steamid = ?) as bonuses,
-            (SELECT COUNT(*) FROM ck_stages WHERE steamid = ?) as stages
-        `, [validSteamId, validSteamId, validSteamId]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
-
       const counts: PlayerCompletionCounts = {
-        maps: Number(countRows[0]?.maps) || 0,
-        bonuses: Number(countRows[0]?.bonuses) || 0,
-        stages: Number(countRows[0]?.stages) || 0,
+        maps: Number(row.maps) || 0,
+        bonuses: Number(row.bonuses) || 0,
+        stages: Number(row.stages) || 0,
       };
 
       return { player, counts };

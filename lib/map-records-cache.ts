@@ -93,7 +93,8 @@ interface BonusRecordsResult {
 }
 
 /**
- * Get record counts and WR time from cache
+ * Get record counts and WR time from cache. One round trip: four scalar
+ * subqueries over the map's rows.
  */
 export async function getRecordCountsAndWRFromCache(mapname: string): Promise<CountsAndWr> {
   return mapCachedFetch<CountsAndWr>({
@@ -109,8 +110,9 @@ export async function getRecordCountsAndWRFromCache(mapname: string): Promise<Co
           SELECT
             (SELECT COUNT(*) FROM ck_playertimes WHERE mapname = ?) as leaderboardTotal,
             (SELECT COUNT(*) FROM ck_bonus WHERE mapname = ?) as bonusesTotal,
-            (SELECT COUNT(*) FROM ck_stages WHERE \`map\` = ?) as stagesTotal
-        `, [validMapname, validMapname, validMapname]),
+            (SELECT COUNT(*) FROM ck_stages WHERE \`map\` = ?) as stagesTotal,
+            (SELECT MIN(runtimepro) FROM ck_playertimes WHERE mapname = ?) as wr_time
+        `, [validMapname, validMapname, validMapname, validMapname]),
         QUERY_TIMEOUT_MS,
         'Query timeout exceeded'
       );
@@ -121,16 +123,7 @@ export async function getRecordCountsAndWRFromCache(mapname: string): Promise<Co
         stagesTotal: countsRows[0]?.stagesTotal || 0,
       };
 
-      const [wrTimeRows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT MIN(runtimepro) as wr_time FROM ck_playertimes WHERE mapname = ?
-        `, [validMapname]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
-      const wr_time = wrTimeRows[0]?.wr_time || null;
-
-      return { counts, wr_time };
+      return { counts, wr_time: countsRows[0]?.wr_time || null };
     },
   });
 }
