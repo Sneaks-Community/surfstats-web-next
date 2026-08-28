@@ -14,11 +14,17 @@ vi.mock('../lib/valkey', () => ({
   waitForCacheReady: () => Promise.resolve(true),
 }));
 vi.mock('../lib/db', () => ({ default: { query: (...args: unknown[]) => query(...args) } }));
+vi.mock('../lib/map-cache', () => ({
+  getAllMapMetadataFromCache: () => Promise.resolve(mapMetadata),
+  isStagedMap: () => false,
+}));
 vi.mock('../lib/logger', () => ({
   default: { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-const { getPlayerOverviewFromCache } = await import('../lib/player-profile-cache');
+let mapMetadata = new Map<string, { tier: number; wr_time: number | null }>();
+
+const { getPlayerOverviewFromCache, getPlayerMapTimesFromCache } = await import('../lib/player-profile-cache');
 
 const STEAM_ID = 'STEAM_1:0:9471875';
 
@@ -59,5 +65,22 @@ describe('getPlayerOverviewFromCache', () => {
     await getPlayerOverviewFromCache('99999999999999999');
 
     expect(recordProfileView).not.toHaveBeenCalled();
+  });
+});
+
+describe('getPlayerMapTimesFromCache', () => {
+  // Metadata excludes untiered maps and tiers outside 1-10; a miss used to be
+  // rendered as a fabricated tier 1 instead of being dropped.
+  it('drops maps that are absent from the metadata blob', async () => {
+    mapMetadata = new Map([['surf_kitsune', { tier: 3, wr_time: 42 }]]);
+    query.mockResolvedValue([[
+      { mapname: 'surf_kitsune', runtimepro: 100, date: '', player_rank: 1 },
+      { mapname: 'surf_untiered', runtimepro: 200, date: '', player_rank: 1 },
+    ]]);
+
+    const times = await getPlayerMapTimesFromCache(STEAM_ID);
+
+    expect(times.map(t => t.mapname)).toEqual(['surf_kitsune']);
+    expect(times[0].tier).toBe(3);
   });
 });

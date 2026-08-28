@@ -308,15 +308,18 @@ export async function getPlayerMapTimesFromCache(steamid: string): Promise<Playe
         'Query timeout exceeded'
       );
 
-      // Tier and WR come from the cached metadata, which already holds the same
-      // per-map MIN(runtimepro) the query used to re-derive.
+      // Tier and WR come from the cached metadata; a miss means the map is
+      // untiered or outside tiers 1-10, so it drops out of the list.
+      const tiered: RowDataPacket[] = [];
       for (const map of maps) {
         const metadata = allMapMetadata.get(map.mapname);
-        map.tier = metadata?.tier ?? 1;
-        map.wr_time = metadata?.wr_time ?? null;
+        if (!metadata) continue;
+        map.tier = metadata.tier;
+        map.wr_time = metadata.wr_time;
+        tiered.push(map);
       }
 
-      return maps as PlayerMapTime[];
+      return tiered as PlayerMapTime[];
     },
     {
       lock: true,
@@ -451,10 +454,10 @@ export async function getIncompleteMapsFromCache(steamid: string): Promise<Incom
         pool.query<RowDataPacket[]>(`
           SELECT
             m.mapname,
-            COALESCE(m.tier, 1) as tier
+            m.tier
           FROM ck_maptier m
           LEFT JOIN ck_playertimes pt ON m.mapname = pt.mapname AND pt.steamid = ?
-          WHERE pt.mapname IS NULL
+          WHERE pt.mapname IS NULL AND m.tier BETWEEN 1 AND 10
           ORDER BY m.tier ASC, m.mapname ASC
         `, [validSteamId]),
         QUERY_TIMEOUT_MS,
@@ -631,7 +634,7 @@ export async function getLinearVsStagedPerTierFromCache(steamid: string, { force
       const [rows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT
-            COALESCE(m.tier, 1) as \`tier\`,
+            m.tier,
             COALESCE(SUM(CASE WHEN staged_map.mapname IS NULL THEN 1 ELSE 0 END), 0) as \`linear\`,
             COALESCE(SUM(CASE WHEN staged_map.mapname IS NOT NULL THEN 1 ELSE 0 END), 0) as \`staged\`
           FROM ck_maptier m
@@ -639,6 +642,7 @@ export async function getLinearVsStagedPerTierFromCache(steamid: string, { force
           LEFT JOIN (
             SELECT DISTINCT mapname FROM ck_zones WHERE zonetype = 3
           ) staged_map ON m.mapname = staged_map.mapname
+          WHERE m.tier BETWEEN 1 AND 10
           GROUP BY m.tier
           ORDER BY m.tier ASC
         `, [validSteamId]),

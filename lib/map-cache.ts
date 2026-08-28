@@ -99,7 +99,8 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
         LEFT JOIN ck_playertimes wr_holder
           ON wr.mapname = wr_holder.mapname
           AND wr.min_runtime = wr_holder.runtimepro
-        WHERE pt_cnt.completions > 0
+        -- Untiered maps and tiers outside 1-10 are excluded app-wide.
+        WHERE pt_cnt.completions > 0 AND m.tier BETWEEN 1 AND 10
         -- The join emits one row per tied holder (11 maps today), so the sort
         -- keys fix which one the loop below keeps. Cheap: it orders the ~1038
         -- joined rows, not the base table.
