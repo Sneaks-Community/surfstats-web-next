@@ -279,8 +279,9 @@ export async function getPlayerWrPerformanceFromCache(steamid: string, { force }
 }
 
 /**
- * Full list of the player's completed map times, with per-map WR time and the
- * player's rank on each map (correlated `COUNT(*)` rank subquery). Expensive —
+ * Full list of the player's completed map times, with the player's rank on each
+ * map (correlated `COUNT(*)` rank subquery); tier and WR time come from the
+ * cached map metadata rather than a second full-table aggregate. Expensive —
  * routed through the single-flight lock + the expensive-query semaphore. Gated
  * behind the Times tab click.
  *
@@ -307,15 +308,9 @@ export async function getPlayerMapTimesFromCache(steamid: string): Promise<Playe
             pt.mapname,
             pt.runtimepro,
             pt.date,
-            wr.min_runtime as wr_time,
             (SELECT COUNT(*) + 1 FROM ck_playertimes pt2
              WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as player_rank
           FROM ck_playertimes pt
-          LEFT JOIN (
-            SELECT mapname, MIN(runtimepro) as min_runtime
-            FROM ck_playertimes
-            GROUP BY mapname
-          ) wr ON pt.mapname = wr.mapname
           WHERE pt.steamid = ?
           ORDER BY pt.mapname ASC
         `, [validSteamId]),
@@ -323,10 +318,12 @@ export async function getPlayerMapTimesFromCache(steamid: string): Promise<Playe
         'Query timeout exceeded'
       );
 
-      // Look up tier from cache for each map (matches the old monolith).
+      // Tier and WR come from the cached metadata, which already holds the same
+      // per-map MIN(runtimepro) the query used to re-derive.
       for (const map of maps) {
         const metadata = allMapMetadata.get(map.mapname);
         map.tier = metadata?.tier ?? 1;
+        map.wr_time = metadata?.wr_time ?? null;
       }
 
       return maps as PlayerMapTime[];
@@ -442,8 +439,9 @@ export async function getPlayerStageTimesFromCache(steamid: string): Promise<Pla
 
 /**
  * Maps the player has NOT completed (anti-join against the full map list), with
- * tier, WR time, and the linear/staged classification. Expensive — gated behind
- * the Times → Map sub-tab.
+ * tier from the map row and WR + linear/staged from the cached metadata (a map
+ * missing there has no completions, so its WR is null either way). Expensive —
+ * gated behind the Times → Map sub-tab.
  *
  * @param steamid - The player's SteamID
  * @returns Incomplete-maps list (empty on invalid id / error)
@@ -465,15 +463,9 @@ export async function getIncompleteMapsFromCache(steamid: string): Promise<Incom
         pool.query<RowDataPacket[]>(`
           SELECT
             m.mapname,
-            COALESCE(m.tier, 1) as tier,
-            wr.min_runtime as wr_time
+            COALESCE(m.tier, 1) as tier
           FROM ck_maptier m
           LEFT JOIN ck_playertimes pt ON m.mapname = pt.mapname AND pt.steamid = ?
-          LEFT JOIN (
-            SELECT mapname, MIN(runtimepro) as min_runtime
-            FROM ck_playertimes
-            GROUP BY mapname
-          ) wr ON m.mapname = wr.mapname
           WHERE pt.mapname IS NULL
           ORDER BY m.tier ASC, m.mapname ASC
         `, [validSteamId]),
@@ -488,7 +480,7 @@ export async function getIncompleteMapsFromCache(steamid: string): Promise<Incom
         return {
           mapname: r.mapname,
           tier: r.tier,
-          wr_time: r.wr_time,
+          wr_time: mapMetadata?.wr_time ?? null,
           mapType,
         };
       });
