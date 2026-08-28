@@ -1,7 +1,7 @@
 import 'server-only';
 import logger from './logger';
 import { createBackgroundRefresh } from './background-refresh';
-import { getErrorMessage } from './errors';
+import { CacheUnavailableError, getErrorMessage } from './errors';
 import {
   getDashboardStatsFromCache,
   getRecentRecordsFromCache,
@@ -117,6 +117,7 @@ async function warmRecentProfiles(startup: boolean): Promise<void> {
     try {
       await refreshProfile(steamid, startup);
     } catch (error) {
+      if (error instanceof CacheUnavailableError) throw error;
       logger.warn(`[RecentProfilesRefresh] Failed to warm ${steamid}: ${getErrorMessage(error)}`);
     }
   }

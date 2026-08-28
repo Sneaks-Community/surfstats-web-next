@@ -117,19 +117,30 @@ export async function cachedFetch<T>(
     throw new CacheUnavailableError();
   }
 
+  // An explicit `force: false` (as opposed to absent) is a background refresher
+  // reading its own keys first. That pass is paced, so it renews a near-expiry
+  // key inline; fanning out one background refresh per key would put a whole
+  // sweep's worth of them on the expensive-query semaphore at once.
+  const paced = options.force === false;
+  let renewing = false;
+
   if (!options.force) {
     const { value: cached, ttlMs } = await cacheGetWithTtl<T>(key);
     if (cached !== null) {
-      if (shouldRefreshEarly(ttlMs, ttl)) {
-        triggerBackgroundRefresh(key, ttl, fetchFn, options.expensive ?? false);
+      if (!shouldRefreshEarly(ttlMs, ttl)) {
+        return cached;
       }
-      return cached;
+      if (!paced) {
+        triggerBackgroundRefresh(key, ttl, fetchFn, options.expensive ?? false);
+        return cached;
+      }
+      renewing = true;
     }
   }
 
   const load = async (): Promise<T> => {
     // A concurrent request may have populated the key while we waited for it.
-    if (options.lock && !options.force) {
+    if (options.lock && !options.force && !renewing) {
       const { value: rechecked } = await cacheGetWithTtl<T>(key);
       if (rechecked !== null) {
         return rechecked;

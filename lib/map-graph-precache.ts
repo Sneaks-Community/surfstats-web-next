@@ -10,7 +10,7 @@ import {
   getPercentileTimesFromCache,
 } from './map-stats-cache';
 import { getAllMapMetadataFromCache, getMapMetadataFromCache } from './map-cache';
-import { getErrorMessage } from './errors';
+import { CacheUnavailableError, getErrorMessage } from './errors';
 import { createBackgroundRefresh } from './background-refresh';
 
 // Pacing: all seven series run under the expensive-query semaphore, so keep the
@@ -48,6 +48,9 @@ async function precacheMapGraphs(mapname: string, startup: boolean): Promise<voi
 
     logger.debug(`[MapGraphPrecache] Cached graphs for ${mapname}`);
   } catch (error) {
+    // A dropped cache fails every map identically and the sweep can't do any
+    // work without it: abort so it's logged once, not ~1,000 times.
+    if (error instanceof CacheUnavailableError) throw error;
     logger.warn(`[MapGraphPrecache] Failed to cache graphs for ${mapname}: ${getErrorMessage(error)}`);
   }
 }

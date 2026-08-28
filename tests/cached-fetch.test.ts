@@ -84,6 +84,29 @@ describe('cachedFetch', () => {
 
   // The readiness gate is awaited, and onError must not swallow it: serving a
   // fallback would hide a cache outage behind empty pages.
+  // A sweep reads thousands of keys at once. Fanning out a background refresh
+  // per near-expiry key put a whole sweep on the expensive-query semaphore and
+  // flooded the log with "Database busy".
+  it('renews a near-expiry key inline for a refresher, not in the background', async () => {
+    // 1% of the TTL left: shouldRefreshEarly fires with probability ~1.
+    cacheGetWithTtl.mockResolvedValue({ value: { n: 1 }, ttlMs: 600 });
+    const loader = vi.fn(() => Promise.resolve({ n: 2 }));
+
+    const result = await cachedFetch('k', 60, loader, { lock: true, force: false });
+
+    expect(loader).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ n: 2 });
+    expect(cacheSet).toHaveBeenCalledWith('k', { n: 2 }, 60);
+  });
+
+  it('serves an on-demand near-expiry hit immediately and refreshes behind it', async () => {
+    cacheGetWithTtl.mockResolvedValue({ value: { n: 1 }, ttlMs: 600 });
+    const loader = vi.fn(() => Promise.resolve({ n: 2 }));
+
+    // No `force` key at all: the on-demand path, which must not block the caller.
+    expect(await cachedFetch('k', 60, loader, { lock: true })).toEqual({ n: 1 });
+  });
+
   it('throws CacheUnavailableError past onError when the cache is down', async () => {
     waitForCacheReady.mockResolvedValue(false);
     const loader = vi.fn();

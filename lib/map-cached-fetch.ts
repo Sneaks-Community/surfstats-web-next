@@ -26,7 +26,11 @@ export interface MapCachedFetchOptions<T> {
   errorLabel: string;
   /** Run the loader under the expensive-query concurrency cap. Defaults to false. */
   expensive?: boolean;
-  /** Refresh in place: skip the read, run the loader, overwrite on success. */
+  /**
+   * Refresh in place: skip the read, run the loader, overwrite on success.
+   * Left undefined by on-demand reads, which `cachedFetch` treats differently
+   * from a refresher's explicit `false`.
+   */
   force?: boolean;
   /** Log level for fetch errors. Defaults to 'error'. */
   errorLevel?: 'warn' | 'error';
@@ -49,7 +53,7 @@ export function mapCachedFetch<T>({
   fetch,
   errorLabel,
   expensive = false,
-  force = false,
+  force,
   errorLevel = 'error',
 }: MapCachedFetchOptions<T>): Promise<T> {
   const validMapname = validateMapName(mapname);
