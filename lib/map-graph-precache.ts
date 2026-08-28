@@ -5,7 +5,6 @@ import {
   getTimeOnMapDataFromCache,
   getCheckpointStatsFromCache,
   getWRCheckpointTimesFromCache,
-  getFinishTimeDataFromCache,
   getBonusCompletionsOverTimeFromCache,
   getPercentileTimesFromCache,
 } from './map-stats-cache';
@@ -13,7 +12,7 @@ import { getAllMapMetadataFromCache, getMapMetadataFromCache } from './map-cache
 import { CacheUnavailableError, getErrorMessage } from './errors';
 import { createBackgroundRefresh } from './background-refresh';
 
-// Pacing: all seven series run under the expensive-query semaphore, so keep the
+// Pacing: all six series run under the expensive-query semaphore, so keep the
 // sweep's share of it small enough that page renders still get connections.
 const BATCH_SIZE = 20;
 const BATCH_DELAY_MS = 1_000;
@@ -41,7 +40,6 @@ async function precacheMapGraphs(mapname: string, startup: boolean): Promise<voi
       getTimeOnMapDataFromCache(mapname, force),
       getCheckpointStatsFromCache(mapname, force),
       getWRCheckpointTimesFromCache(mapname, maxCheckpoint, force),
-      getFinishTimeDataFromCache(mapname, force),
       getBonusCompletionsOverTimeFromCache(mapname, force),
       getPercentileTimesFromCache(mapname, force),
     ]);

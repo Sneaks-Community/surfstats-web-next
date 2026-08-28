@@ -59,7 +59,7 @@ describe('key builders', () => {
   });
 });
 
-// MAP_STATS_SUFFIXES is the canonical list of the seven series the precache refreshes,
+// MAP_STATS_SUFFIXES is the canonical list of the six series the precache refreshes,
 // so a fetcher writing a suffix that isn't in there is a series nothing enumerates.
 describe('map stats suffixes', () => {
   it('cover every key the stats fetchers write', async () => {
@@ -68,7 +68,6 @@ describe('map stats suffixes', () => {
       stats.getTimeOnMapDataFromCache(MAP),
       stats.getCheckpointStatsFromCache(MAP),
       stats.getWRCheckpointTimesFromCache(MAP, 3),
-      stats.getFinishTimeDataFromCache(MAP),
       stats.getBonusCompletionsOverTimeFromCache(MAP),
       stats.getPercentileTimesFromCache(MAP),
     ]);

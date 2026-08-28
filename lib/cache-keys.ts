@@ -17,12 +17,11 @@ export function mapKey(mapname: string, suffix: string): string {
   return `surfstats:map:${mapname}:${suffix}`;
 }
 
-/** The seven per-map chart series the graph precache refreshes, one key each. */
+/** The six per-map chart series the graph precache refreshes, one key each. */
 export const MAP_STATS_SUFFIXES = {
   completions: 'stats:completions',
   timeOnMap: 'stats:time-on-map',
   checkpoints: 'stats:checkpoints',
-  finishTime: 'stats:finish-time',
   bonusTime: 'stats:bonus-time',
   percentiles: 'stats:percentiles',
 } as const;

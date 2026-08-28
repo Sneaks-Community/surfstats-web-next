@@ -40,7 +40,7 @@ export default function MapChartGrid({ data }: MapChartGridProps) {
       <CheckpointTimesChart
         data={data.checkpointAvgTimes}
         wrData={data.wrCheckpointTimes}
-        finishTime={data.finishTime}
+        finishTime={data.percentileTimes ?? undefined}
         isStageMap={data.isStageMap}
       />
       <PercentileBreakdownChart data={data.percentileTimes} />

@@ -11,7 +11,7 @@ import { MAP_STATS_SUFFIXES, wrCheckpointSuffix } from './cache-keys';
 
 // TTL is the safety net, the 12h precache sweep is the freshness guarantee, so the
 // net has to be slacker: at 1x every map but the first in the sweep spent part of
-// each cycle expired, making its next visitor pay for seven aggregates.
+// each cycle expired, making its next visitor pay for six aggregates.
 const STATS_CACHE_TTL = 129600; // 36 hours = 3x the sweep interval
 
 // Every fetcher here aggregates over ck_playertimes/ck_checkpoints/ck_bonus, so all
@@ -322,42 +322,6 @@ export async function getTimeOnMapDataFromCache(
 }
 
 /**
- * Get finish time data from cache
- */
-export async function getFinishTimeDataFromCache(
-  mapname: string,
-  { force = false }: RefreshOptions = {}
-): Promise<{ avgTime: number | null; wrTime: number | null }> {
-  return mapCachedFetch<{ avgTime: number | null; wrTime: number | null }>({
-    mapname,
-    keySuffix: MAP_STATS_SUFFIXES.finishTime,
-    ttl: STATS_CACHE_TTL,
-    force,
-    empty: { avgTime: null, wrTime: null },
-    errorLabel: 'finish time data',
-    expensive: true,
-    errorLevel: 'warn',
-    fetch: async (validMapname) => {
-      const [finishRows] = await pool.query<RowDataPacket[]>(`
-        SELECT
-          AVG(runtimepro) as avgTime,
-          MIN(runtimepro) as wrTime
-        FROM ck_playertimes
-        WHERE mapname = ?
-      `, [validMapname]);
-
-      const avgTime = finishRows[0]?.avgTime || null;
-      const wrTime = finishRows[0]?.wrTime || null;
-
-      return {
-        avgTime: avgTime ? Number(avgTime) : null,
-        wrTime: wrTime ? Number(wrTime) : null,
-      };
-    },
-  });
-}
-
-/**
  * Get percentile completion times from cache
  * Uses MariaDB-compatible queries with LIMIT/OFFSET
  */
@@ -453,7 +417,6 @@ export interface MapChartData {
   timeOnMapData: Array<{ date: string; totalDuration: number }>;
   checkpointAvgTimes: Array<{ checkpoint: number; avgTime: number; sampleSize: number }>;
   wrCheckpointTimes?: Array<{ checkpoint: number; time: number }>;
-  finishTime?: { avgTime: number | null; wrTime: number | null };
   bonusCompletionsOverTime: Record<number, Array<{ date: string; count: number }>>;
   isStageMap: boolean;
   percentileTimes: {
@@ -507,7 +470,6 @@ export async function getMapChartDataFromCache(mapname: string): Promise<MapChar
     timeOnMapData,
     { checkpointAvgTimes },
     wrCheckpointTimes,
-    finishTime,
     bonusCompletionsOverTime,
     percentileTimes,
   ] = await Promise.all([
@@ -515,7 +477,6 @@ export async function getMapChartDataFromCache(mapname: string): Promise<MapChar
     getTimeOnMapDataFromCache(validMapname),
     getCheckpointStatsFromCache(validMapname),
     getWRCheckpointTimesFromCache(validMapname, maxCheckpoint),
-    getFinishTimeDataFromCache(validMapname),
     getBonusCompletionsOverTimeFromCache(validMapname),
     getPercentileTimesFromCache(validMapname),
   ]);
@@ -525,7 +486,6 @@ export async function getMapChartDataFromCache(mapname: string): Promise<MapChar
     timeOnMapData,
     checkpointAvgTimes,
     wrCheckpointTimes,
-    finishTime,
     bonusCompletionsOverTime,
     isStageMap,
     percentileTimes,
