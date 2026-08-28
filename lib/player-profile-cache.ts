@@ -9,7 +9,7 @@ import 'server-only';
 import pool from './db';
 import type { RowDataPacket } from 'mysql2';
 import { cachedFetch, type RefreshOptions } from './cached-fetch';
-import { isStagedMap } from './map-cache';
+import { getAllMapMetadataFromCache, isStagedMap } from './map-cache';
 import { withTimeout } from './timeout';
 import { validateSteamId } from './validators';
 import { recordProfileView } from './recent-profiles';
@@ -228,8 +228,6 @@ export async function getPlayerWrPerformanceFromCache(steamid: string, { force }
     `${PLAYER_WR_PERF_KEY}:${validSteamId}`,
     PLAYER_PROFILE_TTL,
     async () => {
-      const { getAllMapMetadataFromCache } = await import('@/lib/map-cache');
-
       const [rows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT pt.mapname, pt.runtimepro, pt.date
@@ -292,7 +290,6 @@ export async function getPlayerMapTimesFromCache(steamid: string): Promise<Playe
     `${PLAYER_MAP_TIMES_KEY}:${validSteamId}`,
     PLAYER_PROFILE_TTL,
     async () => {
-      const { getAllMapMetadataFromCache } = await import('@/lib/map-cache');
       const allMapMetadata = await getAllMapMetadataFromCache();
 
       const [maps] = await withTimeout(
@@ -450,8 +447,6 @@ export async function getIncompleteMapsFromCache(steamid: string): Promise<Incom
     `${PLAYER_INCOMPLETE_MAPS_KEY}:${validSteamId}`,
     PLAYER_PROFILE_TTL,
     async () => {
-      const { getAllMapMetadataFromCache } = await import('@/lib/map-cache');
-
       const [rows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT
