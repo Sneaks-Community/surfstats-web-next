@@ -1,0 +1,97 @@
+name: Release to Docker
+
+on:
+  release:
+    types: [published]
+  push:
+    branches: [main]
+  # Weekly rebuild so base-image CVE fixes reach :latest between releases
+  schedule:
+    - cron: '0 5 * * 6'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IMAGE: ghcr.io/sneaks-community/surfstats-web-next
+
+jobs:
+  build:
+    name: Build and Push Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      # Weekly rebuild targets the last release, not main HEAD — :latest must
+      # stay released code, just with patched base packages. No release yet
+      # leaves tag empty, which skips the build below.
+      - name: Resolve release ref
+        id: ref
+        if: github.event_name == 'schedule'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! tag=$(gh release view -R "$GITHUB_REPOSITORY" --json tagName -q .tagName 2>/dev/null); then
+            echo "::notice::No published release yet — nothing to rebuild."
+            exit 0
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.1
+        with:
+          # empty on non-schedule runs = default checkout
+          ref: ${{ steps.ref.outputs.tag }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4.3.0
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set image metadata
+        id: meta
+        uses: docker/metadata-action@v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          flavor: latest=false
+          tags: |
+            type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+            type=semver,pattern={{version}},enable=${{ github.event_name == 'release' }}
+            type=raw,value=dev,enable=${{ github.event_name == 'push' }}
+            type=raw,value=latest,enable=${{ steps.ref.outputs.tag != '' }}
+            type=raw,value=${{ steps.ref.outputs.version }},enable=${{ steps.ref.outputs.tag != '' }}
+
+      - name: Build and push image
+        if: github.event_name != 'schedule' || steps.ref.outputs.tag != ''
+        uses: docker/build-push-action@v7.3.0
+        with:
+          context: .
+          target: production
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+
+      #- name: Prune orphaned image versions
+      #  if: github.event_name != 'schedule' || steps.ref.outputs.tag != ''
+      #  uses: snok/container-retention-policy@v3.1.0
+      #  with:
+      #    account: ${{ github.repository_owner }}
+      #    token: ${{ secrets.GITHUB_TOKEN }}
+      #    image-names: surfstats-web-next
+      #    tag-selection: untagged
+      #    cut-off: 1w
