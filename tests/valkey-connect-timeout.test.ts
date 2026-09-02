@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Unreachable server: node-redis retries forever, so connect() never settles.
 const connect = vi.fn(() => new Promise<never>(() => undefined));
@@ -20,6 +20,11 @@ vi.mock('../lib/shutdown', () => ({ onShutdown: vi.fn() }));
 
 process.env.VALKEY_CONNECT_TIMEOUT = '50';
 const { waitForCacheReady } = await import('../lib/valkey');
+
+// The second test flips isReady on the shared client; reset so order can't decide.
+beforeEach(() => {
+  client.isReady = false;
+});
 
 describe('waitForCacheReady', () => {
   it('gives up on an unreachable server so callers can fail closed', async () => {

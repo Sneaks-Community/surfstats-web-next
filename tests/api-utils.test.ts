@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('server-only', () => ({}));
 const logger = { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() };
@@ -8,6 +8,11 @@ const { parsePageParams, apiError } = await import('../lib/api-utils');
 const { DbBusyError, CacheUnavailableError } = await import('../lib/errors');
 
 const params = (qs: string) => new URLSearchParams(qs);
+
+// The 503 test asserts logger.error was never called, so counts must not carry over.
+beforeEach(() => {
+  vi.clearAllMocks();
+});
 
 describe('parsePageParams', () => {
   it('snaps pageSize to the two sizes the UI requests', () => {
