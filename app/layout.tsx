@@ -89,7 +89,7 @@ export default async function RootLayout({children}: {children: React.ReactNode}
             </main>
           <footer className="bg-background-secondary border-t border-border mt-auto relative">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 text-center text-text-muted text-sm">
-              <a href={process.env.NEXT_PUBLIC_MAIN_SITE_URL || 'https://snksrv.com'} className="hover:text-primary transition-colors">{process.env.NEXT_PUBLIC_MAIN_SITE_NAME || 'Main Site'}</a>
+              <a href={process.env.NEXT_PUBLIC_MAIN_SITE_URL || 'https://yourdomain.invalid'} className="hover:text-primary transition-colors">{process.env.NEXT_PUBLIC_MAIN_SITE_NAME || 'Main Site'}</a>
               {process.env.NEXT_PUBLIC_FOOTER_LINK_URL && (
                 <>
                   <span className="mx-2">|</span>
