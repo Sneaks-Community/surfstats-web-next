@@ -106,7 +106,6 @@ export default function WorldReachChart({ data }: WorldReachChartProps) {
   // green. Five sequential steps, fewest → most; fallbacks are the default
   // emerald theme.
   const { ramp, emptyColor, borderColor } = useMemo(() => {
-    void themeVersion;
     const isLight =
       typeof document !== 'undefined' &&
       document.documentElement.classList.contains('light');
@@ -136,6 +135,8 @@ export default function WorldReachChart({ data }: WorldReachChartProps) {
       // including empty ones — on either surface.
       borderColor: isLight ? '#9ca3af' : '#52525b',
     };
+    // themeVersion is only a recompute trigger, not an input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [themeVersion]);
 
   const backgroundColors = useMemo(
