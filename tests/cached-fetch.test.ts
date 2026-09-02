@@ -22,6 +22,9 @@ beforeEach(() => {
   waitForCacheReady.mockResolvedValue(true);
   cacheGetWithTtl.mockResolvedValue(miss);
   cacheSet.mockResolvedValue(undefined);
+  // shouldRefreshEarly is probabilistic; pin the draw so the near-expiry tests
+  // aren't a 90/10 coin flip.
+  vi.spyOn(Math, 'random').mockReturnValue(0);
 });
 
 describe('cachedFetch', () => {
@@ -88,7 +91,7 @@ describe('cachedFetch', () => {
   // per near-expiry key put a whole sweep on the expensive-query semaphore and
   // flooded the log with "Database busy".
   it('renews a near-expiry key inline for a refresher, not in the background', async () => {
-    // 1% of the TTL left: shouldRefreshEarly fires with probability ~1.
+    // 1% of the TTL left: inside the early-refresh window.
     cacheGetWithTtl.mockResolvedValue({ value: { n: 1 }, ttlMs: 600 });
     const loader = vi.fn(() => Promise.resolve({ n: 2 }));
 
