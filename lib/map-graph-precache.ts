@@ -17,7 +17,7 @@ import { createBackgroundRefresh } from './background-refresh';
 // queues behind itself, leaving the rest for page renders.
 const BATCH_SIZE = 20;
 const BATCH_DELAY_MS = 1_000;
-const REFRESH_INTERVAL_MS = 43200_000; // 12 hours
+const REFRESH_INTERVAL_MS = 86400_000; // 24 hours
 const MAX_CONCURRENT = 2;
 
 /**
@@ -33,7 +33,7 @@ async function precacheMapGraphs(mapname: string, startup: boolean): Promise<voi
     const stages = metadata?.stages || 0;
     const maxCheckpoint = checkpoints > 0 ? checkpoints : stages;
 
-    // Startup reads first (skip series still within their 36h TTL); interval
+    // Startup reads first (skip series still within their 72h TTL); interval
     // sweeps force an in-place refresh.
     const force = { force: !startup };
     // One series at a time: measured on this DB, the six run no faster in
@@ -105,5 +105,5 @@ const { start: startMapGraphPrecache } = createBackgroundRefresh({
   startupDetail: `every ${REFRESH_INTERVAL_MS / 3600_000}h`,
 });
 
-/** Non-blocking: the first sweep runs in the background, then every 12 hours. */
+/** Non-blocking: the first sweep runs in the background, then every 24 hours. */
 export { startMapGraphPrecache };

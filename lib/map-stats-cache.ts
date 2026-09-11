@@ -9,10 +9,10 @@ import { isStagedMap } from './map-cache';
 import { validateMapName } from './validators';
 import { MAP_STATS_SUFFIXES, wrCheckpointSuffix } from './cache-keys';
 
-// TTL is the safety net, the 12h precache sweep is the freshness guarantee, so the
+// TTL is the safety net, the 24h precache sweep is the freshness guarantee, so the
 // net has to be slacker: at 1x every map but the first in the sweep spent part of
 // each cycle expired, making its next visitor pay for six aggregates.
-const STATS_CACHE_TTL = 129600; // 36 hours = 3x the sweep interval
+const STATS_CACHE_TTL = 259200; // 72 hours = 3x the sweep interval
 
 // Every fetcher here aggregates over ck_playertimes/ck_checkpoints/ck_bonus, so all
 // of them pass `expensive: true`; otherwise the precache floods the 20-connection
