@@ -21,6 +21,9 @@ vi.mock('../lib/shutdown', () => ({ onShutdown: vi.fn() }));
 process.env.VALKEY_CONNECT_TIMEOUT = '50';
 const { waitForCacheReady } = await import('../lib/valkey');
 
+// connect() fires on import, and clearMocks wipes the history before test one.
+const connectedOnImport = connect.mock.calls.length > 0;
+
 // The second test flips isReady on the shared client; reset so order can't decide.
 beforeEach(() => {
   client.isReady = false;
@@ -33,7 +36,7 @@ describe('waitForCacheReady', () => {
     await expect(waitForCacheReady()).resolves.toBe(false);
 
     expect(Date.now() - start).toBeLessThan(3000);
-    expect(connect).toHaveBeenCalled();
+    expect(connectedOnImport).toBe(true);
   });
 
   // The initial-connect promise is bounded by a wall-clock race and is one-shot,
