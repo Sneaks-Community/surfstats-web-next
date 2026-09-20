@@ -144,9 +144,11 @@ function MapFiltersForm({
         </button>
       </div>
 
-      {/* Collapsible Advanced Filters */}
+      {/* Collapsible Advanced Filters. `inert` while collapsed: max-h-0 only
+          clips the panel, it leaves the controls focusable and typeable. */}
       <div
         id="advanced-filters"
+        inert={!isExpanded}
         className={`space-y-4 overflow-hidden transition-all duration-200 ${isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
       >
         {/* Row: Mapper + Type + Bonuses */}
