@@ -6,7 +6,7 @@ import { useNavigationPending } from '@/components/NavigationPending';
 
 export interface SortLinkProps {
   column: string;
-  label: string;
+  label: React.ReactNode;
   currentSort: string;
   currentOrder: 'asc' | 'desc';
   baseUrl: string;
