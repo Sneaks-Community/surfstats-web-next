@@ -6,7 +6,8 @@ coverage/
 .env*
 !.env.example
 plans/
-sql/
+sql/*
+!sql/player_analytics_setup.sql
 *.tsbuildinfo
 docker-compose.yml
 .vscode/

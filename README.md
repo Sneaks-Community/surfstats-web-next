@@ -57,7 +57,15 @@ The application is configured using environment variables. You can set these in 
 
 ### Player Analytics database (optional)
 
-Powers play-time and activity displays. Requires [the PlayerAnalytics fork](https://github.com/sneak-it/PlayerAnalytics), including its `player_analytics_summary` table; without that table player play-time reads as unavailable.
+Powers play-time and activity displays. Requires [the PlayerAnalytics fork](https://github.com/sneak-it/PlayerAnalytics).
+
+On a stock PlayerAnalytics database, run [`sql/player_analytics_setup.sql`](sql/player_analytics_setup.sql) once against it:
+
+```bash
+mysql -u USER -p player_analytics_surf < sql/player_analytics_setup.sql
+```
+
+It creates the `player_analytics_summary` table the play-time display reads (without it, play-time reads as unavailable) and adds the two indexes the map time-on-server graph and the activity heatmap need. Safe to re-run; use a low-traffic window, since the indexes and the backfill each take minutes on a large table.
 
 Analytics is opt-in: it is enabled only when `ANALYTICS_MYSQL_HOST` or `ANALYTICS_MYSQL_DATABASE` is set. Leave both unset and the feature is off, with no connection attempts.
 

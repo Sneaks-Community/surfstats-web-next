@@ -40,7 +40,8 @@ lib/            Server logic: db, caching, analytics, steam, validators, theme, 
 types/          Type defs
 instrumentation.ts  Startup hook (runs once per server): defers to lib/startup.ts
 proxy.ts        Next proxy (middleware): rate limit, origin guard, cache-readiness gate for /api/* and pages
-sql/            Reference schema (surf85.sql) + performance-index migrations; add new index migrations here
+sql/            Gitignored except player_analytics_setup.sql (shipped: analytics summary table + indexes);
+                local-only reference schema and index migrations live here too
 ```
 
 API routes: `maps/[mapname]/{records,bonuses,stages}`, `players/[steamid]/{maps,bonuses,stages}`, `search`, `health`. `health` is exempted at the top of [`proxy.ts`](proxy.ts) because the container healthcheck sends no Origin/`Sec-Fetch-*` and the origin guard would 403 it; it checks no dependencies by design.
