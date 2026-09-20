@@ -139,6 +139,9 @@ export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
           minRotation: 0,
           autoSkip: true,
           maxTicksLimit: 12,
+          // Without a real gap autoSkip packs "MM/YYYY" labels edge to edge and
+          // they collide on narrow screens.
+          autoSkipPadding: 14,
         },
       },
       y: {

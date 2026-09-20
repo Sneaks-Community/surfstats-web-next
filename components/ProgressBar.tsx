@@ -31,7 +31,7 @@ export default function ProgressBar({ label, current, total, color }: ProgressBa
           {percentage}%
         </span>
       </div>
-      <span className="text-sm text-text-muted w-20 text-right flex-shrink-0">{current.toLocaleString()} / {total.toLocaleString()}</span>
+      <span className="text-sm text-text-muted w-24 text-right flex-shrink-0 whitespace-nowrap tabular-nums">{current.toLocaleString()} / {total.toLocaleString()}</span>
     </div>
   );
 }

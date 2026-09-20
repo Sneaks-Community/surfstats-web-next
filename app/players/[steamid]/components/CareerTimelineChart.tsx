@@ -155,7 +155,7 @@ export default function CareerTimelineChart({ data }: CareerTimelineChartProps) 
         x: {
           stacked: true,
           grid: { display: false },
-          ticks: { color: chartTheme.textMuted, font: { size: 10 }, maxRotation: 0, maxTicksLimit: 12 },
+          ticks: { color: chartTheme.textMuted, font: { size: 10 }, maxRotation: 0, maxTicksLimit: 12, autoSkipPadding: 14 },
         },
         y: {
           stacked: true,

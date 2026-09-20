@@ -43,7 +43,7 @@ const COLUMNS = [
   { key: 'rank', label: 'Rank', short: '#', width: 'w-11 sm:w-20', right: false, defaultOrder: 'asc' as const },
   { key: 'player', label: 'Player', short: 'Player', width: 'flex-1 min-w-0', right: false, defaultOrder: 'asc' as const },
   { key: 'points', label: 'Points', short: 'Pts', width: 'w-14 sm:w-20 flex', right: true, defaultOrder: 'desc' as const },
-  { key: 'maps', label: 'Maps', short: 'Maps', width: 'w-10 sm:w-16 flex', right: true, defaultOrder: 'desc' as const },
+  { key: 'maps', label: 'Maps', short: 'Maps', width: 'w-14 sm:w-16 flex', right: true, defaultOrder: 'desc' as const },
   { key: 'lastseen', label: 'Last Seen', short: 'Last Seen', width: 'hidden sm:flex sm:w-24', right: true, defaultOrder: 'desc' as const },
 ];
 
@@ -117,7 +117,7 @@ function Row({ player, avatar }: { player: PlayerListEntry; avatar?: { avatarmed
         </div>
       </div>
       <div className="w-14 sm:w-20 text-right text-xs sm:text-sm text-text tabular-nums">{player.points.toLocaleString()}</div>
-      <div className="w-10 sm:w-16 text-right text-xs sm:text-sm text-text tabular-nums">{player.finishedmaps.toLocaleString()}</div>
+      <div className="w-14 sm:w-16 text-right text-xs sm:text-sm text-text tabular-nums">{player.finishedmaps.toLocaleString()}</div>
       <div className="hidden sm:block w-24 text-right text-sm text-text-muted">{lastSeen}</div>
     </div>
   );
