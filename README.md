@@ -121,8 +121,6 @@ Rate limiting uses [`rate-limiter-flexible`](https://github.com/animir/node-rate
 
 ### Site branding
 
-All are optional and public (baked into the client bundle at build time). The required `NEXT_PUBLIC_SITE_URL` is documented under [Security and limits](#security-and-limits).
-
 | Env var | Required | Default | Description |
 | --- | --- | --- | --- |
 | `NEXT_PUBLIC_SITE_TITLE` | No | `SurfStats - CS:GO Surf Community` | Browser tab / metadata title. |
