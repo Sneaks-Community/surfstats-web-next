@@ -47,7 +47,7 @@ export function Navigation({ siteName }: { siteName: string }) {
               <Activity className="h-8 w-8 text-primary" />
               <span className="text-text font-bold text-xl tracking-tight">{siteName}</span>
             </Link>
-            <div className="hidden md:block ml-10">
+            <div className="hidden lg:block ml-10">
               <div className="flex items-baseline space-x-4">
                 {navLinks.map((link) => (
                   link.children ? (
@@ -106,13 +106,13 @@ export function Navigation({ siteName }: { siteName: string }) {
           </div>
 
           {/* Desktop search and theme toggle */}
-          <div className="hidden md:flex items-center gap-4">
+          <div className="hidden lg:flex items-center gap-4">
             <SearchDropdown />
             <ThemeToggle />
           </div>
 
           {/* Mobile menu button */}
-          <div className="md:hidden flex items-center gap-2">
+          <div className="lg:hidden flex items-center gap-2">
             <ThemeToggle />
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -130,9 +130,10 @@ export function Navigation({ siteName }: { siteName: string }) {
         </div>
       </div>
 
-      {/* Mobile menu */}
+      {/* Mobile menu. Capped to the space under the bar and scrollable: the nav
+          is sticky, so anything past the viewport would be unreachable. */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-t border-border bg-background-secondary">
+        <div className="lg:hidden border-t border-border bg-background-secondary max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain">
           <div className="px-4 py-4 space-y-4">
             {/* Mobile nav links */}
             <div className="flex flex-col space-y-2">
