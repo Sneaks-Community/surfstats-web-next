@@ -22,9 +22,9 @@ vi.mock('../lib/logger', () => ({
   default: { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-let mapMetadata = new Map<string, { tier: number; wr_time: number | null }>();
+let mapMetadata = new Map<string, { mapname: string; tier: number; wr_time: number | null }>();
 
-const { getPlayerOverviewFromCache, getPlayerMapTimesFromCache } = await import('../lib/player-profile-cache');
+const { getPlayerOverviewFromCache, getPlayerMapTimesFromCache, getIncompleteMapsFromCache } = await import('../lib/player-profile-cache');
 
 const STEAM_ID = 'STEAM_1:0:9471875';
 
@@ -72,7 +72,7 @@ describe('getPlayerMapTimesFromCache', () => {
   // Metadata excludes untiered maps and tiers outside 1-10; a miss used to be
   // rendered as a fabricated tier 1 instead of being dropped.
   it('drops maps that are absent from the metadata blob', async () => {
-    mapMetadata = new Map([['surf_kitsune', { tier: 3, wr_time: 42 }]]);
+    mapMetadata = new Map([['surf_kitsune', { mapname: 'surf_kitsune', tier: 3, wr_time: 42 }]]);
     query.mockResolvedValue([[
       { mapname: 'surf_kitsune', runtimepro: 100, date: '', player_rank: 1 },
       { mapname: 'surf_untiered', runtimepro: 200, date: '', player_rank: 1 },
@@ -82,5 +82,22 @@ describe('getPlayerMapTimesFromCache', () => {
 
     expect(times.map(t => t.mapname)).toEqual(['surf_kitsune']);
     expect(times[0].tier).toBe(3);
+  });
+});
+
+describe('getIncompleteMapsFromCache', () => {
+  // The universe is the metadata blob — what /maps lists — so a tiered map that
+  // nobody has ever finished is absent from both instead of only from /maps.
+  it('subtracts the player times from the metadata universe', async () => {
+    mapMetadata = new Map([
+      ['surf_kitsune', { mapname: 'surf_kitsune', tier: 3, wr_time: 42 }],
+      ['surf_mesa', { mapname: 'surf_mesa', tier: 1, wr_time: null }],
+    ]);
+    query.mockResolvedValue([[{ mapname: 'surf_kitsune' }]]);
+
+    const incomplete = await getIncompleteMapsFromCache(STEAM_ID);
+
+    expect(incomplete.map(m => m.mapname)).toEqual(['surf_mesa']);
+    expect(incomplete[0].wr_time).toBeNull();
   });
 });

@@ -431,10 +431,10 @@ export async function getPlayerStageTimesFromCache(steamid: string): Promise<Pla
 }
 
 /**
- * Maps the player has NOT completed (anti-join against the full map list), with
- * tier from the map row and WR + linear/staged from the cached metadata (a map
- * missing there has no completions, so its WR is null either way). Expensive —
- * gated behind the Times → Map sub-tab.
+ * Maps the player has NOT completed: the cached map metadata minus the player's
+ * own times. The metadata is the same universe the /maps page lists (tier 1-10
+ * with at least one completion), so a tiered map nobody has ever finished no
+ * longer shows up here as incomplete. Gated behind the Times → Map sub-tab.
  *
  * @param steamid - The player's SteamID
  * @returns Incomplete-maps list (empty on invalid id / error)
@@ -452,33 +452,29 @@ export async function getIncompleteMapsFromCache(steamid: string): Promise<Incom
     async () => {
       const [rows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
-          SELECT
-            m.mapname,
-            m.tier
-          FROM ck_maptier m
-          LEFT JOIN ck_playertimes pt ON m.mapname = pt.mapname AND pt.steamid = ?
-          WHERE pt.mapname IS NULL AND m.tier BETWEEN 1 AND 10
-          ORDER BY m.tier ASC, m.mapname ASC
+          SELECT mapname
+          FROM ck_playertimes
+          WHERE steamid = ?
         `, [validSteamId]),
         QUERY_TIMEOUT_MS,
         'Query timeout exceeded'
       );
 
+      const completed = new Set(rows.map(r => r.mapname));
       const allMapMetadata = await getAllMapMetadataFromCache();
-      return rows.map(r => {
-        const mapMetadata = allMapMetadata.get(r.mapname);
-        const mapType: 'linear' | 'staged' = mapMetadata && isStagedMap(mapMetadata) ? 'staged' : 'linear';
-        return {
-          mapname: r.mapname,
-          tier: r.tier,
-          wr_time: mapMetadata?.wr_time ?? null,
-          mapType,
-        };
-      });
+
+      return Array.from(allMapMetadata.values())
+        .filter(m => !completed.has(m.mapname))
+        .sort((a, b) => a.tier - b.tier || a.mapname.localeCompare(b.mapname))
+        .map(m => ({
+          mapname: m.mapname,
+          tier: m.tier,
+          wr_time: m.wr_time,
+          mapType: isStagedMap(m) ? 'staged' : 'linear',
+        }));
     },
     {
       lock: true,
-      expensive: true,
       onError: (error) => {
         logger.error(`[PlayerProfileCache] Failed to fetch incomplete maps for ${validSteamId}: ${getErrorMessage(error)}`);
         return [];
@@ -489,7 +485,8 @@ export async function getIncompleteMapsFromCache(steamid: string): Promise<Incom
 
 /**
  * Bonus zones the player has NOT completed (anti-join against the full bonus
- * zone list). Expensive — gated behind the Times → Bonus sub-tab.
+ * zone list), restricted to the maps the cached metadata lists so the universe
+ * matches /maps. Expensive — gated behind the Times → Bonus sub-tab.
  *
  * @param steamid - The player's SteamID
  * @returns Incomplete-bonuses list (empty on invalid id / error)
@@ -525,11 +522,14 @@ export async function getIncompleteBonusesFromCache(steamid: string): Promise<In
         'Query timeout exceeded'
       );
 
-      return rows.map(r => ({
-        mapname: r.mapname,
-        zonegroup: r.zonegroup,
-        wr_time: r.wr_time,
-      }));
+      const allMapMetadata = await getAllMapMetadataFromCache();
+      return rows
+        .filter(r => allMapMetadata.has(r.mapname))
+        .map(r => ({
+          mapname: r.mapname,
+          zonegroup: r.zonegroup,
+          wr_time: r.wr_time,
+        }));
     },
     {
       lock: true,
@@ -543,7 +543,8 @@ export async function getIncompleteBonusesFromCache(steamid: string): Promise<In
 }
 
 /**
- * Stages the player has NOT completed (anti-join against the full stage list).
+ * Stages the player has NOT completed (anti-join against the full stage list),
+ * restricted to the maps the cached metadata lists so the universe matches /maps.
  * Expensive — gated behind the Times → Stage sub-tab.
  *
  * Building the stage universe from `ck_zones` needs two corrections, both
@@ -595,10 +596,13 @@ export async function getIncompleteStagesFromCache(steamid: string): Promise<Inc
         'Query timeout exceeded'
       );
 
-      return rows.map(r => ({
-        map: r.map,
-        stage: r.stage,
-      }));
+      const allMapMetadata = await getAllMapMetadataFromCache();
+      return rows
+        .filter(r => allMapMetadata.has(r.map))
+        .map(r => ({
+          map: r.map,
+          stage: r.stage,
+        }));
     },
     {
       lock: true,
