@@ -422,25 +422,29 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
     return 'text-red-400';
   };
 
-  // Get count for current tab based on status filter
-  const getTabCount = (tabId: TabType): number => {
-    if (statusFilter === 'finished') {
-      // Prefer the fetched list length once a section has loaded; otherwise fall
-      // back to the authoritative overview counts so badges are correct before
-      // the (lazily-fetched) Bonuses/Stages lists arrive.
-      switch (tabId) {
-        case 'maps': return mapsData ? maps.length : counts.maps;
-        case 'bonuses': return bonusesData ? bonuses.length : counts.bonuses;
-        case 'stages': return stagesData ? stages.length : counts.stages;
-      }
-    } else {
-      switch (tabId) {
-        case 'maps': return incompleteMaps.length;
-        case 'bonuses': return incompleteBonuses.length;
-        case 'stages': return incompleteStages.length;
-      }
+  // Prefer the fetched list length once a section has loaded; otherwise fall
+  // back to the authoritative overview counts so badges are correct before the
+  // (lazily-fetched) Bonuses/Stages lists arrive.
+  const finishedCount = (tabId: TabType): number => {
+    switch (tabId) {
+      case 'maps': return mapsData ? maps.length : counts.maps;
+      case 'bonuses': return bonusesData ? bonuses.length : counts.bonuses;
+      case 'stages': return stagesData ? stages.length : counts.stages;
     }
   };
+
+  // Null until the section loads: only the active tab fetches, and there is no
+  // overview equivalent to fall back on, so an unloaded tab has no count yet.
+  const incompleteCount = (tabId: TabType): number | null => {
+    switch (tabId) {
+      case 'maps': return mapsData ? incompleteMaps.length : null;
+      case 'bonuses': return bonusesData ? incompleteBonuses.length : null;
+      case 'stages': return stagesData ? incompleteStages.length : null;
+    }
+  };
+
+  const getTabCount = (tabId: TabType): number | null =>
+    statusFilter === 'finished' ? finishedCount(tabId) : incompleteCount(tabId);
 
   const tabs = [
     { id: 'maps' as TabType, label: 'Maps', icon: MapIcon, color: 'text-blue-500' },
@@ -448,9 +452,9 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
     { id: 'stages' as TabType, label: 'Stages', icon: Layers, color: 'text-orange-500' },
   ];
 
-  const statusFilters: Array<{ id: StatusFilter; label: string; count: number; icon: typeof CheckCircle }> = [
-    { id: 'finished', label: 'Finished', count: activeTab === 'maps' ? (mapsData ? maps.length : counts.maps) : activeTab === 'bonuses' ? (bonusesData ? bonuses.length : counts.bonuses) : (stagesData ? stages.length : counts.stages), icon: CheckCircle },
-    { id: 'incomplete', label: 'Incomplete', count: activeTab === 'maps' ? incompleteMaps.length : activeTab === 'bonuses' ? incompleteBonuses.length : incompleteStages.length, icon: Circle },
+  const statusFilters: Array<{ id: StatusFilter; label: string; count: number | null; icon: typeof CheckCircle }> = [
+    { id: 'finished', label: 'Finished', count: finishedCount(activeTab), icon: CheckCircle },
+    { id: 'incomplete', label: 'Incomplete', count: incompleteCount(activeTab), icon: Circle },
   ];
 
   const currentSearchQuery = searchQueries[activeTab];
@@ -483,7 +487,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                 <Icon className={`h-4 w-4 sm:h-5 sm:w-5 ${isActive ? tab.color : ''}`} />
                 <span className="font-medium text-xs sm:text-sm">{tab.label}</span>
                 <span className="bg-surface-active text-text-muted text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full">
-                  {getTabCount(tab.id)}
+                  {getTabCount(tab.id) ?? '–'}
                 </span>
                 {isActive && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500 sm:hidden" />
@@ -511,7 +515,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                 <Icon className={`h-4 w-4 ${isActive ? 'text-primary-500' : ''}`} />
                 <span className="text-xs sm:text-sm">{filter.label}</span>
                 <span className="bg-surface-active text-text-muted text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full">
-                  {filter.count}
+                  {filter.count ?? '–'}
                 </span>
                 {isActive && (
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary-500 hidden sm:block" />
