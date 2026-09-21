@@ -24,6 +24,8 @@ const navLinks = [
 export function Navigation({ siteName }: { siteName: string }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobilePlayersExpanded, setMobilePlayersExpanded] = useState(false);
+  // Hover alone would keep the panel open after a child click, since the pointer is still on it
+  const [dropdownDismissed, setDropdownDismissed] = useState(false);
   const pathname = usePathname();
 
   // Check if a path is active (exact match)
@@ -55,6 +57,8 @@ export function Navigation({ siteName }: { siteName: string }) {
                     <div key={link.href} className="group relative">
                       <Link
                         href={link.href}
+                        onMouseEnter={() => setDropdownDismissed(false)}
+                        onFocus={() => setDropdownDismissed(false)}
                         className={`inline-flex items-center gap-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                           isParentActive(link.href)
                             ? 'text-text bg-surface-hover'
@@ -66,12 +70,17 @@ export function Navigation({ siteName }: { siteName: string }) {
                       </Link>
                       
                       {/* Dropdown panel: hidden by visibility, so its links leave the tab order until shown */}
-                      <div className="invisible absolute left-0 mt-0 w-48 rounded-md shadow-lg bg-surface border border-border ring-1 ring-black ring-opacity-5 group-hover:visible group-focus-within:visible">
+                      <div
+                        className={`invisible absolute left-0 mt-0 w-48 rounded-md shadow-lg bg-surface border border-border ring-1 ring-black ring-opacity-5 ${
+                          dropdownDismissed ? '' : 'group-hover:visible group-focus-within:visible'
+                        }`}
+                      >
                         <div className="py-1">
                           {link.children.map((child) => (
                             <Link
                               key={child.href}
                               href={child.href}
+                              onClick={() => setDropdownDismissed(true)}
                               aria-current={isActive(child.href) ? 'page' : undefined}
                               className={`block px-4 py-2 text-sm transition-colors ${
                                 isActive(child.href)
