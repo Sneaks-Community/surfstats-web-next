@@ -11,3 +11,4 @@ sql/*
 *.tsbuildinfo
 docker-compose.yml
 .vscode/
+.claude/

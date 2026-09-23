@@ -15,6 +15,7 @@ export default defineConfig(
       "eslint.config.mjs",
       "postcss.config.mjs",
       "next.config.ts",
+      ".claude/**/*",
     ],
   },
 
