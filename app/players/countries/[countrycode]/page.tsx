@@ -121,7 +121,7 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
             players={players}
             avatars={avatarsWithData}
             emptyMessage="No players found for this country."
-            rankLabel="Country Rank"
+            rankLabel="Rank"
             sort={{
               baseUrl: `/players/countries/${countryCode}`,
               queryParams,

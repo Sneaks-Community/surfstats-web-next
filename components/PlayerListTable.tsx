@@ -28,10 +28,6 @@ interface PlayerListTableProps {
   avatars: AvatarMap;
   emptyMessage: string;
   sort?: PlayerListSort;
-  /**
-   * Header for the rank column. The country page passes "Country Rank" because
-   * its `rank` is computed within the country, not against the global list.
-   */
   rankLabel?: string;
 }
 
