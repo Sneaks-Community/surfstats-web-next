@@ -1,6 +1,6 @@
 {
   "name": "surfstats-web-next",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "type": "module",
   "engines": {
     "node": ">=24.0.0"
@@ -23,7 +23,7 @@
     "i18n-iso-countries": "^7.14.0",
     "lucide-react": "^1.47.0",
     "mysql2": "^3.24.4",
-    "next": "^16.3.5",
+    "next": "^16.3.6",
     "pino": "^10.3.1",
     "rate-limiter-flexible": "^11.2.1",
     "react": "^19.3.0",
@@ -41,11 +41,11 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "eslint": "^10.11.0",
-    "eslint-config-next": "^16.3.5",
+    "eslint-config-next": "^16.3.6",
     "eslint-plugin-react-hooks": "^7.1.1",
     "tailwindcss": "4.3.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "8.70.0",
+    "typescript-eslint": "8.70.1",
     "vitest": "^5.0.1"
   },
   "overrides": {
