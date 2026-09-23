@@ -4,6 +4,7 @@ import {
   formatPlaytime,
   formatPlaytimeToggle,
   formatTime,
+  isSurfMap,
   mapImageUrl,
   matchesQuery,
   parseIntParam,
@@ -115,6 +116,17 @@ describe('mapImageUrl', () => {
       'https://cdn/______etc_passwd.jpg'
     );
     expect(mapImageUrl('https://cdn/', null)).toBe('https://cdn/.jpg');
+  });
+});
+
+// Server cards link only surf maps; KZ/Bhop maps have no ckSurf map page.
+describe('isSurfMap', () => {
+  it('accepts only names with the surf_ prefix', () => {
+    expect(isSurfMap('surf_beginner')).toBe(true);
+    expect(isSurfMap('kz_beginnerblock_go')).toBe(false);
+    expect(isSurfMap('bhop_arcane')).toBe(false);
+    expect(isSurfMap('workshop/123/surf_beginner')).toBe(false);
+    expect(isSurfMap(undefined)).toBe(false);
   });
 });
 

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { Server, Users, ChevronDown, Clock, Check, Copy } from 'lucide-react';
+import { useId, useRef, useState } from 'react';
+import { Users, ChevronRight, Clock, Check, Copy, X, Mountain } from 'lucide-react';
 import Link from '@/components/Link';
 import MapImage from '@/components/MapImage';
-import MapLinkWithPreview from '@/components/MapLinkWithPreview';
-import { mapImageUrl } from '@/lib/utils';
+import { getTierColor } from '@/lib/tierColors';
+import { isSurfMap, mapImageUrl } from '@/lib/utils';
 import type { ServerStatus, Player } from '@/lib/server-status';
 
 function formatTime(seconds?: number) {
@@ -18,22 +18,80 @@ function formatTime(seconds?: number) {
   return `${hours}h ${remainingMins}m`;
 }
 
-/** Links the thumbnail only when the server reported a map. */
-function MapThumb({ href, className, children }: { href: string | null; className: string; children: React.ReactNode }) {
-  if (!href) return <div className={className}>{children}</div>;
-  return <Link href={href} className={className}>{children}</Link>;
+/** Dimmed map image fading into the surface color, so text keeps the theme colors. */
+function MapBackdrop({ src }: { src: string }) {
+  return (
+    <div aria-hidden="true" className="absolute inset-0">
+      {/* Keyed so a new map retries after the previous image 404'd. */}
+      <MapImage
+        key={src}
+        src={src}
+        alt=""
+        unoptimized
+        fill
+        loading="eager"
+        className="object-cover opacity-60"
+        referrerPolicy="no-referrer"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-surface from-40% to-surface/40" />
+    </div>
+  );
 }
 
-export default function ServerCard({ server, mapImagesUrl }: { server: ServerStatus; mapImagesUrl: string }) {
-  const [expanded, setExpanded] = useState(false);
+function StatusDot({ server }: { server: ServerStatus }) {
+  if (!server.online) return <span className="inline-flex rounded-full h-2 w-2 bg-red-500 shrink-0" />;
+  const color = (server.players ?? 0) < (server.maxplayers ?? 0) ? 'bg-green-500' : 'bg-yellow-500';
+  return (
+    <span className="relative flex h-2 w-2 shrink-0">
+      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${color}`}></span>
+      <span className={`relative inline-flex rounded-full h-2 w-2 ${color}`}></span>
+    </span>
+  );
+}
+
+function MapLabel({ map, tier }: { map?: string; tier: number | null }) {
+  const tierColor = tier === null ? null : getTierColor(tier);
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      {isSurfMap(map) ? (
+        <Link href={`/maps/${map}`} className="pointer-events-auto truncate text-sm font-medium text-primary hover:underline">
+          {map}
+        </Link>
+      ) : (
+        <span className={`truncate text-sm font-medium ${map ? 'text-text' : 'text-text-muted'}`}>
+          {map ?? 'Unknown map'}
+        </span>
+      )}
+      {/* TierBadge is 30px tall; this stays on the 20px text line so cards keep one height. */}
+      {tierColor && (
+        <span
+          className={`inline-flex h-5 shrink-0 items-center gap-1 rounded border px-1.5 text-xs font-bold uppercase tracking-wider ${tierColor.bg} ${tierColor.text} ${tierColor.border}`}
+        >
+          <Mountain className="h-3 w-3" />T{tier}
+        </span>
+      )}
+    </div>
+  );
+}
+
+export default function ServerCard({
+  server,
+  tier,
+  mapImagesUrl,
+}: {
+  server: ServerStatus;
+  tier: number | null;
+  mapImagesUrl: string;
+}) {
   const [copied, setCopied] = useState(false);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
 
   const address = `${server.config.ip}:${server.config.port}`;
-  // gamedig can report an online server with no current map; a link built from
-  // it lands on /maps/undefined.
-  const mapHref = server.map ? `/maps/${server.map}` : null;
-  // Unique per card so aria-controls resolves and ids don't collide across cards.
-  const panelId = `server-details-${server.config.ip}-${server.config.port}`;
+  const players = server.playerList ?? [];
+  const hasPlayers = server.online && players.length > 0;
+  // gamedig can report an online server with no current map.
+  const backdropSrc = server.online && server.map ? mapImageUrl(mapImagesUrl, server.map) : null;
 
   const copyAddress = async () => {
     try {
@@ -41,60 +99,54 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Clipboard unavailable (e.g. insecure context) — silently ignore
+      // Clipboard unavailable (e.g. insecure context); silently ignore
     }
   };
 
+  const connect = (
+    <a
+      href={`steam://connect/${address}`}
+      className="pointer-events-auto hidden sm:inline-flex px-3 py-1.5 bg-surface hover:bg-surface-hover text-primary border border-primary/40 rounded-md text-sm font-medium transition-colors"
+    >
+      Connect
+    </a>
+  );
+
   return (
-    <div className="bg-surface border border-border rounded-xl overflow-hidden flex flex-col transition-all">
-      <div className={`relative px-4 py-3 flex items-center justify-between transition-colors ${server.online ? 'cursor-pointer hover:bg-surface-hover/50' : ''}`}>
-        {/* Stretched toggle: keeps the whole header clickable without nesting
+    <>
+      <div
+        className={`relative bg-surface border border-border rounded-xl overflow-hidden transition-colors ${hasPlayers ? 'hover:border-primary/50' : ''}`}
+      >
+        {backdropSrc && <MapBackdrop src={backdropSrc} />}
+        {/* Stretched trigger: keeps the whole card clickable without nesting
             the copy/connect controls inside a button. */}
-        {server.online && (
+        {hasPlayers && (
           <button
             type="button"
-            className="absolute inset-0 w-full"
-            onClick={() => setExpanded(!expanded)}
-            aria-expanded={expanded}
-            aria-controls={panelId}
+            className="absolute inset-0 w-full rounded-xl cursor-pointer focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary"
+            onClick={() => dialogRef.current?.showModal()}
+            aria-haspopup="dialog"
           >
-            <span className="sr-only">
-              {expanded ? 'Hide' : 'Show'} details for {server.config.name}
-            </span>
+            <span className="sr-only">Show players on {server.config.name}</span>
           </button>
         )}
-        <div className="relative flex items-center gap-4 pointer-events-none">
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-surface-hover/50 border border-border/50 shrink-0">
-            <Server className={`h-5 w-5 ${server.online ? 'text-primary' : 'text-text-placeholder'}`} />
-          </div>
-          
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold text-text">{server.config.name}</h2>
-              <span className="relative flex h-2 w-2">
-                {server.online ? (
-                  (server.players ?? 0) < (server.maxplayers ?? 0) ? (
-                    <>
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-500 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-yellow-500"></span>
-                    </>
-                  )
-                ) : (
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                )}
-              </span>
+        <div className="relative pointer-events-none p-3 flex justify-between gap-3">
+          <div className="min-w-0 flex flex-col gap-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <StatusDot server={server} />
+              <h2 className="truncate text-base font-semibold text-text">{server.config.name}</h2>
             </div>
+            {server.online ? (
+              <MapLabel map={server.map} tier={tier} />
+            ) : (
+              <div className="text-sm font-medium uppercase tracking-wider text-text-muted">Offline</div>
+            )}
             <button
               type="button"
               onClick={() => void copyAddress()}
               title="Copy address to clipboard"
               aria-label={copied ? 'Address copied to clipboard' : `Copy ${address} to clipboard`}
-              className="group pointer-events-auto inline-flex items-center gap-1.5 text-xs text-text-placeholder hover:text-text font-mono mt-0.5 transition-colors cursor-pointer"
+              className="group self-start pointer-events-auto inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text font-mono transition-colors cursor-pointer"
             >
               <span>{address}</span>
               {copied ? (
@@ -104,119 +156,80 @@ export default function ServerCard({ server, mapImagesUrl }: { server: ServerSta
               )}
             </button>
           </div>
+          {server.online && (
+            <div className="flex flex-col items-end justify-between shrink-0">
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-surface/80 px-2 py-0.5 text-sm font-medium text-text tabular-nums">
+                <Users className="h-3.5 w-3.5 text-text-muted" />
+                {server.players} <span className="text-text-muted">/ {server.maxplayers}</span>
+              </span>
+              <div className="flex items-center gap-2">
+                {connect}
+                {hasPlayers && <ChevronRight className="h-5 w-5 rounded bg-surface/80 text-text-muted" />}
+              </div>
+            </div>
+          )}
         </div>
-        
-        {server.online ? (
-          <div className="relative flex items-center gap-4 sm:gap-6 pointer-events-none">
-            <div className="hidden sm:block text-right">
-              {server.map ? (
-                <MapLinkWithPreview mapname={server.map} className="pointer-events-auto text-sm font-medium text-primary hover:underline block">
-                  {server.map}
-                </MapLinkWithPreview>
-              ) : (
-                <span className="text-sm font-medium text-text-placeholder">Unknown Map</span>
-              )}
-              <div className="text-[10px] uppercase tracking-wider text-text-placeholder mt-0.5">Map</div>
-            </div>
-            
-            <div className="hidden sm:block text-right">
-              <div className="text-sm font-medium text-text">
-                {server.players} <span className="text-text-placeholder">/ {server.maxplayers}</span>
-              </div>
-              <div className="text-[10px] uppercase tracking-wider text-text-placeholder mt-0.5">Players</div>
-            </div>
-            
-            <div className="flex items-center gap-3">
-              <a
-                href={`steam://connect/${server.config.ip}:${server.config.port}`}
-                className="pointer-events-auto hidden sm:inline-flex px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 rounded-md text-sm font-medium transition-colors"
-              >
-                Connect
-              </a>
-              <ChevronDown className={`h-5 w-5 text-text-placeholder transition-transform ${expanded ? 'rotate-180' : ''}`} />
-            </div>
-          </div>
-        ) : (
-          <div className="relative text-sm font-medium text-text-placeholder uppercase tracking-wider">
-            Offline
-          </div>
-        )}
       </div>
-      
-      {expanded && server.online && (
-        <div id={panelId} className="border-t border-border bg-surface/30">
-          {/* Mobile-only stats row */}
-          <div className="sm:hidden flex items-center justify-between p-4 border-b border-border/50 bg-surface-hover/20">
-            <div>
-              <div className="text-[10px] uppercase tracking-wider text-text-placeholder mb-1">Map</div>
-              {server.map ? (
-                <Link href={`/maps/${server.map}`} className="text-sm font-medium text-primary hover:underline">
-                  {server.map}
-                </Link>
-              ) : (
-                <span className="text-sm font-medium text-text-placeholder">Unknown</span>
-              )}
-            </div>
-            <div className="text-right">
-              <div className="text-[10px] uppercase tracking-wider text-text-placeholder mb-1">Players</div>
-              <div className="text-sm font-medium text-text">
-                {server.players} <span className="text-text-placeholder">/ {server.maxplayers}</span>
+
+      {/* A sibling, not a child: hovering the open dialog would otherwise
+          highlight the card's border through the backdrop. */}
+      {hasPlayers && (
+        <dialog
+          ref={dialogRef}
+          closedby="any"
+          aria-labelledby={titleId}
+          className="m-auto w-[calc(100%-2rem)] max-w-lg rounded-xl border border-border bg-surface text-text shadow-2xl backdrop:bg-background/70 backdrop:backdrop-blur-sm"
+        >
+          {/* Layout lives here: `flex` on the dialog would override its closed display:none. */}
+          <div className="flex max-h-[85dvh] flex-col">
+            <div className="relative shrink-0 border-b border-border">
+              {backdropSrc && <MapBackdrop src={backdropSrc} />}
+              <div className="relative flex items-start justify-between gap-3 p-4">
+                <div className="min-w-0 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <StatusDot server={server} />
+                    <h2 id={titleId} className="truncate text-lg font-semibold text-text">
+                      {server.config.name}
+                    </h2>
+                  </div>
+                  <MapLabel map={server.map} tier={tier} />
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {connect}
+                  <button
+                    type="button"
+                    onClick={() => dialogRef.current?.close()}
+                    aria-label="Close"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-surface/80 text-text-muted hover:bg-surface-hover hover:text-text transition-colors cursor-pointer"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-          
-          {/* Map Image Section */}
-          <div className="p-4 border-b border-border/50">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <MapThumb href={mapHref} className="relative h-24 w-40 rounded-lg overflow-hidden border border-border/50 bg-surface-hover flex-shrink-0 hover:border-primary/50 transition-colors">
-                <MapImage
-                  src={mapImageUrl(mapImagesUrl, server.map)}
-                  alt={server.map ?? 'Unknown Map'}
-                  unoptimized
-                  fill
-                  className="object-cover"
-                  referrerPolicy="no-referrer"
-                />
-              </MapThumb>
-              <div className="flex-1">
-                <div className="text-[10px] uppercase tracking-wider text-text-placeholder mb-1">Current Map</div>
-                {server.map ? (
-                  <Link href={`/maps/${server.map}`} className="text-lg font-semibold text-primary hover:underline">
-                    {server.map}
-                  </Link>
-                ) : (
-                  <span className="text-lg font-semibold text-text-placeholder">Unknown Map</span>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          <div className="p-4">
-            <h3 className="text-sm font-medium text-text-muted mb-3 flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Connected Players
-            </h3>
-            
-            {server.playerList && server.playerList.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                {server.playerList.map((player: Player, idx: number) => (
-                  <div key={idx} className="flex items-center justify-between bg-surface-hover/40 rounded p-2 border border-border/30">
+
+            <div className="min-h-0 overflow-y-auto p-4">
+              <h3 className="text-sm font-medium text-text-muted mb-3 flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                {server.players} / {server.maxplayers} players
+              </h3>
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {players.map((player: Player, idx: number) => (
+                  <li key={idx} className="flex items-center justify-between bg-surface-hover/40 rounded p-2 border border-border/30">
                     <span className="text-sm text-text truncate pr-2 font-medium">
                       {player.name || 'Connecting...'}
                     </span>
-                    <div className="flex items-center gap-1 text-xs text-text-placeholder shrink-0">
+                    <span className="flex items-center gap-1 text-xs text-text-muted shrink-0">
                       <Clock className="h-3 w-3" />
                       {formatTime(player.time)}
-                    </div>
-                  </div>
+                    </span>
+                  </li>
                 ))}
-              </div>
-            ) : (
-              <div className="text-sm text-text-placeholder italic py-2">No players currently online.</div>
-            )}
+              </ul>
+            </div>
           </div>
-        </div>
+        </dialog>
       )}
-    </div>
+    </>
   );
 }

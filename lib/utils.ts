@@ -227,3 +227,8 @@ export function mapImageUrl(baseUrl: string, map: string | null | undefined): st
   const safeMap = (map ?? '').replace(/[^a-zA-Z0-9_-]/g, '_');
   return `${baseUrl}${safeMap}.jpg`;
 }
+
+/** Whether a live server's map is a surf map; other servers' maps (KZ, Bhop) have no map page. */
+export function isSurfMap(map: string | null | undefined): map is `surf_${string}` {
+  return !!map && map.startsWith('surf_');
+}
