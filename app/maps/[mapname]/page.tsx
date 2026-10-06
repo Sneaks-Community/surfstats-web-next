@@ -5,13 +5,12 @@ import { Skeleton } from '@/components/Skeleton';
 import { Map as MapIcon, Users, Layers, Target, Download } from 'lucide-react';
 import MapImage from '@/components/MapImage';
 import { validateMapName, validatePlayerName } from '@/lib/validators';
-import { mapImageUrl, getMapImagesUrl } from '@/lib/utils';
+import { mapImageUrl, getMapImagesUrl, isStagedMap } from '@/lib/utils';
 import logger from '@/lib/logger';
 import MapRecordsTabs from './components/MapRecordsTabs';
 import PageTabs from '@/components/PageTabs';
 import TierBadge from '@/components/TierBadge';
 import MapChartGrid from './components/charts/MapChartGrid';
-import { isStagedMap } from '@/lib/map-cache';
 import { getMapMetadataFromCache } from '@/lib/map-cache';
 import { getMapChartDataFromCache } from '@/lib/map-stats-cache';
 

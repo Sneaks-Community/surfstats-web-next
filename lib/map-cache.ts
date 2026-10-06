@@ -23,18 +23,6 @@ export interface MapMetadata {
 }
 
 /**
- * Whether a map is staged rather than linear.
- *
- * `stages` comes from `COUNT(*) + 1` over the stage zones, so a linear map is 0
- * and a staged map is at least 2 — never 1. Call sites used to test `> 0` and
- * `> 1` interchangeably, which agreed only by that accident; route every check
- * through here so one query change can't split the filter from the badge.
- */
-export function isStagedMap(metadata: Pick<MapMetadata, 'stages'>): boolean {
-  return metadata.stages > 1;
-}
-
-/**
  * Fetch all map metadata from database in a single optimized query
  * Uses JOINs instead of correlated subqueries for better performance
  */

@@ -48,7 +48,6 @@ export async function GET(
   if (!bonusExists) {
     return NextResponse.json({
       bonuses: [],
-      bonusGroupsList,
       pagination: { bonus, page, pageSize, offset: (page - 1) * pageSize, total: 0, totalPages: 0 },
     }, {
       headers: { 'Cache-Control': RECORDS_CACHE_CONTROL },
@@ -64,10 +63,7 @@ export async function GET(
     const totalPages = Math.max(1, Math.ceil(counts.bonusesTotal / pageSize));
     const data = await getBonusRecordsFromCache(validMapname, bonus, Math.min(page, totalPages), pageSize);
 
-    return NextResponse.json({
-      ...data,
-      bonusGroupsList,
-    }, {
+    return NextResponse.json(data, {
       headers: { 'Cache-Control': RECORDS_CACHE_CONTROL },
     });
   } catch (error: unknown) {

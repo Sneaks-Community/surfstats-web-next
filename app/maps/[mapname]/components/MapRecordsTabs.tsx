@@ -11,6 +11,7 @@ import {
   wrDiff,
   ITEMS_PER_PAGE,
   RECORDS_PAGE_SIZE,
+  isStagedMap,
   type SortDirection,
 } from '@/lib/utils';
 import { useRecordSearch, type LoadError } from '@/hooks/useRecordSearch';
@@ -139,6 +140,7 @@ export default function MapRecordsTabs({
   numStages,
 }: MapRecordsTabsProps) {
   const searchParams = useSearchParams();
+  const staged = isStagedMap({ stages: numStages });
 
   // Get initial state from URL
   const initialTab = oneOf(TABS, searchParams.get('tab'), 'map');
@@ -263,7 +265,7 @@ export default function MapRecordsTabs({
   // rather than an in-flight guard: switching stages rapidly must never let an
   // earlier response overwrite the current selection.
   useEffect(() => {
-    if (activeTab !== 'stages' || numStages <= 1) return;
+    if (activeTab !== 'stages' || !staged) return;
 
     const controller = new AbortController();
     void (async () => {
@@ -287,7 +289,7 @@ export default function MapRecordsTabs({
       }
     })();
     return () => controller.abort();
-  }, [activeTab, selectedStage, numStages, mapname, retryToken]);
+  }, [activeTab, selectedStage, staged, mapname, retryToken]);
 
   // Load bonus records when the selected bonus or page changes, with a
   // client-side cache. Skip while a non-rank sort is active — that uses the
@@ -611,7 +613,7 @@ export default function MapRecordsTabs({
                 Bonus
               </button>
             )}
-            {numStages > 1 && (
+            {staged && (
               <button {...tabProps('stages')} onClick={() => handleTabChange('stages')} className={tabButtonClass(activeTab === 'stages')}>
                 <Layers className="h-4 w-4" />
                 Stages
@@ -668,7 +670,7 @@ export default function MapRecordsTabs({
         )}
 
         {/* Stage sub-tabs */}
-        {activeTab === 'stages' && numStages > 1 && (
+        {activeTab === 'stages' && staged && (
           <div className="flex gap-2 mt-4 flex-wrap items-center">
             <span className="text-xs text-text-muted font-medium px-2">Top 100 times:</span>
             {Array.from({ length: numStages }, (_, i) => i + 1).map((stageNum) => (
@@ -730,7 +732,7 @@ export default function MapRecordsTabs({
           />
         )}
 
-        {activeTab === 'stages' && numStages > 1 && (
+        {activeTab === 'stages' && staged && (
           <LeaderboardTable
             rows={stageRows.map(toStageRow)}
             sortField={sortField}

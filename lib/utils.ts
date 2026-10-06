@@ -119,6 +119,18 @@ export const HEATMAP_MAX_SESSIONS = 10000;
 export type SortDirection = 'asc' | 'desc';
 
 /**
+ * Whether a map is staged rather than linear. Client-safe, so the map page's
+ * tabs use the same check as the server.
+ *
+ * `stages` comes from `COUNT(*) + 1` over the stage zones, so a linear map is 0
+ * and a staged map is at least 2, never 1. Route every check through here so one
+ * query change can't split the filter from the badge.
+ */
+export function isStagedMap(metadata: { stages: number }): boolean {
+  return metadata.stages > 1;
+}
+
+/**
  * Shortest search that reaches the DB. The server counts the sanitized query, so
  * one that sanitizes shorter (`ab'`) gets empty results, not an error.
  */

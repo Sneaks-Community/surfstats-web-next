@@ -9,7 +9,8 @@ import 'server-only';
 import pool from './db';
 import type { RowDataPacket } from 'mysql2';
 import { cachedFetch, type RefreshOptions } from './cached-fetch';
-import { getAllMapMetadataFromCache, isStagedMap } from './map-cache';
+import { getAllMapMetadataFromCache } from './map-cache';
+import { isStagedMap } from './utils';
 import { validateSteamId } from './validators';
 import { recordProfileView } from './recent-profiles';
 import logger from './logger';
@@ -549,29 +550,23 @@ export async function getLinearVsStagedPerTierFromCache(steamid: string, { force
     label: 'tier distribution',
     empty: [],
     force,
-    expensive: true,
     fetch: async (validSteamId) => {
-      const [rows] = await pool.query<RowDataPacket[]>(`
-        SELECT
-          m.tier,
-          COALESCE(SUM(CASE WHEN staged_map.mapname IS NULL THEN 1 ELSE 0 END), 0) as \`linear\`,
-          COALESCE(SUM(CASE WHEN staged_map.mapname IS NOT NULL THEN 1 ELSE 0 END), 0) as \`staged\`
-        FROM ck_maptier m
-        INNER JOIN ck_playertimes pt ON m.mapname = pt.mapname AND pt.steamid = ?
-        LEFT JOIN (
-          SELECT DISTINCT mapname FROM ck_zones WHERE zonetype = 3
-        ) staged_map ON m.mapname = staged_map.mapname
-        WHERE m.tier BETWEEN 1 AND 10
-        GROUP BY m.tier
-        ORDER BY m.tier ASC
-      `, [validSteamId]);
+      const [rows] = await pool.query<RowDataPacket[]>(
+        'SELECT mapname FROM ck_playertimes WHERE steamid = ?',
+        [validSteamId]
+      );
+      const allMapMetadata = await getAllMapMetadataFromCache();
 
-      // MySQL returns SUM/tier as strings, so convert them here.
-      return rows.map(row => ({
-        tier: Number(row.tier),
-        linear: Number(row.linear) || 0,
-        staged: Number(row.staged) || 0,
-      }));
+      const byTier = new Map<number, TierDistributionRow>();
+      for (const { mapname } of rows) {
+        const map = allMapMetadata.get(mapname);
+        if (!map) continue;
+        const row = byTier.get(map.tier) ?? { tier: map.tier, linear: 0, staged: 0 };
+        if (isStagedMap(map)) row.staged++;
+        else row.linear++;
+        byTier.set(map.tier, row);
+      }
+      return [...byTier.values()].sort((a, b) => a.tier - b.tier);
     },
   });
 }

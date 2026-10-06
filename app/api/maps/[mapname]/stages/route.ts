@@ -48,7 +48,6 @@ export async function GET(
   if (!stageExists) {
     return NextResponse.json({
       stages: [],
-      stagesList,
       pagination: { stage, page, pageSize, offset, total: 0, totalPages: 0 },
     }, {
       headers: { 'Cache-Control': RECORDS_CACHE_CONTROL },
@@ -63,10 +62,7 @@ export async function GET(
       pageSize
     );
 
-    return NextResponse.json({
-      ...data,
-      stagesList,
-    }, {
+    return NextResponse.json(data, {
       headers: { 'Cache-Control': RECORDS_CACHE_CONTROL },
     });
   } catch (error: unknown) {

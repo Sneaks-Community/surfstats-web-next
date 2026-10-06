@@ -16,15 +16,19 @@ vi.mock('../lib/valkey', () => ({
 vi.mock('../lib/db', () => ({ default: { query: (...args: unknown[]) => query(...args) } }));
 vi.mock('../lib/map-cache', () => ({
   getAllMapMetadataFromCache: () => Promise.resolve(mapMetadata),
-  isStagedMap: () => false,
 }));
 vi.mock('../lib/logger', () => ({
   default: { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-let mapMetadata = new Map<string, { mapname: string; tier: number; wr_time: number | null }>();
+let mapMetadata = new Map<string, { mapname: string; tier: number; wr_time: number | null; stages?: number }>();
 
-const { getPlayerOverviewFromCache, getPlayerMapTimesFromCache, getIncompleteMapsFromCache } = await import('../lib/player-profile-cache');
+const {
+  getPlayerOverviewFromCache,
+  getPlayerMapTimesFromCache,
+  getIncompleteMapsFromCache,
+  getLinearVsStagedPerTierFromCache,
+} = await import('../lib/player-profile-cache');
 
 const STEAM_ID = 'STEAM_1:0:9471875';
 
@@ -99,5 +103,22 @@ describe('getIncompleteMapsFromCache', () => {
 
     expect(incomplete.map(m => m.mapname)).toEqual(['surf_mesa']);
     expect(incomplete[0].wr_time).toBeNull();
+  });
+});
+
+describe('getLinearVsStagedPerTierFromCache', () => {
+  // Staged is isStagedMap over the metadata, the same check the map badges use.
+  it('counts the player maps per tier, split by isStagedMap', async () => {
+    mapMetadata = new Map([
+      ['surf_a', { mapname: 'surf_a', tier: 2, wr_time: 1, stages: 0 }],
+      ['surf_b', { mapname: 'surf_b', tier: 2, wr_time: 1, stages: 5 }],
+      ['surf_c', { mapname: 'surf_c', tier: 1, wr_time: 1, stages: 0 }],
+    ]);
+    query.mockResolvedValue([[{ mapname: 'surf_b' }, { mapname: 'surf_a' }, { mapname: 'surf_c' }, { mapname: 'surf_untiered' }]]);
+
+    expect(await getLinearVsStagedPerTierFromCache(STEAM_ID)).toEqual([
+      { tier: 1, linear: 1, staged: 0 },
+      { tier: 2, linear: 1, staged: 1 },
+    ]);
   });
 });

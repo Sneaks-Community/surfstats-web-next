@@ -5,7 +5,7 @@ import pool from './db';
 import analyticsPool, { isAnalyticsAvailable } from './db-analytics';
 import type { RowDataPacket } from 'mysql2';
 import { getMapMetadataFromCache } from './map-cache';
-import { isStagedMap } from './map-cache';
+import { isStagedMap } from './utils';
 import { validateMapName } from './validators';
 import { MAP_STATS_SUFFIXES, wrCheckpointSuffix } from './cache-keys';
 
