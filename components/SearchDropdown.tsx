@@ -10,6 +10,7 @@ import { mapImageUrl } from '@/lib/utils';
 import { clientError } from '@/lib/client-logger';
 import { getErrorMessage, isAbortError } from '@/lib/errors';
 import { fetchJson } from '@/lib/fetch-json';
+import { useDebounce } from '@/hooks/useDebounce';
 
 interface PlayerResult {
   steamid: string;
@@ -49,7 +50,6 @@ export function SearchDropdown({
 
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const debounceRef = useRef<NodeJS.Timeout | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const mapImagesUrl = useMapImagesUrl();
 
@@ -96,35 +96,26 @@ export function SearchDropdown({
     }
   }, [minChars]);
 
-  // Debounced search effect with AbortController cleanup
+  const debouncedQuery = useDebounce(query, debounceMs);
+
+  // Too short closes at once, not after the debounce.
   useEffect(() => {
-    if (debounceRef.current) {
-      clearTimeout(debounceRef.current);
-    }
+    if (query.length >= minChars) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing results with query length
+    setResults({ players: [], maps: [] });
+    setError(null);
+    setIsOpen(false);
+  }, [query, minChars]);
 
-    if (query.length < minChars) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing results with query length
-      setResults({ players: [], maps: [] });
-      setError(null);
-      setIsOpen(false);
-      return;
-    }
-
-    debounceRef.current = setTimeout(() => {
-      void performSearch(query);
-    }, debounceMs);
-
+  useEffect(() => {
+    if (debouncedQuery.length < minChars) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the request is the external system this syncs with
+    void performSearch(debouncedQuery);
     return () => {
-      if (debounceRef.current) {
-        clearTimeout(debounceRef.current);
-      }
-      // Abort any pending request on cleanup
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-        abortControllerRef.current = null;
-      }
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
     };
-  }, [query, minChars, debounceMs, performSearch]);
+  }, [debouncedQuery, minChars, performSearch]);
 
   // Click outside to close
   useEffect(() => {

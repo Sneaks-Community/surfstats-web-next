@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server';
 import { RateLimiterMemory, RateLimiterRedis, RateLimiterRes } from 'rate-limiter-flexible';
 import client from './valkey';
 import logger from './logger';
+import { getErrorMessage } from './errors';
 import { getClientIp } from './client-ip';
 
 /**
@@ -170,7 +171,7 @@ export async function checkRateLimit(
     // the request is allowed: an outage should degrade protection, not the API.
     if (!(err instanceof RateLimiterRes)) {
       logger.warn(
-        `[RateLimit] Check failed, allowing request: ${err instanceof Error ? err.message : String(err)}`
+        `[RateLimit] Check failed, allowing request: ${getErrorMessage(err)}`
       );
       return { allowed: true, limit, remaining: limit, resetSeconds: WINDOW_SECONDS };
     }

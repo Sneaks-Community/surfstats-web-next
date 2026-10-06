@@ -5,14 +5,13 @@
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
 
-  const [{ startServer }, { default: logger }] = await Promise.all([
+  const [{ startServer }, { default: logger }, { getErrorMessage }] = await Promise.all([
     import('./lib/startup'),
     import('./lib/logger'),
+    import('./lib/errors'),
   ]);
 
   void startServer().catch((error: unknown) => {
-    logger.error(
-      `[Startup] Failed: ${error instanceof Error ? error.message : String(error)}`
-    );
+    logger.error(`[Startup] Failed: ${getErrorMessage(error)}`);
   });
 }

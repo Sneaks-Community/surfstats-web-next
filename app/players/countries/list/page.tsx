@@ -1,14 +1,14 @@
 import Link from '@/components/Link';
 import { ArrowLeft } from 'lucide-react';
 import { getCountriesRankingFromCache, getCountriesStatsFromCache, sortCountries } from '@/lib/country-cache';
-import type { CountrySortKey, SortOrder } from '@/lib/country-cache';
+import type { CountrySortKey } from '@/lib/country-cache';
 import CountryBadge from '@/components/CountryBadge';
 import Pagination from '@/components/Pagination';
 import SortableTableHeader from '@/components/SortableTableHeader';
 import CountriesTableSkeleton from '@/components/CountriesTableSkeleton';
 import { SkeletonScreen } from '@/components/Skeleton';
 import { NavigationPendingProvider, PendingContent } from '@/components/NavigationPending';
-import { parseIntParam } from '@/lib/utils';
+import { parseIntParam, type SortDirection } from '@/lib/utils';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -28,14 +28,14 @@ export default async function CountriesListPage({
 
   // Parse and validate sort/order parameters
   const sort = (typeof params.sort === 'string' ? params.sort : undefined) as CountrySortKey | undefined || 'points';
-  const order = (typeof params.order === 'string' ? params.order : undefined) as SortOrder | undefined || 'desc';
+  const order = (typeof params.order === 'string' ? params.order : undefined) as SortDirection | undefined || 'desc';
 
   // Validate sort column
   const validSortColumns: CountrySortKey[] = ['rank', 'country', 'points', 'players'];
   const validatedSort = validSortColumns.includes(sort) ? sort : 'points';
 
   // Validate order
-  const validatedOrder: SortOrder = order === 'asc' ? 'asc' : 'desc';
+  const validatedOrder: SortDirection = order === 'asc' ? 'asc' : 'desc';
 
   // Both reads are one fixed cache key each, so an out-of-range `?page=` can no
   // longer mint a key and the two no longer have to be sequential. `page` is

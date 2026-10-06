@@ -6,6 +6,7 @@ import { getCountryNamesFromCode, getCountryCodeFromName, getPrimaryCountryName,
 import { cachedFetch, type RefreshOptions } from './cached-fetch';
 import { PLAYERS_PAGE_SIZE } from './player-cache';
 import { getErrorCode, getErrorMessage } from './errors';
+import { sortRecords, type SortDirection } from './utils';
 
 /**
  * Country ranking data from database (raw query result)
@@ -45,7 +46,6 @@ export interface CountryPlayer extends RowDataPacket {
  * Sort configuration for country rankings
  */
 export type CountrySortKey = 'rank' | 'country' | 'points' | 'players';
-export type SortOrder = 'asc' | 'desc';
 
 /**
  * Internal function for getting the full countries ranking.
@@ -137,7 +137,7 @@ const getCountriesRankingInternal = async (): Promise<CountryRank[]> => {
 export function sortCountries(
   countries: readonly CountryRank[],
   sort: CountrySortKey,
-  order: SortOrder
+  order: SortDirection
 ): CountryRank[] {
   // Sort on what CountryBadge renders, not the ISO code behind it: by code,
   // Sweden (SE) precedes Slovakia (SK), which reads as broken in the list.
@@ -157,7 +157,7 @@ export function sortCountries(
     }
   };
 
-  return [...countries].sort((a, b) => (order === 'asc' ? comparator(a, b) : -comparator(a, b)));
+  return sortRecords(countries, order, comparator);
 }
 
 /**
@@ -235,7 +235,7 @@ const getCountryPlayersInternal = async (
   page = 1,
   limit = PLAYERS_PAGE_SIZE,
   sort: PlayerSortKey = 'rank',
-  order: SortOrder = 'desc'
+  order: SortDirection = 'desc'
 ): Promise<{ players: CountryPlayer[]; total: number; totalPages: number; countryName: string }> => {
   logger.debug(`[CountryCache] Fetching players for country: ${countryCode} (page: ${page}, sort: ${sort}, order: ${order})`);
 
@@ -316,7 +316,7 @@ export async function getCountryPlayers(
   page = 1,
   limit = PLAYERS_PAGE_SIZE,
   sort: PlayerSortKey = 'rank',
-  order: SortOrder = 'desc'
+  order: SortDirection = 'desc'
 ): Promise<{ players: CountryPlayer[]; total: number; totalPages: number; countryName: string }> {
   const cacheKey = `${COUNTRIES_PLAYERS_KEY}:${countryCode}:${sort}:${order}:${page}:${limit}`;
 
@@ -379,7 +379,7 @@ export async function getCountryPlayerCount(countryCode: string): Promise<number
 /**
  * Helper: Build ORDER BY clause for player listings
  */
-function getPlayerOrderByClause(sort: PlayerSortKey, order: SortOrder): string {
+function getPlayerOrderByClause(sort: PlayerSortKey, order: SortDirection): string {
   const columnMap: Record<PlayerSortKey, string> = {
     rank: '`rank`',
     player: 'name',

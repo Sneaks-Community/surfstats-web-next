@@ -2,7 +2,7 @@ import Link from '@/components/Link';
 import { Search as SearchIcon, Map as MapIcon, Users, ChevronRight } from 'lucide-react';
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
-import { getTierTextColor } from '@/lib/tierColors';
+import { getTierColor } from '@/lib/tierColors';
 import { mapImageUrl, getMapImagesUrl } from '@/lib/utils';
 import { validateSearchQuery, validatePlayerName } from '@/lib/validators';
 import { getAllMapMetadataFromCache } from '@/lib/map-cache';
@@ -172,7 +172,7 @@ export default async function SearchPage({
                         <MapLinkWithPreview mapname={map.mapname} className="font-medium text-primary group-hover:text-primary transition-colors">
                           {map.mapname}
                         </MapLinkWithPreview>
-                        <div className={`text-xs mt-0.5 ${getTierTextColor(map.tier)}`}>Tier {map.tier}</div>
+                        <div className={`text-xs mt-0.5 ${getTierColor(map.tier).text}`}>Tier {map.tier}</div>
                       </div>
                     </div>
                     <ChevronRight className="h-5 w-5 text-text-placeholder group-hover:text-text-muted transition-colors" />

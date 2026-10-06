@@ -3,7 +3,7 @@ import { cacheGetWithTtl, cacheSet } from './valkey-cache';
 import { cacheLock, shouldExpireEarly } from './cache-lock';
 import { withExpensiveQueryLimit } from './db-semaphore';
 import { waitForCacheReady } from './valkey';
-import { CacheUnavailableError, DbBusyError } from './errors';
+import { CacheUnavailableError, DbBusyError, getErrorMessage } from './errors';
 import logger from './logger';
 
 export { CacheUnavailableError };
@@ -86,11 +86,7 @@ function triggerBackgroundRefresh<T>(
       return value;
     })
     .catch((error: unknown) => {
-      logger.warn(
-        `[Cache] Background refresh failed for ${key}: ${
-          error instanceof Error ? error.message : String(error)
-        }`
-      );
+      logger.warn(`[Cache] Background refresh failed for ${key}: ${getErrorMessage(error)}`);
     });
 }
 

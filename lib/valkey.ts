@@ -1,5 +1,6 @@
 import { createClient } from 'redis';
 import logger from './logger';
+import { getErrorMessage } from './errors';
 import { onShutdown } from './shutdown';
 
 const valkeyUrl = process.env.VALKEY_URL || 'redis://localhost:6379';
@@ -74,9 +75,8 @@ function createValkey() {
           );
         }),
       ]);
-    } catch (err) {
-      const error = err as { message?: string };
-      logger.error(`[Valkey] Failed to connect: ${error.message || 'Unknown error'}`);
+    } catch (error) {
+      logger.error(`[Valkey] Failed to connect: ${getErrorMessage(error)}`);
     } finally {
       clearTimeout(timer);
     }

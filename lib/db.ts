@@ -5,6 +5,7 @@ import { wrapPoolQuery } from '@/lib/db-query-logger';
 import { isBuildPhase, validateEnv } from '@/lib/env';
 import { onShutdown } from '@/lib/shutdown';
 import { applyStatementTimeout } from '@/lib/timeout';
+import { getErrorCode, getErrorMessage } from '@/lib/errors';
 
 // queueLimit accepts 0 (mysql2's "unlimited"), so a plain `|| default` won't do —
 // only fall back when the var is unset/non-numeric.
@@ -69,19 +70,17 @@ export async function initializeDatabase(): Promise<boolean> {
     logger.info(`[DB] Database connection established successfully (${duration}ms)`);
     logger.info('[DB] Initialization complete');
     return true;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  } catch (error: any) {
-    const errorCode = error.code || 'UNKNOWN';
-    const errorMessage = error.message || 'Unknown error';
-    logger.error(`[DB] Initialization failed (${errorCode}): ${errorMessage}`);
+  } catch (error: unknown) {
+    const errorCode = getErrorCode(error);
+    logger.error(`[DB] Initialization failed (${errorCode}): ${getErrorMessage(error)}`);
     logger.error('[DB] Application may not function correctly without database connection');
     
     // Log helpful hints based on error type
-    if (error.code === 'ECONNREFUSED') {
+    if (errorCode === 'ECONNREFUSED') {
       logger.error('[DB] Hint: Ensure MySQL server is running and accessible');
-    } else if (error.code === 'ER_ACCESS_DENIED_ERROR') {
+    } else if (errorCode === 'ER_ACCESS_DENIED_ERROR') {
       logger.error('[DB] Hint: Check database credentials in environment variables');
-    } else if (error.code === 'ER_BAD_DB_ERROR') {
+    } else if (errorCode === 'ER_BAD_DB_ERROR') {
       logger.error('[DB] Hint: Verify the database name and ensure it exists');
     }
     return false;

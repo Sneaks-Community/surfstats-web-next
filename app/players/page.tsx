@@ -1,5 +1,4 @@
 import { Search } from 'lucide-react';
-import { cache } from 'react';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import Pagination from '@/components/Pagination';
 import PlayerListTable from '@/components/PlayerListTable';
@@ -15,9 +14,6 @@ export const metadata: Metadata = {
   title: 'Players',
 };
 
-// Cache Steam profile fetches within a request to avoid duplicate calls
-const getCachedSteamProfiles = cache(getSteamProfilesFromCache);
-
 export default async function PlayersPage({
   searchParams,
 }: {
@@ -32,9 +28,9 @@ export default async function PlayersPage({
   // Fetch players first to get steam IDs
   const { players, total, totalPages } = await getPlayersFromCache(page, q);
 
-  // Extract steam IDs and fetch avatars (cached within request via React.cache)
+  // Extract steam IDs and fetch avatars
   const steamIds = players.map(p => p.steamid);
-  const avatarsWithData = await getCachedSteamProfiles(steamIds);
+  const avatarsWithData = await getSteamProfilesFromCache(steamIds);
 
   return (
     <div className="space-y-4">

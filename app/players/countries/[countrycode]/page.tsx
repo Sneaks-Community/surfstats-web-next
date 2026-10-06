@@ -1,8 +1,7 @@
-import { cache } from 'react';
 import Link from '@/components/Link';
 import { getCountryPlayers, getCountryPlayerCount } from '@/lib/country-cache';
 import { PLAYERS_PAGE_SIZE } from '@/lib/player-cache';
-import type { PlayerSortKey, SortOrder } from '@/lib/country-cache';
+import type { PlayerSortKey } from '@/lib/country-cache';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import { isValidCountryCode, getPrimaryCountryName } from '@/lib/countries';
 import CountryBadge from '@/components/CountryBadge';
@@ -11,12 +10,9 @@ import PlayerListTable from '@/components/PlayerListTable';
 import PlayersTableSkeleton from '@/components/PlayersTableSkeleton';
 import { SkeletonScreen } from '@/components/Skeleton';
 import { NavigationPendingProvider, PendingContent } from '@/components/NavigationPending';
-import { parseIntParam } from '@/lib/utils';
+import { parseIntParam, type SortDirection } from '@/lib/utils';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-
-// Cache Steam profile fetches within a request to avoid duplicate calls
-const getCachedSteamProfiles = cache(getSteamProfilesFromCache);
 
 interface CountryPageProps {
   params: Promise<{ countrycode: string }>;
@@ -62,7 +58,7 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
   const validatedSort: PlayerSortKey = validSortColumns.includes(sort as PlayerSortKey)
     ? (sort as PlayerSortKey)
     : 'points';
-  const validatedOrder: SortOrder = order === 'asc' ? 'asc' : 'desc';
+  const validatedOrder: SortDirection = order === 'asc' ? 'asc' : 'desc';
 
   // Fetch players for this country with sorting
   const { players, total, totalPages, countryName } = await getCountryPlayers(
@@ -78,7 +74,7 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
 
   // Extract steam IDs and fetch avatars
   const steamIds = players.map(p => p.steamid);
-  const avatarsWithData = await getCachedSteamProfiles(steamIds);
+  const avatarsWithData = await getSteamProfilesFromCache(steamIds);
 
   // Build query params for pagination
   const queryParams: Record<string, string> = {};

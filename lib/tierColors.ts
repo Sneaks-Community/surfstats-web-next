@@ -66,20 +66,3 @@ export function getTierColor(tier: number | string): TierColor {
     };
   }
 }
-
-/**
- * Get a simple text color for a given tier number
- * @param tier - The tier number
- * @returns Tailwind text color class
- */
-export function getTierTextColor(tier: number): string {
-  const colors: Record<number, string> = {
-    1: 'text-emerald-400',
-    2: 'text-lime-400',
-    3: 'text-yellow-400',
-    4: 'text-orange-400',
-    5: 'text-orange-500',
-  };
-  
-  return colors[tier] ?? 'text-red-400';
-}

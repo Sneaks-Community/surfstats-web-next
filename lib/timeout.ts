@@ -6,6 +6,7 @@
 import type { PoolConnection } from 'mysql2';
 import type { Pool } from 'mysql2/promise';
 import logger from './logger';
+import { getErrorMessage } from './errors';
 
 /**
  * Reject after `ms` if `promise` has not settled. Does not cancel its work.
@@ -84,9 +85,8 @@ export function applyStatementTimeout(pool: Pool, prefix: string): void {
       .catch((error: unknown) => {
         if (warned) return;
         warned = true;
-        const message = error instanceof Error ? error.message : String(error);
         logger.warn(
-          `[${prefix}] Could not set a server-side statement timeout, queries are uncapped: ${message}`
+          `[${prefix}] Could not set a server-side statement timeout, queries are uncapped: ${getErrorMessage(error)}`
         );
       });
   });

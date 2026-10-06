@@ -2,6 +2,7 @@ import 'server-only';
 import type mysql from 'mysql2/promise';
 import logger from './logger';
 import { statementTimeoutMs, withTimeout } from './timeout';
+import { getErrorCode, getErrorMessage } from './errors';
 
 export interface DbQueryLoggerOptions {
   /** Logger prefix for identifying the database source */
@@ -76,10 +77,9 @@ export function wrapPoolQuery(
         }
 
         return result;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      } catch (error: any) {
-        const errorCode = error.code || 'UNKNOWN';
-        const errorMessage = error.message || 'Unknown error';
+      } catch (error: unknown) {
+        const errorCode = getErrorCode(error);
+        const errorMessage = getErrorMessage(error);
 
         if (errorMessage === 'Queue limit reached.') {
           logger.error(
