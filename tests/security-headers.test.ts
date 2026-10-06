@@ -28,6 +28,10 @@ describe('contentSecurityPolicy', () => {
     expect(directive(csp, 'frame-ancestors')).toBe("'none'");
   });
 
+  it('lets the browser connect only to its own origin', () => {
+    expect(directive(contentSecurityPolicy('abc123'), 'connect-src')).toBe("'self'");
+  });
+
   // Styles are the deliberate exception: React writes style attributes, which a
   // nonce cannot cover.
   it('still allows inline styles', () => {

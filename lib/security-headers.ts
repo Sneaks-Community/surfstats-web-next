@@ -39,7 +39,7 @@ export function contentSecurityPolicy(nonce?: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' blob: data: https:",
     "font-src 'self'",
-    "connect-src 'self' https://api.steampowered.com",
+    "connect-src 'self'",
     "object-src 'none'",
     "frame-src 'none'",
     "frame-ancestors 'none'",
