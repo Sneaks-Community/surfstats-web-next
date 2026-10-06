@@ -1,6 +1,7 @@
 import { Globe } from 'lucide-react';
-import { getCountriesRankingFromCache, getCountriesStatsFromCache, sortCountries } from '@/lib/country-cache';
+import { getCountriesRankingFromCache, sortCountries } from '@/lib/country-cache';
 import { getNumericCodeFromAlpha2, getPrimaryCountryName } from '@/lib/countries';
+import { getPlayerCountFromCache } from '@/lib/registry-cache';
 import PanelHeader from '@/components/PanelHeader';
 import TopCountriesList, { type TopCountryEntry } from '@/app/components/countries/TopCountriesList';
 import { WorldReachChart } from '@/app/components/countries/LazyGlobalReach';
@@ -13,11 +14,11 @@ export const metadata: Metadata = {
 };
 
 export default async function CountriesPage() {
-  // The whole ranking, so every country can be shaded, plus the stats headline.
-  // The Top-Countries list beside the map is the accessible twin.
-  const [ranking, stats] = await Promise.all([
+  // The whole ranking, so every country can be shaded, plus the headline's player
+  // count. The Top-Countries list beside the map is the accessible twin.
+  const [ranking, playerCount] = await Promise.all([
     getCountriesRankingFromCache(),
-    getCountriesStatsFromCache(),
+    getPlayerCountFromCache(),
   ]);
   const byPlayers = sortCountries(ranking, 'players', 'desc');
 
@@ -49,7 +50,7 @@ export default async function CountriesPage() {
       <div>
         <h1 className="text-3xl font-bold text-text">Countries</h1>
         <p className="text-text-muted">
-          Global reach of the surf community • {stats.totalCountries.toLocaleString()} countries • {stats.totalPlayers.toLocaleString()} players
+          Global reach of the surf community • {ranking.length.toLocaleString()} countries • {playerCount.toLocaleString()} players
         </p>
       </div>
 
@@ -66,7 +67,7 @@ export default async function CountriesPage() {
               <p className="text-sm text-text-muted mb-3">
                 Players ranked from{' '}
                 <span className="text-text font-semibold">
-                  {stats.totalCountries.toLocaleString()}
+                  {ranking.length.toLocaleString()}
                 </span>{' '}
                 countries around the world.
               </p>

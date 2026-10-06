@@ -1,7 +1,8 @@
 import Link from '@/components/Link';
 import { ArrowLeft } from 'lucide-react';
-import { getCountriesRankingFromCache, getCountriesStatsFromCache, sortCountries } from '@/lib/country-cache';
+import { getCountriesRankingFromCache, sortCountries } from '@/lib/country-cache';
 import type { CountrySortKey } from '@/lib/country-cache';
+import { getPlayerCountFromCache } from '@/lib/registry-cache';
 import CountryBadge from '@/components/CountryBadge';
 import Pagination from '@/components/Pagination';
 import SortableTableHeader from '@/components/SortableTableHeader';
@@ -36,12 +37,11 @@ export default async function CountriesListPage({
   // Validate order
   const validatedOrder: SortDirection = order === 'asc' ? 'asc' : 'desc';
 
-  // Both reads are one fixed cache key each, so an out-of-range `?page=` can no
-  // longer mint a key and the two no longer have to be sequential. `page` is
-  // still clamped, now against the ranking itself rather than a second query.
-  const [ranking, stats] = await Promise.all([
+  // Both reads are fixed cache keys, so an out-of-range `?page=` mints no key;
+  // it is clamped against the ranking itself.
+  const [ranking, playerCount] = await Promise.all([
     getCountriesRankingFromCache(),
-    getCountriesStatsFromCache(),
+    getPlayerCountFromCache(),
   ]);
 
   const sorted = sortCountries(ranking, validatedSort, validatedOrder);
@@ -67,7 +67,7 @@ export default async function CountriesListPage({
         </Link>
         <h1 className="text-3xl font-bold text-text">All Countries</h1>
         <p className="text-text-muted">
-          Country rankings by total points • {stats.totalCountries.toLocaleString()} countries • {stats.totalPlayers.toLocaleString()} players
+          Country rankings by total points • {ranking.length.toLocaleString()} countries • {playerCount.toLocaleString()} players
         </p>
       </div>
 

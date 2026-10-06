@@ -13,7 +13,7 @@ import {
   getTotalsFromCache,
 } from './map-cache';
 import { getAllRegistryDataFromCache } from './registry-cache';
-import { getCountriesRankingFromCache, getCountriesStatsFromCache } from './country-cache';
+import { getCountriesRankingFromCache } from './country-cache';
 import {
   getPlayerOverviewFromCache,
   getPlayerWrPerformanceFromCache,
@@ -102,10 +102,7 @@ const refreshers = [
     name: 'CountriesRefresh',
     intervalMs: COUNTRIES_INTERVAL_MS,
     task: async () => {
-      await Promise.all([
-        getCountriesRankingFromCache(force),
-        getCountriesStatsFromCache(force),
-      ]);
+      await getCountriesRankingFromCache(force);
     },
   }),
   createBackgroundRefresh({

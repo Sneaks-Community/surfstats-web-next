@@ -299,7 +299,7 @@ const getCountryPlayersInternal = async (
 // country page returns.
 // v4: rows and `total` are filtered to points > 0 (see countryWhereClause).
 const COUNTRIES_PLAYERS_KEY = 'surfstats:countries:players:v4';
-const COUNTRIES_PLAYERS_TTL = 86400; // 24 hours — matches country ranking/stats
+const COUNTRIES_PLAYERS_TTL = 86400; // 24 hours, matches the country ranking
 
 /**
  * Get players from a specific country from Valkey cache.
@@ -308,7 +308,7 @@ const COUNTRIES_PLAYERS_TTL = 86400; // 24 hours — matches country ranking/sta
  * on every parameter so each country/page/sort/order combination caches
  * independently. The RANK() window query is heavy, so it runs under the
  * expensive-query semaphore + single-flight lock. Cached for 24 hours to match
- * the sibling country ranking/stats caches (same slow-moving `ck_playerrank`).
+ * the sibling country ranking cache (same slow-moving `ck_playerrank`).
  */
 export async function getCountryPlayers(
   countryCode: string,
@@ -405,59 +405,4 @@ function getPlayerOrderByClause(sort: PlayerSortKey, order: SortDirection): stri
   }
   
   return `${column} ${direction}`;
-}
-
-/**
- * Internal function for getting country statistics summary
- * Used for displaying total countries count
- */
-const getCountriesStatsInternal = async (): Promise<{ totalCountries: number; totalPlayers: number }> => {
-  // Throws on failure; the fallback lives in the caller's `onError`, uncached.
-  // Countries: distinct resolved ISO codes, matching the ranking list (raw
-  // DISTINCT names over-counted). Players: every ranked player, including those
-  // with an unresolved country, matching the points > 0 universe used site-wide.
-  const countriesQuery = `
-    SELECT country, SUM(points) as total_points
-    FROM ck_playerrank
-    WHERE points > 0 AND country IS NOT NULL AND country != ''
-    GROUP BY country
-  `;
-  const playersQuery = `SELECT COUNT(*) as total_players FROM ck_playerrank WHERE points > 0`;
-
-  const [[countryRows], [playerRows]] = await Promise.all([
-    pool.query<RowDataPacket[]>(countriesQuery),
-    pool.query<RowDataPacket[]>(playersQuery),
-  ]);
-
-  const codes = new Set<string>();
-  for (const row of countryRows) {
-    const countryCode = getCountryCodeFromName(row.country);
-    if (row.total_points <= 0 || countryCode === UNKNOWN_COUNTRY_CODE) continue;
-    codes.add(countryCode);
-  }
-
-  return {
-    totalCountries: codes.size,
-    totalPlayers: playerRows[0]?.total_players || 0,
-  };
-};
-
-// Versioned like the ranking key so logic changes orphan stale payloads.
-const COUNTRIES_STATS_KEY = 'surfstats:countries:stats:v3';
-const COUNTRIES_STATS_TTL = 86400; // 24 hours
-
-/**
- * Get country statistics summary from Valkey cache
- * Used for displaying total countries count
- */
-export async function getCountriesStatsFromCache({ force }: RefreshOptions = {}): Promise<{ totalCountries: number; totalPlayers: number }> {
-  return cachedFetch(COUNTRIES_STATS_KEY, COUNTRIES_STATS_TTL, getCountriesStatsInternal, {
-    lock: true,
-    expensive: true,
-    force,
-    onError: (error) => {
-      logger.error(`[CountryCache] Failed to fetch countries stats: ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
-      return { totalCountries: 0, totalPlayers: 0 };
-    },
-  });
 }
