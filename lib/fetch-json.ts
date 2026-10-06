@@ -4,19 +4,9 @@
  * The API's error bodies are valid JSON (`{ error }`, built by `apiError`), so a
  * bare `response.json()` resolves successfully for a 403/429/503 and the
  * caller's `?? []` guard renders it as "no data" with no error surfaced. This
- * throws an {@link HttpError} instead, carrying the status and the server's
- * message. Safe to import from client components.
+ * throws an Error carrying the server's message instead. Safe to import from
+ * client components.
  */
-
-export class HttpError extends Error {
-  readonly status: number;
-
-  constructor(status: number, message: string) {
-    super(message);
-    this.name = 'HttpError';
-    this.status = status;
-  }
-}
 
 async function errorMessage(response: Response): Promise<string> {
   try {
@@ -32,13 +22,13 @@ async function errorMessage(response: Response): Promise<string> {
 }
 
 /**
- * @throws {HttpError} when the response status is not 2xx.
+ * @throws {Error} when the response status is not 2xx.
  * Abort errors from `init.signal` propagate as-is (check with `isAbortError`).
  */
 export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);
   if (!response.ok) {
-    throw new HttpError(response.status, await errorMessage(response));
+    throw new Error(await errorMessage(response));
   }
   return (await response.json()) as T;
 }

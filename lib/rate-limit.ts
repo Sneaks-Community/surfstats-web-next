@@ -142,7 +142,7 @@ function toResetSeconds(msBeforeNext: number): number {
  */
 export async function checkRateLimit(
   request: NextRequest,
-  scope: RateLimitScope = 'api'
+  scope: RateLimitScope
 ): Promise<RateLimitResult> {
   // An unidentifiable caller shares one bucket rather than escaping the limit.
   const ip = getClientIp(request) || 'unknown';

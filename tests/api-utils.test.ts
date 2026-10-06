@@ -16,16 +16,16 @@ beforeEach(() => {
 
 describe('parsePageParams', () => {
   it('snaps pageSize to the two sizes the UI requests', () => {
-    expect(parsePageParams(params('pageSize=1'), 100, 100).pageSize).toBe(20);
-    expect(parsePageParams(params('pageSize=7'), 100, 100).pageSize).toBe(20);
-    expect(parsePageParams(params('pageSize=21'), 100, 100).pageSize).toBe(100);
-    expect(parsePageParams(params('pageSize=999'), 100, 100).pageSize).toBe(100);
-    expect(parsePageParams(params(''), 100, 100).pageSize).toBe(100);
+    expect(parsePageParams(params('pageSize=1')).pageSize).toBe(20);
+    expect(parsePageParams(params('pageSize=7')).pageSize).toBe(20);
+    expect(parsePageParams(params('pageSize=21')).pageSize).toBe(100);
+    expect(parsePageParams(params('pageSize=999')).pageSize).toBe(100);
+    expect(parsePageParams(params('')).pageSize).toBe(100);
   });
 
   it('clamps page to MAX_PAGE', () => {
-    expect(parsePageParams(params('page=99999999'), 100, 100).page).toBe(10000);
-    expect(parsePageParams(params('page=0'), 100, 100).page).toBe(1);
+    expect(parsePageParams(params('page=99999999')).page).toBe(10000);
+    expect(parsePageParams(params('page=0')).page).toBe(1);
   });
 });
 

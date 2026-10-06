@@ -30,15 +30,10 @@ interface SearchResponse {
   maps: MapResult[];
 }
 
-interface SearchDropdownProps {
-  minChars?: number;
-  debounceMs?: number;
-}
+const MIN_CHARS = 3;
+const DEBOUNCE_MS = 300;
 
-export function SearchDropdown({
-  minChars = 3,
-  debounceMs = 300
-}: SearchDropdownProps) {
+export function SearchDropdown() {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResponse>({ players: [], maps: [] });
@@ -58,7 +53,7 @@ export function SearchDropdown({
 
   // Search function with AbortController to prevent stale race conditions
   const performSearch = useCallback(async (searchQuery: string) => {
-    if (searchQuery.length < minChars) {
+    if (searchQuery.length < MIN_CHARS) {
       setResults({ players: [], maps: [] });
       setIsOpen(false);
       return;
@@ -94,28 +89,28 @@ export function SearchDropdown({
     } finally {
       setIsLoading(false);
     }
-  }, [minChars]);
+  }, []);
 
-  const debouncedQuery = useDebounce(query, debounceMs);
+  const debouncedQuery = useDebounce(query, DEBOUNCE_MS);
 
   // Too short closes at once, not after the debounce.
   useEffect(() => {
-    if (query.length >= minChars) return;
+    if (query.length >= MIN_CHARS) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing results with query length
     setResults({ players: [], maps: [] });
     setError(null);
     setIsOpen(false);
-  }, [query, minChars]);
+  }, [query]);
 
   useEffect(() => {
-    if (debouncedQuery.length < minChars) return;
+    if (debouncedQuery.length < MIN_CHARS) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the request is the external system this syncs with
     void performSearch(debouncedQuery);
     return () => {
       abortControllerRef.current?.abort();
       abortControllerRef.current = null;
     };
-  }, [debouncedQuery, minChars, performSearch]);
+  }, [debouncedQuery, performSearch]);
 
   // Click outside to close
   useEffect(() => {
@@ -153,7 +148,7 @@ export function SearchDropdown({
         e.preventDefault();
         if (selectedIndex >= 0) {
           navigateToSelected();
-        } else if (query.length >= minChars) {
+        } else if (query.length >= MIN_CHARS) {
           // Submit form to search page using Next.js router
           router.push(`/search?q=${encodeURIComponent(query)}`);
         }
@@ -186,7 +181,7 @@ export function SearchDropdown({
   };
 
   const handleInputFocus = () => {
-    if (query.length >= minChars && totalResults > 0) {
+    if (query.length >= MIN_CHARS && totalResults > 0) {
       setIsOpen(true);
     }
   };
@@ -194,7 +189,7 @@ export function SearchDropdown({
   const optionId = (index: number) => `search-option-${index}`;
 
   const hasResults = results.players.length > 0 || results.maps.length > 0;
-  const showDropdown = isOpen && query.length >= minChars && (hasResults || error !== null);
+  const showDropdown = isOpen && query.length >= MIN_CHARS && (hasResults || error !== null);
 
   return (
     <div className="relative" ref={dropdownRef}>

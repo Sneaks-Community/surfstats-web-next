@@ -7,23 +7,7 @@
  * This is critical for high-traffic endpoints like player profiles and dashboard stats.
  */
 
-/**
- * CacheLock provides request deduplication for cache misses.
- *
- * When multiple requests miss the cache simultaneously, this class ensures
- * only one database query is executed, and all waiting requests share the result.
- *
- * @example
- * const lock = new CacheLock();
- *
- * export async function getCachedData(key: string, fetchFn: () => Promise<Data>): Promise<Data> {
- *   const cached = await cacheGet<Data>(key);
- *   if (cached) return cached;
- *
- *   return lock.acquire(key, fetchFn);
- * }
- */
-export class CacheLock {
+class CacheLock {
   private locks = new Map<string, Promise<unknown>>();
 
   /**
@@ -54,25 +38,8 @@ export class CacheLock {
       this.locks.delete(key);
     }
   }
-
-  /**
-   * Gets the number of currently active locks.
-   * Useful for monitoring and debugging.
-   */
-  get activeLockCount(): number {
-    return this.locks.size;
-  }
-
-  /**
-   * Clears all locks.
-   * Useful for testing or emergency situations.
-   */
-  clear(): void {
-    this.locks.clear();
-  }
 }
 
-// Export a singleton instance for global use
 export const cacheLock = new CacheLock();
 
 /**

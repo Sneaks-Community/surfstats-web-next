@@ -47,27 +47,14 @@ export function resolveSteamIdParam(raw: string): string | NextResponse {
 /** Absolute backstop on `page`; routes with a known row count clamp tighter. */
 export const MAX_PAGE = 10000;
 
-// Defined in `utils` because the client's load-all loop needs the same value and
-// cannot import this module; re-exported so server callers keep one import.
-export { RECORDS_PAGE_SIZE };
-
 /**
  * Parse and clamp `page`/`pageSize` search params. NaN/negative/oversized inputs
  * fall back or clamp rather than producing invalid offsets. `page` is capped at
- * `maxPage` (default {@link MAX_PAGE}).
+ * {@link MAX_PAGE}.
  */
-export function parsePageParams(
-  searchParams: URLSearchParams,
-  defaultPageSize: number,
-  maxPageSize: number,
-  maxPage: number = MAX_PAGE
-): { page: number; pageSize: number } {
-  const page = parseIntParam(searchParams.get('page'), { fallback: 1, min: 1, max: maxPage });
-  const raw = parseIntParam(searchParams.get('pageSize'), {
-    fallback: defaultPageSize,
-    min: 1,
-    max: maxPageSize,
-  });
+export function parsePageParams(searchParams: URLSearchParams): { page: number; pageSize: number } {
+  const page = parseIntParam(searchParams.get('page'), { max: MAX_PAGE });
+  const raw = parseIntParam(searchParams.get('pageSize'), { fallback: RECORDS_PAGE_SIZE });
   // Snapped to the only two sizes the UI requests. Anything else is pure
   // cache-key churn, and `pageSize=1` multiplies the clamped page count by 100.
   const pageSize = raw <= ITEMS_PER_PAGE ? ITEMS_PER_PAGE : RECORDS_PAGE_SIZE;

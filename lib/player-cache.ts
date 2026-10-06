@@ -57,9 +57,9 @@ export const PLAYERS_PAGE_SIZE = 20;
  *
  * @param pageSize - Rows per page (defaults to {@link PLAYERS_PAGE_SIZE})
  */
-export async function getPlayerPageCeiling(pageSize = PLAYERS_PAGE_SIZE): Promise<number> {
+export async function getPlayerPageCeiling(): Promise<number> {
   const total = await getPlayerCountFromCache();
-  return Math.max(1, Math.ceil(total / pageSize));
+  return Math.max(1, Math.ceil(total / PLAYERS_PAGE_SIZE));
 }
 
 /**

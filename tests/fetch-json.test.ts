@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { HttpError, fetchJson } from '../lib/fetch-json';
+import { fetchJson } from '../lib/fetch-json';
 
 function response(status: number, body: unknown, ok = status < 300): Response {
   return {
@@ -22,7 +22,7 @@ describe('fetchJson', () => {
 
   // These bodies are valid JSON, so a bare .json() would resolve and the caller's
   // `?? []` would render an empty table instead of an error.
-  it('throws HttpError carrying the status and the server message', async () => {
+  it('throws the server message', async () => {
     for (const [status, message] of [
       [400, 'Invalid map name'],
       [403, 'Forbidden'],
@@ -31,10 +31,7 @@ describe('fetchJson', () => {
     ] as const) {
       vi.mocked(fetch).mockResolvedValue(response(status, { error: message }));
 
-      const error = await fetchJson('/api/x').catch((e: unknown) => e);
-      expect(error).toBeInstanceOf(HttpError);
-      expect((error as HttpError).status).toBe(status);
-      expect((error as HttpError).message).toBe(message);
+      await expect(fetchJson('/api/x')).rejects.toThrow(message);
     }
   });
 
