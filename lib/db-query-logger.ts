@@ -1,6 +1,7 @@
 import 'server-only';
 import type mysql from 'mysql2/promise';
 import logger from './logger';
+import { statementTimeoutMs, withTimeout } from './timeout';
 
 export interface DbQueryLoggerOptions {
   /** Logger prefix for identifying the database source */
@@ -34,6 +35,10 @@ export function wrapPoolQuery(
   options: DbQueryLoggerOptions
 ): void {
   const { prefix, slowThresholdMs = 1000 } = options;
+  // The server kills a statement at its timeout, so one still pending 2s later is
+  // lost on the wire. Uncapped statements get no client deadline either.
+  const timeoutMs = statementTimeoutMs();
+  const deadlineMs = timeoutMs > 0 ? timeoutMs + 2000 : 0;
 
   const marked = pool as mysql.Pool & { [WRAPPED]?: boolean };
   if (marked[WRAPPED]) {
@@ -56,7 +61,10 @@ export function wrapPoolQuery(
 
       try {
         const startTime = Date.now();
-        const result = await original(...args);
+        const pending = original(...args);
+        const result = deadlineMs > 0
+          ? await withTimeout(pending, deadlineMs, `Query exceeded its ${deadlineMs}ms deadline`)
+          : await pending;
         const duration = Date.now() - startTime;
 
         // Log all queries at debug level

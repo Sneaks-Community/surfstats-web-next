@@ -10,7 +10,6 @@ import pool from './db';
 import type { RowDataPacket } from 'mysql2';
 import { cachedFetch, type RefreshOptions } from './cached-fetch';
 import { getAllMapMetadataFromCache, isStagedMap } from './map-cache';
-import { withTimeout } from './timeout';
 import { validateSteamId } from './validators';
 import { recordProfileView } from './recent-profiles';
 import logger from './logger';
@@ -29,7 +28,6 @@ const PLAYER_TIER_DIST_KEY = 'surfstats:player:tierdist';
 // is the safety net rather than the freshness guarantee. Profiles outside that set
 // are on-demand and stale for up to an hour.
 const PLAYER_PROFILE_TTL = 3600; // 1 hour
-const QUERY_TIMEOUT_MS = 30000; // 30 seconds — per-query backstop
 
 // Type definitions for cached profile data
 export interface PlayerBasicInfo {
@@ -180,22 +178,18 @@ export async function getPlayerOverviewFromCache(steamid: string, { force }: Ref
     empty: null,
     force,
     fetch: async (validSteamId) => {
-      const [playerRows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT
-            pr.steamid, pr.name, pr.country, pr.points, pr.lastseen,
-            pr.finishedmaps as maps,
-            CASE WHEN pr.points > 0
-              THEN (SELECT COUNT(*) + 1 FROM ck_playerrank WHERE points > pr.points)
-            END as \`rank\`,
-            (SELECT COUNT(*) FROM ck_bonus WHERE steamid = pr.steamid) as bonuses,
-            (SELECT COUNT(*) FROM ck_stages WHERE steamid = pr.steamid) as stages
-          FROM ck_playerrank pr
-          WHERE pr.steamid = ?
-        `, [validSteamId]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
+      const [playerRows] = await pool.query<RowDataPacket[]>(`
+        SELECT
+          pr.steamid, pr.name, pr.country, pr.points, pr.lastseen,
+          pr.finishedmaps as maps,
+          CASE WHEN pr.points > 0
+            THEN (SELECT COUNT(*) + 1 FROM ck_playerrank WHERE points > pr.points)
+          END as \`rank\`,
+          (SELECT COUNT(*) FROM ck_bonus WHERE steamid = pr.steamid) as bonuses,
+          (SELECT COUNT(*) FROM ck_stages WHERE steamid = pr.steamid) as stages
+        FROM ck_playerrank pr
+        WHERE pr.steamid = ?
+      `, [validSteamId]);
 
       if (playerRows.length === 0) {
         logger.warn(`[PlayerProfileCache] No player found with SteamID: ${validSteamId}`);
@@ -254,16 +248,12 @@ export async function getPlayerWrPerformanceFromCache(steamid: string, { force }
     empty: [],
     force,
     fetch: async (validSteamId) => {
-      const [rows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT pt.mapname, pt.runtimepro, pt.date
-          FROM ck_playertimes pt
-          WHERE pt.steamid = ?
-          ORDER BY pt.mapname ASC
-        `, [validSteamId]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
+      const [rows] = await pool.query<RowDataPacket[]>(`
+        SELECT pt.mapname, pt.runtimepro, pt.date
+        FROM ck_playertimes pt
+        WHERE pt.steamid = ?
+        ORDER BY pt.mapname ASC
+      `, [validSteamId]);
 
       const allMapMetadata = await getAllMapMetadataFromCache();
 
@@ -307,21 +297,17 @@ export async function getPlayerMapTimesFromCache(steamid: string): Promise<Playe
     fetch: async (validSteamId) => {
       const allMapMetadata = await getAllMapMetadataFromCache();
 
-      const [maps] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT
-            pt.mapname,
-            pt.runtimepro,
-            pt.date,
-            (SELECT COUNT(*) + 1 FROM ck_playertimes pt2
-             WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as player_rank
-          FROM ck_playertimes pt
-          WHERE pt.steamid = ?
-          ORDER BY pt.mapname ASC
-        `, [validSteamId]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
+      const [maps] = await pool.query<RowDataPacket[]>(`
+        SELECT
+          pt.mapname,
+          pt.runtimepro,
+          pt.date,
+          (SELECT COUNT(*) + 1 FROM ck_playertimes pt2
+           WHERE pt2.mapname = pt.mapname AND pt2.runtimepro < pt.runtimepro) as player_rank
+        FROM ck_playertimes pt
+        WHERE pt.steamid = ?
+        ORDER BY pt.mapname ASC
+      `, [validSteamId]);
 
       // Tier and WR come from the cached metadata; a miss means the map is
       // untiered or outside tiers 1-10, so it drops out of the list.
@@ -355,22 +341,18 @@ export async function getPlayerBonusTimesFromCache(steamid: string): Promise<Pla
     empty: [],
     expensive: true,
     fetch: async (validSteamId) => {
-      const [bonuses] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT
-            b.mapname,
-            b.zonegroup,
-            b.runtime,
-            b.date,
-            (SELECT COUNT(*) + 1 FROM ck_bonus b2
-             WHERE b2.mapname = b.mapname AND b2.zonegroup = b.zonegroup AND b2.runtime < b.runtime) as player_rank
-          FROM ck_bonus b
-          WHERE b.steamid = ?
-          ORDER BY b.mapname ASC, b.zonegroup ASC
-        `, [validSteamId]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
+      const [bonuses] = await pool.query<RowDataPacket[]>(`
+        SELECT
+          b.mapname,
+          b.zonegroup,
+          b.runtime,
+          b.date,
+          (SELECT COUNT(*) + 1 FROM ck_bonus b2
+           WHERE b2.mapname = b.mapname AND b2.zonegroup = b.zonegroup AND b2.runtime < b.runtime) as player_rank
+        FROM ck_bonus b
+        WHERE b.steamid = ?
+        ORDER BY b.mapname ASC, b.zonegroup ASC
+      `, [validSteamId]);
 
       return bonuses as PlayerBonusTime[];
     },
@@ -393,22 +375,18 @@ export async function getPlayerStageTimesFromCache(steamid: string): Promise<Pla
     empty: [],
     expensive: true,
     fetch: async (validSteamId) => {
-      const [stages] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT
-            s.map,
-            s.stage,
-            s.runtime,
-            s.date,
-            (SELECT COUNT(*) + 1 FROM ck_stages s2
-             WHERE s2.map = s.map AND s2.stage = s.stage AND s2.runtime < s.runtime) as player_rank
-          FROM ck_stages s
-          WHERE s.steamid = ?
-          ORDER BY s.map ASC, s.stage ASC
-        `, [validSteamId]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
+      const [stages] = await pool.query<RowDataPacket[]>(`
+        SELECT
+          s.map,
+          s.stage,
+          s.runtime,
+          s.date,
+          (SELECT COUNT(*) + 1 FROM ck_stages s2
+           WHERE s2.map = s.map AND s2.stage = s.stage AND s2.runtime < s.runtime) as player_rank
+        FROM ck_stages s
+        WHERE s.steamid = ?
+        ORDER BY s.map ASC, s.stage ASC
+      `, [validSteamId]);
 
       return stages as PlayerStageTime[];
     },
@@ -431,15 +409,11 @@ export async function getIncompleteMapsFromCache(steamid: string): Promise<Incom
     label: 'incomplete maps',
     empty: [],
     fetch: async (validSteamId) => {
-      const [rows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT mapname
-          FROM ck_playertimes
-          WHERE steamid = ?
-        `, [validSteamId]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
+      const [rows] = await pool.query<RowDataPacket[]>(`
+        SELECT mapname
+        FROM ck_playertimes
+        WHERE steamid = ?
+      `, [validSteamId]);
 
       const completed = new Set(rows.map(r => r.mapname));
       const allMapMetadata = await getAllMapMetadataFromCache();
@@ -473,25 +447,21 @@ export async function getIncompleteBonusesFromCache(steamid: string): Promise<In
     empty: [],
     expensive: true,
     fetch: async (validSteamId) => {
-      const [rows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT
-            z.mapname,
-            z.zonegroup,
-            wr.min_runtime as wr_time
-          FROM ck_zones z
-          LEFT JOIN ck_bonus br ON z.mapname = br.mapname AND z.zonegroup = br.zonegroup AND br.steamid = ?
-          LEFT JOIN (
-            SELECT mapname, zonegroup, MIN(runtime) as min_runtime
-            FROM ck_bonus
-            GROUP BY mapname, zonegroup
-          ) wr ON z.mapname = wr.mapname AND z.zonegroup = wr.zonegroup
-          WHERE z.zonetype = 2 AND z.zonegroup > 0 AND br.mapname IS NULL
-          ORDER BY z.mapname ASC, z.zonegroup ASC
-        `, [validSteamId]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
+      const [rows] = await pool.query<RowDataPacket[]>(`
+        SELECT
+          z.mapname,
+          z.zonegroup,
+          wr.min_runtime as wr_time
+        FROM ck_zones z
+        LEFT JOIN ck_bonus br ON z.mapname = br.mapname AND z.zonegroup = br.zonegroup AND br.steamid = ?
+        LEFT JOIN (
+          SELECT mapname, zonegroup, MIN(runtime) as min_runtime
+          FROM ck_bonus
+          GROUP BY mapname, zonegroup
+        ) wr ON z.mapname = wr.mapname AND z.zonegroup = wr.zonegroup
+        WHERE z.zonetype = 2 AND z.zonegroup > 0 AND br.mapname IS NULL
+        ORDER BY z.mapname ASC, z.zonegroup ASC
+      `, [validSteamId]);
 
       const allMapMetadata = await getAllMapMetadataFromCache();
       return rows
@@ -534,27 +504,23 @@ export async function getIncompleteStagesFromCache(steamid: string): Promise<Inc
     empty: [],
     expensive: true,
     fetch: async (validSteamId) => {
-      const [rows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT all_stages.map, all_stages.stage
-          FROM (
-            SELECT mapname AS map, zonetypeid + 1 AS stage
-            FROM ck_zones
-            WHERE zonetype = 3 AND zonegroup = 0
-            UNION ALL
-            SELECT mapname AS map, MAX(zonetypeid) + 2 AS stage
-            FROM ck_zones
-            WHERE zonetype = 3 AND zonegroup = 0
-            GROUP BY mapname
-          ) all_stages
-          LEFT JOIN ck_stages sr
-            ON all_stages.map = sr.map AND all_stages.stage = sr.stage AND sr.steamid = ?
-          WHERE sr.map IS NULL
-          ORDER BY all_stages.map ASC, all_stages.stage ASC
-        `, [validSteamId]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
+      const [rows] = await pool.query<RowDataPacket[]>(`
+        SELECT all_stages.map, all_stages.stage
+        FROM (
+          SELECT mapname AS map, zonetypeid + 1 AS stage
+          FROM ck_zones
+          WHERE zonetype = 3 AND zonegroup = 0
+          UNION ALL
+          SELECT mapname AS map, MAX(zonetypeid) + 2 AS stage
+          FROM ck_zones
+          WHERE zonetype = 3 AND zonegroup = 0
+          GROUP BY mapname
+        ) all_stages
+        LEFT JOIN ck_stages sr
+          ON all_stages.map = sr.map AND all_stages.stage = sr.stage AND sr.steamid = ?
+        WHERE sr.map IS NULL
+        ORDER BY all_stages.map ASC, all_stages.stage ASC
+      `, [validSteamId]);
 
       const allMapMetadata = await getAllMapMetadataFromCache();
       return rows
@@ -585,24 +551,20 @@ export async function getLinearVsStagedPerTierFromCache(steamid: string, { force
     force,
     expensive: true,
     fetch: async (validSteamId) => {
-      const [rows] = await withTimeout(
-        pool.query<RowDataPacket[]>(`
-          SELECT
-            m.tier,
-            COALESCE(SUM(CASE WHEN staged_map.mapname IS NULL THEN 1 ELSE 0 END), 0) as \`linear\`,
-            COALESCE(SUM(CASE WHEN staged_map.mapname IS NOT NULL THEN 1 ELSE 0 END), 0) as \`staged\`
-          FROM ck_maptier m
-          INNER JOIN ck_playertimes pt ON m.mapname = pt.mapname AND pt.steamid = ?
-          LEFT JOIN (
-            SELECT DISTINCT mapname FROM ck_zones WHERE zonetype = 3
-          ) staged_map ON m.mapname = staged_map.mapname
-          WHERE m.tier BETWEEN 1 AND 10
-          GROUP BY m.tier
-          ORDER BY m.tier ASC
-        `, [validSteamId]),
-        QUERY_TIMEOUT_MS,
-        'Query timeout exceeded'
-      );
+      const [rows] = await pool.query<RowDataPacket[]>(`
+        SELECT
+          m.tier,
+          COALESCE(SUM(CASE WHEN staged_map.mapname IS NULL THEN 1 ELSE 0 END), 0) as \`linear\`,
+          COALESCE(SUM(CASE WHEN staged_map.mapname IS NOT NULL THEN 1 ELSE 0 END), 0) as \`staged\`
+        FROM ck_maptier m
+        INNER JOIN ck_playertimes pt ON m.mapname = pt.mapname AND pt.steamid = ?
+        LEFT JOIN (
+          SELECT DISTINCT mapname FROM ck_zones WHERE zonetype = 3
+        ) staged_map ON m.mapname = staged_map.mapname
+        WHERE m.tier BETWEEN 1 AND 10
+        GROUP BY m.tier
+        ORDER BY m.tier ASC
+      `, [validSteamId]);
 
       // MySQL returns SUM/tier as strings, so convert them here.
       return rows.map(row => ({

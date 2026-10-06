@@ -86,4 +86,17 @@ describe('wrapPoolQuery', () => {
 
     expect(logger.warn.mock.calls[0][0]).toContain('Slow query detected');
   });
+
+  // A dropped connection never answers; without a deadline its caller hangs.
+  it('rejects a query still pending 2s past the statement timeout', async () => {
+    vi.useFakeTimers();
+    const pool = fakePool();
+    (pool.query as unknown as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => undefined));
+    wrapPoolQuery(pool, { prefix: 'DB' });
+
+    const pending = expect(pool.query('SELECT 1')).rejects.toThrow('10000ms deadline');
+    await vi.advanceTimersByTimeAsync(10_000);
+    await pending;
+    vi.useRealTimers();
+  });
 });

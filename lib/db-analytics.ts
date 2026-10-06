@@ -55,8 +55,7 @@ analyticsPool.on('enqueue', () => {
 // Wrap the pool with slow query logging using the shared utility
 wrapPoolQuery(analyticsPool, { prefix: 'Analytics DB', slowThresholdMs: 1000 });
 
-// Same server-side statement cap as the main pool. These queries have no
-// withTimeout wrapper at all, so this is their only limit.
+// Same server-side statement cap as the main pool.
 applyStatementTimeout(analyticsPool, 'Analytics DB');
 
 // How often to re-check the analytics connection health, in milliseconds.
