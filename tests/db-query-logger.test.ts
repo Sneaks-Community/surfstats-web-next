@@ -99,4 +99,19 @@ describe('wrapPoolQuery', () => {
     await pending;
     vi.useRealTimers();
   });
+
+  // Turning the server cap off must not leave a hung query holding its caller forever.
+  it('keeps a 30s deadline when the statement timeout is off', async () => {
+    vi.useFakeTimers();
+    process.env.DB_STATEMENT_TIMEOUT_MS = '0';
+    const pool = fakePool();
+    (pool.query as unknown as ReturnType<typeof vi.fn>).mockReturnValue(new Promise(() => undefined));
+    wrapPoolQuery(pool, { prefix: 'DB' });
+
+    const pending = expect(pool.query('SELECT 1')).rejects.toThrow('30000ms deadline');
+    await vi.advanceTimersByTimeAsync(30_000);
+    await pending;
+    delete process.env.DB_STATEMENT_TIMEOUT_MS;
+    vi.useRealTimers();
+  });
 });

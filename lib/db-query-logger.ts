@@ -37,9 +37,9 @@ export function wrapPoolQuery(
 ): void {
   const { prefix, slowThresholdMs = 1000 } = options;
   // The server kills a statement at its timeout, so one still pending 2s later is
-  // lost on the wire. Uncapped statements get no client deadline either.
+  // lost on the wire. Uncapped statements still get a 30s client backstop.
   const timeoutMs = statementTimeoutMs();
-  const deadlineMs = timeoutMs > 0 ? timeoutMs + 2000 : 0;
+  const deadlineMs = timeoutMs > 0 ? timeoutMs + 2000 : 30_000;
 
   const marked = pool as mysql.Pool & { [WRAPPED]?: boolean };
   if (marked[WRAPPED]) {
@@ -62,10 +62,7 @@ export function wrapPoolQuery(
 
       try {
         const startTime = Date.now();
-        const pending = original(...args);
-        const result = deadlineMs > 0
-          ? await withTimeout(pending, deadlineMs, `Query exceeded its ${deadlineMs}ms deadline`)
-          : await pending;
+        const result = await withTimeout(original(...args), deadlineMs, `Query exceeded its ${deadlineMs}ms deadline`);
         const duration = Date.now() - startTime;
 
         // Log all queries at debug level
