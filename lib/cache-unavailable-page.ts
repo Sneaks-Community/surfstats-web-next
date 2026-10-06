@@ -1,6 +1,5 @@
 import 'server-only';
-
-const SITE_NAME = process.env.NEXT_PUBLIC_SITE_NAME || 'Surf Stats';
+import { SITE_NAME } from './utils';
 
 /**
  * Shared shell for the proxy's short-circuit HTML responses. Inline styles, no

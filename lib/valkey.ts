@@ -2,13 +2,16 @@ import { createClient } from 'redis';
 import logger from './logger';
 import { getErrorMessage } from './errors';
 import { onShutdown } from './shutdown';
+import { getEnv } from './env';
 
-const valkeyUrl = process.env.VALKEY_URL || 'redis://localhost:6379';
-const valkeyUsername = process.env.VALKEY_USERNAME;
-const valkeyPassword = process.env.VALKEY_PASSWORD;
-const valkeyTls = process.env.VALKEY_TLS === 'true';
-const valkeyTlsRejectUnauthorized = process.env.VALKEY_TLS_REJECT_UNAUTHORIZED !== 'false';
-const valkeyConnectTimeout = parseInt(process.env.VALKEY_CONNECT_TIMEOUT || '5000', 10) || 5000;
+const {
+  VALKEY_URL: valkeyUrl,
+  VALKEY_USERNAME: valkeyUsername,
+  VALKEY_PASSWORD: valkeyPassword,
+  VALKEY_TLS: valkeyTls,
+  VALKEY_TLS_REJECT_UNAUTHORIZED: valkeyTlsRejectUnauthorized,
+  VALKEY_CONNECT_TIMEOUT: valkeyConnectTimeout,
+} = getEnv();
 
 // Exponential backoff (100ms, doubling) capped at 30s. node-redis calls this
 // once per reconnect attempt with the retry counter and the failure cause, so

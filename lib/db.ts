@@ -2,28 +2,25 @@ import 'server-only';
 import mysql from 'mysql2/promise';
 import logger from '@/lib/logger';
 import { wrapPoolQuery } from '@/lib/db-query-logger';
-import { isBuildPhase, validateEnv } from '@/lib/env';
+import { getEnv, isBuildPhase, validateEnv } from '@/lib/env';
 import { onShutdown } from '@/lib/shutdown';
 import { applyStatementTimeout } from '@/lib/timeout';
 import { getErrorCode, getErrorMessage } from '@/lib/errors';
 
-// queueLimit accepts 0 (mysql2's "unlimited"), so a plain `|| default` won't do —
-// only fall back when the var is unset/non-numeric.
-const parsedQueueLimit = parseInt(process.env.DB_QUEUE_LIMIT ?? '', 10);
-const queueLimit = Number.isNaN(parsedQueueLimit) ? 100 : parsedQueueLimit;
+const env = getEnv();
 
 // Create pool - uses env vars at runtime, fallback defaults at build time
 const pool = mysql.createPool({
   host: process.env.MYSQL_HOST || 'localhost',
-  port: parseInt(process.env.MYSQL_PORT || '3306', 10) || 3306,
+  port: env.MYSQL_PORT,
   user: process.env.MYSQL_USER || 'root',
   password: process.env.MYSQL_PASSWORD || '',
   database: process.env.MYSQL_DATABASE || 'cksurf',
   waitForConnections: true,
-  connectionLimit: parseInt(process.env.DB_CONNECTION_LIMIT || '20', 10) || 20,
-  queueLimit,
+  connectionLimit: env.DB_CONNECTION_LIMIT,
+  queueLimit: env.DB_QUEUE_LIMIT,
   // Milliseconds before a timeout occurs during the initial connection to the MySQL server
-  connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT_MS || '5000', 10) || 5000,
+  connectTimeout: env.DB_CONNECT_TIMEOUT_MS,
   // DECIMAL runtimes and SUM()/AVG() results arrive as numbers, as the row types
   // claim, rather than as strings that only arithmetic happened to coerce.
   decimalNumbers: true,

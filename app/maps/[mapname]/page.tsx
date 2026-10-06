@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/Skeleton';
 import { Map as MapIcon, Users, Layers, Target, Download } from 'lucide-react';
 import MapImage from '@/components/MapImage';
 import { validateMapName, validatePlayerName } from '@/lib/validators';
-import { mapImageUrl, getMapImagesUrl, isStagedMap } from '@/lib/utils';
+import { mapImageUrl, getMapImagesUrl, isStagedMap, SITE_NAME } from '@/lib/utils';
 import logger from '@/lib/logger';
 import MapRecordsTabs from './components/MapRecordsTabs';
 import PageTabs from '@/components/PageTabs';
@@ -29,7 +29,6 @@ export async function generateMetadata({ params }: { params: Promise<{ mapname: 
     return { title: 'Map Not Found' };
   }
 
-  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats';
   const description =
     `Leaderboards, world records, and completion stats for the CS:GO surf map ${map.mapname} (Tier ${map.tier})` +
     (map.wr_holder ? `. Current world record held by ${map.wr_holder}.` : '.');
@@ -40,8 +39,8 @@ export async function generateMetadata({ params }: { params: Promise<{ mapname: 
     description,
     openGraph: {
       type: 'website',
-      siteName,
-      title: `${map.mapname} - ${siteName}`,
+      siteName: SITE_NAME,
+      title: `${map.mapname} - ${SITE_NAME}`,
       description,
       images: [{ url: mapImageUrl(imagesBaseUrl, map.mapname) }],
     },

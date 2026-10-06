@@ -1,11 +1,10 @@
 import 'server-only';
 import type { NextRequest } from 'next/server';
 import logger from './logger';
+import { getEnv } from './env';
 
 /** Set TRUSTED_CLIENT_IP_HEADER to a CDN header when a CDN, not the local proxy, is the trust boundary. */
-const TRUSTED_HEADER = (process.env.TRUSTED_CLIENT_IP_HEADER || 'x-forwarded-for')
-  .trim()
-  .toLowerCase();
+const TRUSTED_HEADER = getEnv().TRUSTED_CLIENT_IP_HEADER;
 
 let warned = false;
 

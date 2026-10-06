@@ -10,9 +10,11 @@ import type { TierDistributionRow } from '@/lib/player-profile-cache';
 import logger from '@/lib/logger';
 import PlayerProfileContent from './components/PlayerProfileContent';
 import { getErrorMessage } from '@/lib/errors';
+import { getEnv } from '@/lib/env';
+import { SITE_NAME } from '@/lib/utils';
 
-// Highest tier the Tier Distribution radar will render. Defaults to 10.
-const MAX_ALLOWED_TIER = parseInt(process.env.MAX_TIER || '10', 10) || 10;
+// Highest tier the Tier Distribution radar will render.
+const MAX_ALLOWED_TIER = getEnv().MAX_TIER;
 
 /**
  * Zero-fill the player's per-tier completions across the full tier range
@@ -55,16 +57,15 @@ export async function generateMetadata({ params }: { params: Promise<{ steamid: 
       };
     }
 
-    const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats';
-    const description = `View ${name}'s CS:GO surf statistics, records, rankings, and completions on ${siteName}.`;
+    const description = `View ${name}'s CS:GO surf statistics, records, rankings, and completions on ${SITE_NAME}.`;
 
     return {
       title: `${name} - Player Profile`,
       description,
       openGraph: {
         type: 'profile',
-        siteName,
-        title: `${name} - Player Profile - ${siteName}`,
+        siteName: SITE_NAME,
+        title: `${name} - Player Profile - ${SITE_NAME}`,
         description,
       },
     };

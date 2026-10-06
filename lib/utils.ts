@@ -118,6 +118,8 @@ export const HEATMAP_MAX_SESSIONS = 10000;
 
 export type SortDirection = 'asc' | 'desc';
 
+export const SITE_NAME = process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats';
+
 /**
  * Whether a map is staged rather than linear. Client-safe, so the map page's
  * tabs use the same check as the server.

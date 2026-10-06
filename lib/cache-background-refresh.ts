@@ -29,6 +29,7 @@ import { fetchServersFromGame } from './server-status';
 import { cacheSet } from './valkey-cache';
 import { SERVER_CACHE_KEY, SERVER_CACHE_TTL } from './cache-keys';
 import { warmPlayersListCache } from './player-cache';
+import { getEnv } from './env';
 
 /**
  * Every recurring cache refresh. Cadence is per domain because the cost of a pass is
@@ -46,14 +47,7 @@ const COUNTRIES_INTERVAL_MS = 21_600_000; // 6 hours
 const PROFILES_INTERVAL_MS = 900_000; // 15 minutes
 
 // Rankings change slowly, so a few-minute interval keeps the browsed pages fresh.
-const PLAYERS_LIST_WARM_PAGES = Math.max(
-  1,
-  parseInt(process.env.PLAYERS_LIST_WARM_PAGES || '10', 10) || 10
-);
-const PLAYERS_LIST_INTERVAL_MS = Math.max(
-  60_000,
-  parseInt(process.env.PLAYERS_LIST_WARM_INTERVAL_MS || '', 10) || 300_000 // 5 minutes
-);
+const { PLAYERS_LIST_WARM_PAGES, PLAYERS_LIST_WARM_INTERVAL_MS } = getEnv();
 
 const force = { force: true } as const;
 
@@ -69,8 +63,8 @@ const refreshers = [
   }),
   createBackgroundRefresh({
     name: 'PlayersListRefresh',
-    intervalMs: PLAYERS_LIST_INTERVAL_MS,
-    startupDetail: `${PLAYERS_LIST_WARM_PAGES} pages every ${PLAYERS_LIST_INTERVAL_MS}ms`,
+    intervalMs: PLAYERS_LIST_WARM_INTERVAL_MS,
+    startupDetail: `${PLAYERS_LIST_WARM_PAGES} pages every ${PLAYERS_LIST_WARM_INTERVAL_MS}ms`,
     task: async () => {
       await warmPlayersListCache(PLAYERS_LIST_WARM_PAGES);
       logger.debug(`[PlayersListRefresh] Warmed first ${PLAYERS_LIST_WARM_PAGES} players-list pages`);

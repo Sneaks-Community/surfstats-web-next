@@ -1,12 +1,10 @@
 import 'server-only';
 import type { NextRequest } from 'next/server';
+import { getEnv } from './env';
 
 // Extra origins (comma-separated) allowed to call the API, e.g. a separate
 // front-end. The site's own origin is always allowed.
-const ALLOWED_ORIGINS: readonly string[] = (process.env.ALLOWED_ORIGINS || '')
-  .split(',')
-  .map((o) => o.trim())
-  .filter(Boolean);
+const ALLOWED_ORIGINS: readonly string[] = getEnv().ALLOWED_ORIGINS;
 
 // The site's own origin, from the required NEXT_PUBLIC_SITE_URL. Never derived
 // from Host / X-Forwarded-Host: those are client-spoofable, so a header-derived

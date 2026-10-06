@@ -6,6 +6,7 @@ import { getErrorMessage } from './errors';
 import { onShutdown } from './shutdown';
 import { applyStatementTimeout } from './timeout';
 import { createBackgroundRefresh } from './background-refresh';
+import { getEnv } from './env';
 
 // Health flag on globalThis: only one module evaluation wins the shared probe slot
 // (lib/background-refresh.ts), so other copies must read its result instead of
@@ -23,10 +24,12 @@ const isAnalyticsConfigured = !!(
   process.env.ANALYTICS_MYSQL_HOST || process.env.ANALYTICS_MYSQL_DATABASE
 );
 
+const env = getEnv();
+
 // Create analytics database pool with graceful fallback
 const analyticsPool = mysql.createPool({
   host: process.env.ANALYTICS_MYSQL_HOST || process.env.MYSQL_HOST || 'localhost',
-  port: parseInt(process.env.ANALYTICS_MYSQL_PORT || process.env.MYSQL_PORT || '3306', 10) || 3306,
+  port: env.ANALYTICS_MYSQL_PORT ?? env.MYSQL_PORT,
   user: process.env.ANALYTICS_MYSQL_USER || process.env.MYSQL_USER || 'root',
   password: process.env.ANALYTICS_MYSQL_PASSWORD || process.env.MYSQL_PASSWORD || '',
   database: process.env.ANALYTICS_MYSQL_DATABASE || 'player_analytics_surf',
@@ -60,26 +63,8 @@ wrapPoolQuery(analyticsPool, { prefix: 'Analytics DB', slowThresholdMs: 1000 });
 // Same server-side statement cap as the main pool.
 applyStatementTimeout(analyticsPool, 'Analytics DB');
 
-// How often to re-check the analytics connection health, in milliseconds.
-// Configurable via ANALYTICS_HEALTHCHECK_INTERVAL_MS (clamped to a 10s minimum so
-// a typo can't hammer the DB). Set it to 0 (or a negative value) to disable
-// periodic re-checks and only probe once at startup.
-function resolveHealthCheckIntervalMs(): number {
-  const raw = process.env.ANALYTICS_HEALTHCHECK_INTERVAL_MS;
-  if (raw === undefined || raw.trim() === '') {
-    return 60_000; // default: 1 minute
-  }
-  const parsed = parseInt(raw, 10);
-  if (Number.isNaN(parsed)) {
-    return 60_000;
-  }
-  if (parsed <= 0) {
-    return 0; // disabled
-  }
-  return Math.max(10_000, parsed);
-}
-
-const HEALTHCHECK_INTERVAL_MS = resolveHealthCheckIntervalMs();
+// 0 disables periodic re-checks, leaving only the probe at startup.
+const HEALTHCHECK_INTERVAL_MS = env.ANALYTICS_HEALTHCHECK_INTERVAL_MS;
 
 // Tracks the last state we logged so a steady connection doesn't spam the log —
 // we only emit on the first probe and on each subsequent up<->down transition.

@@ -1,7 +1,8 @@
 import 'server-only';
 import type mysql from 'mysql2/promise';
 import logger from './logger';
-import { statementTimeoutMs, withTimeout } from './timeout';
+import { withTimeout } from './timeout';
+import { getEnv } from './env';
 import { getErrorCode, getErrorMessage } from './errors';
 
 export interface DbQueryLoggerOptions {
@@ -38,7 +39,7 @@ export function wrapPoolQuery(
   const { prefix, slowThresholdMs = 1000 } = options;
   // The server kills a statement at its timeout, so one still pending 2s later is
   // lost on the wire. Uncapped statements still get a 30s client backstop.
-  const timeoutMs = statementTimeoutMs();
+  const timeoutMs = getEnv().DB_STATEMENT_TIMEOUT_MS;
   const deadlineMs = timeoutMs > 0 ? timeoutMs + 2000 : 30_000;
 
   const marked = pool as mysql.Pool & { [WRAPPED]?: boolean };

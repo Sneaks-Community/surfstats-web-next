@@ -5,6 +5,7 @@ import client from './valkey';
 import logger from './logger';
 import { getErrorMessage } from './errors';
 import { getClientIp } from './client-ip';
+import { getEnv } from './env';
 
 /**
  * Fixed-window, per-IP rate limiter backed by Valkey, implemented with
@@ -28,19 +29,11 @@ import { getClientIp } from './client-ip';
  * as the outage lasts, and the fallback's counters are not synced back.
  */
 
-const WINDOW_SECONDS = Math.max(
-  1,
-  parseInt(process.env.RATE_LIMIT_WINDOW_SECONDS || '60', 10) || 60
-);
-const MAX_REQUESTS = Math.max(
-  1,
-  parseInt(process.env.RATE_LIMIT_MAX || '120', 10) || 120
-);
+const env = getEnv();
+const WINDOW_SECONDS = env.RATE_LIMIT_WINDOW_SECONDS;
+const MAX_REQUESTS = env.RATE_LIMIT_MAX;
 /** More generous than the API's: one page view fans out into several API calls. */
-const PAGE_MAX_REQUESTS = Math.max(
-  1,
-  parseInt(process.env.RATE_LIMIT_PAGE_MAX || '300', 10) || 300
-);
+const PAGE_MAX_REQUESTS = env.RATE_LIMIT_PAGE_MAX;
 /**
  * The router's RSC requests get their own, much larger budget. Every viewport
  * `<Link>` prefetches, so a single link-dense page view (~38 on the home page)
@@ -52,19 +45,13 @@ const PAGE_MAX_REQUESTS = Math.max(
  * navigation (full render); both arrive as `sec-fetch-dest: empty` and count
  * here. The cap therefore also bounds a caller who forges that header.
  */
-const PREFETCH_MAX_REQUESTS = Math.max(
-  1,
-  parseInt(process.env.RATE_LIMIT_PREFETCH_MAX || '900', 10) || 900
-);
+const PREFETCH_MAX_REQUESTS = env.RATE_LIMIT_PREFETCH_MAX;
 /**
  * Optional penalty: keep an IP blocked this many seconds from the moment it
  * blows a budget, replacing (not extending) the window reset. Unset (0)
  * disables it, which is the default.
  */
-const BLOCK_SECONDS = Math.max(
-  0,
-  parseInt(process.env.RATE_LIMIT_BLOCK_SECONDS || '0', 10) || 0
-);
+const BLOCK_SECONDS = env.RATE_LIMIT_BLOCK_SECONDS;
 
 /** Which budget a request counts against. */
 export type RateLimitScope = 'api' | 'page' | 'prefetch';

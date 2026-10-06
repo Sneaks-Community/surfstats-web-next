@@ -104,3 +104,44 @@ describe('validateEnv', () => {
     ).resolves.toBeUndefined();
   });
 });
+
+describe('getEnv', () => {
+  const ORIGINAL_ENV = process.env;
+
+  async function read(vars: Record<string, string>) {
+    process.env = { NODE_ENV: 'test', ...vars };
+    const { getEnv } = await import('../lib/env');
+    return getEnv();
+  }
+
+  afterEach(() => {
+    process.env = ORIGINAL_ENV;
+  });
+
+  // The defaults every module used to repeat as its own `parseInt(...) || n`.
+  it('fills in the defaults and parses what is set', async () => {
+    const env = await read({ RATE_LIMIT_MAX: '50', ALLOWED_ORIGINS: 'https://a.example, https://b.example' });
+
+    expect(env.RATE_LIMIT_MAX).toBe(50);
+    expect(env.RATE_LIMIT_PAGE_MAX).toBe(300);
+    expect(env.DB_QUEUE_LIMIT).toBe(100);
+    expect(env.VALKEY_TLS_REJECT_UNAUTHORIZED).toBe(true);
+    expect(env.ALLOWED_ORIGINS).toEqual(['https://a.example', 'https://b.example']);
+  });
+
+  // One typo must not quietly reset every other var to its default too.
+  it('defaults only the invalid var', async () => {
+    const env = await read({ RATE_LIMIT_MAX: 'lots', VALKEY_URL: 'redis://cache:6379' });
+
+    expect(env.RATE_LIMIT_MAX).toBe(120);
+    expect(env.VALKEY_URL).toBe('redis://cache:6379');
+  });
+
+  it('keeps the clamps the modules applied', async () => {
+    const env = await read({ ANALYTICS_HEALTHCHECK_INTERVAL_MS: '500', PLAYERS_LIST_WARM_INTERVAL_MS: '1000' });
+
+    expect(env.ANALYTICS_HEALTHCHECK_INTERVAL_MS).toBe(10_000);
+    expect(env.PLAYERS_LIST_WARM_INTERVAL_MS).toBe(60_000);
+    expect((await read({ ANALYTICS_HEALTHCHECK_INTERVAL_MS: '0' })).ANALYTICS_HEALTHCHECK_INTERVAL_MS).toBe(0);
+  });
+});

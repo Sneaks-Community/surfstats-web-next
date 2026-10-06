@@ -5,21 +5,16 @@ import { COLOR_FAMILIES, BACKGROUND_FAMILIES } from './theme-config';
 import { isValidTimeZone } from './utils';
 
 /**
- * Centralized, boot-time environment validation.
- *
- * Previously env handling was scattered: the MySQL vars failed fast in db.ts,
- * while STEAM_API_KEY, SERVERS_JSON and the analytics DB vars failed silently
- * at request time. This module is the single place that:
- *   - fails fast (throws) on missing/invalid REQUIRED vars, and
- *   - logs clear warnings for optional-but-unset feature flags.
- *
- * Call `validateEnv()` once at server startup.
+ * One schema for the environment: `validateEnv()` checks it once at startup
+ * (throwing on a missing or invalid required var), and `getEnv()` hands every
+ * module the optional vars with their defaults, so none re-parses its own.
+ * `logger`, `theme-config` and `utils` still read theirs directly: the first two
+ * would import this module in a cycle, and `utils` runs on the client.
  */
 
 /** True during `next build`, where env vars are absent and no server runs. */
 export const isBuildPhase =
   process.env.npm_lifecycle_event === 'build' ||
-  process.env.NEXT_PHASE === 'build' ||
   process.env.NEXT_PHASE === 'phase-production-build';
 
 // Required for the app to function at all — the primary ckSurf database, plus
@@ -37,54 +32,74 @@ const requiredSchema = z.object({
   ),
 });
 
-// Optional infra vars with safe fallbacks — validated for shape when present so
-// a typo (e.g. a non-numeric RATE_LIMIT_MAX or bad LOG_LEVEL) is caught at boot
-// rather than silently falling back at request time.
+// Optional vars, with the defaults every module reads them through. Validated
+// for shape when present so a typo (e.g. a non-numeric RATE_LIMIT_MAX or bad
+// LOG_LEVEL) is caught at boot rather than silently falling back.
 const optionalSchema = z.object({
-  MYSQL_PORT: z.coerce.number().int().positive().optional(),
+  MYSQL_PORT: z.coerce.number().int().positive().default(3306),
+  // Falls back to MYSQL_PORT.
   ANALYTICS_MYSQL_PORT: z.coerce.number().int().positive().optional(),
-  // How often to re-check the analytics DB connection (ms). 0 disables re-checks.
-  ANALYTICS_HEALTHCHECK_INTERVAL_MS: z.coerce.number().int().nonnegative().optional(),
-  RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().optional(),
-  RATE_LIMIT_MAX: z.coerce.number().int().positive().optional(),
-  RATE_LIMIT_PAGE_MAX: z.coerce.number().int().positive().optional(),
-  RATE_LIMIT_PREFETCH_MAX: z.coerce.number().int().positive().optional(),
-  // 0 (or unset) means a blown budget clears when the window rolls over.
-  RATE_LIMIT_BLOCK_SECONDS: z.coerce.number().int().nonnegative().optional(),
-  DB_MAX_CONCURRENT_EXPENSIVE: z.coerce.number().int().positive().optional(),
+  // How often to re-check the analytics DB connection (ms). 0 disables re-checks;
+  // anything else is at least 10s, so a typo can't hammer the DB.
+  ANALYTICS_HEALTHCHECK_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .nonnegative()
+    .transform((ms) => (ms === 0 ? 0 : Math.max(10_000, ms)))
+    .default(60_000),
+  RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(120),
+  RATE_LIMIT_PAGE_MAX: z.coerce.number().int().positive().default(300),
+  RATE_LIMIT_PREFETCH_MAX: z.coerce.number().int().positive().default(900),
+  // 0 means a blown budget clears when the window rolls over.
+  RATE_LIMIT_BLOCK_SECONDS: z.coerce.number().int().nonnegative().default(0),
+  DB_MAX_CONCURRENT_EXPENSIVE: z.coerce.number().int().positive().default(6),
   // Callers allowed to wait for a slot; past it they get a 503 (default: 2x above).
   DB_MAX_QUEUED_EXPENSIVE: z.coerce.number().int().positive().optional(),
-  // MySQL connection pool tuning (see lib/db.ts for defaults).
-  DB_CONNECTION_LIMIT: z.coerce.number().int().positive().optional(),
-  DB_QUEUE_LIMIT: z.coerce.number().int().nonnegative().optional(),
-  DB_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().optional(),
+  // MySQL connection pool tuning; 0 queue limit is mysql2's "unlimited".
+  DB_CONNECTION_LIMIT: z.coerce.number().int().positive().default(20),
+  DB_QUEUE_LIMIT: z.coerce.number().int().nonnegative().default(100),
+  DB_CONNECT_TIMEOUT_MS: z.coerce.number().int().positive().default(5000),
   // Server-side per-statement cap (see lib/timeout.ts). 0 disables it.
-  DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().nonnegative().optional(),
-  // Background warmer for the default players-list pages.
-  PLAYERS_LIST_WARM_PAGES: z.coerce.number().int().positive().optional(),
-  PLAYERS_LIST_WARM_INTERVAL_MS: z.coerce.number().int().positive().optional(),
+  DB_STATEMENT_TIMEOUT_MS: z.coerce.number().int().nonnegative().default(8000),
+  // Background warmer for the default players-list pages; at most once a minute.
+  PLAYERS_LIST_WARM_PAGES: z.coerce.number().int().positive().default(10),
+  PLAYERS_LIST_WARM_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .transform((ms) => Math.max(60_000, ms))
+    .default(300_000),
   // Comma-separated extra origins allowed to call the API (own origin always allowed).
-  ALLOWED_ORIGINS: z.string().optional(),
+  ALLOWED_ORIGINS: z
+    .string()
+    .transform((list) => list.split(',').map((o) => o.trim()).filter(Boolean))
+    .default([]),
   // Valkey cache (see lib/valkey.ts). The cache is fail-closed, so a typo here
   // reads as a whole-site outage unless it's caught at boot.
   VALKEY_URL: z
     .url({ protocol: /^rediss?$/, error: 'VALKEY_URL must be a redis:// or rediss:// URL' })
-    .optional(),
+    .default('redis://localhost:6379'),
   VALKEY_USERNAME: z.string().min(1).optional(),
   VALKEY_PASSWORD: z.string().min(1).optional(),
-  // Read as `=== 'true'` / `!== 'false'`, so anything else silently means the
-  // opposite of what the operator wrote.
-  VALKEY_TLS: z.enum(['true', 'false'], "VALKEY_TLS must be 'true' or 'false'").optional(),
+  // Exactly 'true' or 'false': anything else would silently mean the opposite of
+  // what the operator wrote.
+  VALKEY_TLS: z
+    .enum(['true', 'false'], "VALKEY_TLS must be 'true' or 'false'")
+    .transform((v) => v === 'true')
+    .default(false),
   VALKEY_TLS_REJECT_UNAUTHORIZED: z
     .enum(['true', 'false'], "VALKEY_TLS_REJECT_UNAUTHORIZED must be 'true' or 'false'")
-    .optional(),
-  VALKEY_CONNECT_TIMEOUT: z.coerce.number().int().positive().optional(),
+    .transform((v) => v === 'true')
+    .default(true),
+  VALKEY_CONNECT_TIMEOUT: z.coerce.number().int().positive().default(5000),
   // Client-IP header (see lib/client-ip.ts). A typo would collapse every caller
   // into one rate-limit bucket, so shape-check it.
   TRUSTED_CLIENT_IP_HEADER: z
     .string()
     .regex(/^[A-Za-z0-9-]+$/, 'TRUSTED_CLIENT_IP_HEADER must be a valid HTTP header name')
-    .optional(),
+    .transform((header) => header.toLowerCase())
+    .default('x-forwarded-for'),
   LOG_LEVEL: z
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
     .optional(),
@@ -97,7 +112,7 @@ const optionalSchema = z.object({
     .refine(isValidTimeZone, 'DISPLAY_TZ must be a valid IANA timezone (e.g. UTC, America/New_York)')
     .optional(),
   // Highest tier shown on the player Tier Distribution radar.
-  MAX_TIER: z.coerce.number().int().positive().optional(),
+  MAX_TIER: z.coerce.number().int().positive().default(10),
   // Theme palette families. Injected as CSS vars from the root layout, so an
   // unknown value would otherwise throw on every page render.
   THEME_PRIMARY: z.enum(COLOR_FAMILIES).optional(),
@@ -109,6 +124,24 @@ const optionalSchema = z.object({
   THEME_LIGHT_BACKGROUND: z.enum(BACKGROUND_FAMILIES).optional(),
   THEME_DARK_BACKGROUND: z.enum(BACKGROUND_FAMILIES).optional(),
 });
+
+export type OptionalEnv = z.infer<typeof optionalSchema>;
+
+/**
+ * The optional vars with their defaults. Read where the value is used: parsing is
+ * cheap, and tests set `process.env` between calls. A var that fails validation
+ * falls back to its own default only; `validateEnv` fails the boot on it.
+ */
+export function getEnv(): OptionalEnv {
+  const parsed = optionalSchema.safeParse(process.env);
+  if (parsed.success) return parsed.data;
+  return Object.fromEntries(
+    Object.entries(optionalSchema.shape).map(([key, field]) => {
+      const one = field.safeParse(process.env[key]);
+      return [key, one.success ? one.data : field.parse(undefined)];
+    })
+  ) as OptionalEnv;
+}
 
 // Live-status game servers. Validated per item so a malformed entry can't reach
 // GameDig.query() as an arbitrary host/port.

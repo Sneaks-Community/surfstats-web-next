@@ -6,7 +6,7 @@ import {
   Flag,
   Layers,
 } from 'lucide-react';
-import { getMapImagesUrl } from '@/lib/utils';
+import { getMapImagesUrl, SITE_NAME } from '@/lib/utils';
 import { getStatsFromCache, getLatestCompletionsFromCache } from '@/lib/dashboard-cache';
 import { getPlayersFromCache } from '@/lib/player-cache';
 import { EMPTY_SEARCH } from '@/lib/validators';
@@ -78,7 +78,7 @@ export default async function Home() {
       <section className="pt-1 pb-2 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <div className="min-w-0">
           <h1 className="text-3xl font-bold tracking-tight text-text mb-1">
-            Welcome to {process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats'}
+            Welcome to {SITE_NAME}
           </h1>
           <p className="text-text-muted text-base max-w-2xl">
             {process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||

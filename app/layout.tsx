@@ -6,7 +6,7 @@ import { ClientConfigProvider } from '@/lib/ClientConfigContext';
 import { ThemeProvider } from '@/lib/theme-context';
 import { generateThemeStyles } from '@/lib/theme-config';
 import { getSiteUrl } from '@/lib/site-url';
-import { getMapImagesUrl, getDisplayTz } from '@/lib/utils';
+import { getMapImagesUrl, getDisplayTz, SITE_NAME } from '@/lib/utils';
 
 // Startup work lives in instrumentation.ts -> lib/startup.ts; a layout module is
 // not a startup hook (it can be evaluated more than once per process).
@@ -16,7 +16,6 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteUrl = await getSiteUrl();
-  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats';
   const title = process.env.NEXT_PUBLIC_SITE_TITLE || 'SurfStats - CS:GO Surf Community';
   const description =
     process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
@@ -26,12 +25,12 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(siteUrl),
     title: {
       default: title,
-      template: `%s - ${siteName}`,
+      template: `%s - ${SITE_NAME}`,
     },
     description,
     openGraph: {
       type: 'website',
-      siteName,
+      siteName: SITE_NAME,
       title,
       description,
       url: siteUrl,
@@ -47,7 +46,6 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RootLayout({children}: {children: React.ReactNode}) {
   const mapImagesUrl = getMapImagesUrl();
   const displayTz = getDisplayTz();
-  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats';
   const themeStyles = generateThemeStyles();
   // Set by proxy.ts. Next nonces its own scripts from the CSP header, but not
   // one written by hand, so the theme bootstrap below needs it explicitly.
@@ -83,7 +81,7 @@ export default async function RootLayout({children}: {children: React.ReactNode}
       <body className="bg-gradient-radial grid-pattern bg-background text-text min-h-screen flex flex-col antialiased" suppressHydrationWarning>
         <ThemeProvider>
           <ClientConfigProvider mapImagesUrl={mapImagesUrl} displayTz={displayTz}>
-            <Navigation siteName={siteName} />
+            <Navigation siteName={SITE_NAME} />
             <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 glow-effect">
               {children}
             </main>

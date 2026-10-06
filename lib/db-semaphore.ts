@@ -1,6 +1,7 @@
 import 'server-only';
 import { DbBusyError } from './errors';
 import logger from './logger';
+import { getEnv } from './env';
 
 /**
  * In-process cap on concurrent expensive DB queries so a burst (e.g. scraping
@@ -15,20 +16,15 @@ import logger from './logger';
  * rethrows past any `onError`, so the queries already running finish quickly.
  */
 
-const MAX_CONCURRENT = Math.max(
-  1,
-  parseInt(process.env.DB_MAX_CONCURRENT_EXPENSIVE || '6', 10) || 6
-);
+const env = getEnv();
+const MAX_CONCURRENT = env.DB_MAX_CONCURRENT_EXPENSIVE;
 
 /**
  * How many callers may wait for a slot. At the default 2x the concurrency the
  * worst-case wait is ~2 query durations, so the tail is only as bounded as
  * `DB_STATEMENT_TIMEOUT_MS`: raise that and this queue grows the tail with it.
  */
-const MAX_QUEUED = Math.max(
-  1,
-  parseInt(process.env.DB_MAX_QUEUED_EXPENSIVE || '', 10) || MAX_CONCURRENT * 2
-);
+const MAX_QUEUED = env.DB_MAX_QUEUED_EXPENSIVE ?? MAX_CONCURRENT * 2;
 
 let active = 0;
 const waiters: Array<() => void> = [];

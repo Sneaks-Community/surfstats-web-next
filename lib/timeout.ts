@@ -7,6 +7,7 @@ import type { PoolConnection } from 'mysql2';
 import type { Pool } from 'mysql2/promise';
 import logger from './logger';
 import { getErrorMessage } from './errors';
+import { getEnv } from './env';
 
 /**
  * Reject after `ms` if `promise` has not settled. Does not cancel its work.
@@ -39,12 +40,6 @@ export async function withTimeout<T>(
   }
 }
 
-/** `DB_STATEMENT_TIMEOUT_MS`, default 8000; 0 or less means uncapped. */
-export function statementTimeoutMs(): number {
-  const parsed = parseInt(process.env.DB_STATEMENT_TIMEOUT_MS ?? '', 10);
-  return Number.isNaN(parsed) ? 8000 : parsed;
-}
-
 /**
  * Cap every statement server-side, so a query the client gave up on stops
  * holding its pool connection.
@@ -61,8 +56,8 @@ export function statementTimeoutMs(): number {
  * @param prefix - Logger prefix, matching the pool's other log lines
  */
 export function applyStatementTimeout(pool: Pool, prefix: string): void {
-  const ms = statementTimeoutMs();
-  if (ms <= 0) {
+  const ms = getEnv().DB_STATEMENT_TIMEOUT_MS;
+  if (ms === 0) {
     logger.warn(`[${prefix}] Server-side statement timeout disabled`);
     return;
   }
