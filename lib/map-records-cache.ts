@@ -3,16 +3,9 @@ import { mapCachedFetch } from './map-cached-fetch';
 import pool from './db';
 import type { RowDataPacket } from 'mysql2';
 
-/**
- * Every paginated/ranked query here orders by `runtime…, date ASC, steamid ASC`.
- * Without a tiebreak, rows sharing a time have no guaranteed order, so a player
- * can appear on two pages or on none as the plan or the data shifts. `steamid` is
- * unique per (map[, zonegroup]), so the three keys are a total order; `date`
- * comes first to match the "earliest run wins" rule the WR tiebreak uses.
- *
- * The stage queries instead use `DENSE_RANK` over `runtime, date`, where ties
- * deliberately *share* a rank — do not add `steamid` to those windows.
- */
+// Paginated queries order by `runtime, date, steamid`: steamid is unique per map/zonegroup, so tied
+// times never skip or repeat across pages, and date first matches the earliest-run-wins WR rule.
+// Stage DENSE_RANK ties deliberately share a rank: do not add `steamid` to those windows.
 const RECORDS_CACHE_TTL = 300; // 5 minutes
 const RECORDS_COUNTS_TTL = 300; // 5 minutes
 const STAGES_CACHE_TTL = 300; // 5 minutes
@@ -90,10 +83,7 @@ interface BonusRecordsResult {
   };
 }
 
-/**
- * Get record counts and WR time from cache. One round trip: four scalar
- * subqueries over the map's rows.
- */
+/** One round trip: four scalar subqueries over the map's rows. */
 export async function getRecordCountsAndWRFromCache(mapname: string): Promise<CountsAndWr> {
   return mapCachedFetch<CountsAndWr>({
     mapname,
@@ -122,9 +112,6 @@ export async function getRecordCountsAndWRFromCache(mapname: string): Promise<Co
   });
 }
 
-/**
- * Get leaderboard records from cache
- */
 export async function getLeaderboardRecordsFromCache(
   mapname: string,
   page: number,
@@ -165,9 +152,6 @@ export async function getLeaderboardRecordsFromCache(
   });
 }
 
-/**
- * Get stage records from cache
- */
 export async function getStageRecordsFromCache(
   mapname: string,
   stage: number,
@@ -176,8 +160,8 @@ export async function getStageRecordsFromCache(
 ): Promise<StageRecordsResult> {
   const offset = (page - 1) * pageSize;
 
-  // Row data is always the rank-ordered top-100 per (map, stage); sort/page are
-  // applied client-side. Cache only that expensive slice, keyed by stage alone.
+  // Caches only the expensive rank-ordered top 100, keyed by stage alone; sort and page are
+  // applied client-side.
   const { stages, total } = await mapCachedFetch<{ stages: StageRecord[]; total: number }>({
     mapname,
     keySuffix: `stages:${stage}`,
@@ -250,9 +234,6 @@ export async function getStageRecordsFromCache(
   };
 }
 
-/**
- * Get bonus records from cache
- */
 export async function getBonusRecordsFromCache(
   mapname: string,
   bonus: number,
@@ -301,13 +282,10 @@ export async function getBonusRecordsFromCache(
   });
 }
 
-const SEARCH_CACHE_TTL = 60; // 1 minute — short TTL since query results vary
+const SEARCH_CACHE_TTL = 60; // 1 minute; short, since results vary per query
 const SEARCH_MAX_RESULTS = 100;
 
-/**
- * Search leaderboard records by player name or SteamID across ALL completions for a map.
- * Bypasses pagination so results are never limited to already-loaded pages.
- */
+/** Name or SteamID search over all completions, not just loaded pages; ranks stay global. */
 export async function searchLeaderboardRecordsFromCache(
   mapname: string,
   query: string
@@ -349,10 +327,7 @@ export async function searchLeaderboardRecordsFromCache(
   });
 }
 
-/**
- * Search stage records by player name or SteamID. Ranks are computed globally
- * (DENSE_RANK over all stage completions) before the LIKE filter is applied.
- */
+/** Name or SteamID search; DENSE_RANK runs over all stage completions before the LIKE filter. */
 export async function searchStageRecordsFromCache(
   mapname: string,
   stage: number,
@@ -396,9 +371,7 @@ export async function searchStageRecordsFromCache(
   });
 }
 
-/**
- * Search bonus records by player name or SteamID for a specific bonus zone.
- */
+/** Name or SteamID search within one bonus zone. */
 export async function searchBonusRecordsFromCache(
   mapname: string,
   bonus: number,

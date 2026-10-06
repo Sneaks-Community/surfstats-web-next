@@ -1,14 +1,6 @@
-/**
- * Error helpers shared across client and server code.
- * Safe to import anywhere — no server-only dependencies.
- */
+// Imported by client and server code: keep it free of server-only dependencies.
 
-/**
- * Safely extract a human-readable message from an unknown error value.
- * Handles both `Error` instances and plain `{ message }` objects (e.g. driver errors).
- * @param error - The caught value (typed `unknown`)
- * @returns The message, or 'Unknown error' when none can be found
- */
+/** Also handles plain `{ message }` objects (driver errors); falls back to 'Unknown error'. */
 export function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
   if (typeof error === 'string') return error;
@@ -19,12 +11,7 @@ export function getErrorMessage(error: unknown): string {
   return 'Unknown error';
 }
 
-/**
- * Extract a driver error code (mysql2 `ER_*`/`ECONNREFUSED`, ioredis, etc.) from
- * an unknown error value, for log context alongside {@link getErrorMessage}.
- * @param error - The caught value (typed `unknown`)
- * @returns The code, or 'N/A' when the value carries none
- */
+/** Driver error code (e.g. mysql2 `ER_*`, `ECONNREFUSED`) for log context, or 'N/A'. */
 export function getErrorCode(error: unknown): string {
   if (typeof error === 'object' && error !== null && 'code' in error) {
     const code = (error as { code?: unknown }).code;
@@ -34,17 +21,14 @@ export function getErrorCode(error: unknown): string {
   return 'N/A';
 }
 
-/**
- * Whether an error is a fetch/AbortController abort (safe to ignore).
- * @param error - The caught value
- */
+/** Fetch/AbortController abort; safe to ignore. */
 export function isAbortError(error: unknown): boolean {
   return error instanceof Error && error.name === 'AbortError';
 }
 
 /**
- * Thrown by `cachedFetch` when Valkey is unreachable; `apiError` turns it into
- * a 503. Lives here so both can import it without the cache module graph.
+ * Thrown by `cachedFetch` when Valkey is down; `apiError` maps it to 503.
+ * Lives here so both can import it without pulling in the cache module graph.
  */
 export class CacheUnavailableError extends Error {
   constructor() {
@@ -54,9 +38,8 @@ export class CacheUnavailableError extends Error {
 }
 
 /**
- * Thrown by `withExpensiveQueryLimit` when the expensive-query queue is full;
- * `apiError` turns it into a 503. Shedding load beats queueing behind a
- * multi-second scan the caller has most likely already given up on.
+ * Thrown by `withExpensiveQueryLimit` when its queue is full; `apiError` maps it to 503.
+ * Shedding beats queueing behind a slow scan the caller has likely given up on.
  */
 export class DbBusyError extends Error {
   constructor() {

@@ -3,15 +3,12 @@ import type { NextRequest } from 'next/server';
 import logger from './logger';
 import { getEnv } from './env';
 
-/** Set TRUSTED_CLIENT_IP_HEADER to a CDN header when a CDN, not the local proxy, is the trust boundary. */
+// Use a CDN's header when the CDN, not the local proxy, is the trust boundary.
 const TRUSTED_HEADER = getEnv().TRUSTED_CLIENT_IP_HEADER;
 
 let warned = false;
 
-/**
- * Warn the operator that the configured header is missing. Once per process:
- * the fix is a config change, so repeating the line only buries other logs.
- */
+// Once per process: the fix is a config change, so repeats would only bury other logs.
 function warnUntrusted(hasFallback: boolean): void {
   if (warned) return;
   warned = true;
@@ -23,12 +20,9 @@ function warnUntrusted(hasFallback: boolean): void {
 }
 
 /**
- * Client IP from the trusted header, falling back to `x-real-ip`. Takes the
- * right-most comma entry — the hop the proxy appended, which a client cannot
- * forge, unlike the left-most. Assumes a single trusted hop.
- *
- * `null` = no forwarding header at all; `''` = present but unusable. Callers
- * gating on trust must treat those differently.
+ * From the trusted header, else `x-real-ip`. Takes the right-most entry (the hop the proxy
+ * appended; clients can forge the left-most), so it assumes one trusted hop.
+ * `null` = no forwarding header; `''` = present but unusable. Trust gates must tell them apart.
  */
 export function getClientIp(request: NextRequest): string | null {
   const forwarded = request.headers.get(TRUSTED_HEADER);

@@ -1,11 +1,8 @@
 import 'server-only';
 import { SITE_NAME } from './utils';
 
-/**
- * Shared shell for the proxy's short-circuit HTML responses. Inline styles, no
- * external assets and no inline scripts, so it renders while the app is
- * degraded and needs no CSP exemption.
- */
+// Shell for the proxy's short-circuit pages. Inline styles, no external assets or scripts,
+// so it renders while the app is degraded and needs no CSP exemption.
 function errorPageHtml(
   heading: string,
   body: string,
@@ -44,9 +41,7 @@ function errorPageHtml(
 </html>`;
 }
 
-/**
- * Self-contained 503 page served (by the proxy) when Valkey is unavailable.
- */
+/** 503 page the proxy serves when Valkey is unavailable. */
 export function cacheUnavailableHtml(): string {
   return errorPageHtml(
     'Temporarily unavailable',
@@ -55,12 +50,7 @@ export function cacheUnavailableHtml(): string {
   );
 }
 
-/**
- * Self-contained 429 page served (by the proxy) when a client exceeds the
- * page-route rate limit.
- *
- * @param resetSeconds - Seconds until the caller's window resets
- */
+/** 429 page for the page-route rate limit; `resetSeconds` is until the caller's window resets. */
 export function tooManyRequestsHtml(resetSeconds: number): string {
   return errorPageHtml(
     'Too many requests',

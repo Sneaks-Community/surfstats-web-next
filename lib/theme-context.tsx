@@ -12,25 +12,19 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = 'theme';
-// Same-tab notification: 'storage' events only fire in *other* tabs, so we emit
-// our own event when this tab writes the theme.
+// 'storage' events only fire in other tabs, so this tab emits its own.
 const THEME_CHANGE_EVENT = 'themechange';
 
 function isTheme(value: string | null): value is Theme {
   return value === 'light' || value === 'dark' || value === 'system';
 }
 
-/**
- * Get the system preference for color scheme
- */
 function getSystemTheme(): 'light' | 'dark' {
   if (typeof window === 'undefined') return 'dark';
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
-/**
- * Read the persisted theme from localStorage (client snapshot for the store).
- */
+/** Client snapshot for `useSyncExternalStore`. */
 function getStoredTheme(): Theme {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -40,10 +34,6 @@ function getStoredTheme(): Theme {
   }
 }
 
-/**
- * Subscribe to theme changes from other tabs ('storage') and this tab
- * (our custom event dispatched by setTheme).
- */
 function subscribe(callback: () => void): () => void {
   window.addEventListener('storage', callback);
   window.addEventListener(THEME_CHANGE_EVENT, callback);
@@ -53,9 +43,6 @@ function subscribe(callback: () => void): () => void {
   };
 }
 
-/**
- * Apply the resolved (light/dark) theme to the document element.
- */
 function applyResolvedTheme(theme: Theme): void {
   const root = document.documentElement;
   const resolved = theme === 'system' ? getSystemTheme() : theme;
@@ -64,10 +51,6 @@ function applyResolvedTheme(theme: Theme): void {
   root.style.colorScheme = resolved;
 }
 
-/**
- * ThemeProvider component
- * Wraps the application to provide theme context
- */
 export function ThemeProvider({
   children,
   defaultTheme = 'system',
@@ -75,24 +58,20 @@ export function ThemeProvider({
   children: React.ReactNode;
   defaultTheme?: Theme;
 }) {
-  // localStorage is a client-only external store. useSyncExternalStore renders
-  // the server snapshot (defaultTheme) during SSR *and* hydration so the markup
-  // matches (no hydration mismatch / React #418), then switches to the stored
-  // value on the client without a mismatch error. This keeps every consumer
-  // (e.g. the theme toggle icon) hydration-safe.
+  // SSR and hydration use the server snapshot (defaultTheme), then the stored value takes
+  // over, so no consumer (e.g. the toggle icon) can hit a hydration mismatch (React #418).
   const theme = useSyncExternalStore(subscribe, getStoredTheme, () => defaultTheme);
 
   const setTheme = useCallback((newTheme: Theme) => {
     try {
       localStorage.setItem(STORAGE_KEY, newTheme);
     } catch {
-      // Ignore write failures (e.g. private mode); the in-memory value below still updates.
+      // Private mode can reject writes; still notify listeners.
     }
     window.dispatchEvent(new Event(THEME_CHANGE_EVENT));
   }, []);
 
-  // Keep the <html> class in sync with the resolved theme. Runs for every theme
-  // (including 'system'), so React authoritatively manages the class.
+  // Runs for every theme, 'system' included, so React alone manages the <html> class.
   useEffect(() => {
     applyResolvedTheme(theme);
   }, [theme]);
@@ -115,10 +94,6 @@ export function ThemeProvider({
   );
 }
 
-/**
- * Hook to access theme context
- * Must be used within a ThemeProvider
- */
 export function useTheme(): ThemeContextValue {
   const context = useContext(ThemeContext);
   if (!context) {

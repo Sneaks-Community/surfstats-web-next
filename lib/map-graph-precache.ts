@@ -12,19 +12,16 @@ import { getAllMapMetadataFromCache, getMapMetadataFromCache } from './map-cache
 import { CacheUnavailableError, getErrorMessage } from './errors';
 import { createBackgroundRefresh } from './background-refresh';
 
-// Pacing: the series run under the expensive-query semaphore, one at a time per
-// map, so the whole sweep holds at most MAX_CONCURRENT of its 6 slots and never
-// queues behind itself, leaving the rest for page renders.
+// One series per map at a time, so the sweep holds at most MAX_CONCURRENT of the semaphore's
+// 6 slots, never queues behind itself, and leaves the rest for page renders.
 const BATCH_SIZE = 20;
 const BATCH_DELAY_MS = 1_000;
 const REFRESH_INTERVAL_MS = 86400_000; // 24 hours
 const MAX_CONCURRENT = 2;
 
 /**
- * Refresh all graph data points for a single map from the database, one series at
- * a time. Each series is refreshed in place: no `DEL` first, so there is no window
- * where a visitor finds the key missing and pays for the query, and a failed
- * refresh leaves the previous value being served.
+ * Refreshes one map's chart series in place (no `DEL` first), so a visitor never finds a key
+ * missing and pays for the query, and a failed refresh keeps serving the previous value.
  */
 async function precacheMapGraphs(mapname: string, startup: boolean): Promise<void> {
   try {
@@ -33,13 +30,10 @@ async function precacheMapGraphs(mapname: string, startup: boolean): Promise<voi
     const stages = metadata?.stages || 0;
     const maxCheckpoint = checkpoints > 0 ? checkpoints : stages;
 
-    // Startup reads first (skip series still within their 72h TTL); interval
-    // sweeps force an in-place refresh.
+    // Startup skips series still within their 72h TTL; interval sweeps force an in-place refresh.
     const force = { force: !startup };
-    // One series at a time: measured on this DB, the six run no faster in
-    // parallel (~300ms per map either way) and six copies of one aggregate are
-    // 2.75x slower fanned out, so the fan-out only widened the sweep's hold on
-    // the expensive-query semaphore.
+    // Sequential: measured ~300ms per map either way, and six copies of one aggregate run 2.75x
+    // slower fanned out, so fan-out only lengthens the sweep's hold on the semaphore.
     for (const series of [
       () => getCompletionsOverTimeFromCache(mapname, force),
       () => getTimeOnMapDataFromCache(mapname, force),
@@ -53,17 +47,13 @@ async function precacheMapGraphs(mapname: string, startup: boolean): Promise<voi
 
     logger.debug(`[MapGraphPrecache] Cached graphs for ${mapname}`);
   } catch (error) {
-    // A dropped cache fails every map identically and the sweep can't do any
-    // work without it: abort so it's logged once, not ~1,000 times.
+    // A dropped cache fails every map identically: abort so it's logged once, not per map.
     if (error instanceof CacheUnavailableError) throw error;
     logger.warn(`[MapGraphPrecache] Failed to cache graphs for ${mapname}: ${getErrorMessage(error)}`);
   }
 }
 
-/**
- * Refresh every map's chart series once, in paced batches. One sweep per interval
- * replaces a ~1,000-timer per-map tree; the batch pacing already spreads the load.
- */
+/** Refreshes every map's chart series once per interval, in paced batches to spread the load. */
 async function precacheAllMapGraphs(startup: boolean): Promise<void> {
   const metadata = await getAllMapMetadataFromCache();
   const mapNames = Array.from(metadata.keys());

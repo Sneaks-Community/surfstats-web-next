@@ -1,9 +1,6 @@
 import 'server-only';
 
-/**
- * Supported Tailwind color families for theming
- * These can be set via environment variables
- */
+/** Tailwind families accepted by the THEME_* color env vars. */
 export const COLOR_FAMILIES = [
   'emerald', 'green', 'teal', 'cyan', 'sky',
   'blue', 'indigo', 'violet', 'purple', 'fuchsia',
@@ -16,7 +13,7 @@ export type ColorFamily = (typeof COLOR_FAMILIES)[number];
 
 export type BackgroundFamily = (typeof BACKGROUND_FAMILIES)[number];
 
-// Color definitions using hex values for runtime injection
+// Hex values, injected as CSS variables at runtime.
 const colorPalettes: Record<ColorFamily, Record<string, string>> = {
   emerald: {
     50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 300: '#6ee7b7', 400: '#34d399',
@@ -111,15 +108,10 @@ const backgroundPalettes: Record<BackgroundFamily, Record<string, string>> = {
   },
 };
 
-// Cached theme config - initialized once at server start
 let cachedThemeConfig: ReturnType<typeof createThemeConfig> | null = null;
 
-/**
- * Resolve an env value to a known palette family, falling back when it is unset
- * or misspelled. Env is also validated at boot (lib/env.ts), so a typo normally
- * fails fast; this keeps an unvalidated value from throwing in the root layout
- * and 500-ing every route.
- */
+// Falls back when unset or misspelled. Env is validated at boot, but an unvalidated typo
+// must not throw in the root layout and 500 every route.
 function colorFamily(value: string | undefined, fallback: ColorFamily): ColorFamily {
   return value && Object.hasOwn(colorPalettes, value) ? (value as ColorFamily) : fallback;
 }
@@ -128,9 +120,6 @@ function backgroundFamily(value: string | undefined, fallback: BackgroundFamily)
   return value && Object.hasOwn(backgroundPalettes, value) ? (value as BackgroundFamily) : fallback;
 }
 
-/**
- * Create theme configuration from environment variables
- */
 function createThemeConfig() {
   const primary = colorFamily(process.env.THEME_PRIMARY, 'emerald');
   const secondary = colorFamily(process.env.THEME_SECONDARY, 'cyan');
@@ -149,9 +138,7 @@ function createThemeConfig() {
   };
 }
 
-/**
- * Get theme configuration from environment variables (cached at server start)
- */
+/** Theme families from the THEME_* env vars, computed once per process. */
 export function getThemeConfig() {
   if (!cachedThemeConfig) {
     cachedThemeConfig = createThemeConfig();
@@ -169,9 +156,7 @@ function scaleVars(name: string, palette: Record<string, string>): string {
   ].join('\n');
 }
 
-/**
- * Generate CSS for theme colors
- */
+/** CSS variables for both themes, for the root layout's inline `<style>`. */
 export function generateThemeStyles(): string {
   const config = getThemeConfig();
   

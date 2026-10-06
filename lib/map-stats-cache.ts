@@ -8,12 +8,11 @@ import { getMapMetadataFromCache } from './map-cache';
 import { isStagedMap } from './utils';
 import { validateMapName } from './validators';
 
-// TTL is the safety net, the 24h precache sweep is the freshness guarantee, so the
-// net has to be slacker: at 1x every map but the first in the sweep spent part of
-// each cycle expired, making its next visitor pay for six aggregates.
+// Safety net only; the 24h precache sweep keeps it fresh. At 1x, maps late in each sweep would
+// sit expired and their next visitor would pay for six aggregates.
 const STATS_CACHE_TTL = 259200; // 72 hours = 3x the sweep interval
 
-/** Five of the six per-map chart series, one key each; the sixth is below. */
+/** Five of the six per-map chart series; the sixth is {@link wrCheckpointSuffix}. */
 export const MAP_STATS_SUFFIXES = {
   completions: 'stats:completions',
   timeOnMap: 'stats:time-on-map',
@@ -22,14 +21,13 @@ export const MAP_STATS_SUFFIXES = {
   percentiles: 'stats:percentiles',
 } as const;
 
-/** WR checkpoint times are keyed per checkpoint count, so this one is a function. */
+/** The sixth series, keyed per checkpoint count. */
 export function wrCheckpointSuffix(maxCheckpoint: number): string {
   return `stats:wr-checkpoint:${maxCheckpoint}`;
 }
 
-// Every fetcher here aggregates over ck_playertimes/ck_checkpoints/ck_bonus, so all
-// of them pass `expensive: true`; otherwise the precache floods the 20-connection
-// pool with concurrent aggregates while page renders wait.
+// Every fetcher here is an aggregate, so all pass `expensive: true`; otherwise the precache
+// floods the 20-connection pool while page renders wait.
 
 interface CompletionsOverTimeData extends RowDataPacket {
   date: string;
@@ -50,10 +48,7 @@ interface CheckpointStatsResult {
   checkpointAvgTimes: Array<{ checkpoint: number; avgTime: number; sampleSize: number }>;
 }
 
-/**
- * `cp1..cpN` for a SELECT list. The count is bounded here so the names callers
- * interpolate into SQL are always synthesized from a checked integer.
- */
+// `cp1..cpN`, bounded here because callers interpolate these names into SQL.
 function checkpointColumns(maxCheckpoint: number): string[] {
   if (maxCheckpoint > 75 || maxCheckpoint < 0) {
     throw new Error('Invalid checkpoint count');
@@ -61,9 +56,7 @@ function checkpointColumns(maxCheckpoint: number): string[] {
   return Array.from({ length: maxCheckpoint }, (_, i) => `cp${i + 1}`);
 }
 
-/**
- * Process checkpoint rows into average times statistics
- */
+// Average time and sample size per checkpoint, across all players' rows.
 function processCheckpointData(
   checkpointRows: RowDataPacket[],
   maxCheckpoint: number
@@ -104,9 +97,6 @@ function processCheckpointData(
   return { checkpointAvgTimes };
 }
 
-/**
- * Get WR checkpoint times from cache
- */
 export async function getWRCheckpointTimesFromCache(
   mapname: string,
   maxCheckpoint: number,
@@ -163,9 +153,6 @@ export async function getWRCheckpointTimesFromCache(
   });
 }
 
-/**
- * Get checkpoint stats from cache
- */
 export async function getCheckpointStatsFromCache(
   mapname: string,
   { force = false }: RefreshOptions = {}
@@ -202,9 +189,6 @@ export async function getCheckpointStatsFromCache(
   });
 }
 
-/**
- * Get bonus completions over time from cache
- */
 export async function getBonusCompletionsOverTimeFromCache(
   mapname: string,
   { force = false }: RefreshOptions = {}
@@ -248,9 +232,6 @@ export async function getBonusCompletionsOverTimeFromCache(
   });
 }
 
-/**
- * Get completions over time from cache
- */
 export async function getCompletionsOverTimeFromCache(
   mapname: string,
   { force = false }: RefreshOptions = {}
@@ -284,13 +265,8 @@ export async function getCompletionsOverTimeFromCache(
 }
 
 /**
- * Get time on map data from cache.
- *
- * Backed by the optional analytics DB, so it short-circuits when that database
- * is absent or unhealthy: without the guard every map render and every precache
- * pass attempted a doomed connection and logged a warning. The empty result is
- * deliberately returned *outside* the cache, so it isn't pinned for the TTL and
- * the chart repopulates as soon as the health probe recovers.
+ * Short-circuits while the optional analytics DB is absent or unhealthy, so no render or sweep
+ * tries a doomed connection. That empty result is uncached, so the chart refills on recovery.
  */
 export async function getTimeOnMapDataFromCache(
   mapname: string,
@@ -334,10 +310,7 @@ export async function getTimeOnMapDataFromCache(
   });
 }
 
-/**
- * Get percentile completion times from cache
- * Uses MariaDB-compatible queries with LIMIT/OFFSET
- */
+/** Percentiles via LIMIT/OFFSET, for MariaDB compatibility. */
 export async function getPercentileTimesFromCache(
   mapname: string,
   { force = false }: RefreshOptions = {}
@@ -364,7 +337,6 @@ export async function getPercentileTimesFromCache(
     expensive: true,
     errorLevel: 'warn',
     fetch: async (validMapname) => {
-      // First, get count, min (WR), and avg in a single query
       const [summaryRows] = await pool.query<RowDataPacket[]>(`
         SELECT
           MIN(runtimepro) as wrTime,
@@ -381,12 +353,11 @@ export async function getPercentileTimesFromCache(
         return { wrTime: null, p1Time: null, p10Time: null, medianTime: null, avgTime: null };
       }
 
-      // Calculate offsets for percentiles (0-indexed)
+      // 0-indexed row offsets for `LIMIT 1 OFFSET ?`.
       const p1Offset = Math.max(0, Math.floor(totalCount * 0.01));
       const p10Offset = Math.max(0, Math.floor(totalCount * 0.10));
       const medianOffset = Math.max(0, Math.floor(totalCount * 0.50));
 
-      // Get each percentile value using LIMIT 1 OFFSET
       const [p1Rows] = await pool.query<RowDataPacket[]>(`
         SELECT runtimepro FROM ck_playertimes
         WHERE mapname = ?
@@ -419,12 +390,7 @@ export async function getPercentileTimesFromCache(
   });
 }
 
-/**
- * Aggregated chart data for a map's stats grid.
- *
- * Composed by the map page (server-rendered → passed as props to MapChartGrid)
- * from the underlying cached sub-fetches.
- */
+/** A map's stats-grid data, rendered server-side and passed to MapChartGrid as props. */
 export interface MapChartData {
   completionsOverTime: Array<{ date: string; count: number }>;
   timeOnMapData: Array<{ date: string; totalDuration: number }>;
@@ -442,8 +408,8 @@ export interface MapChartData {
 }
 
 /**
- * Compose the full chart-data payload for a map from its cached sub-fetches.
- * Returns empty series (but the correct `isStageMap`) for maps with no completions.
+ * Composes {@link MapChartData} from the map's cached series.
+ * Empty series (but the correct `isStageMap`) for maps with no completions.
  */
 export async function getMapChartDataFromCache(mapname: string): Promise<MapChartData> {
   const validMapname = validateMapName(mapname);
@@ -458,7 +424,7 @@ export async function getMapChartDataFromCache(mapname: string): Promise<MapChar
     };
   }
 
-  // Map metadata (cached, 1h TTL) — includes completions count, checkpoints, stages.
+  // Completions, checkpoints and stages come from the cached metadata, not a query.
   const mapMetadata = await getMapMetadataFromCache(validMapname);
   const totalCompletions = mapMetadata?.completions || 0;
   const checkpoints = mapMetadata?.checkpoints || 0;

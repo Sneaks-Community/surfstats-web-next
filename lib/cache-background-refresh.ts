@@ -31,14 +31,9 @@ import { SERVER_CACHE_KEY, SERVER_CACHE_TTL } from './cache-keys';
 import { warmPlayersListCache } from './player-cache';
 import { getEnv } from './env';
 
-/**
- * Every recurring cache refresh. Cadence is per domain because the cost of a pass is
- * (number of keys / interval): the volatile single-key caches are cheap enough to
- * run every minute, the 250-country slice is not.
- *
- * Every task refreshes in place (`force`), never `DEL`, so a pass can only ever
- * make a page faster, and a failed pass leaves the previous value being served.
- */
+// Every recurring cache refresh. Cadence is per domain since a pass costs keys / interval (one-key
+// caches run every minute, the 250-country slice can't). Tasks refresh in place (`force`), never
+// `DEL`, so a failed pass keeps serving the old value.
 const SERVERS_INTERVAL_MS = 30_000;
 const DASHBOARD_INTERVAL_MS = 60_000;
 const TOTALS_INTERVAL_MS = 300_000; // 5 minutes
@@ -112,10 +107,9 @@ const refreshers = [
   }),
 ];
 
-/** The six keys a profile page's server render awaits. The tab data stays on demand. */
+// The keys a profile page's server render awaits; tab data stays on demand.
 async function refreshProfile(steamid: string, startup: boolean): Promise<void> {
-  // Startup reads first (skip profiles still within their 1h TTL); interval
-  // sweeps force an in-place refresh.
+  // Startup reads first (skipping profiles within their 1h TTL); interval sweeps force.
   const opts = { force: !startup };
   await Promise.all([
     getPlayerOverviewFromCache(steamid, opts),
@@ -127,11 +121,9 @@ async function refreshProfile(steamid: string, startup: boolean): Promise<void> 
   ]);
 }
 
-/**
- * Refresh the recently-viewed profiles, one at a time: the six fetches per profile
- * are already parallel, and pacing at one profile keeps the sweep off the
- * expensive-query semaphore that page renders share.
- */
+// Recently viewed profiles, one at a time (each profile's fetches already run in parallel), to
+// keep the sweep off the expensive-query semaphore page renders share.
+
 async function warmRecentProfiles(startup: boolean): Promise<void> {
   const steamids = await listRecentProfiles();
   if (steamids.length === 0) return;
@@ -148,7 +140,8 @@ async function warmRecentProfiles(startup: boolean): Promise<void> {
   logger.debug(`[RecentProfilesRefresh] Warmed ${steamids.length} recently viewed profiles`);
 }
 
-/** Non-blocking: each refresher runs once immediately, which is also its warm. */
+/** Non-blocking; each refresher's first run is also its cache warm. */
+
 export function startCacheRefreshers(): void {
   refreshers.forEach(({ start }) => { start(); });
 }

@@ -7,26 +7,22 @@ import { startMapGraphPrecache } from './map-graph-precache';
 import { startCacheRefreshers } from './cache-background-refresh';
 
 /**
- * Everything that has to happen once per server process, in order.
- *
- * Never awaited: the cache pre-warm and first precache sweep take minutes, and
- * `register()` blocks the server from accepting requests. Until the cache is up,
- * the proxy's gate serves a 503.
+ * Once-per-process startup, in order. Never awaited: warming takes minutes and `register()`
+ * blocks serving; the proxy's gate serves a 503 until the cache is up.
  */
 export async function startServer(): Promise<void> {
   validateEnv();
 
-  // Non-blocking: flips the analytics feature on when the optional DB answers.
+  // Non-blocking; enables analytics once the optional DB answers.
   startAnalyticsHealthCheck();
 
   const dbReady = await initializeDatabase();
 
-  // Each refresher's first run is its cache warm. Started even if the probe failed,
-  // so a late DB heals on the next interval instead of waiting for a restart.
+  // Each first run is its cache warm. Started even if the probe failed, so a late DB heals
+  // on the next interval instead of needing a restart.
   startCacheRefreshers();
 
-  // Seven aggregate queries per map across ~1,000 maps: skip the sweep if the probe
-  // failed, rather than logging a thousand failures.
+  // ~7 queries per map across ~1,000 maps: skip rather than log a thousand failures.
   if (dbReady) {
     startMapGraphPrecache();
   } else {

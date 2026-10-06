@@ -50,7 +50,7 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
 }
 
 /**
- * Get a value plus its remaining TTL, for {@link cachedFetch}'s early refresh.
+ * Value plus remaining TTL, for {@link cachedFetch}'s early refresh.
  * `ttlMs` follows PTTL: `-2` = missing, `-1` = no expiry.
  */
 // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters -- T is the caller-supplied cached value shape, mirroring cacheGet<T>
@@ -74,10 +74,7 @@ export async function cacheGetWithTtl<T>(
   }
 }
 
-/**
- * Get many values in one round trip, in key order. Missing and unparseable
- * entries come back as `null`, so callers treat them as misses.
- */
+/** One round trip, in key order; missing and unparseable entries are `null` (misses). */
 export async function cacheGetMany<T>(keys: string[]): Promise<Array<T | null>> {
   if (keys.length === 0) return [];
 
@@ -97,7 +94,7 @@ export async function cacheGetMany<T>(keys: string[]): Promise<Array<T | null>> 
   }
 }
 
-/** Set many values in one round trip, all with the same TTL. */
+/** One round trip; every entry gets the same `ttl` (seconds). */
 export async function cacheSetMany(
   entries: ReadonlyArray<{ key: string; value: unknown }>,
   ttl: number

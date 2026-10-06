@@ -5,21 +5,16 @@ import { validateMapName, validateSteamId } from './validators';
 import { parseIntParam, ITEMS_PER_PAGE, RECORDS_PAGE_SIZE } from './utils';
 import { getErrorMessage, CacheUnavailableError, DbBusyError } from './errors';
 
-/** Cache-Control header used by the map search endpoints. */
+/** Cache-Control for the map search endpoints. */
 export const SEARCH_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=30';
 
 /**
- * Cache-Control for the paginated record/stage/bonus endpoints. Lets a shared
- * cache/CDN absorb repeated identical page requests (aligns with the 5-min
- * server-side cache); browsers still revalidate.
+ * For the paginated record/stage/bonus endpoints: a shared cache/CDN absorbs repeated requests
+ * (aligned with the 5-min server-side cache); browsers still revalidate.
  */
 export const RECORDS_CACHE_CONTROL = 'public, s-maxage=60, stale-while-revalidate=300';
 
-/**
- * Decode and validate a `mapname` route param.
- * @returns the validated mapname, or a 400 `NextResponse` the caller should return as-is.
- *   Usage: `const m = resolveMapnameParam(raw); if (m instanceof NextResponse) return m;`
- */
+/** Decodes and validates `mapname`; returns it, or a 400 `NextResponse` to return as-is. */
 export function resolveMapnameParam(raw: string): string | NextResponse {
   const valid = validateMapName(decodeURIComponent(raw));
   if (!valid) {
@@ -29,12 +24,8 @@ export function resolveMapnameParam(raw: string): string | NextResponse {
 }
 
 /**
- * Decode and validate a `steamid` route param.
- * @returns the validated SteamID, or a 400 `NextResponse` the caller should return as-is.
- *   Usage: `const s = resolveSteamIdParam(raw); if (s instanceof NextResponse) return s;`
- *
- * Unlike the player page (which falls back to the raw value), the API rejects
- * an invalid SteamID outright so a malformed id never reaches a cache/DB query.
+ * Decodes and validates `steamid`; returns it, or a 400 `NextResponse` to return as-is. Unlike
+ * the player page (raw fallback), this keeps a malformed id out of cache keys and DB queries.
  */
 export function resolveSteamIdParam(raw: string): string | NextResponse {
   const valid = validateSteamId(decodeURIComponent(raw));
@@ -47,34 +38,28 @@ export function resolveSteamIdParam(raw: string): string | NextResponse {
 /** Absolute backstop on `page`; routes with a known row count clamp tighter. */
 export const MAX_PAGE = 10000;
 
-/**
- * Parse and clamp `page`/`pageSize` search params. NaN/negative/oversized inputs
- * fall back or clamp rather than producing invalid offsets. `page` is capped at
- * {@link MAX_PAGE}.
- */
+/** NaN, negative or oversized values fall back or clamp; `page` is capped at {@link MAX_PAGE}. */
 export function parsePageParams(searchParams: URLSearchParams): { page: number; pageSize: number } {
   const page = parseIntParam(searchParams.get('page'), { max: MAX_PAGE });
   const raw = parseIntParam(searchParams.get('pageSize'), { fallback: RECORDS_PAGE_SIZE });
-  // Snapped to the only two sizes the UI requests. Anything else is pure
-  // cache-key churn, and `pageSize=1` multiplies the clamped page count by 100.
+  // Snap to the UI's two sizes: others are cache-key churn, and `pageSize=1` would multiply the
+  // reachable page count by 100.
   const pageSize = raw <= ITEMS_PER_PAGE ? ITEMS_PER_PAGE : RECORDS_PAGE_SIZE;
   return { page, pageSize };
 }
 
-/**
- * Log an error server-side (via Pino) and build the client-facing error response.
- * Keeps internal messages out of the response body.
- */
+/** Logs the error and returns `clientMessage`, keeping internals out of the response. */
 export function apiError(
   logLabel: string,
   error: unknown,
   clientMessage: string,
   status = 500
 ): NextResponse {
-  // Cache down (mirrors the proxy's 503 for the post-gate race) or the DB queue
-  // full: both are "come back shortly", not a failure of this request. Not
-  // logged here, since a flood would write one line per rejection; the cache and
-  // the semaphore each report their own episode once, with a count.
+  // Cache down (the proxy's 503, for requests past its gate) or DB queue full: both transient.
+  // Not logged, since a flood would log every rejection; the cache and semaphore each report
+  // their episode once, with a count.
+
+
   if (error instanceof CacheUnavailableError || error instanceof DbBusyError) {
     return NextResponse.json(
       { error: 'Service temporarily unavailable' },

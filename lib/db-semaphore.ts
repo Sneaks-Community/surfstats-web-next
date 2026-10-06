@@ -3,34 +3,22 @@ import { DbBusyError } from './errors';
 import logger from './logger';
 import { getEnv } from './env';
 
-/**
- * In-process cap on concurrent expensive DB queries so a burst (e.g. scraping
- * uncached keys) can't consume the whole connection pool and starve SSR page
- * rendering. Waiters are released FIFO. In-process only, like the cache lock.
- *
- * The queue is bounded as well as the concurrency: an unbounded one turns a
- * burst into a growing backlog where request #200 waits behind ~33 rounds of
- * multi-second scans and answers a caller that timed out long ago, while still
- * holding its DB work in the queue. Past the bound we shed instead, throwing
- * {@link DbBusyError}, which `apiError` serves as a 503 and `cachedFetch`
- * rethrows past any `onError`, so the queries already running finish quickly.
- */
+// In-process cap (like the cache lock) so a burst of expensive queries can't starve SSR of
+// pool connections. Waiters run FIFO. The queue is bounded too: past it we shed with
+// DbBusyError (503 via `apiError`; `cachedFetch` rethrows it past `onError`) rather than
+// answer callers that already timed out.
 
 const env = getEnv();
 const MAX_CONCURRENT = env.DB_MAX_CONCURRENT_EXPENSIVE;
 
-/**
- * How many callers may wait for a slot. At the default 2x the concurrency the
- * worst-case wait is ~2 query durations, so the tail is only as bounded as
- * `DB_STATEMENT_TIMEOUT_MS`: raise that and this queue grows the tail with it.
- */
+// At the default 2x concurrency the worst-case wait is ~2 query durations, so the tail
+// grows with DB_STATEMENT_TIMEOUT_MS.
 const MAX_QUEUED = env.DB_MAX_QUEUED_EXPENSIVE ?? MAX_CONCURRENT * 2;
 
 let active = 0;
 const waiters: Array<() => void> = [];
-// Two warns per overload episode, not one per shed request: the open names the
-// episode, the close counts it. Nothing else logs a shed, since `DbBusyError`
-// travels past `onError` untouched.
+// One warn when shedding starts and one with the count when it ends, not one per request.
+// Nothing else logs a shed: DbBusyError passes `onError` untouched.
 let shedding = false;
 let shedCount = 0;
 let shedStartedAt = 0;
@@ -73,8 +61,7 @@ function release(): void {
 }
 
 /**
- * Run `fn` under the global expensive-query concurrency cap.
- *
+ * Run `fn` under the expensive-query concurrency cap.
  * @throws {DbBusyError} When the wait queue is already full, before `fn` runs.
  */
 export async function withExpensiveQueryLimit<T>(fn: () => Promise<T>): Promise<T> {

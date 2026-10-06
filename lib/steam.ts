@@ -3,9 +3,6 @@ import logger from '@/lib/logger';
 import { cacheGetMany, cacheSetMany } from './valkey-cache';
 import { getErrorMessage } from './errors';
 
-/**
- * Steam API interface types
- */
 interface SteamPlayer {
   steamid: string;
   personaname: string;
@@ -28,7 +25,6 @@ interface SteamWrapperResponse {
   response?: SteamAPIResponse;
 }
 
-/** The three avatar sizes returned to callers for a Steam profile. */
 export interface SteamAvatarSet {
   avatar: string;
   avatarmedium: string;
@@ -45,23 +41,13 @@ function steamAvatarKey(steamId: string): string {
 /** Cached for IDs Steam omits (deleted accounts), so they are not re-asked every render. */
 const NO_AVATAR: SteamAvatarSet = { avatar: '', avatarmedium: '', avatarfull: '' };
 
-/**
- * Strip the API key out of anything about to be logged.
- *
- * The key travels in the query string, and some undici/fetch failures put the
- * request URL in the error message, which would write a live credential into the
- * logs at `error` level.
- */
+/** Strips the API key before logging: some fetch failures put the request URL, key included,
+ * in the error message, which would log a live credential. */
 function redactApiKey(message: string): string {
   return message.replace(/([?&]key=)[^&\s]+/gi, '$1***');
 }
 
-/**
- * Fetch player data directly from Steam API
- * This is the core function that makes the actual Steam API call
- * @param steamId64s - Array of SteamID64 values to fetch
- * @returns Steam player data, or null when Steam failed or no key is set
- */
+/** One GetPlayerSummaries call for SteamID64s; null when Steam failed or no key is set. */
 async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[] | null> {
   const startTime = Date.now();
   const apiKey = process.env.STEAM_API_KEY;
@@ -97,7 +83,6 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
     const data: SteamWrapperResponse = await response.json();
     const duration = Date.now() - startTime;
     
-    // Steam API returns data in { response: { players: [...] } } format
     const players = data.response?.players || [];
     
     logger.debug(`[Steam API] Successfully fetched ${players.length} players in ${duration}ms`);
@@ -121,11 +106,7 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
   }
 }
 
-/**
- * Get Steam profiles from Valkey cache
- * @param steamIds - Array of SteamIDs to fetch avatars for
- * @returns Map of original SteamID to avatar data
- */
+/** Avatars for SteamID2s, from cache then Steam; keyed by the caller's original SteamID. */
 export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map<string, SteamAvatarSet>> {
   const result = new Map<string, SteamAvatarSet>();
   
@@ -137,7 +118,7 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
   logger.debug(`[Steam] Fetching profiles for ${steamIds.length} SteamIDs`);
   
   try {
-    // One round trip for every SteamID, not one per ID.
+    // One round trip for all SteamIDs, not one per ID.
     const cached = await cacheGetMany<SteamAvatarSet>(steamIds.map(steamAvatarKey));
 
     const uncachedSteamIds: string[] = [];
@@ -150,7 +131,6 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
       }
     });
 
-    // Fetch uncached profiles from Steam API
     if (uncachedSteamIds.length > 0) {
       const uncachedSteamId64s: string[] = [];
       const uncachedSteamId64Map = new Map<string, string>();
@@ -170,8 +150,7 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
         return result;
       }
 
-      // Steam caps GetPlayerSummaries at 100 IDs and drops the rest silently, so
-      // chunk rather than trusting every caller to stay under a page size.
+      // Chunk here rather than trusting every caller to stay under the cap.
       const chunks: string[][] = [];
       for (let i = 0; i < uncachedSteamId64s.length; i += STEAM_IDS_PER_REQUEST) {
         chunks.push(uncachedSteamId64s.slice(i, i + STEAM_IDS_PER_REQUEST));
@@ -203,7 +182,7 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
           return steamId && !result.has(steamId) ? [{ key: steamAvatarKey(steamId), value: NO_AVATAR }] : [];
         });
 
-      // Pipelined, for the same reason the reads are.
+      // One pipelined round trip, like the read.
       await cacheSetMany([...toCache, ...misses], STEAM_AVATAR_TTL);
     }
 
@@ -219,11 +198,7 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
   }
 }
 
-/**
- * Convert SteamID2 (STEAM_X:Y:Z) to SteamID64
- * @param steamId - SteamID2 format (e.g., STEAM_1:0:12345)
- * @returns SteamID64 string or null if invalid
- */
+/** SteamID2 (`STEAM_X:Y:Z`) to SteamID64; null if invalid. */
 export function convertSteamIdTo64(steamId: string): string | null {
   const match = steamId.match(/^STEAM_([0-5]):([0-1]):([0-9]+)$/);
   if (!match) return null;
@@ -235,12 +210,7 @@ export function convertSteamIdTo64(steamId: string): string | null {
   return (v + z * BigInt(2) + y).toString();
 }
 
-/**
- * Convert SteamID2 (STEAM_X:Y:Z) to SteamID3 numeric (Y component in [U:1:Y])
- * SteamID3 numeric = Z * 2 + Y
- * @param steamId - SteamID2 format (e.g., STEAM_1:0:95515509)
- * @returns SteamID3 numeric value or null if invalid
- */
+/** SteamID2 to the numeric part of SteamID3 `[U:1:N]`; null if invalid. */
 export function convertSteamId2ToSteamId3Numeric(steamId: string): number | null {
   const match = steamId.match(/^STEAM_([0-5]):([0-1]):([0-9]+)$/);
   if (!match) return null;
@@ -248,22 +218,15 @@ export function convertSteamId2ToSteamId3Numeric(steamId: string): number | null
   const z = parseInt(match[3], 10);
   const y = parseInt(match[2], 10);
 
-  // SteamID3 numeric = Z * 2 + Y
   return z * 2 + y;
 }
 
-/**
- * Generates a Steam community profile URL from a SteamID
- * @param steamId - Can be either STEAM_1:0:12345 format or already a SteamID64
- * @returns The Steam profile URL or null if the steamId is invalid
- */
+/** Accepts SteamID2 or SteamID64; null if invalid. */
 export function getSteamProfileUrl(steamId: string): string | null {
-  // Check if it's already a SteamID64 (numeric string)
   if (/^\d+$/.test(steamId)) {
     return `https://steamcommunity.com/profiles/${steamId}`;
   }
   
-  // Try to convert STEAM_1:0:12345 format to SteamID64
   const steamId64 = convertSteamIdTo64(steamId);
   if (steamId64) {
     return `https://steamcommunity.com/profiles/${steamId64}`;

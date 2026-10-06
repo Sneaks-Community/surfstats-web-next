@@ -5,45 +5,33 @@ import { mapKey } from './cache-keys';
 import logger from './logger';
 import { getErrorMessage } from './errors';
 
-/**
- * Options for {@link mapCachedFetch}.
- */
 export interface MapCachedFetchOptions<T> {
-  /** Raw (unvalidated) map name from the caller. */
+  /** Raw, unvalidated. */
   mapname: string;
-  /**
-   * Key part appended after the `surfstats:map:<validMapname>:` prefix. Chart series
-   * use a suffix from `MAP_STATS_SUFFIXES` (`lib/map-stats-cache.ts`) rather than a literal.
-   */
+  /** Appended to `surfstats:map:<map>:`; chart series use `MAP_STATS_SUFFIXES`. */
   keySuffix: string;
-  /** Cache TTL in seconds. */
+  /** Seconds. */
   ttl: number;
-  /** Value returned when the map name is invalid or the fetch throws. */
+  /** Returned uncached when the map name is invalid or the fetch throws. */
   empty: T;
-  /** Loader run on a cache miss; receives the validated map name. */
+  /** Loader run on a cache miss. */
   fetch: (validMapname: string) => Promise<T>;
-  /** Operation label for the miss-path error log (e.g. "leaderboard records"). */
+  /** Names the operation in the error log, e.g. "leaderboard records". */
   errorLabel: string;
-  /** Run the loader under the expensive-query concurrency cap. Defaults to false. */
+  /** Run the loader under the expensive-query semaphore. Default false. */
   expensive?: boolean;
   /**
-   * Refresh in place: skip the read, run the loader, overwrite on success.
-   * Left undefined by on-demand reads, which `cachedFetch` treats differently
-   * from a refresher's explicit `false`.
+   * Refresh in place: skip the read, overwrite on success. On-demand reads leave it undefined,
+   * which `cachedFetch` treats differently from a refresher's explicit `false`.
    */
   force?: boolean;
-  /** Log level for fetch errors. Defaults to 'error'. */
+  /** For fetch errors. Default 'error'. */
   errorLevel?: 'warn' | 'error';
 }
 
 /**
- * Shared skeleton for every per-map Valkey cache: validate the map name, build
- * the `surfstats:map:<map>:<suffix>` key, and run {@link cachedFetch} with the
- * standard lock + onError-logging wiring. Extracted from ~14 near-identical
- * copies across `map-records-cache.ts` and `map-stats-cache.ts`.
- *
- * On an invalid map name it logs a warning and resolves to `empty` without
- * touching the cache; on a fetch failure `empty` is returned (never cached).
+ * Per-map {@link cachedFetch}: validates the name, builds the key, locks, logs failures.
+ * An invalid name logs a warning and resolves to `empty` without touching the cache.
  */
 export function mapCachedFetch<T>({
   mapname,

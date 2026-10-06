@@ -4,43 +4,34 @@ import logger from './logger';
 import { COLOR_FAMILIES, BACKGROUND_FAMILIES } from './theme-config';
 import { isValidTimeZone } from './utils';
 
-/**
- * One schema for the environment: `validateEnv()` checks it once at startup
- * (throwing on a missing or invalid required var), and `getEnv()` hands every
- * module the optional vars with their defaults, so none re-parses its own.
- * `logger`, `theme-config` and `utils` still read theirs directly: the first two
- * would import this module in a cycle, and `utils` runs on the client.
- */
+// One schema: `validateEnv()` fails the boot on bad vars; `getEnv()` serves every module the
+// optional vars with defaults. `logger` and `theme-config` read env directly (they'd import
+// this in a cycle), as does `utils` (it runs on the client).
 
 /** True during `next build`, where env vars are absent and no server runs. */
 export const isBuildPhase =
   process.env.npm_lifecycle_event === 'build' ||
   process.env.NEXT_PHASE === 'phase-production-build';
 
-// Required for the app to function at all — the primary ckSurf database, plus
-// the canonical public URL.
 const requiredSchema = z.object({
   MYSQL_HOST: z.string().min(1, 'MYSQL_HOST is required'),
   MYSQL_USER: z.string().min(1, 'MYSQL_USER is required'),
   MYSQL_PASSWORD: z.string().min(1, 'MYSQL_PASSWORD is required'),
   MYSQL_DATABASE: z.string().min(1, 'MYSQL_DATABASE is required'),
-  // Canonical public base URL (e.g. https://stats.example.com). Required, not
-  // defaulted: unset makes the origin guard and every absolute link fall back to
-  // the client-spoofable Host / X-Forwarded-Host headers.
+  // Canonical public base URL. Required: unset, the origin guard and absolute links fall back
+  // to the client-spoofable Host / X-Forwarded-Host headers.
   NEXT_PUBLIC_SITE_URL: z.url(
     'NEXT_PUBLIC_SITE_URL is required and must be an absolute URL (e.g. https://stats.example.com)'
   ),
 });
 
-// Optional vars, with the defaults every module reads them through. Validated
-// for shape when present so a typo (e.g. a non-numeric RATE_LIMIT_MAX or bad
-// LOG_LEVEL) is caught at boot rather than silently falling back.
+// Optional vars and the defaults every module reads. Shape-checked when present so a typo
+// fails the boot instead of silently defaulting.
 const optionalSchema = z.object({
   MYSQL_PORT: z.coerce.number().int().positive().default(3306),
   // Falls back to MYSQL_PORT.
   ANALYTICS_MYSQL_PORT: z.coerce.number().int().positive().optional(),
-  // How often to re-check the analytics DB connection (ms). 0 disables re-checks;
-  // anything else is at least 10s, so a typo can't hammer the DB.
+  // Analytics DB re-check interval (ms); 0 disables, else floored at 10s so a typo can't hammer it.
   ANALYTICS_HEALTHCHECK_INTERVAL_MS: z.coerce
     .number()
     .int()
@@ -75,15 +66,13 @@ const optionalSchema = z.object({
     .string()
     .transform((list) => list.split(',').map((o) => o.trim()).filter(Boolean))
     .default([]),
-  // Valkey cache (see lib/valkey.ts). The cache is fail-closed, so a typo here
-  // reads as a whole-site outage unless it's caught at boot.
+  // Valkey (lib/valkey.ts) is fail-closed, so a typo here is a site outage unless caught at boot.
   VALKEY_URL: z
     .url({ protocol: /^rediss?$/, error: 'VALKEY_URL must be a redis:// or rediss:// URL' })
     .default('redis://localhost:6379'),
   VALKEY_USERNAME: z.string().min(1).optional(),
   VALKEY_PASSWORD: z.string().min(1).optional(),
-  // Exactly 'true' or 'false': anything else would silently mean the opposite of
-  // what the operator wrote.
+  // Exactly 'true' or 'false', so a typo can't silently mean the opposite.
   VALKEY_TLS: z
     .enum(['true', 'false'], "VALKEY_TLS must be 'true' or 'false'")
     .transform((v) => v === 'true')
@@ -93,8 +82,7 @@ const optionalSchema = z.object({
     .transform((v) => v === 'true')
     .default(true),
   VALKEY_CONNECT_TIMEOUT: z.coerce.number().int().positive().default(5000),
-  // Client-IP header (see lib/client-ip.ts). A typo would collapse every caller
-  // into one rate-limit bucket, so shape-check it.
+  // Client-IP header (lib/client-ip.ts); a typo would put every caller in one rate-limit bucket.
   TRUSTED_CLIENT_IP_HEADER: z
     .string()
     .regex(/^[A-Za-z0-9-]+$/, 'TRUSTED_CLIENT_IP_HEADER must be a valid HTTP header name')
@@ -104,17 +92,15 @@ const optionalSchema = z.object({
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
     .optional(),
   MAP_IMAGES_URL: z.url('MAP_IMAGES_URL must be a valid URL').optional(),
-  // IANA timezone every rendered date and the activity heatmap's day/hour
-  // buckets are computed in. Defaults to UTC. Rejected at boot if the runtime
-  // does not know the zone, since an unknown one makes Intl throw on render.
+  // IANA zone for rendered dates and heatmap day/hour buckets (default UTC). Rejected at boot if
+  // unknown to the runtime, since Intl would throw on render.
   DISPLAY_TZ: z
     .string()
     .refine(isValidTimeZone, 'DISPLAY_TZ must be a valid IANA timezone (e.g. UTC, America/New_York)')
     .optional(),
   // Highest tier shown on the player Tier Distribution radar.
   MAX_TIER: z.coerce.number().int().positive().default(10),
-  // Theme palette families. Injected as CSS vars from the root layout, so an
-  // unknown value would otherwise throw on every page render.
+  // Palette families, injected as CSS vars by the root layout; an unknown one throws on render.
   THEME_PRIMARY: z.enum(COLOR_FAMILIES).optional(),
   THEME_SECONDARY: z.enum(COLOR_FAMILIES).optional(),
   THEME_LIGHT_PRIMARY: z.enum(COLOR_FAMILIES).optional(),
@@ -128,9 +114,8 @@ const optionalSchema = z.object({
 export type OptionalEnv = z.infer<typeof optionalSchema>;
 
 /**
- * The optional vars with their defaults. Read where the value is used: parsing is
- * cheap, and tests set `process.env` between calls. A var that fails validation
- * falls back to its own default only; `validateEnv` fails the boot on it.
+ * Optional vars with defaults, parsed per call (cheap; tests mutate `process.env`), so read
+ * where used. An invalid var falls back to its own default here; `validateEnv` fails the boot.
  */
 export function getEnv(): OptionalEnv {
   const parsed = optionalSchema.safeParse(process.env);
@@ -143,8 +128,8 @@ export function getEnv(): OptionalEnv {
   ) as OptionalEnv;
 }
 
-// Live-status game servers. Validated per item so a malformed entry can't reach
-// GameDig.query() as an arbitrary host/port.
+// Live-status game servers, validated per item so a malformed entry can't reach GameDig.query()
+// as an arbitrary host/port.
 const serverConfigSchema = z.object({
   name: z.string().min(1),
   ip: z.string().min(1),
@@ -184,7 +169,7 @@ function parseServerConfigs(): ServerConfig[] {
   return result.data;
 }
 
-/** Validated game server list from SERVERS_JSON. Parsed once, empty on any error. */
+/** Game servers from SERVERS_JSON, parsed once; empty on any error. */
 export function getServerConfigs(): ServerConfig[] {
   serverConfigs ??= parseServerConfigs();
   return serverConfigs;
@@ -193,14 +178,12 @@ export function getServerConfigs(): ServerConfig[] {
 let validated = false;
 
 /**
- * Validate environment variables at server startup. Idempotent and a no-op
- * during the build phase. Throws if any required variable is missing/invalid;
- * warns (but continues) for unset optional features.
+ * Startup check; idempotent and a no-op during build. Throws on missing or invalid vars, and
+ * warns for unset optional features so their absence isn't silent.
  */
 export function validateEnv(): void {
   if (isBuildPhase || validated) return;
 
-  // 1. Required vars — fail fast with an aggregated, actionable message.
   const required = requiredSchema.safeParse(process.env);
   const optional = optionalSchema.safeParse(process.env);
 
@@ -215,14 +198,13 @@ export function validateEnv(): void {
     throw new Error(`[env] Invalid environment configuration:\n${details}`);
   }
 
-  // 2. Optional features — warn clearly when disabled so operators aren't
-  //    surprised by silently-missing functionality.
   if (!process.env.STEAM_API_KEY) {
     logger.warn('[env] STEAM_API_KEY not set — Steam profile names/avatars will be unavailable');
   }
 
-  // Parse (and warn) once at boot; the result is what fetchServersFromGame uses.
+  // Parses (and warns) once at boot; fetchServersFromGame reuses the result.
   getServerConfigs();
+
 
   // Opt-in only; must match `isAnalyticsConfigured` in lib/db-analytics.ts.
   const analyticsConfigured = Boolean(

@@ -8,14 +8,12 @@ import logger from './logger';
 
 export { CacheUnavailableError };
 
-/** Fraction of the TTL, measured from the end, in which early refresh may fire. */
+// Fraction of the TTL, measured from the end, in which early refresh may fire.
 const EARLY_REFRESH_WINDOW = 0.1;
 
 /**
- * Put a fetched value through the same JSON round trip a cached one takes, so
- * both paths hand back the same shape. mysql2 returns `DATETIME` as `Date`,
- * which the row types declare as `string`; without this they are wrong on
- * exactly the first request after an expiry.
+ * JSON round trip so a fresh fetch has a cache hit's shape: mysql2 returns `DATETIME` as `Date`,
+ * which row types declare as `string`, so the first request after an expiry would differ.
  */
 export function normalizeToCachedShape<T>(value: T): T {
   if (value === null || value === undefined) return value;
@@ -27,33 +25,22 @@ export interface RefreshOptions {
   force?: boolean;
 }
 
-/** Options for {@link cachedFetch}. */
 export interface CachedFetchOptions<T> {
   /** Dedupe concurrent misses on one key via {@link cacheLock}, against stampedes. */
   lock?: boolean;
   /** Run `fetchFn` under the global expensive-query cap ({@link withExpensiveQueryLimit}). */
   expensive?: boolean;
   /**
-   * Fallback for a failed `fetchFn`, never cached so a transient failure isn't
-   * pinned for the TTL. Omitted, the error propagates; {@link DbBusyError}
-   * bypasses it either way.
+   * Fallback for a failed fetch; never cached, so a transient failure isn't pinned for the TTL.
+   * Omitted, the error propagates; {@link DbBusyError} always propagates.
    */
   onError?: (error: unknown) => T;
-  /**
-   * Skip the read and overwrite the key on success. The old value keeps serving
-   * until the new one lands, so a failed refresh is a no-op, not a blank page.
-   */
+  /** Skip the read and overwrite on success; a failed refresh keeps the old value. */
   force?: boolean;
 }
 
-/**
- * Whether a still-valid hit should refresh early. Probability ramps from ~0 at
- * the window's edge to ~1 at expiry, so some request renews a hot key before
- * everyone misses at once.
- *
- * @param remainingTtlMs - Remaining PTTL; negative (no key, no expiry) skips
- * @param ttlSeconds - The full TTL the entry was written with
- */
+// Ramps ~0 at the window's edge to ~1 at expiry, so one request renews a hot key before everyone
+// misses at once. A negative PTTL (no key, or no expiry) never refreshes.
 function shouldRefreshEarly(remainingTtlMs: number, ttlSeconds: number): boolean {
   if (remainingTtlMs < 0 || ttlSeconds <= 0) return false;
 
@@ -64,11 +51,8 @@ function shouldRefreshEarly(remainingTtlMs: number, ttlSeconds: number): boolean
   return shouldExpireEarly(probability);
 }
 
-/**
- * Refresh `key` without blocking the caller. Locked per key so a foreground
- * miss joins instead of querying again; errors are logged and dropped, since
- * the still-valid value already went out.
- */
+// Doesn't block the caller; errors are only logged, since the still-valid value already went out.
+// Locked per key so a foreground miss joins instead of querying again.
 function triggerBackgroundRefresh<T>(
   key: string,
   ttl: number,
@@ -91,14 +75,8 @@ function triggerBackgroundRefresh<T>(
 }
 
 /**
- * The get → (lock → recheck →) fetch → set pattern every Valkey-backed cache
- * here shares. `null`/`undefined` is never written, since a stored `null` reads
- * back as a miss.
- *
- * @param key - Fully-qualified Valkey key
- * @param ttl - Time-to-live in seconds
- * @param fetchFn - Loader run on a cache miss
- * @param options - See {@link CachedFetchOptions}
+ * The get → (lock → recheck →) fetch → set path every Valkey cache shares; `ttl` is in seconds.
+ * `null`/`undefined` is never written, since a stored `null` reads back as a miss.
  */
 export async function cachedFetch<T>(
   key: string,
@@ -106,17 +84,15 @@ export async function cachedFetch<T>(
   fetchFn: () => Promise<T>,
   options: CachedFetchOptions<T> = {}
 ): Promise<T> {
-  // Fail closed rather than hammer the DB, and outside the try/catch so
-  // `onError` can't swallow it. Awaited, not `isCacheReady()`: the proxy's gate
-  // is a different module scope, so a lazily loaded route races the handshake.
+  // Fail closed rather than hammer the DB, outside the try so `onError` can't swallow it.
+  // Awaited, not `isCacheReady()`: the proxy's gate is another module scope, so a lazily
+  // loaded route races the handshake.
   if (!(await waitForCacheReady())) {
     throw new CacheUnavailableError();
   }
 
-  // An explicit `force: false` (as opposed to absent) is a background refresher
-  // reading its own keys first. That pass is paced, so it renews a near-expiry
-  // key inline; fanning out one background refresh per key would put a whole
-  // sweep's worth of them on the expensive-query semaphore at once.
+  // Explicit `force: false` (not absent) is a refresher's paced read-first pass: it renews a
+  // near-expiry key inline, since one background refresh per key would flood the semaphore.
   const paced = options.force === false;
   let renewing = false;
 
@@ -146,8 +122,7 @@ export async function cachedFetch<T>(
     const fetched = await (options.expensive ? withExpensiveQueryLimit(fetchFn) : fetchFn());
     const value = normalizeToCachedShape(fetched);
 
-    // Meaningful where T is nullable (profiles resolve to null); the generic
-    // just doesn't carry that.
+    // T may be nullable (profiles resolve to null); the generic doesn't carry that.
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (value !== null && value !== undefined) {
       await cacheSet(key, value, ttl);
@@ -159,8 +134,10 @@ export async function cachedFetch<T>(
   try {
     return options.lock ? await cacheLock.acquire(key, load) : await load();
   } catch (error) {
-    // Backpressure, not a failed query: an `onError` shape renders as a real
-    // answer ("no players found"), so shedding would serve fabricated data.
+    // Backpressure, not a failed query: an `onError` shape renders as a real answer ("no
+    // players found"), so it would serve fabricated data.
+
+
     if (error instanceof DbBusyError) {
       throw error;
     }

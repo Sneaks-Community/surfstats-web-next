@@ -7,7 +7,6 @@ import { mapKey } from './cache-keys';
 import { getErrorCode, getErrorMessage } from './errors';
 import { validateMapName, type SearchQuery } from './validators';
 
-// Types for map metadata
 export interface MapMetadata {
   mapname: string;
   tier: number;
@@ -22,17 +21,13 @@ export interface MapMetadata {
   wr_holder_steamid: string | null;
 }
 
-/**
- * Fetch all map metadata from database in a single optimized query
- * Uses JOINs instead of correlated subqueries for better performance
- */
+/** Every map's metadata in one query, JOINing pre-aggregated subqueries instead of correlated ones. */
 async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
   const startTime = Date.now();
-  
+
   try {
     logger.debug('[MapCache] Fetching all map metadata from database...');
-    
-    // Single query with JOINs - much more efficient than multiple queries or correlated subqueries
+
     const [rows] = await pool.query<RowDataPacket[]>(`
       SELECT
         m.mapname,
@@ -70,9 +65,8 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
         WHERE zonetype = 4
         GROUP BY mapname
       ) c_cnt ON m.mapname = c_cnt.mapname
-      -- MIN() + self-join, NOT a ROW_NUMBER() window: the MIN is answered by a
-      -- loose index scan of ~862 index entries, while partitioning over
-      -- ck_playertimes forces a full sort of 1.6M rows (100ms vs >300s).
+      -- MIN() + self-join, NOT ROW_NUMBER(): MIN is a loose index scan (~862 entries), the
+      -- window a full sort of ck_playertimes' 1.6M rows (100ms vs >300s).
       LEFT JOIN (
         SELECT mapname, MIN(runtimepro) as min_runtime
         FROM ck_playertimes
@@ -83,18 +77,16 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
         AND wr.min_runtime = wr_holder.runtimepro
       -- Untiered maps and tiers outside 1-10 are excluded app-wide.
       WHERE pt_cnt.completions > 0 AND m.tier BETWEEN 1 AND 10
-      -- The join emits one row per tied holder (11 maps today), so the sort
-      -- keys fix which one the loop below keeps. Cheap: it orders the ~1038
-      -- joined rows, not the base table.
+      -- One row per tied WR holder; the sort fixes which one the loop below keeps.
+      -- Cheap: it orders the ~1038 joined rows, not the base table.
       ORDER BY m.mapname ASC, wr_holder.date ASC, wr_holder.steamid ASC
     `);
     
     const metadataMap = new Map<string, MapMetadata>();
     
     for (const row of rows) {
-      // First row per map wins. Combined with the ORDER BY above that means the
-      // earliest run, then the lowest steamid, so a tied WR resolves to a stable
-      // holder instead of whichever row MySQL happened to return last.
+      // First row per map wins: a tied WR goes to the earliest run, then the lowest steamid,
+      // rather than whichever row MySQL returned last.
       if (metadataMap.has(row.mapname)) continue;
 
       metadataMap.set(row.mapname, {
@@ -124,13 +116,8 @@ async function fetchAllMapMetadata(): Promise<Map<string, MapMetadata>> {
   }
 }
 
-/**
- * Get totals for progress bars (maps, bonuses, stages)
- *
- * Counts the cached metadata blob rather than re-running the five-way join, so
- * the two never disagree and the join runs once per its own TTL. Same reasoning
- * as {@link getTierDistributionFromCache}; derived, so there's no nested lock.
- */
+// Progress-bar totals, counted from the cached metadata blob instead of rerunning the join: the two
+// never disagree, the join runs once per its TTL, and being derived it needs no nested lock.
 async function getTotals(): Promise<{
   totalMaps: number;
   totalBonuses: number;

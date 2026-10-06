@@ -60,11 +60,13 @@ API routes: `maps/[mapname]/{records,bonuses,stages}`, `players/[steamid]/{maps,
 
 **Validation.** Zod schemas in [`lib/validators.ts`](lib/validators.ts) (`validateMapName`, `validateSteamId`, `validateSearchQuery`, `validatePlayerName`). Never hand-roll sanitization. Env is validated at boot in [`lib/env.ts`](lib/env.ts).
 
-**Logging.** `import logger from '@/lib/logger'`; prefix messages by module, e.g. `[DB]`, `[Steam]`. No `console.log`. Level via `LOG_LEVEL` (default `warn`).
+**Logging.** `import logger from '@/lib/logger'`; prefix messages by module, e.g. `[DB]`, `[Steam]`. No `console.log`. Level via `LOG_LEVEL` (default `info`).
 
 **Errors.** Wrap async in try/catch, log via Pino, return a fallback for graceful degradation.
 
 **Types.** Interfaces for all data shapes; extend `RowDataPacket` for query rows.
+
+**Comments.** Explain what a function does and why whenever the name and types don't, as briefly as the meaning allows (aim for 2 lines); never restate code or describe past versions of it. No JSDoc on self-describing types. One sentence fits on one line (`/** ... */`); no blank `*` lines. `@param`/`@returns` only when they add what the type can't (units, null/empty meaning, caching). Rationale that explains one line goes in a `//` at that line; design history goes in the commit message. When shortening a comment, cut words, not information.
 
 **Theme.** Theme-aware Tailwind tokens only (`text-text`, `text-text-muted`, `bg-surface`, `bg-background-secondary`, `border-border`); no hardcoded colors. Support light and dark (`dark:` prefix), WCAG AA contrast. Colors are injected as CSS vars from env: `THEME_PRIMARY`, `THEME_SECONDARY`, and the per-mode `THEME_{LIGHT,DARK}_{PRIMARY,SECONDARY,BACKGROUND}` overrides. Surface, border and text tokens are derived from the background family, so there is no `THEME_*_SURFACE` var. See [`lib/theme-config.ts`](lib/theme-config.ts).
 

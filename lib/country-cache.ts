@@ -7,9 +7,6 @@ import { cachedFetch, type RefreshOptions } from './cached-fetch';
 import { getErrorCode, getErrorMessage } from './errors';
 import { ITEMS_PER_PAGE, sortRecords, type SortDirection } from './utils';
 
-/**
- * Country ranking data from database (raw query result)
- */
 export interface CountryRankRow extends RowDataPacket {
   country: string;
   total_points: number;
@@ -17,9 +14,6 @@ export interface CountryRankRow extends RowDataPacket {
   rank: number;
 }
 
-/**
- * Processed country ranking data with ISO code
- */
 export interface CountryRank {
   country: string;
   country_code: string;
@@ -28,9 +22,6 @@ export interface CountryRank {
   rank: number;
 }
 
-/**
- * Player data within a country
- */
 export interface CountryPlayer extends RowDataPacket {
   steamid: string;
   name: string;
@@ -41,29 +32,17 @@ export interface CountryPlayer extends RowDataPacket {
   rank: number;
 }
 
-/**
- * Sort configuration for country rankings
- */
 export type CountrySortKey = 'rank' | 'country' | 'points' | 'players';
 
 /**
- * Internal function for getting the full countries ranking.
- *
- * Returns *every* country, deduplicated by ISO code and ranked by points. Sorting
- * and pagination are deliberately NOT done here: they are pure functions of this
- * array (see {@link sortCountries}), so caching one key and sorting at the call
- * site replaces the dozens of keys that each re-ran this whole aggregation.
- *
- * IMPORTANT: Country names in the database may have variations (e.g., "Thailand", "thailand", "THAILAND").
- * We normalize them to ISO codes BEFORE grouping to avoid duplicate entries.
+ * Every country, merged by ISO code (DB names vary in case and spelling) and ranked by points.
+ * Unsorted and unpaged, so one cache key serves every view (see {@link sortCountries}).
  */
 const getCountriesRankingInternal = async (): Promise<CountryRank[]> => {
   logger.debug('[CountryCache] Fetching countries ranking');
 
   // Throws on failure; the fallback lives in the caller's `onError`, uncached.
-
-  // Use SQL GROUP BY for efficient aggregation instead of loading all rows into memory
-  // This is O(n) on the database side instead of O(n) in JavaScript with n = total players
+  // Aggregate in SQL rather than loading every player row into memory.
   const query = `
     SELECT
       country,
@@ -83,9 +62,7 @@ const getCountriesRankingInternal = async (): Promise<CountryRank[]> => {
   for (const row of rows) {
     const countryCode = getCountryCodeFromName(row.country);
 
-    // Skip unresolved country codes. `points > 0` in the query already means
-    // total_points is positive and player_count counts only ranked players,
-    // matching the per-country page's total.
+    // Skip unresolved names. `points > 0` above makes player_count match the country page total.
     if (countryCode === UNKNOWN_COUNTRY_CODE) continue;
 
     const existing = byCode.get(countryCode);
@@ -94,20 +71,18 @@ const getCountriesRankingInternal = async (): Promise<CountryRank[]> => {
       existing.player_count += Number(row.player_count);
     } else {
       byCode.set(countryCode, {
-        country: countryCode, // Use ISO code as the country identifier
+        country: countryCode, // the ISO code, not the DB name
         country_code: countryCode,
         total_points: Number(row.total_points),
         player_count: Number(row.player_count),
-        rank: 0, // Will be calculated after sorting
+        rank: 0, // assigned after sorting
       });
     }
   }
   const countriesArray: CountryRank[] = [...byCode.values()];
 
-  // Sort by points descending to calculate ranks
   countriesArray.sort((a, b) => b.total_points - a.total_points);
 
-  // Assign ranks
   let currentRank = 1;
   for (let i = 0; i < countriesArray.length; i++) {
     if (i > 0 && countriesArray[i].total_points < countriesArray[i - 1].total_points) {
@@ -122,16 +97,8 @@ const getCountriesRankingInternal = async (): Promise<CountryRank[]> => {
 };
 
 /**
- * Sort a cached countries ranking. Pure, so every sort/order the UI offers is a
- * few microseconds over the one cached array rather than another 24h cache key
- * paying for the full `GROUP BY country` aggregation.
- *
- * `rank` is already assigned by points, so it is not re-derived here.
- *
- * @param countries - The cached ranking (not mutated)
- * @param sort - Column to sort by
- * @param order - 'asc' or 'desc'
- * @returns A new sorted array
+ * Pure sort over the one cached ranking, so no sort/order needs its own key or aggregation.
+ * Returns a new array (input untouched); `rank` keeps its points-based value.
  */
 export function sortCountries(
   countries: readonly CountryRank[],
@@ -159,34 +126,14 @@ export function sortCountries(
   return sortRecords(countries, order, comparator);
 }
 
-/**
- * Get the full countries ranking from Valkey cache.
- *
- * IMPORTANT: Country names in the database may have variations (e.g., "Thailand", "thailand", "THAILAND").
- * We normalize them to ISO codes in application code to avoid duplicate entries.
- * Cached for 24 hours - country rankings change relatively infrequently
- */
-// Bump on any change to the cached result's shape or computation; orphans stale
-// payloads instead of serving them until the 24h TTL expires.
-// v3: country-name normalization now resolves the GeoIP "The <country>" forms
-// (e.g. "The United States"), so the aggregation includes countries that v2
-// silently dropped — the old payload must not be served.
-// v4: `player_count` now counts only players with points > 0, matching the
-// per-country page's total and the players list.
-// v5: the key is no longer parameterized by sort/order/page/limit — it holds the
-// whole ranked array and callers sort/slice it. The old suffixed keys are
-// orphaned and expire within 24h.
+// Bump on any change to the cached result's shape or computation, so stale payloads are orphaned.
 const COUNTRIES_RANKING_SCHEMA_VERSION = 5;
 const COUNTRIES_RANKING_KEY = `surfstats:countries:ranking:v${COUNTRIES_RANKING_SCHEMA_VERSION}`;
 const COUNTRIES_RANKING_TTL = 86400; // 24 hours
 
 /**
- * Get the full countries ranking from Valkey cache.
- *
- * One key for every caller: sorting and paging are pure functions of this array
- * (see {@link sortCountries}), so an alternate sort or a deep page costs no DB
- * work and mints no new key. `lock: true` keeps a cold start from stampeding the
- * aggregation.
+ * One key for every caller: sorts and deep pages are done on the array (see {@link sortCountries})
+ * and cost no DB work. `lock: true` keeps a cold start from stampeding the aggregation.
  */
 export async function getCountriesRankingFromCache(
   { force }: RefreshOptions = {}
@@ -202,33 +149,17 @@ export async function getCountriesRankingFromCache(
   });
 }
 
-/**
- * Sort keys for country players
- */
 export type PlayerSortKey = 'rank' | 'player' | 'points' | 'maps' | 'lastseen';
 
 /**
- * `WHERE` fragment selecting one country's ranked players.
- *
- * Carries the same `points > 0` filter `fetchPlayersInternal` applies, so the
- * country page's total, its page ceiling, and the countries list's
- * `player_count` all count the same rows. The name variations are OR'd and
- * parenthesised; without the parens the `AND` would bind to the first one only.
+ * One country's ranked players. `points > 0` matches the players list, so the page total, page
+ * ceiling and ranking `player_count` agree. Without the parens, AND binds to the first name only.
  */
 function countryWhereClause(countryNames: string[]): string {
   return `points > 0 AND (${countryNames.map(() => 'country = ?').join(' OR ')})`;
 }
 
-/**
- * Internal function for getting players from a specific country
- *
- * Query optimization notes:
- * - Uses RANK() window function for player ranking within the country
- * - Uses index on country column (if available) for filtering
- * - Pagination with LIMIT/OFFSET
- * - Handles multiple country name variations for the same ISO code
- * - Supports sorting by different columns
- */
+/** One sorted page of a country's players, matching every DB spelling of the code. */
 const getCountryPlayersInternal = async (
   countryCode: string,
   page = 1,
@@ -239,7 +170,6 @@ const getCountryPlayersInternal = async (
   logger.debug(`[CountryCache] Fetching players for country: ${countryCode} (page: ${page}, sort: ${sort}, order: ${order})`);
 
   // Throws on failure; the fallback lives in the caller's `onError`, uncached.
-  // Get all possible country name variations for this code
   const countryNames = getCountryNamesFromCode(countryCode);
 
   // An unresolvable country code is a real (cacheable) result, not a failure.
@@ -252,12 +182,9 @@ const getCountryPlayersInternal = async (
 
   const whereClause = countryWhereClause(countryNames);
 
-  // Build ORDER BY clause based on sort column
   const orderByClause = getPlayerOrderByClause(sort, order);
 
-  // Rank is deliberately *within the country*: the window runs after the WHERE,
-  // so the numbering is 1..N over this country's players, not the global list.
-  // The column is labelled "Country Rank" in the UI to keep that explicit.
+  // The window runs after the WHERE, so rank is within the country ("Country Rank" in the UI).
   const playersQuery = `
     SELECT
       steamid, name, country, points, finishedmaps, lastseen,
@@ -271,7 +198,6 @@ const getCountryPlayersInternal = async (
   const params = [...countryNames, limit, offset];
   const [rows] = await pool.query<CountryPlayer[]>(playersQuery, params);
 
-  // Get total count for this country
   const countQuery = `
     SELECT COUNT(*) as total
     FROM ck_playerrank
@@ -281,7 +207,7 @@ const getCountryPlayersInternal = async (
   const [countRows] = await pool.query<RowDataPacket[]>(countQuery, countParams);
   const total = countRows[0]?.total || 0;
 
-  // Use the first country name as the display name (most common variation)
+  // The first variation is the most common spelling.
   const countryName = countryNames[0];
 
   logger.debug(`[CountryCache] Retrieved ${rows.length} players for ${countryName} (page ${page} of ${Math.ceil(total / limit)})`);
@@ -294,22 +220,11 @@ const getCountryPlayersInternal = async (
   };
 };
 
-// v3: matches the country-name normalization fix (see ranking key) — the WHERE
-// clause now includes "The <country>" spellings, changing which players a
-// country page returns.
-// v4: rows and `total` are filtered to points > 0 (see countryWhereClause).
+// Bump the version whenever countryWhereClause changes which players match.
 const COUNTRIES_PLAYERS_KEY = 'surfstats:countries:players:v4';
-const COUNTRIES_PLAYERS_TTL = 86400; // 24 hours, matches the country ranking
+const COUNTRIES_PLAYERS_TTL = 86400; // 24 hours, matches the country ranking (same slow-moving table)
 
-/**
- * Get players from a specific country from Valkey cache.
- *
- * Wraps {@link getCountryPlayersInternal} in the shared cache-aside layer, keyed
- * on every parameter so each country/page/sort/order combination caches
- * independently. The RANK() window query is heavy, so it runs under the
- * expensive-query semaphore + single-flight lock. Cached for 24 hours to match
- * the sibling country ranking cache (same slow-moving `ck_playerrank`).
- */
+/** Cached per country/page/sort/order; the heavy RANK() query runs under the semaphore and lock. */
 export async function getCountryPlayers(
   countryCode: string,
   page = 1,
@@ -334,20 +249,13 @@ export async function getCountryPlayers(
   );
 }
 
-// v4: filtered to points > 0, in step with COUNTRIES_PLAYERS_KEY.
+// Versioned in step with COUNTRIES_PLAYERS_KEY (same filter).
 const COUNTRY_PLAYER_COUNT_KEY = 'surfstats:countries:playercount:v4';
-const COUNTRY_PLAYER_COUNT_TTL = 86400; // 24 hours — matches the sibling country caches
+const COUNTRY_PLAYER_COUNT_TTL = 86400; // 24 hours, matches the sibling country caches
 
 /**
- * Total players in one country, so the country page can clamp `?page=` before
- * the paginated RANK() query runs.
- *
- * Shares {@link countryWhereClause} with {@link getCountryPlayersInternal}; the
- * two must stay on the same filter or the ceiling and `totalPages` disagree and
- * real pages become unreachable.
- *
- * @param countryCode - ISO 3166-1 alpha-2 code
- * @returns Player count, or 0 for an unresolvable code
+ * Lets the country page clamp `?page=` before the RANK() query; 0 for an unresolvable code.
+ * Must share {@link countryWhereClause} with the page query, or real pages become unreachable.
  */
 export async function getCountryPlayerCount(countryCode: string): Promise<number> {
   const cacheKey = `${COUNTRY_PLAYER_COUNT_KEY}:${countryCode}`;
@@ -375,9 +283,6 @@ export async function getCountryPlayerCount(countryCode: string): Promise<number
   );
 }
 
-/**
- * Helper: Build ORDER BY clause for player listings
- */
 function getPlayerOrderByClause(sort: PlayerSortKey, order: SortDirection): string {
   const columnMap: Record<PlayerSortKey, string> = {
     rank: '`rank`',
@@ -390,12 +295,10 @@ function getPlayerOrderByClause(sort: PlayerSortKey, order: SortDirection): stri
   const column = columnMap[sort];
   const direction = order.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
 
-  // Name sorting relies on the column's own collation, which is already
-  // case-insensitive in the ckSurf schema. An explicit `COLLATE utf8mb4_*` here
-  // would raise "not valid for CHARACTER SET" on a latin1 `name` column, and
-  // ckSurf schemas are not uniformly utf8mb4.
+  // Name sorts by its own (case-insensitive) collation: `COLLATE utf8mb4_*` would error on the
+  // latin1 `name` column some ckSurf schemas use.
 
-  // For lastseen, handle NULL values (never seen players sort last)
+  // Never-seen players (NULL) sort last.
   if (sort === 'lastseen') {
     if (order === 'desc') {
       return `${column} IS NULL, ${column} ${direction}`;

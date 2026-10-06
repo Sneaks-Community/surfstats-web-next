@@ -17,14 +17,9 @@ interface PlayerTimeResult {
   connectionCount: number;
 }
 
-/**
- * Fetch total playtime for a player from the analytics database
- * @param steamId - SteamID2 format (e.g., STEAM_1:0:95515509)
- * @returns Object with totalSeconds and connectionCount, or null if unavailable
- */
+/** Total playtime for a SteamID2. Null when analytics is unavailable (unconfigured, or the
+ * startup check failed) or the query fails, which hides the box. */
 async function getPlayerTimeOnServerInternal(steamId: string): Promise<PlayerTimeResult | null> {
-  // Return null if analytics is unavailable (not configured, or the startup
-  // connection check failed) - box will be hidden
   if (!isAnalyticsAvailable()) {
     return null;
   }
@@ -36,9 +31,8 @@ async function getPlayerTimeOnServerInternal(steamId: string): Promise<PlayerTim
   }
 
   try {
-    // Reads the pre-aggregated `player_analytics_summary` table. There is no
-    // fallback to the raw scan: that table is a hard requirement of the
-    // analytics feature, and a deployment missing it gets null playtime.
+    // The summary table is required: there is no raw-scan fallback, so a deployment
+    // without it gets null playtime.
     const [rows] = await analyticsPool.query<PlayerTimeData[]>(`
       SELECT
         total_duration,
@@ -48,7 +42,7 @@ async function getPlayerTimeOnServerInternal(steamId: string): Promise<PlayerTim
     `, [steamId3Numeric]);
 
     if (rows.length === 0) {
-      // No data found in summary - player has no connections
+      // No summary row: the player has never connected.
       return { totalSeconds: 0, connectionCount: 0 };
     }
 
@@ -58,7 +52,6 @@ async function getPlayerTimeOnServerInternal(steamId: string): Promise<PlayerTim
       connectionCount: row.connection_count || 0,
     };
   } catch (error: unknown) {
-    // Log error but don't throw - analytics is optional
     const errorMessage = getErrorMessage(error);
     logger.error(`[Analytics] Failed to fetch time data for ${steamId}: ${errorMessage}`);
     return null;
@@ -68,9 +61,6 @@ async function getPlayerTimeOnServerInternal(steamId: string): Promise<PlayerTim
 const PLAYER_TIME_KEY = 'surfstats:player:time';
 const PLAYER_TIME_TTL = 3600; // 1 hour, in step with the other profile render keys
 
-/**
- * Get player time on server from Valkey cache
- */
 export async function getPlayerTimeOnServerFromCache(
   steamId: string,
   { force }: RefreshOptions = {}
@@ -81,7 +71,6 @@ export async function getPlayerTimeOnServerFromCache(
   return cachedFetch(cacheKey, PLAYER_TIME_TTL, () => getPlayerTimeOnServerInternal(steamId), { force });
 }
 
-// Activity Heatmap Data Interface
 interface PlayerConnectData extends RowDataPacket {
   /** Unix epoch seconds (an `int` column). */
   connect_time: number;
@@ -93,18 +82,10 @@ interface HeatmapDataPoint {
   count: number;
 }
 
-/**
- * Bucket a connection instant into a day-of-week / hour-of-day pair in the
- * configured display timezone.
- *
- * `Date#getDay`/`getHours` would use the *container's* TZ, so the same data
- * rendered a different chart depending on where the process happened to run.
- * `connect_time` is a Unix epoch (`int`), so the instant itself is unambiguous;
- * only the bucketing needs a zone. `en-US` with `weekday: 'short'` is used rather
- * than arithmetic because DST offsets are not whole-day shifts.
- */
 const bucketFormatter = new Map<string, Intl.DateTimeFormat>();
 
+/** Day of week and hour of an instant in the display TZ (`Date#getDay`/`getHours` would use the
+ * container's). Intl rather than offset arithmetic, which DST breaks. */
 function bucketParts(date: Date, timeZone: string): { dayOfWeek: number; hour: number } | null {
   let formatter = bucketFormatter.get(timeZone);
   if (!formatter) {
@@ -130,17 +111,10 @@ function bucketParts(date: Date, timeZone: string): { dayOfWeek: number; hour: n
   return { dayOfWeek, hour };
 }
 
-/**
- * Fetch player connection activity heatmap data
- * Returns a grid of day-of-week vs hour-of-day connection counts
- * @param steamId - SteamID2 format (e.g., STEAM_1:0:95515509)
- * @returns 2D array of connection counts [dayOfWeek][hour], or null if unavailable
- */
+/** Sparse day-of-week x hour connection counts for a SteamID2; null if analytics is unavailable. */
 async function getPlayerActivityHeatmapInternal(
   steamId: string
 ): Promise<HeatmapDataPoint[] | null> {
-  // Return null if analytics is unavailable (not configured, or the startup
-  // connection check failed)
   if (!isAnalyticsAvailable()) {
     return null;
   }
@@ -170,7 +144,6 @@ async function getPlayerActivityHeatmapInternal(
       return [];
     }
 
-    // Aggregate by day of week and hour, in the configured display timezone.
     const timeZone = getDisplayTz();
     const aggregated = new Map<string, number>();
 
@@ -185,7 +158,6 @@ async function getPlayerActivityHeatmapInternal(
       aggregated.set(key, (aggregated.get(key) || 0) + 1);
     }
 
-    // Convert to array format
     const result: HeatmapDataPoint[] = [];
     for (const [key, count] of aggregated) {
       const [dayOfWeek, hour] = key.split('-').map(Number);
@@ -200,16 +172,9 @@ async function getPlayerActivityHeatmapInternal(
   }
 }
 
-/**
- * Cache key and TTL for activity heatmap data
- */
 const ACTIVITY_HEATMAP_KEY = 'surfstats:player:activity-heatmap';
 const ACTIVITY_HEATMAP_TTL = 3600; // 1 hour (data changes slowly)
 
-/**
- * Cached version of getPlayerActivityHeatmap for use in server components
- * Cache for 1 hour (3600 seconds) to reduce database load on high-traffic pages
- */
 export async function getActivityHeatmapFromCache(
   steamId: string,
   { force }: RefreshOptions = {}

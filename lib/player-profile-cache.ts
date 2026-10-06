@@ -1,10 +1,3 @@
-/**
- * Player Profile Cache
- * 
- * Caches player profile data including basic info, completed maps, bonuses, and stages.
- * Uses request deduplication to prevent cache stampede on high-traffic player profile pages.
- */
-
 import 'server-only';
 import pool from './db';
 import type { RowDataPacket } from 'mysql2';
@@ -25,12 +18,10 @@ const PLAYER_INCOMPLETE_MAPS_KEY = 'surfstats:player:incomplete:maps';
 const PLAYER_INCOMPLETE_BONUSES_KEY = 'surfstats:player:incomplete:bonuses';
 const PLAYER_INCOMPLETE_STAGES_KEY = 'surfstats:player:incomplete:stages';
 const PLAYER_TIER_DIST_KEY = 'surfstats:player:tierdist';
-// The recently-viewed warmer refreshes the render keys every 15 minutes, so the TTL
-// is the safety net rather than the freshness guarantee. Profiles outside that set
-// are on-demand and stale for up to an hour.
-const PLAYER_PROFILE_TTL = 3600; // 1 hour
+// Safety net for profiles the recently-viewed warmer refreshes every 15 min; the rest are
+// on demand and stale for up to an hour.
+const PLAYER_PROFILE_TTL = 3600;
 
-// Type definitions for cached profile data
 export interface PlayerBasicInfo {
   steamid: string;
   name: string;
@@ -72,7 +63,7 @@ export interface PlayerCompletionCounts {
   stages: number;
 }
 
-/** One point per completed map for the Completion Percentile chart. */
+/** One point per completed map, for the Completion Percentile chart. */
 export interface PlayerWrPerformancePoint {
   mapname: string;
   wrPercentage: number;
@@ -80,12 +71,8 @@ export interface PlayerWrPerformancePoint {
   date: string;
 }
 
-/**
- * Cheap player overview: basic info + global rank + completion counts. Consumed
- * by the Overview tab's stat cards / progress bars. Deliberately avoids the
- * full per-section row lists and correlated rank subqueries — those live in the
- * `get*TimesFromCache` fetchers gated behind the Times tab click.
- */
+/** Cheap Overview-tab data: no full row lists or rank subqueries, which live in the
+ * `get*TimesFromCache` fetchers behind the Times tab. */
 export interface PlayerOverview {
   player: PlayerBasicInfo;
   counts: PlayerCompletionCounts;
@@ -115,11 +102,8 @@ export interface TierDistributionRow {
   staged: number;
 }
 
-/**
- * Shared skeleton for every per-player cache: validate the SteamID, key it as
- * `<key>:<steamid>`, and run {@link cachedFetch} under the lock. Resolves to
- * `empty` on an invalid id or a failed fetch, which is never cached.
- */
+/** Shared per-player cache: validates the SteamID, keys `<key>:<steamid>`, single-flight lock.
+ * Resolves to `empty` (never cached) on an invalid SteamID or a failed fetch. */
 function playerCachedFetch<T>({
   steamid,
   key,
@@ -155,23 +139,9 @@ function playerCachedFetch<T>({
   });
 }
 
-/**
- * Cheap player overview for the server-rendered Overview tab.
- *
- * Returns basic player info, the global rank, and per-section completion counts
- * in one round trip — but none of the expensive full row lists or correlated
- * rank subqueries. Maps completed is `ck_playerrank.finishedmaps` off the row
- * being read; bonuses and stages are scalar `COUNT(*)` subqueries. The global rank uses `COUNT(*) + 1` over the rows with strictly
- * more points, reproducing the players list's `RANK() OVER (ORDER BY points
- * DESC)` (ties share a rank, gaps after) without a full-table window. Players
- * with 0 points are absent from that list, so their rank is null (Unranked).
- *
- * @param steamid - The player's SteamID
- * @returns Overview data, or null if the SteamID is invalid / player not found
- */
+/** Info, rank and completion counts for the Overview tab in one round trip.
+ * Null (not cached, so retried) when the SteamID is invalid or the player is not found. */
 export async function getPlayerOverviewFromCache(steamid: string, { force }: RefreshOptions = {}): Promise<PlayerOverview | null> {
-  // A null overview (player not found / query error) is never cached, so
-  // subsequent requests keep retrying rather than pinning the absence.
   const overview = await playerCachedFetch<PlayerOverview | null>({
     steamid,
     key: PLAYER_OVERVIEW_KEY,
@@ -179,6 +149,8 @@ export async function getPlayerOverviewFromCache(steamid: string, { force }: Ref
     empty: null,
     force,
     fetch: async (validSteamId) => {
+      // Rank as COUNT(*) + 1 over higher points equals the players list's RANK() (ties share, gaps
+      // after) without a full-table window. Maps is finishedmaps, not a ck_playertimes count.
       const [playerRows] = await pool.query<RowDataPacket[]>(`
         SELECT
           pr.steamid, pr.name, pr.country, pr.points, pr.lastseen,
@@ -218,29 +190,14 @@ export async function getPlayerOverviewFromCache(steamid: string, { force }: Ref
     },
   });
 
-  // Every profile view calls this, and nothing else does, so it is where the warm
-  // set is fed. Recorded only for a player that exists: recording first let a
-  // sweep of made-up numeric ids evict all 100 real profiles. Skipped on a forced
-  // refresh: that is the warmer itself, and re-recording would keep the same 100
-  // profiles in the set forever.
+  // Only profile views call this, so it feeds the warm set. Real players only, so fake-id sweeps
+  // can't evict it; skipped when forced (the warmer), or the same 100 would stay forever.
   if (!force && overview) recordProfileView(overview.player.steamid);
   return overview;
 }
 
-/**
- * Data for the Completion Percentile chart: one `{ mapname, wrPercentage, tier,
- * date }` point per completed map.
- *
- * Deliberately cheap so it can render in the always-visible Overview (incl.
- * crawler hits): a player-bounded `WHERE steamid = ?` scan with **no** correlated
- * rank subquery, and the per-map WR time + tier come from the already-cached map
- * metadata — so it also avoids the full-table `MIN(...) GROUP BY`. WR here is the
- * same `MIN(runtimepro)` per map that the full map-times query uses, so the
- * plotted values match.
- *
- * @param steamid - The player's SteamID
- * @returns One point per completed map that has a WR time (empty on invalid id / error)
- */
+/** Completion Percentile chart data, kept cheap for the always-visible Overview (and crawlers): no
+ * rank subquery, and WR/tier come from map metadata, the same WR the map-times list uses. */
 export async function getPlayerWrPerformanceFromCache(steamid: string, { force }: RefreshOptions = {}): Promise<PlayerWrPerformancePoint[]> {
   return playerCachedFetch<PlayerWrPerformancePoint[]>({
     steamid,
@@ -263,7 +220,7 @@ export async function getPlayerWrPerformanceFromCache(steamid: string, { force }
         const metadata = allMapMetadata.get(row.mapname);
         const wrTime = metadata?.wr_time ?? null;
         const runtime = Number(row.runtimepro);
-        // Match the old client-side filter: needs a WR and a positive run time.
+        // Needs a WR and a positive run time.
         if (wrTime == null || !(runtime > 0)) continue;
         points.push({
           mapname: row.mapname,
@@ -278,16 +235,8 @@ export async function getPlayerWrPerformanceFromCache(steamid: string, { force }
   });
 }
 
-/**
- * Full list of the player's completed map times, with the player's rank on each
- * map (correlated `COUNT(*)` rank subquery); tier and WR time come from the
- * cached map metadata rather than a second full-table aggregate. Expensive —
- * routed through the single-flight lock + the expensive-query semaphore. Gated
- * behind the Times tab click.
- *
- * @param steamid - The player's SteamID
- * @returns Full map-times list (empty on invalid id / error)
- */
+/** Every completed map with the player's rank on it (correlated subquery, so `expensive`); gated
+ * behind the Times tab. Tier and WR come from map metadata, not a second full-table aggregate. */
 export async function getPlayerMapTimesFromCache(steamid: string): Promise<PlayerMapTime[]> {
   return playerCachedFetch<PlayerMapTime[]>({
     steamid,
@@ -310,8 +259,7 @@ export async function getPlayerMapTimesFromCache(steamid: string): Promise<Playe
         ORDER BY pt.mapname ASC
       `, [validSteamId]);
 
-      // Tier and WR come from the cached metadata; a miss means the map is
-      // untiered or outside tiers 1-10, so it drops out of the list.
+      // A metadata miss means the map is untiered or outside tiers 1-10, so it drops out.
       const tiered: RowDataPacket[] = [];
       for (const map of maps) {
         const metadata = allMapMetadata.get(map.mapname);
@@ -326,14 +274,7 @@ export async function getPlayerMapTimesFromCache(steamid: string): Promise<Playe
   });
 }
 
-/**
- * Full list of the player's completed bonus times, with the player's rank on
- * each bonus zone (correlated `COUNT(*)` rank subquery). Expensive — gated
- * behind the Times tab click.
- *
- * @param steamid - The player's SteamID
- * @returns Full bonus-times list (empty on invalid id / error)
- */
+/** Completed bonuses with the player's rank per zone (correlated subquery); behind the Times tab. */
 export async function getPlayerBonusTimesFromCache(steamid: string): Promise<PlayerBonusTime[]> {
   return playerCachedFetch<PlayerBonusTime[]>({
     steamid,
@@ -360,14 +301,7 @@ export async function getPlayerBonusTimesFromCache(steamid: string): Promise<Pla
   });
 }
 
-/**
- * Full list of the player's completed stage times, with the player's rank on
- * each stage (correlated `COUNT(*)` rank subquery). Expensive — gated behind
- * the Times tab click.
- *
- * @param steamid - The player's SteamID
- * @returns Full stage-times list (empty on invalid id / error)
- */
+/** Completed stages with the player's rank on each (correlated subquery); behind the Times tab. */
 export async function getPlayerStageTimesFromCache(steamid: string): Promise<PlayerStageTime[]> {
   return playerCachedFetch<PlayerStageTime[]>({
     steamid,
@@ -394,15 +328,8 @@ export async function getPlayerStageTimesFromCache(steamid: string): Promise<Pla
   });
 }
 
-/**
- * Maps the player has NOT completed: the cached map metadata minus the player's
- * own times. The metadata is the same universe the /maps page lists (tier 1-10
- * with at least one completion), so a tiered map nobody has ever finished no
- * longer shows up here as incomplete. Gated behind the Times → Map sub-tab.
- *
- * @param steamid - The player's SteamID
- * @returns Incomplete-maps list (empty on invalid id / error)
- */
+/** Map metadata minus the player's times. Same universe as /maps (tier 1-10, at least one
+ * completion), so a map nobody has finished is not listed. Gated behind the Map sub-tab. */
 export async function getIncompleteMapsFromCache(steamid: string): Promise<IncompleteMap[]> {
   return playerCachedFetch<IncompleteMap[]>({
     steamid,
@@ -432,14 +359,8 @@ export async function getIncompleteMapsFromCache(steamid: string): Promise<Incom
   });
 }
 
-/**
- * Bonus zones the player has NOT completed (anti-join against the full bonus
- * zone list), restricted to the maps the cached metadata lists so the universe
- * matches /maps. Expensive — gated behind the Times → Bonus sub-tab.
- *
- * @param steamid - The player's SteamID
- * @returns Incomplete-bonuses list (empty on invalid id / error)
- */
+/** Anti-join over all bonus zones, limited to map-metadata maps so the universe matches /maps.
+ * Expensive, so gated behind the Bonus sub-tab. */
 export async function getIncompleteBonusesFromCache(steamid: string): Promise<IncompleteBonus[]> {
   return playerCachedFetch<IncompleteBonus[]>({
     steamid,
@@ -476,27 +397,8 @@ export async function getIncompleteBonusesFromCache(steamid: string): Promise<In
   });
 }
 
-/**
- * Stages the player has NOT completed (anti-join against the full stage list),
- * restricted to the maps the cached metadata lists so the universe matches /maps.
- * Expensive — gated behind the Times → Stage sub-tab.
- *
- * Building the stage universe from `ck_zones` needs two corrections, both
- * verified against the live DB (see AGENTS.md's zone model):
- *
- * - `zonetypeid` is 0-based stage *ordering* (id 0 = Stage 1) while
- *   `ck_stages.stage` is 1-based, so the join needs `zonetypeid + 1`. It is
- *   contiguous `0..N-1` on every map, and `min` is always 0.
- * - A staged map's final stage ends at the map end zone, so it has no
- *   `zonetype = 3` row at all. Stage `N + 1` therefore has to be added per map,
- *   which is the same `COUNT(*) + 1` {@link fetchAllMapMetadata} counts.
- *
- * Without both, Stage 1 was excluded, every remaining stage was reported one
- * lower than its real number, and the last stage of every map was invisible.
- *
- * @param steamid - The player's SteamID
- * @returns Incomplete-stages list (empty on invalid id / error)
- */
+/** Anti-join over all stages, limited to map-metadata maps so the universe matches /maps.
+ * Expensive, so gated behind the Stage sub-tab. */
 export async function getIncompleteStagesFromCache(steamid: string): Promise<IncompleteStage[]> {
   return playerCachedFetch<IncompleteStage[]>({
     steamid,
@@ -505,6 +407,9 @@ export async function getIncompleteStagesFromCache(steamid: string): Promise<Inc
     empty: [],
     expensive: true,
     fetch: async (validSteamId) => {
+      // zonetypeid is contiguous 0..N-1 (id 0 = Stage 1) but ck_stages.stage is 1-based, hence + 1.
+      // The final stage ends at the map end zone with no zonetype 3 row, so MAX + 2 adds it
+      // (the same COUNT(*) + 1 fetchAllMapMetadata counts).
       const [rows] = await pool.query<RowDataPacket[]>(`
         SELECT all_stages.map, all_stages.stage
         FROM (
@@ -534,15 +439,8 @@ export async function getIncompleteStagesFromCache(steamid: string): Promise<Inc
   });
 }
 
-/**
- * Player's linear/staged completion counts per tier, returning only the tiers
- * the player has actually completed (no zero-padding — the caller pads across
- * the server's real tier range). Cached so the Tier Distribution aggregate no
- * longer runs uncached on every player-page render.
- *
- * @param steamid - The player's SteamID
- * @returns Per-tier rows (empty on invalid id / error)
- */
+/** Linear/staged completions per tier, only for tiers the player has completed; the caller pads
+ * across the server's tier range. */
 export async function getLinearVsStagedPerTierFromCache(steamid: string, { force }: RefreshOptions = {}): Promise<TierDistributionRow[]> {
   return playerCachedFetch<TierDistributionRow[]>({
     steamid,

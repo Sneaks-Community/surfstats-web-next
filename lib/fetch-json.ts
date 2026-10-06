@@ -1,13 +1,3 @@
-/**
- * Client-side JSON fetch that fails on a non-2xx response.
- *
- * The API's error bodies are valid JSON (`{ error }`, built by `apiError`), so a
- * bare `response.json()` resolves successfully for a 403/429/503 and the
- * caller's `?? []` guard renders it as "no data" with no error surfaced. This
- * throws an Error carrying the server's message instead. Safe to import from
- * client components.
- */
-
 async function errorMessage(response: Response): Promise<string> {
   try {
     const body: unknown = await response.json();
@@ -16,14 +6,14 @@ async function errorMessage(response: Response): Promise<string> {
       if (typeof error === 'string' && error) return error;
     }
   } catch {
-    // Non-JSON body (e.g. a proxy's HTML error page) — fall through.
+    // Non-JSON body (e.g. a proxy's HTML error page).
   }
   return `Request failed (${response.status})`;
 }
 
 /**
- * @throws {Error} when the response status is not 2xx.
- * Abort errors from `init.signal` propagate as-is (check with `isAbortError`).
+ * Client-safe fetch that throws on non-2xx with the server's `{ error }` message: error bodies
+ * are valid JSON and would otherwise render as "no data". Aborts propagate as-is (`isAbortError`).
  */
 export async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, init);

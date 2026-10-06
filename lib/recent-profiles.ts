@@ -8,15 +8,9 @@ import { getErrorMessage } from './errors';
 export const RECENT_PROFILES_KEY = 'surfstats:player:recent';
 export const RECENT_PROFILES_MAX = 100;
 
-/**
- * Record a profile view in the capped recently-viewed set.
- *
- * Fire-and-forget so it never delays a render, and both commands go in one
- * transaction: the ZADD is only ever paired with the trim that keeps the newest
- * {@link RECENT_PROFILES_MAX}. Selecting the warm set from real views (rather
- * than from a points ranking) means it self-tunes and stays bounded, and a
- * profile that stops being viewed falls off the tail and just expires.
- */
+/** Fire-and-forget, so it never delays a render; one transaction so the ZADD always gets its trim
+ * to the newest {@link RECENT_PROFILES_MAX}. Views, not points, pick the warm set: it self-tunes,
+ * and a profile no longer viewed falls off and expires. */
 export function recordProfileView(steamid: string): void {
   void client
     .multi()

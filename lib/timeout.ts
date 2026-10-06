@@ -1,7 +1,5 @@
-/**
- * `withTimeout` only abandons the promise; the query keeps running on its
- * connection. `applyStatementTimeout` is the server-side kill that frees it.
- */
+// `withTimeout` only abandons the promise; the query keeps running on its connection.
+// `applyStatementTimeout` is the server-side kill that frees it.
 
 import type { PoolConnection } from 'mysql2';
 import type { Pool } from 'mysql2/promise';
@@ -9,14 +7,7 @@ import logger from './logger';
 import { getErrorMessage } from './errors';
 import { getEnv } from './env';
 
-/**
- * Reject after `ms` if `promise` has not settled. Does not cancel its work.
- *
- * @param promise - The promise to wrap
- * @param ms - Timeout in milliseconds
- * @param message - Error message if the timeout fires
- * @returns The promise's result, or throws on timeout
- */
+/** Reject after `ms` if `promise` has not settled. Does not cancel its work. */
 export async function withTimeout<T>(
   promise: Promise<T>,
   ms: number,
@@ -41,19 +32,8 @@ export async function withTimeout<T>(
 }
 
 /**
- * Cap every statement server-side, so a query the client gave up on stops
- * holding its pool connection.
- *
- * MariaDB spells it `max_statement_time` (seconds), MySQL/Percona/Aurora
- * `max_execution_time` (ms, SELECT only), and each rejects the other's name;
- * mysql2's handshake vendor flag picks which to try first, the other is the
- * fallback. Per-connection command serialization gets the SET in before the
- * acquirer's first query. `DB_STATEMENT_TIMEOUT_MS` (default 8000) is the
- * limit; 0 disables it. The cap doubles as backpressure: an expensive-query
- * slot held for 30s stalls every caller queued behind it.
- *
- * @param pool - The pool to cap
- * @param prefix - Logger prefix, matching the pool's other log lines
+ * Server-side cap per statement (`DB_STATEMENT_TIMEOUT_MS`, 0 disables), so a query the client
+ * gave up on frees its connection. Also backpressure: a held expensive-query slot stalls its queue.
  */
 export function applyStatementTimeout(pool: Pool, prefix: string): void {
   const ms = getEnv().DB_STATEMENT_TIMEOUT_MS;
@@ -67,6 +47,9 @@ export function applyStatementTimeout(pool: Pool, prefix: string): void {
   const mariaDbSql = `SET SESSION max_statement_time=${ms / 1000}`;
   const mySqlSql = `SET SESSION max_execution_time=${Math.round(ms)}`;
 
+  // MariaDB: max_statement_time (s); MySQL: max_execution_time (ms, SELECT only).
+  // Each rejects the other's name, so try the vendor's first and fall back. Commands
+  // serialize per connection, so the SET lands before the acquirer's first query.
   pool.on('connection', (connection) => {
     // The event forwards the callback-style connection, not the promise-wrapped
     // one its typings claim.

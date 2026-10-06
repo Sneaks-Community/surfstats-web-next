@@ -6,9 +6,9 @@ import { getEnv } from './env';
 import { getErrorCode, getErrorMessage } from './errors';
 
 export interface DbQueryLoggerOptions {
-  /** Logger prefix for identifying the database source */
+  /** Log prefix naming the database, e.g. 'DB'. */
   prefix: string;
-  /** Slow query threshold in milliseconds (default: 1000) */
+  /** Default 1000. */
   slowThresholdMs?: number;
 }
 
@@ -16,21 +16,8 @@ export interface DbQueryLoggerOptions {
 const WRAPPED = Symbol.for('surfstats.queryLoggerWrapped');
 
 /**
- * Wraps a MySQL pool's `query` and `execute` with slow query logging.
- *
- * Logs all queries at debug level.
- * Logs slow queries (>threshold) at both debug AND warn level.
- * Does NOT include query parameters in logs.
- *
- * Idempotent: re-wrapping a pool is a no-op (see WRAPPED), so a re-evaluated
- * module can't make every query log twice.
- *
- * @param pool - The MySQL pool to wrap
- * @param options - Configuration options
- *
- * @example
- * wrapPoolQuery(pool, { prefix: 'DB' });
- * wrapPoolQuery(analyticsPool, { prefix: 'Analytics DB' });
+ * Wraps `query` and `execute`: every query logs at debug, slow ones also at warn, and each gets
+ * a client deadline. Idempotent (see WRAPPED). Query parameters are never logged.
  */
 export function wrapPoolQuery(
   pool: mysql.Pool,
@@ -66,10 +53,8 @@ export function wrapPoolQuery(
         const result = await withTimeout(original(...args), deadlineMs, `Query exceeded its ${deadlineMs}ms deadline`);
         const duration = Date.now() - startTime;
 
-        // Log all queries at debug level
         logger.debug(`[${prefix}] Query executed in ${duration}ms: ${queryPreview}`);
 
-        // Log slow queries as warning
         if (duration > slowThresholdMs) {
           logger.warn(`[${prefix}] Slow query detected (${duration}ms): ${queryPreview}`);
         }
@@ -88,8 +73,7 @@ export function wrapPoolQuery(
         }
         logger.error(`[${prefix}] Query: ${queryPreview}`);
 
-        // Rethrow all errors to allow callers to handle or propagate them
-        // Returning empty arrays silently masks failures and causes incorrect cached data
+        // Rethrow: returning [] would mask the failure and get cached as real data.
         throw error;
       }
     };

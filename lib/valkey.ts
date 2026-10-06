@@ -13,11 +13,8 @@ const {
   VALKEY_CONNECT_TIMEOUT: valkeyConnectTimeout,
 } = getEnv();
 
-// Exponential backoff (100ms, doubling) capped at 30s. node-redis calls this
-// once per reconnect attempt with the retry counter and the failure cause, so
-// it's the one place to emit an informative per-attempt log line. Returning a
-// number (never false/Error) preserves the default behavior of retrying
-// indefinitely.
+// Called by node-redis per reconnect attempt, so it's where the per-attempt log lives. Always
+// returns a delay (never false/Error), which keeps it retrying indefinitely.
 function reconnectStrategy(retries: number, cause: Error): number {
   const delay = Math.min(2 ** retries * 100, 30_000);
   logger.warn(
@@ -26,7 +23,7 @@ function reconnectStrategy(retries: number, cause: Error): number {
   return delay;
 }
 
-// Build socket options conditionally to satisfy TypeScript types
+// Built conditionally to satisfy the client's TypeScript socket types.
 const socketOptions: {
   tls?: true;
   rejectUnauthorized?: boolean;
@@ -56,13 +53,9 @@ function createValkey() {
     logger.warn('[Valkey] Reconnecting...');
   });
 
-  // Force connection on import. Kept as a promise so callers can await the
-  // initial attempt instead of racing it — otherwise the very first request
-  // after startup sees isReady === false and gets a 503 before the handshake
-  // has had a chance to complete.
-  //
-  // VALKEY_CONNECT_TIMEOUT caps one socket attempt, not connect(), which retries
-  // forever, so bound the whole wait or callers hang instead of failing closed.
+  // Connects on import; awaitable so the first request doesn't 503 mid-handshake. connect()
+  // retries forever (VALKEY_CONNECT_TIMEOUT caps one attempt), so bound the whole wait or
+  // callers hang instead of failing closed.
   const initialConnect: Promise<void> = (async () => {
     if (client.isOpen) {
       return;
@@ -85,8 +78,7 @@ function createValkey() {
     }
   })();
 
-  // Graceful shutdown: quit the client so in-flight commands drain and the
-  // connection closes cleanly instead of being reset when the process exits.
+  // quit() drains in-flight commands instead of the connection being reset on exit.
   onShutdown('valkey-client', async () => {
     if (client.isOpen) {
       await client.quit();
@@ -97,23 +89,20 @@ function createValkey() {
   return { client, initialConnect };
 }
 
-// Next evaluates lib modules in several bundles per process, so a module-scoped
-// client opens one connection per copy, and a caller landing in a copy still
-// mid-handshake sees isReady === false and fails closed while another copy is
-// happily serving. Same shape as the registry in lib/shutdown.ts.
+// On globalThis: Next evaluates lib modules in several bundles per process, so a module-scoped
+// client would open a connection per copy, and one still mid-handshake fails closed while
+// another serves.
 const globalForValkey = globalThis as unknown as {
   __surfstatsValkey?: ReturnType<typeof createValkey>;
 };
 
 const { client, initialConnect } = (globalForValkey.__surfstatsValkey ??= createValkey());
 
-// How long a caller waits on a handshake that is still in flight. Covers a slow
-// first connect and the early reconnect backoff steps without making a real
-// outage feel hung, since every request pays this before its 503.
+// Wait on an in-flight handshake: covers a slow first connect and early reconnect backoff, yet
+// short, since during a real outage every request pays it before its 503.
 const READY_WAIT_MS = 1_000;
 
-// One shared waiter rather than one per caller: a precache sweep asks thousands
-// of times, and a listener each would blow past the emitter's max.
+// Shared waiter: a precache sweep asks thousands of times, past the emitter's listener max.
 let readyWait: Promise<boolean> | undefined;
 
 function waitForReadyEvent(): Promise<boolean> {
@@ -137,16 +126,13 @@ function waitForReadyEvent(): Promise<boolean> {
 }
 
 /**
- * Whether the cache can serve, waiting out a handshake that is still in flight.
- *
- * `initialConnect` is not enough on its own: it is bounded by a wall-clock timer
- * that races `connect()`, so it can settle while the socket is still connecting,
- * and it is one-shot, so it does nothing for a steady-state reconnect. Without
- * the second wait both windows turn every caller into an instant hard failure.
+ * Whether the cache can serve, waiting out an in-flight handshake. `initialConnect` alone can
+ * settle (timed out) mid-connect and is one-shot, so it misses steady-state reconnects.
  */
+
 export async function waitForCacheReady(): Promise<boolean> {
-  // Read through a call: as a property, the first check narrows the second to
-  // `false` even though the state changes across the await.
+  // A call, not a property: TS would narrow the second check to `false` across the await.
+
   const ready = (): boolean => client.isReady;
 
   if (ready()) return true;

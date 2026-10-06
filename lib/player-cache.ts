@@ -17,9 +17,6 @@ function playersListKey(page: number, search: string): string {
   return `surfstats:players:list:${page}:${search}`;
 }
 
-/**
- * Player rank data from database
- */
 export interface PlayerRank extends RowDataPacket {
   steamid: string;
   name: string;
@@ -30,46 +27,30 @@ export interface PlayerRank extends RowDataPacket {
   rank: number;
 }
 
-/**
- * Player search result (lighter than full PlayerRank)
- */
 export interface PlayerSearchResult {
   steamid: string;
   name: string;
   points: number;
 }
 
-/**
- * Player name result (minimal data for metadata)
- */
 export interface PlayerNameResult {
   name: string;
 }
 
-/**
- * Result of getPlayers paginated query
- */
 export interface PlayersResult {
   players: PlayerRank[];
   total: number;
   totalPages: number;
 }
 
-/**
- * Page-number ceiling from the cached player count. Page routes clamp `?page=`
- * against this before calling the cache functions, so an out-of-range value
- * can't mint a fresh key or a huge OFFSET.
- */
+/** Last players-list page, from the cached player count. Routes clamp `?page=` to it so an
+ * out-of-range value can't mint a fresh cache key or a huge OFFSET. */
 export async function getPlayerPageCeiling(): Promise<number> {
   const total = await getPlayerCountFromCache();
   return Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
 }
 
-/**
- * Internal function to fetch paginated players list
- *
- * Throws on failure; the fallback lives in the caller's `onError`, uncached.
- */
+/** Throws on failure; the fallback lives in the caller's `onError`, uncached. */
 async function fetchPlayersInternal(
   page: number,
   sanitizedSearch: SearchQuery
@@ -79,21 +60,14 @@ async function fetchPlayersInternal(
   const limit = ITEMS_PER_PAGE;
   const offset = (page - 1) * limit;
 
-  // Use window function for rank calculation (much more efficient than correlated subquery)
-  // RANK() OVER (ORDER BY points DESC) calculates rank based on points
-  // This is O(n log n) instead of O(n²) for the correlated subquery
-  //
-  // finishedmaps is read straight from the ck_playerrank column (maintained by
-  // the ckSurf game server). We intentionally do NOT count ck_playertimes here:
-  // aggregating that table for the map count cost ~5.5s per uncached page.
+  // RANK() OVER, not a correlated COUNT subquery: O(n log n) vs O(n^2). finishedmaps is the
+  // game server's column; a COUNT over ck_playertimes cost ~5.5s per uncached page.
   let query: string;
   const params: Array<string | number> = [];
 
   if (sanitizedSearch) {
-    // Rank over the whole points>0 table FIRST, then filter by name/steamid in
-    // an outer WHERE. Window functions run after the inner WHERE, so filtering
-    // inside the subquery would rank only the matches (giving a positional
-    // 1,2,3...) instead of each player's true global rank.
+    // Rank all points > 0 rows, then filter in the outer WHERE: RANK() runs after the inner WHERE,
+    // so filtering there would rank only the matches (1, 2, 3...), not the global rank.
     query = `
       SELECT
         ranked.steamid, ranked.name, ranked.country, ranked.points,
@@ -111,7 +85,6 @@ async function fetchPlayersInternal(
     `;
     params.push(`%${sanitizedSearch}%`, `%${sanitizedSearch}%`, limit, offset);
   } else {
-    // For non-search, use window function directly with pagination
     query = `
       SELECT
         ranked.steamid, ranked.name, ranked.country, ranked.points,
@@ -131,16 +104,13 @@ async function fetchPlayersInternal(
 
   const [rows] = await pool.query<PlayerRank[]>(query, params);
 
-  // Get total count for pagination
   let total: number;
   if (sanitizedSearch) {
-    // For search, we need to count matching records
     const countQuery = `SELECT COUNT(*) as total FROM ck_playerrank WHERE points > 0 AND (name LIKE ? OR steamid LIKE ?)`;
     const countParams = [`%${sanitizedSearch}%`, `%${sanitizedSearch}%`];
     const [countRows] = await pool.query<RowDataPacket[]>(countQuery, countParams);
     total = countRows[0].total;
   } else {
-    // Use cached player count for non-search queries
     total = await getPlayerCountFromCache();
   }
 
@@ -149,9 +119,6 @@ async function fetchPlayersInternal(
   return { players: rows, total, totalPages: Math.ceil(total / limit) };
 }
 
-/**
- * Get paginated players list from Valkey cache
- */
 export async function getPlayersFromCache(
   page: number,
   search: SearchQuery
@@ -160,8 +127,8 @@ export async function getPlayersFromCache(
   total: number;
   totalPages: number;
 }> {
-  // The term is sanitized by its type; the page still needs bounding so a
-  // malformed value can't spawn arbitrary distinct redis keys.
+  // `search` is sanitized by its type; the page still needs bounding so a malformed value
+  // can't spawn arbitrary distinct keys.
   const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
 
   return cachedFetch(
@@ -179,17 +146,9 @@ export async function getPlayersFromCache(
   );
 }
 
-/**
- * Proactively populate the cache for the first `pageCount` pages of the default
- * (no-search) players listing, so the pages people actually browse are always a
- * cache hit instead of triggering the full-table rank query on a miss.
- *
- * Runs one indexed `ORDER BY points DESC LIMIT k` query for the top
- * `pageCount * PAGE_SIZE` players (no `RANK()` window over the whole table) and
- * assigns rank in JS. Because the slice starts at the very top, positional rank
- * is exact RANK() (ties share a rank, gaps after) — identical to the on-demand
- * query. Called on an interval by the players-list background refresh.
- */
+/** Pre-fills the first `pageCount` no-search pages (run by the players-list refresher) so browsing
+ * never runs the full-table rank query. One indexed top-k query, ranked in JS: exact RANK(), as
+ * the slice starts at the top. */
 export async function warmPlayersListCache(pageCount: number): Promise<void> {
   const pageSize = ITEMS_PER_PAGE;
   const k = Math.max(1, pageCount) * pageSize;
@@ -203,7 +162,7 @@ export async function warmPlayersListCache(pageCount: number): Promise<void> {
     [k]
   );
 
-  // Assign RANK() (ties share a rank; next distinct value jumps to its position).
+  // Ties share a rank; the next distinct value jumps to its position.
   let rank = 0;
   let prevPoints: number | null = null;
   const ranked: PlayerRank[] = rows.map((row, i) => {
@@ -220,21 +179,17 @@ export async function warmPlayersListCache(pageCount: number): Promise<void> {
   for (let page = 1; page <= pageCount; page++) {
     const players = ranked.slice((page - 1) * pageSize, page * pageSize);
     if (players.length === 0) break; // fewer players than requested pages
-    // Same builder as the read path, so the empty-search key can't drift.
+    // Same key builder as the read path, so the warmed key can't drift.
     await cacheSet(playersListKey(page, ''), { players, total, totalPages }, PLAYERS_LIST_TTL);
   }
 
   logger.debug(`[PlayerCache] Warmed ${Math.min(pageCount, Math.ceil(ranked.length / pageSize))} players-list page(s) from top ${ranked.length} players`);
 }
 
-/**
- * Internal function to search players (for search page)
- *
- * Throws on failure; the fallback lives in the caller's `onError`, uncached.
- */
+/** Throws on failure; the fallback lives in the caller's `onError`, uncached. */
 async function searchPlayersInternal(sanitizedQuery: string): Promise<PlayerSearchResult[]> {
-  // An empty term would issue `LIKE '%%'`, a full scan of ck_playerrank that
-  // matches every row. Callers bound the length, this backstops them.
+  // An empty term would be `LIKE '%%'`, a full scan matching every row. Callers bound the
+  // length; this backstops them.
   if (!sanitizedQuery) {
     logger.debug('[PlayerCache] Empty search query after sanitization, skipping query');
     return [];
@@ -260,13 +215,9 @@ async function searchPlayersInternal(sanitizedQuery: string): Promise<PlayerSear
 const PLAYER_SEARCH_KEY = 'surfstats:players:search';
 const PLAYER_SEARCH_TTL = 300; // 5 minutes
 
-/**
- * Search players from Valkey cache
- * Used by the search page to find players matching a query
- */
+/** Search-page lookup by name or SteamID. */
 export async function searchPlayersFromCache(query: SearchQuery): Promise<PlayerSearchResult[]> {
-  // Lowercasing preserves every property the schema enforces, so the key below
-  // is still built from a sanitized term.
+  // Lowercasing keeps the schema's guarantees, so the key is still sanitized.
   const normalizedQuery = query.toLowerCase();
   const cacheKey = `${PLAYER_SEARCH_KEY}:${normalizedQuery}`;
 
@@ -285,12 +236,7 @@ export async function searchPlayersFromCache(query: SearchQuery): Promise<Player
   );
 }
 
-/**
- * Internal function to fetch player name
- *
- * Throws on failure; the fallback lives in the caller's `onError`, uncached. The
- * empty name for an unknown SteamID is a real result and stays cached.
- */
+/** Throws on failure (fallback uncached); an unknown SteamID's empty name is cached. */
 async function getPlayerNameInternal(steamid: string): Promise<PlayerNameResult> {
   logger.debug(`[PlayerCache] Fetching player name for: ${steamid}`);
 
@@ -310,10 +256,7 @@ async function getPlayerNameInternal(steamid: string): Promise<PlayerNameResult>
 const PLAYER_NAME_KEY = 'surfstats:player:name';
 const PLAYER_NAME_TTL = 86400; // 24 hours
 
-/**
- * Get player name from Valkey cache
- * Used by generateMetadata and getPlayerData to avoid duplicate queries
- */
+/** Shared by generateMetadata and getPlayerData so a profile render queries the name once. */
 export async function getPlayerNameFromCache(steamid: string): Promise<{ name: string }> {
   const cacheKey = `${PLAYER_NAME_KEY}:${steamid}`;
 

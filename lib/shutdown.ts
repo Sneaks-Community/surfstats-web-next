@@ -5,18 +5,14 @@ import { getErrorMessage } from './errors';
 type ShutdownHandler = () => void | Promise<void>;
 
 interface ShutdownRegistry {
-  /** Keyed by handler identity, valued by log label. See {@link onShutdown}. */
+  /** Keyed by handler identity, valued by log label. */
   handlers: Map<ShutdownHandler, string>;
   listenersRegistered: boolean;
   shuttingDown: boolean;
 }
 
-// Next.js evaluates lib modules in several separate bundles within one process
-// (middleware graph, server graph, and dev HMR re-evaluations), so a
-// module-scoped registry would give each instance its own handler list and its
-// own signal listeners — firing shutdown multiple times on a single Ctrl+C.
-// Anchoring the registry on globalThis makes every instance in the process share
-// one handler map and one pair of listeners.
+// On globalThis: Next evaluates lib modules in several bundles per process (proxy, server, dev
+// HMR), and a registry per bundle would fire shutdown several times on one Ctrl+C.
 const globalForShutdown = globalThis as unknown as {
   __surfstatsShutdown?: ShutdownRegistry;
 };
@@ -29,20 +25,12 @@ const registry: ShutdownRegistry = (globalForShutdown.__surfstatsShutdown ??= {
 
 type SignalListener = (signal: string) => void;
 
-// Bounded so a connection that never drains cannot cost the pools their close.
-// Kept under Docker's default 10s stop_grace_period, which is the real deadline.
+// Bounded so a connection that never drains can't cost the pools their close; kept under
+// Docker's default 10s stop_grace_period, the real deadline.
 const DRAIN_TIMEOUT_MS = 8000;
 
-/**
- * Hand the signal to the listeners that were already installed (Next's: it stops
- * accepting connections, finishes in-flight requests and runs pending `after()`
- * callbacks), and resolve when they try to exit.
- *
- * Next's cleanup ends in `process.exit()` and awaits nothing this app
- * registered, which is why every handler below used to be skipped. Swapping
- * `process.exit` for a resolve while it runs turns that exit into "the server is
- * drained, carry on".
- */
+// Runs the inherited listeners (Next's: stop accepting, finish in-flight requests, run `after()`).
+// Their cleanup ends in `process.exit()`, which would skip our handlers, so exit becomes a resolve.
 async function drainRequests(signal: string, listeners: SignalListener[]): Promise<void> {
   if (listeners.length === 0) return;
 
@@ -71,17 +59,9 @@ async function drainRequests(signal: string, listeners: SignalListener[]): Promi
   }
 }
 
-/**
- * Drain the HTTP server, then run every registered handler once, then exit.
- * Installing a SIGTERM/SIGINT listener removes Node's default "terminate on
- * signal" behavior, so this is responsible for exiting the process itself.
- *
- * The handlers themselves have no internal timeout: the connection drains
- * (`pool.end()`, `client.quit()`) return promptly when dependencies are
- * reachable and only stall when the sockets are already dead — in which case the
- * platform's post-`stop_grace_period` SIGKILL is the backstop, rather than a
- * hand-tuned constant here.
- */
+// Drain, run each handler once, exit: owning the signal listener removes Node's default exit.
+// Handlers get no timeout; they only stall on dead sockets, where the platform's SIGKILL after
+// stop_grace_period is the backstop.
 async function runShutdown(signal: string, inherited: SignalListener[]): Promise<void> {
   if (registry.shuttingDown) return;
   registry.shuttingDown = true;
@@ -117,17 +97,9 @@ async function runShutdown(signal: string, inherited: SignalListener[]): Promise
 }
 
 /**
- * Register a cleanup callback to run once on process shutdown (SIGTERM/SIGINT).
- *
- * Handlers are keyed by identity in a process-global registry: the same callback
- * registered twice runs once, while two coexisting module instances (proxy and
- * server bundles, a dev HMR reload) each keep their own entry. All instances
- * share a single pair of signal listeners. Handlers may be async and are awaited
- * concurrently; a throwing/rejecting one is logged and skipped so a single
- * failure doesn't block the rest. No-op outside the server.
- *
- * @param name - Log label for this handler (e.g. "db-pool"); not an identity.
- * @param handler - Cleanup callback.
+ * Runs `handler` once on SIGTERM/SIGINT, concurrently with the rest; a failure is logged, not
+ * blocking. Keyed by identity (registering twice runs once, each module copy keeps its own
+ * entry); `name` is only a log label. No-op outside the server.
  */
 export function onShutdown(name: string, handler: ShutdownHandler): void {
   if (typeof window !== 'undefined') return;
@@ -141,11 +113,10 @@ export function onShutdown(name: string, handler: ShutdownHandler): void {
   }
 }
 
-/**
- * Become the only listener for `signal`, keeping whatever was installed before
- * (Next registers its own during server start, ahead of `instrumentation.ts`) to
- * run first inside {@link drainRequests}.
- */
+// Become the sole listener; Next's own, installed before `instrumentation.ts`, run first in
+// drainRequests.
+
+
 function takeOverSignal(signal: 'SIGTERM' | 'SIGINT'): void {
   const inherited = process.listeners(signal) as SignalListener[];
   process.removeAllListeners(signal);

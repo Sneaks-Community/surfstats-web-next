@@ -7,53 +7,25 @@ import { getErrorMessage } from './errors';
 import { getClientIp } from './client-ip';
 import { getEnv } from './env';
 
-/**
- * Fixed-window, per-IP rate limiter backed by Valkey, implemented with
- * `rate-limiter-flexible`'s `RateLimiterRedis` (one atomic Lua INCR + PTTL per
- * request).
- *
- * Defense against cache-miss-cycling: cache keys embed user-controlled values
- * (`page`, `q`, `pageSize`), so an attacker can vary them to force uncached
- * `ROW_NUMBER()`/`DENSE_RANK()` full-table scans and exhaust the ~20-connection
- * MySQL pool. Capping requests per IP bounds that blast radius.
- *
- * Applies to page routes as well as `/api/*`, since they run the same queries.
- * Each scope gets an independent budget and counter so a page render's own
- * client-side API fetches, and the router's link prefetches, don't eat the
- * browsing allowance.
- *
- * If Valkey is unreachable the request falls through to an in-process
- * `RateLimiterMemory` with the same budget (`insuranceLimiter`), so an outage
- * degrades the limiter to per-instance accounting rather than dropping it. The
- * budget is effectively multiplied by the number of app instances for as long
- * as the outage lasts, and the fallback's counters are not synced back.
- */
+// Fixed-window per-IP limiter in Valkey. Cache keys embed user input (page, q, pageSize), so
+// varying them forces uncached full-table scans that exhaust the MySQL pool; the cap bounds that.
+// Pages count too (same queries), each scope on its own budget. With Valkey down, an in-process
+// fallback keeps the same budget per instance (multiplied by instance count, never synced back).
 
 const env = getEnv();
 const WINDOW_SECONDS = env.RATE_LIMIT_WINDOW_SECONDS;
 const MAX_REQUESTS = env.RATE_LIMIT_MAX;
-/** More generous than the API's: one page view fans out into several API calls. */
+// More generous than the API's: one page view fans out into several API calls.
 const PAGE_MAX_REQUESTS = env.RATE_LIMIT_PAGE_MAX;
-/**
- * The router's RSC requests get their own, much larger budget. Every viewport
- * `<Link>` prefetches, so a single link-dense page view (~38 on the home page)
- * is dozens of requests — charging those to the page budget rate limited
- * ordinary browsing after two or three clicks.
- *
- * Next strips its flight headers before middleware, so the proxy cannot tell a
- * prefetch (renders only to the `loading.tsx` boundary) from a client-side
- * navigation (full render); both arrive as `sec-fetch-dest: empty` and count
- * here. The cap therefore also bounds a caller who forges that header.
- */
+// RSC requests get their own, larger budget: every viewport `<Link>` prefetches (dozens per page).
+// Next strips flight headers before the proxy, so client navigations (`sec-fetch-dest: empty`)
+// count here too, and so would a forged header.
 const PREFETCH_MAX_REQUESTS = env.RATE_LIMIT_PREFETCH_MAX;
-/**
- * Optional penalty: keep an IP blocked this many seconds from the moment it
- * blows a budget, replacing (not extending) the window reset. Unset (0)
- * disables it, which is the default.
- */
+// Optional penalty: seconds an IP stays blocked from the moment it blows a budget, replacing
+// (not extending) the window reset. 0 (default) disables it.
 const BLOCK_SECONDS = env.RATE_LIMIT_BLOCK_SECONDS;
 
-/** Which budget a request counts against. */
+/** Which budget a request counts against; each scope has its own counter. */
 export type RateLimitScope = 'api' | 'page' | 'prefetch';
 
 const MAX_BY_SCOPE: Record<RateLimitScope, number> = {
@@ -67,22 +39,17 @@ function buildLimiter(scope: RateLimitScope): RateLimiterRedis {
   return new RateLimiterRedis({
     storeClient: client,
     useRedisPackage: true,
-    // Keys land at `surfstats:ratelimit:<scope>:<ip>`, inside the prefix the
-    // rest of the codebase (and any `SCAN surfstats:*`) uses.
+    // Keys: `surfstats:ratelimit:<scope>:<ip>`, under the app-wide prefix.
     keyPrefix: `surfstats:ratelimit:${scope}`,
     points,
     duration: WINDOW_SECONDS,
     blockDuration: BLOCK_SECONDS,
-    // Once an IP is over budget, reject it in-process instead of paying a
-    // Valkey round-trip per request — the flood case this limiter exists for.
-    // Leaving `inMemoryBlockDuration` unset holds the key for its real
-    // remaining TTL, so `Retry-After` stays accurate; when a block penalty is
-    // configured both durations must be it, or the library takes an earlier
-    // branch and never applies the store-side block.
+    // Reject over-budget IPs in-process, sparing Valkey a round trip per flood request. Unset,
+    // the block lasts the key's real TTL (accurate `Retry-After`); with a penalty both durations
+    // must be it, or the library never applies the store-side block.
     inMemoryBlockOnConsumed: points + 1,
     inMemoryBlockDuration: BLOCK_SECONDS || undefined,
-    // Don't let a command queue behind a reconnect on the request path: a
-    // not-ready client throws immediately, which hands off to the fallback.
+    // Throw instead of queueing behind a reconnect, handing off to the insurance limiter.
     rejectIfRedisNotReady: true,
     insuranceLimiter: new RateLimiterMemory({
       keyPrefix: `surfstats:ratelimit:${scope}`,
@@ -102,7 +69,7 @@ export interface RateLimitResult {
   allowed: boolean;
   limit: number;
   remaining: number;
-  /** Seconds until the current window resets (used for the `Retry-After` header). */
+  /** Seconds until the window resets, for `Retry-After`. */
   resetSeconds: number;
 }
 
@@ -112,20 +79,9 @@ function toResetSeconds(msBeforeNext: number): number {
 }
 
 /**
- * Charge one point to the caller's window and report whether they are within
- * the limit.
- *
- * Logs the request that trips a budget at `warn` (once per IP per window) and
- * every further request made while blocked at `debug` (set `LOG_LEVEL=debug` to
- * see whether a blocked caller backs off or keeps hammering). Because blocked
- * callers are rejected from the in-process block list, the debug line cannot
- * report how many requests they have made since — only that they are still
- * coming; the last quarter of each budget is logged at `debug` too, since the
- * warn alone names the request that crossed the line but not the fan-out that
- * spent the budget.
- *
- * @param request - The incoming request (for client-IP resolution)
- * @param scope - Which budget to charge; each scope counts separately
+ * Charges one point to the caller's `scope` budget. Logs the tripping request at `warn` once per
+ * IP per window; at `debug`, the budget's last quarter and each blocked retry (no count: blocks
+ * are served in-process).
  */
 export async function checkRateLimit(
   request: NextRequest,
@@ -138,8 +94,7 @@ export async function checkRateLimit(
 
   try {
     const res = await limiters[scope].consume(ip);
-    // The last quarter of a budget, so the log shows what ate it. Without this
-    // the only trace is the one request that crossed the line.
+    // Log the last quarter so the trace shows what spent the budget.
     if (res.remainingPoints < limit / 4) {
       logger.debug(
         `[RateLimit] ${ip} down to ${res.remainingPoints}/${limit} ${scope} points: ${path}`
@@ -152,10 +107,8 @@ export async function checkRateLimit(
       resetSeconds: toResetSeconds(res.msBeforeNext),
     };
   } catch (err) {
-    // The library rejects with a RateLimiterRes when the limit is hit and with
-    // an Error when the store failed. The latter should be unreachable now that
-    // an in-memory insurance limiter backs every scope, but if both ever fail
-    // the request is allowed: an outage should degrade protection, not the API.
+    // An Error (not RateLimiterRes) means both stores failed; fail open so an outage
+    // degrades protection, not the API.
     if (!(err instanceof RateLimiterRes)) {
       logger.warn(
         `[RateLimit] Check failed, allowing request: ${getErrorMessage(err)}`
@@ -164,13 +117,12 @@ export async function checkRateLimit(
     }
 
     const resetSeconds = toResetSeconds(err.msBeforeNext);
-    // Only the store-side rejection carries a point count; the in-process block
-    // list reports 0. That makes this exactly one line per IP per window.
+    // The in-process block list reports 0 points, so this fires once per IP per window.
     if (err.consumedPoints > 0) {
-      // How fast the budget went, and which page emitted the requests: a runaway
-      // client spends it in seconds off a single referer, heavy-but-real browsing
-      // spends it across most of the window.
+      // Spend time and referer tell a runaway client (seconds, one referer) from heavy real
+      // browsing (most of the window).
       const spentMs = Math.max(0, WINDOW_SECONDS * 1000 - err.msBeforeNext);
+
       const referer = request.headers.get('referer') || 'none';
       logger.warn(
         `[RateLimit] ${ip} exceeded the ${scope} budget (${limit}/${WINDOW_SECONDS}s) in ${spentMs}ms on ${path} (referer ${referer}), blocked for ${resetSeconds}s${BLOCK_SECONDS ? ' (penalty)' : ' (window reset)'}`

@@ -2,12 +2,8 @@ import 'server-only';
 import { headers } from 'next/headers';
 
 /**
- * Resolve the site's canonical base URL (no trailing slash) for absolute links
- * in robots.txt / sitemap.xml.
- *
- * `NEXT_PUBLIC_SITE_URL` is required at boot, so the header-derived origin below
- * only applies to `next build` (where env validation is skipped) and to a
- * misconfigured server; those headers are spoofable, hence not the normal path.
+ * Canonical base URL (no trailing slash) for robots.txt and sitemap.xml links. The spoofable
+ * header fallback only runs at build (env unvalidated) or on a misconfigured server.
  */
 export async function getSiteUrl(): Promise<string> {
   const configured = process.env.NEXT_PUBLIC_SITE_URL;

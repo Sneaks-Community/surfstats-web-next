@@ -5,7 +5,6 @@ import logger from '@/lib/logger';
 import { cachedFetch, type RefreshOptions } from './cached-fetch';
 import { getErrorMessage } from './errors';
 
-// Types for bonus and stage registries
 export interface BonusGroup {
   mapname: string;
   zonegroup: number;
@@ -18,16 +17,12 @@ export interface StageGroup {
   count: number; // Number of completions for this stage (aggregated)
 }
 
-/**
- * Fetch all bonus groups, stages, and player count from database in parallel
- */
 export async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stages: StageGroup[]; playerCount: number }> {
   const startTime = Date.now();
   
   try {
     logger.debug('[RegistryCache] Fetching bonus/stage registry and player count from database...');
     
-    // Run all three queries in parallel
     const [bonusResult, stageResult, countResult] = await Promise.all([
       pool.query<RowDataPacket[]>(`
         SELECT z.mapname, z.zonegroup, MIN(b.runtime) as wr_time
@@ -43,8 +38,7 @@ export async function fetchRegistryData(): Promise<{ bonuses: BonusGroup[]; stag
         GROUP BY map, stage
         ORDER BY map ASC, stage ASC
       `),
-      // Only ranked players (points > 0) — this count drives the players-list
-      // pagination total, which excludes 0-point players.
+      // points > 0: drives the players-list pagination total, which excludes 0-point players.
       pool.query<RowDataPacket[]>(`
         SELECT COUNT(*) as total FROM ck_playerrank WHERE points > 0
       `),

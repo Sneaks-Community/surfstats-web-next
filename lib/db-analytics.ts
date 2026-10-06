@@ -8,25 +8,20 @@ import { applyStatementTimeout } from './timeout';
 import { createBackgroundRefresh } from './background-refresh';
 import { getEnv } from './env';
 
-// Health flag on globalThis: only one module evaluation wins the shared probe slot
-// (lib/background-refresh.ts), so other copies must read its result instead of
-// their own permanently-false flag.
+// On globalThis: only one module evaluation wins the probe slot (lib/background-refresh.ts);
+// the others read its result instead of a flag that would stay false forever.
 const globalForAnalytics = globalThis as unknown as {
   __surfstatsAnalyticsHealthy?: boolean;
 };
 
-// Analytics is opt-in: it needs one of its own env vars. Falling back to
-// MYSQL_HOST/MYSQL_DATABASE made this always true (they are required to boot),
-// so the "not configured" branch was dead and the pool always dialled
-// player_analytics_surf on the main host. Keep this rule in step with the same
-// check in lib/env.ts.
+// Opt-in via its own env vars: falling back to the always-set MYSQL_* would always dial
+// player_analytics_surf on the main host. Keep this rule in step with lib/env.ts.
 const isAnalyticsConfigured = !!(
   process.env.ANALYTICS_MYSQL_HOST || process.env.ANALYTICS_MYSQL_DATABASE
 );
 
 const env = getEnv();
 
-// Create analytics database pool with graceful fallback
 const analyticsPool = mysql.createPool({
   host: process.env.ANALYTICS_MYSQL_HOST || process.env.MYSQL_HOST || 'localhost',
   port: env.ANALYTICS_MYSQL_PORT ?? env.MYSQL_PORT,
@@ -34,13 +29,12 @@ const analyticsPool = mysql.createPool({
   password: process.env.ANALYTICS_MYSQL_PASSWORD || process.env.MYSQL_PASSWORD || '',
   database: process.env.ANALYTICS_MYSQL_DATABASE || 'player_analytics_surf',
   waitForConnections: true,
-  connectionLimit: 5, // Smaller pool for secondary database
+  connectionLimit: 5, // secondary DB, so a smaller pool
   queueLimit: 100,
   // Same as the main pool: SUM(duration) is a DECIMAL.
   decimalNumbers: true,
 });
 
-// Log pool connection events (debug mode only)
 analyticsPool.on('connection', () => {
   logger.debug('[Analytics DB] New connection created in pool');
 });
@@ -57,22 +51,16 @@ analyticsPool.on('enqueue', () => {
   logger.debug('[Analytics DB] All connections busy, request queued');
 });
 
-// Wrap the pool with slow query logging using the shared utility
 wrapPoolQuery(analyticsPool, { prefix: 'Analytics DB', slowThresholdMs: 1000 });
 
-// Same server-side statement cap as the main pool.
 applyStatementTimeout(analyticsPool, 'Analytics DB');
 
-// 0 disables periodic re-checks, leaving only the probe at startup.
 const HEALTHCHECK_INTERVAL_MS = env.ANALYTICS_HEALTHCHECK_INTERVAL_MS;
 
-// Tracks the last state we logged so a steady connection doesn't spam the log —
-// we only emit on the first probe and on each subsequent up<->down transition.
+// Log only the first probe and up/down transitions.
 let lastLoggedHealthy: boolean | null = null;
 
-// Probe the analytics connection and update the health flag. Never throws -
-// analytics is optional, so a failed probe just flips the feature off until it
-// recovers on a later probe.
+// Never throws: a failed probe turns analytics off until a later probe succeeds.
 async function checkAnalyticsConnection(): Promise<void> {
   try {
     const connection = await analyticsPool.getConnection();
@@ -94,7 +82,6 @@ async function checkAnalyticsConnection(): Promise<void> {
   }
 }
 
-// Shared background-refresh mechanism, for its idempotency and shutdown cleanup.
 const analyticsHealthCheck = createBackgroundRefresh({
   name: 'Analytics DB',
   intervalMs: HEALTHCHECK_INTERVAL_MS,
@@ -103,8 +90,8 @@ const analyticsHealthCheck = createBackgroundRefresh({
 });
 
 /**
- * One immediate probe so {@link isAnalyticsAvailable} is accurate right away, then
- * a re-probe every ANALYTICS_HEALTHCHECK_INTERVAL_MS (`<=0` disables it).
+ * Probes now so {@link isAnalyticsAvailable} is accurate at once, then every
+ * ANALYTICS_HEALTHCHECK_INTERVAL_MS (`<=0` disables re-probes). No-op when unconfigured.
  */
 export function startAnalyticsHealthCheck(): void {
   if (!isAnalyticsConfigured) {
@@ -116,7 +103,7 @@ export function startAnalyticsHealthCheck(): void {
   analyticsHealthCheck.start();
 }
 
-// Graceful shutdown: drain the pool (background-refresh clears the probe timer).
+// Only the pool needs draining; background-refresh clears the probe timer.
 onShutdown('analytics-pool', async () => {
   await analyticsPool.end();
   logger.info('[Analytics DB] Connection pool closed');
@@ -124,10 +111,7 @@ onShutdown('analytics-pool', async () => {
 
 export default analyticsPool;
 
-/**
- * Check if the analytics database is available and healthy
- * Returns true only if configured AND connection is working
- */
+/** True only when configured and the last probe succeeded. */
 export function isAnalyticsAvailable(): boolean {
   return isAnalyticsConfigured && globalForAnalytics.__surfstatsAnalyticsHealthy === true;
 }
