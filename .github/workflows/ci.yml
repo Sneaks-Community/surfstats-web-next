@@ -47,10 +47,6 @@ jobs:
 
       - name: Build
         run: npm run build
-        env:
-          # Provide dummy env vars so the build doesn't fail if it requires them at build time
-          STEAM_API_KEY: dummy_key
-          SERVERS_JSON: '[]'
 
   docker-build:
     name: Docker Build
