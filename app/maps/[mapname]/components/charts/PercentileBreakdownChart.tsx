@@ -10,7 +10,8 @@ import {
   Tooltip,
 } from 'chart.js';
 import { useMemo } from 'react';
-import { useChartTheme } from '@/hooks/useChartTheme';
+import ChartEmptyState from '@/components/ChartEmptyState';
+import { chartTooltip, useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip);
 
@@ -55,16 +56,9 @@ const formatTime = (seconds: number): string => {
 
 export default function PercentileBreakdownChart({ data }: PercentileBreakdownChartProps) {
   const chartTheme = useChartTheme();
-  const hasData = useMemo(() => {
-    if (!data) return false;
-    return data.wrTime !== null || data.p1Time !== null || data.p10Time !== null ||
-           data.medianTime !== null || data.avgTime !== null;
-  }, [data]);
-
   const chartData = useMemo(() => {
-    if (!data) return null;
-
-    const values = DATA_KEYS.map(key => data[key]);
+    const values = DATA_KEYS.map(key => data?.[key] ?? null);
+    if (values.every(v => v === null)) return null;
 
     return {
       labels: LABELS,
@@ -91,21 +85,7 @@ export default function PercentileBreakdownChart({ data }: PercentileBreakdownCh
         display: false,
       },
       tooltip: {
-        backgroundColor: chartTheme.surface,
-        titleColor: chartTheme.text,
-        bodyColor: chartTheme.textMuted,
-        borderColor: chartTheme.border,
-        borderWidth: 1,
-        cornerRadius: 8,
-        padding: 12,
-        displayColors: true,
-        titleFont: {
-          size: 14,
-          weight: 'bold',
-        },
-        bodyFont: {
-          size: 13,
-        },
+        ...chartTooltip(chartTheme),
         callbacks: {
           title: (tooltipItems) => {
             const label = tooltipItems[0].label;
@@ -158,19 +138,16 @@ export default function PercentileBreakdownChart({ data }: PercentileBreakdownCh
     },
   }), [chartTheme]);
 
+  if (!chartData) {
+    return <ChartEmptyState title="Completion Time Percentiles" message="No completion data available" />;
+  }
+
   return (
     <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
       <h3 className="text-sm font-semibold text-text mb-2">Completion Time Percentiles</h3>
-      {!hasData ? (
-        <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-          No completion data available
-        </div>
-      ) : (
-        <div className="flex-1 min-h-[200px]">
-          {/* eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- chartData is guaranteed to be non-null when hasData is true */}
-          <Bar data={chartData!} options={options} />
-        </div>
-      )}
+      <div className="flex-1 min-h-[200px]">
+        <Bar data={chartData} options={options} />
+      </div>
     </div>
   );
 }

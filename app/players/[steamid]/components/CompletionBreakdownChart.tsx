@@ -9,7 +9,7 @@ import {
   Legend,
 } from 'chart.js';
 import { useMemo, useState } from 'react';
-import { useChartTheme } from '@/hooks/useChartTheme';
+import { chartTooltip, useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
@@ -83,15 +83,7 @@ export default function CompletionBreakdownChart({ counts }: CompletionBreakdown
           },
         },
         tooltip: {
-          backgroundColor: chartTheme.surface,
-          titleColor: chartTheme.text,
-          bodyColor: chartTheme.textMuted,
-          borderColor: chartTheme.border,
-          borderWidth: 1,
-          cornerRadius: 8,
-          padding: 12,
-          titleFont: { size: 13, weight: 'bold' as const },
-          bodyFont: { size: 12 },
+          ...chartTooltip(chartTheme),
           callbacks: {
             label: (context) => {
               const value = context.parsed;

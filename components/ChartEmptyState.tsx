@@ -10,8 +10,7 @@ interface ChartEmptyStateProps {
  *
  * Mirrors the populated chart card chrome (surface + border + title) so the
  * surrounding grid keeps a stable height, with a centered muted message in
- * place of the chart. Extracted from ~12 inline copies across the player
- * profile charts.
+ * place of the chart.
  */
 export default function ChartEmptyState({ title, message }: ChartEmptyStateProps) {
   return (

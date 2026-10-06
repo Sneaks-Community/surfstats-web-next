@@ -12,10 +12,10 @@ import {
   Tooltip,
   Legend,
   Filler,
-  ArcElement,
 } from 'chart.js';
 import { useMemo } from 'react';
-import { useChartTheme } from '@/hooks/useChartTheme';
+import ChartEmptyState from '@/components/ChartEmptyState';
+import { chartTooltip, useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(
   CategoryScale,
@@ -25,8 +25,7 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler,
-  ArcElement
+  Filler
 );
 
 interface CheckpointTimeData {
@@ -146,21 +145,8 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
         },
       },
       tooltip: {
-        backgroundColor: chartTheme.surface,
-        titleColor: chartTheme.text,
-        bodyColor: chartTheme.textMuted,
-        borderColor: chartTheme.border,
-        borderWidth: 1,
-        cornerRadius: 8,
-        padding: 12,
+        ...chartTooltip(chartTheme),
         displayColors: false,
-        titleFont: {
-          size: 14,
-          weight: 'bold',
-        },
-        bodyFont: {
-          size: 13,
-        },
         callbacks: {
           title: (tooltipItems) => {
             const label = tooltipItems[0].label;
@@ -232,12 +218,10 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
 
   if (safeData.length === 0) {
     return (
-      <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-        <h3 className="text-sm font-semibold text-text mb-2">Checkpoint Times</h3>
-        <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-          {isStageMap ? 'No stage time data available' : 'No checkpoint time data available'}
-        </div>
-      </div>
+      <ChartEmptyState
+        title="Checkpoint Times"
+        message={isStageMap ? 'No stage time data available' : 'No checkpoint time data available'}
+      />
     );
   }
 

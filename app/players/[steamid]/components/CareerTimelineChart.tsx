@@ -12,7 +12,7 @@ import {
 } from 'chart.js';
 import { useMemo } from 'react';
 import ChartEmptyState from '@/components/ChartEmptyState';
-import { useChartTheme } from '@/hooks/useChartTheme';
+import { chartTooltip, useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
@@ -132,15 +132,7 @@ export default function CareerTimelineChart({ data }: CareerTimelineChartProps) 
           },
         },
         tooltip: {
-          backgroundColor: chartTheme.surface,
-          titleColor: chartTheme.text,
-          bodyColor: chartTheme.textMuted,
-          borderColor: chartTheme.border,
-          borderWidth: 1,
-          cornerRadius: 8,
-          padding: 12,
-          titleFont: { size: 13, weight: 'bold' as const },
-          bodyFont: { size: 12 },
+          ...chartTooltip(chartTheme),
           filter: (item) => (item.parsed.y as number) > 0,
           callbacks: {
             label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}`,

@@ -14,7 +14,8 @@ import {
   Filler,
 } from 'chart.js';
 import { useMemo } from 'react';
-import { useChartTheme } from '@/hooks/useChartTheme';
+import ChartEmptyState from '@/components/ChartEmptyState';
+import { chartTooltip, useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(
   CategoryScale,
@@ -98,21 +99,8 @@ export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
         display: false,
       },
       tooltip: {
-        backgroundColor: chartTheme.surface,
-        titleColor: chartTheme.text,
-        bodyColor: chartTheme.textMuted,
-        borderColor: chartTheme.border,
-        borderWidth: 1,
-        cornerRadius: 8,
-        padding: 12,
+        ...chartTooltip(chartTheme),
         displayColors: false,
-        titleFont: {
-          size: 14,
-          weight: 'bold',
-        },
-        bodyFont: {
-          size: 13,
-        },
         callbacks: {
           title: (tooltipItems) => {
             const date = tooltipItems[0].label;
@@ -165,14 +153,7 @@ export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
   }), [chartTheme]);
 
   if (safeData.length === 0) {
-    return (
-      <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-        <h3 className="text-sm font-semibold text-text mb-2">Time on Map</h3>
-        <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-          No time data available
-        </div>
-      </div>
-    );
+    return <ChartEmptyState title="Time on Map" message="No time data available" />;
   }
 
   return (

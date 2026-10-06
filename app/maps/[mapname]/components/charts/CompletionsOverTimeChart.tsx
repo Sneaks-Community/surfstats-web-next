@@ -13,10 +13,10 @@ import {
   Tooltip,
   Legend,
   Filler,
-  ArcElement,
 } from 'chart.js';
 import { useMemo } from 'react';
-import { useChartTheme } from '@/hooks/useChartTheme';
+import ChartEmptyState from '@/components/ChartEmptyState';
+import { chartTooltip, useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(
   CategoryScale,
@@ -28,7 +28,6 @@ ChartJS.register(
   Tooltip,
   Legend,
   Filler,
-  ArcElement,
 );
 
 interface CompletionsOverTimeData {
@@ -43,58 +42,11 @@ interface CompletionsOverTimeChartProps {
   bonusData: BonusTimeSeriesData;
 }
 
-// Generate distinct colors for each bonus series
-const generateBonusColors = (bonusCount: number) => {
-  const baseHues = [280, 320, 160, 45, 200, 30, 220, 10, 180, 260];
-  const colors: string[] = [];
-  
-  for (let i = 0; i < bonusCount; i++) {
-    const hue = baseHues[i % baseHues.length];
-    const saturation = 70 + (i % 3) * 5; // 70-85%
-    const lightness = 55 + (i % 2) * 5; // 55-60%
-    colors.push(`hsl(${hue}, ${saturation}%, ${lightness}%)`);
-  }
-  
-  return colors;
-};
+const BONUS_HUES = [280, 320, 160, 45, 200, 30, 220, 10, 180, 260];
 
-// Convert HSL color string to RGBA with given opacity
-const hslToRgba = (hsl: string, opacity: number): string => {
-  // Extract HSL values using regex
-  const match = hsl.match(/hsl\(\s*(\d+)\s*,\s*(\d+)%\s*,\s*(\d+)%\s*\)/);
-  if (!match) return `rgba(59, 130, 246, ${opacity})`; // fallback
-  
-  const hue = parseInt(match[1], 10);
-  const saturation = parseInt(match[2], 10) / 100;
-  const lightness = parseInt(match[3], 10) / 100;
-  
-  // Convert HSL to RGB
-  const c = (1 - Math.abs(2 * lightness - 1)) * saturation;
-  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
-  const m = lightness - c / 2;
-  
-  let r = 0, g = 0, b = 0;
-  
-  if (hue >= 0 && hue < 60) {
-    r = c; g = x; b = 0;
-  } else if (hue >= 60 && hue < 120) {
-    r = x; g = c; b = 0;
-  } else if (hue >= 120 && hue < 180) {
-    r = 0; g = c; b = x;
-  } else if (hue >= 180 && hue < 240) {
-    r = 0; g = x; b = c;
-  } else if (hue >= 240 && hue < 300) {
-    r = x; g = 0; b = c;
-  } else if (hue >= 300 && hue < 360) {
-    r = c; g = 0; b = x;
-  }
-  
-  const r8 = Math.round((r + m) * 255);
-  const g8 = Math.round((g + m) * 255);
-  const b8 = Math.round((b + m) * 255);
-  
-  return `rgba(${r8}, ${g8}, ${b8}, ${opacity})`;
-};
+/** A distinct color per bonus series; `alpha` sets its opacity. */
+const bonusColor = (i: number, alpha = 1): string =>
+  `hsla(${BONUS_HUES[i % BONUS_HUES.length]}, ${70 + (i % 3) * 5}%, ${55 + (i % 2) * 5}%, ${alpha})`;
 
 /** Year boundary for a `YYYY-MM-DD` bucket label. */
 const isJanuary = (label: string | undefined): boolean => label?.split('-')[1] === '01';
@@ -160,8 +112,6 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
       .map(Number)
       .sort((a, b) => a - b);
     
-    const bonusColors = generateBonusColors(bonusNumbers.length);
-    
     bonusNumbers.forEach((bonus, index) => {
       const bonusSeries = safeBonusData[bonus] ?? [];
       // Create an array aligned with labels, using null for missing dates
@@ -173,8 +123,8 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
       datasets.push({
         label: `Bonus ${bonus}`,
         data: alignedData,
-        borderColor: bonusColors[index],
-        backgroundColor: hslToRgba(bonusColors[index], 0.1),
+        borderColor: bonusColor(index),
+        backgroundColor: bonusColor(index, 0.1),
         fill: false,
         tension: 0.1,
         pointRadius: 0,
@@ -209,21 +159,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
           },
         },
         tooltip: {
-          backgroundColor: chartTheme.surface,
-          titleColor: chartTheme.text,
-          bodyColor: chartTheme.textMuted,
-          borderColor: chartTheme.border,
-          borderWidth: 1,
-          cornerRadius: 8,
-          padding: 12,
-          displayColors: true,
-          titleFont: {
-            size: 14,
-            weight: 'bold',
-          },
-          bodyFont: {
-            size: 13,
-          },
+          ...chartTooltip(chartTheme),
           callbacks: {
             title: (tooltipItems) => {
               const date = tooltipItems[0].label;
@@ -323,14 +259,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
   }, [chartData, labels, maxCount, chartTheme]);
 
   if (safeData.length === 0) {
-    return (
-      <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">
-        <h3 className="text-sm font-semibold text-text mb-2">Completions Over Time</h3>
-        <div className="flex-1 min-h-[200px] flex items-center justify-center text-text-muted text-sm">
-          No completion data available
-        </div>
-      </div>
-    );
+    return <ChartEmptyState title="Completions Over Time" message="No completion data available" />;
   }
 
   return (

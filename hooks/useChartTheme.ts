@@ -25,6 +25,19 @@ export interface ChartTheme {
   surface: string;
 }
 
+/** Tooltip chrome every chart shares; spread it under `plugins.tooltip`. */
+export const chartTooltip = (theme: ChartTheme) => ({
+  backgroundColor: theme.surface,
+  titleColor: theme.text,
+  bodyColor: theme.textMuted,
+  borderColor: theme.border,
+  borderWidth: 1,
+  cornerRadius: 8,
+  padding: 12,
+  titleFont: { size: 13, weight: 'bold' as const },
+  bodyFont: { size: 12 },
+});
+
 /**
  * Chart.js draws to canvas, so it can't use CSS classes: colors have to be
  * resolved to strings. Reads them from the theme's custom properties and

@@ -11,7 +11,7 @@ import {
 } from 'chart.js';
 import { useMemo } from 'react';
 import type { MapEngagementPoint } from '@/lib/player-analytics';
-import { useChartTheme } from '@/hooks/useChartTheme';
+import { chartTooltip, useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(LinearScale, PointElement, Tooltip, Legend);
 
@@ -61,15 +61,7 @@ export default function MapEngagementChart({ data }: MapEngagementChartProps) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: chartTheme.surface,
-          titleColor: chartTheme.text,
-          bodyColor: chartTheme.textMuted,
-          borderColor: chartTheme.border,
-          borderWidth: 1,
-          cornerRadius: 8,
-          padding: 12,
-          titleFont: { size: 13, weight: 'bold' as const },
-          bodyFont: { size: 12 },
+          ...chartTooltip(chartTheme),
           callbacks: {
             title: (items) => items[0]?.dataset.label ?? '',
             label: (ctx) => {

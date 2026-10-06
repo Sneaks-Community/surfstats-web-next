@@ -13,7 +13,7 @@ import {
 } from 'chart.js';
 import { useMemo } from 'react';
 import ChartEmptyState from '@/components/ChartEmptyState';
-import { useChartTheme } from '@/hooks/useChartTheme';
+import { chartTooltip, useChartTheme } from '@/hooks/useChartTheme';
 
 ChartJS.register(
   RadialLinearScale,
@@ -102,21 +102,7 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
         },
       },
       tooltip: {
-        backgroundColor: chartTheme.surface,
-        titleColor: chartTheme.text,
-        bodyColor: chartTheme.textMuted,
-        borderColor: chartTheme.border,
-        borderWidth: 1,
-        cornerRadius: 8,
-        padding: 12,
-        displayColors: true,
-        titleFont: {
-          size: 14,
-          weight: 'bold' as const,
-        },
-        bodyFont: {
-          size: 13,
-        },
+        ...chartTooltip(chartTheme),
         callbacks: {
           title: (tooltipItems) => {
             return tooltipItems[0].label || '';
