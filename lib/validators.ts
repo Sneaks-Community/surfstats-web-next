@@ -42,8 +42,8 @@ export const searchQuerySchema = z
     let sanitized = query.replace(/[<>"'&;\\]/g, '');
     // Normalize whitespace
     sanitized = sanitized.replace(/\s+/g, ' ').trim();
-    // Escape SQL LIKE `%` wildcard to prevent LIKE wildcard injection
-    sanitized = sanitized.replace(/%/g, '\\%');
+    // Escape SQL LIKE's `%` wildcard and `\` escape char, so a `\` can't unescape a `%`
+    sanitized = sanitized.replace(/[\\%]/g, '\\$&');
     return sanitized;
   });
 
