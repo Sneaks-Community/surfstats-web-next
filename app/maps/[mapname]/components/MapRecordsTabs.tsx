@@ -18,39 +18,8 @@ import { useTabs } from '@/hooks/useTabs';
 import { clientError } from '@/lib/client-logger';
 import { getErrorMessage, isAbortError } from '@/lib/errors';
 import { fetchJson } from '@/lib/fetch-json';
+import type { BonusRecord, MapRecord, StageRecord } from '@/lib/map-records-cache';
 import LeaderboardTable, { type LeaderboardRow, type SortField } from './LeaderboardTable';
-
-interface MapRecord {
-  steamid: string;
-  name: string;
-  runtimepro: number;
-  date: string;
-  rank: number;
-  wr_time: number | null;
-  startspeed: number;
-}
-
-interface BonusRecord {
-  steamid: string;
-  name: string;
-  zonegroup: number;
-  runtime: number;
-  date: string;
-  rank: number;
-  wr_time: number | null;
-  startspeed: number;
-}
-
-interface StageRecord {
-  steamid: string;
-  name: string;
-  stage: number;
-  runtime: number;
-  date: string;
-  rank: number;
-  wr_time: number | null;
-  startspeed: number;
-}
 
 interface MapRecordsTabsProps {
   totalRecords: number;

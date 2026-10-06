@@ -26,7 +26,7 @@ interface RecordCounts {
   stagesTotal: number;
 }
 
-interface MapRecord extends RowDataPacket {
+export interface MapRecord {
   steamid: string;
   name: string;
   runtimepro: number;
@@ -36,7 +36,7 @@ interface MapRecord extends RowDataPacket {
   startspeed: number;
 }
 
-interface BonusRecord extends RowDataPacket {
+export interface BonusRecord {
   steamid: string;
   name: string;
   zonegroup: number;
@@ -47,7 +47,7 @@ interface BonusRecord extends RowDataPacket {
   startspeed: number;
 }
 
-interface StageRecord extends RowDataPacket {
+export interface StageRecord {
   steamid: string;
   name: string;
   stage: number;
@@ -160,7 +160,7 @@ export async function getLeaderboardRecordsFromCache(
       }
 
       const [leaderboardRows] = await withTimeout(
-        pool.query<MapRecord[]>(`
+        pool.query<Array<MapRecord & RowDataPacket>>(`
           SELECT
             steamid, name, runtimepro, date, startspeed,
             ROW_NUMBER() OVER (ORDER BY runtimepro ASC, date ASC, steamid ASC) as \`rank\`,
@@ -231,7 +231,7 @@ export async function getStageRecordsFromCache(
       const wrTime = wrRows[0]?.wr_time || null;
 
       const [stageRows] = await withTimeout(
-        pool.query<StageRecord[]>(`
+        pool.query<Array<StageRecord & RowDataPacket>>(`
           SELECT
             steamid, name, stage, runtime, date, startspeed, \`rank\`, wr_time
           FROM (
@@ -306,7 +306,7 @@ export async function getBonusRecordsFromCache(
       const totalRecords = countRows[0]?.total || 0;
 
       const [bonusRows] = await withTimeout(
-        pool.query<BonusRecord[]>(`
+        pool.query<Array<BonusRecord & RowDataPacket>>(`
           SELECT
             b.steamid, b.name, b.zonegroup, b.runtime, b.date, b.startspeed,
             ROW_NUMBER() OVER (ORDER BY b.runtime ASC, b.date ASC, b.steamid ASC) as \`rank\`,
@@ -368,7 +368,7 @@ export async function searchLeaderboardRecordsFromCache(
       const wr_time: number | null = wrRows[0]?.wr_time ?? null;
 
       const [rows] = await withTimeout(
-        pool.query<MapRecord[]>(
+        pool.query<Array<MapRecord & RowDataPacket>>(
           `SELECT ranked.steamid, ranked.name, ranked.runtimepro, ranked.date, ranked.startspeed,
                   ranked.\`rank\`, ? AS wr_time
            FROM (
@@ -422,7 +422,7 @@ export async function searchStageRecordsFromCache(
       const wr_time: number | null = wrRows[0]?.wr_time ?? null;
 
       const [rows] = await withTimeout(
-        pool.query<StageRecord[]>(
+        pool.query<Array<StageRecord & RowDataPacket>>(
           `SELECT ranked.steamid, ranked.name, ranked.stage, ranked.runtime, ranked.date, ranked.startspeed,
                   ranked.\`rank\`, ? AS wr_time
            FROM (
@@ -466,7 +466,7 @@ export async function searchBonusRecordsFromCache(
     expensive: true,
     fetch: async (validMapname) => {
       const [rows] = await withTimeout(
-        pool.query<BonusRecord[]>(
+        pool.query<Array<BonusRecord & RowDataPacket>>(
           `SELECT ranked.steamid, ranked.name, ranked.zonegroup, ranked.runtime, ranked.date, ranked.startspeed,
                   ranked.\`rank\`,
                   (SELECT MIN(runtime) FROM ck_bonus WHERE mapname = ? AND zonegroup = ranked.zonegroup) AS wr_time

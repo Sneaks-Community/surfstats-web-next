@@ -16,51 +16,15 @@ import { ZoneGroupBadge, StageBadge } from '@/components/RecordBadges';
 import { clientError } from '@/lib/client-logger';
 import { getErrorMessage, isAbortError } from '@/lib/errors';
 import { fetchJson } from '@/lib/fetch-json';
-import type { PlayerCompletionCounts } from '@/lib/player-profile-cache';
-
-// Types for records
-interface MapRecord {
-  mapname: string;
-  runtimepro: number;
-  date: string;
-  wr_time: number | null;
-  player_rank: number;
-  tier: number;
-}
-
-interface IncompleteMapRecord {
-  mapname: string;
-  tier: number | null;
-  wr_time: number | null;
-  mapType: 'linear' | 'staged';
-}
-
-interface BonusRecord {
-  mapname: string;
-  zonegroup: number;
-  runtime: number;
-  date: string;
-  player_rank: number;
-}
-
-interface IncompleteBonusRecord {
-  mapname: string;
-  zonegroup: number;
-  wr_time: number | null;
-}
-
-interface StageRecord {
-  map: string;
-  stage: number;
-  runtime: number;
-  date: string;
-  player_rank: number;
-}
-
-interface IncompleteStageRecord {
-  map: string;
-  stage: number;
-}
+import type {
+  IncompleteBonus,
+  IncompleteMap,
+  IncompleteStage,
+  PlayerBonusTime,
+  PlayerCompletionCounts,
+  PlayerMapTime,
+  PlayerStageTime,
+} from '@/lib/player-profile-cache';
 
 interface PlayerRecordsTabsProps {
   steamid: string;
@@ -73,16 +37,16 @@ interface PlayerRecordsTabsProps {
 // Each player-times route returns the full per-section list + the not-yet-done
 // list. Held in state once fetched (state doubles as the client-side cache).
 interface MapsSection {
-  records: MapRecord[];
-  incomplete: IncompleteMapRecord[];
+  records: PlayerMapTime[];
+  incomplete: IncompleteMap[];
 }
 interface BonusesSection {
-  records: BonusRecord[];
-  incomplete: IncompleteBonusRecord[];
+  records: PlayerBonusTime[];
+  incomplete: IncompleteBonus[];
 }
 interface StagesSection {
-  records: StageRecord[];
-  incomplete: IncompleteStageRecord[];
+  records: PlayerStageTime[];
+  incomplete: IncompleteStage[];
 }
 
 type TabType = 'maps' | 'bonuses' | 'stages';
@@ -315,11 +279,8 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
       switch (sortField) {
         case 'map':
           return a.mapname.localeCompare(b.mapname);
-        case 'tier': {
-          const aTier = a.tier ?? 0;
-          const bTier = b.tier ?? 0;
-          return aTier - bTier;
-        }
+        case 'tier':
+          return a.tier - b.tier;
         case 'wrTime': {
           const aWR = a.wr_time ?? Infinity;
           const bWR = b.wr_time ?? Infinity;
@@ -622,7 +583,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
             <div className="divide-y divide-border">
               {/* FINISHED RECORDS */}
               {statusFilter === 'finished' && activeTab === 'maps' &&
-                (paginatedRecords as MapRecord[]).map((record, i) => {
+                (paginatedRecords as PlayerMapTime[]).map((record, i) => {
                   const wrTimeDiff = record.wr_time ? record.runtimepro - record.wr_time : null;
                   const wrPercent = record.wr_time
                     ? Math.min(100, ((record.runtimepro - record.wr_time) / record.wr_time) * 100)
@@ -666,7 +627,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                 })}
 
               {statusFilter === 'finished' && activeTab === 'bonuses' &&
-                (paginatedRecords as BonusRecord[]).map((record, i) => (
+                (paginatedRecords as PlayerBonusTime[]).map((record, i) => (
                   <div
                     key={`${record.mapname}-${record.zonegroup}-${i}`}
                     className="px-2 sm:px-4 py-2 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3"
@@ -694,7 +655,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                 ))}
 
               {statusFilter === 'finished' && activeTab === 'stages' &&
-                (paginatedRecords as StageRecord[]).map((record, i) => (
+                (paginatedRecords as PlayerStageTime[]).map((record, i) => (
                   <div
                     key={`${record.map}-${record.stage}-${i}`}
                     className="px-2 sm:px-4 py-2 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3"
@@ -723,7 +684,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
 
               {/* INCOMPLETE RECORDS */}
               {statusFilter === 'incomplete' && activeTab === 'maps' &&
-                (paginatedRecords as IncompleteMapRecord[]).map((record, i) => (
+                (paginatedRecords as IncompleteMap[]).map((record, i) => (
                   <div
                     key={`${record.mapname}-${i}`}
                     className="px-2 sm:px-4 py-2 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3"
@@ -735,9 +696,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                     </div>
                     <div className="flex items-center gap-4 sm:gap-4">
                       <div className="sm:w-20 sm:text-right sm:flex sm:items-center sm:justify-end">
-                        {record.tier !== null && (
-                          <TierBadge tier={record.tier} />
-                        )}
+                        <TierBadge tier={record.tier} />
                       </div>
                       <div className="sm:w-20 sm:text-right sm:flex sm:items-center sm:justify-end">
                         <span className={`text-xs px-2 py-0.5 rounded-full ${
@@ -760,7 +719,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                 ))}
 
               {statusFilter === 'incomplete' && activeTab === 'bonuses' &&
-                (paginatedRecords as IncompleteBonusRecord[]).map((record, i) => (
+                (paginatedRecords as IncompleteBonus[]).map((record, i) => (
                   <div
                     key={`${record.mapname}-${record.zonegroup}-${i}`}
                     className="px-2 sm:px-4 py-2 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3"
@@ -785,7 +744,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                 ))}
 
               {statusFilter === 'incomplete' && activeTab === 'stages' &&
-                (paginatedRecords as IncompleteStageRecord[]).map((record, i) => (
+                (paginatedRecords as IncompleteStage[]).map((record, i) => (
                   <div
                     key={`${record.map}-${record.stage}-${i}`}
                     className="px-2 sm:px-4 py-2 hover:bg-surface-hover/50 transition-colors flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3"
