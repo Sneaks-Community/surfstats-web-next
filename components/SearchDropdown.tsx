@@ -281,6 +281,7 @@ export function SearchDropdown({
                       width={24}
                       height={24}
                       className="rounded-full shrink-0"
+                      unoptimized
                     />
                   ) : (
                     <div className="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center shrink-0">

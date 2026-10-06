@@ -49,6 +49,7 @@ export default function TopPlayersPreview({ players }: { players: TopPlayerEntry
                 width={36}
                 height={36}
                 className="h-9 w-9 rounded-full shrink-0 bg-surface-hover"
+                unoptimized
               />
             ) : (
               <span className="h-9 w-9 rounded-full shrink-0 bg-surface-hover" aria-hidden />

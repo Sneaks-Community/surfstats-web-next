@@ -100,6 +100,7 @@ function Row({ player, avatar }: { player: PlayerListEntry; avatar?: { avatarmed
             width={28}
             height={28}
             className="rounded-full shrink-0"
+            unoptimized
           />
         )}
         <div className="min-w-0">
