@@ -18,17 +18,24 @@ const shortCircuitHeaders: Record<string, string> = {
 // (unavailable on Edge).
 export const config = {
   matcher: [
-    // Everything except Next's immutable build assets. Deliberately no
-    // dot-excluding pattern: a dotted path (`/players/1.1`, `/api/maps/a.b/records`)
+    // Everything except Next's build assets; the slash matters, as `/_next/static`
+    // alone renders a page. No dot-excluding pattern: a dotted path (`/players/1.1`)
     // is a page or route like any other and must not skip the gates below.
     // `/public` holds no files, so nothing else is served statically.
-    '/((?!_next/static).*)',
+    '/((?!_next/static/).*)',
   ],
 };
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const isApi = pathname.startsWith('/api/');
+  // Decoded, so an encoded `/%61pi/...` meets the API gates whatever Next's router decodes.
+  let decoded = pathname;
+  try {
+    decoded = decodeURIComponent(pathname);
+  } catch {
+    // Malformed escape: Next cannot route it either.
+  }
+  const isApi = decoded.startsWith('/api/');
 
   // Exempt before every gate, primarily the origin guard: the healthcheck's wget
   // sends no Origin or Sec-Fetch-*, so that guard would 403 it. The route touches

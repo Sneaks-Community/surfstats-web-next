@@ -55,4 +55,14 @@ describe('proxy /api/health exemption', () => {
 
     expect(res.status).toBe(403);
   });
+
+  // An encoded `/api` must never pass as a page, whatever Next's router decodes.
+  it('gates a percent-encoded /api path as API', async () => {
+    const { proxy } = await import('../proxy');
+    waitForCacheReady.mockResolvedValue(true);
+
+    const res = await proxy(healthcheckRequest('/%61pi/search'));
+
+    expect(res.status).toBe(403);
+  });
 });

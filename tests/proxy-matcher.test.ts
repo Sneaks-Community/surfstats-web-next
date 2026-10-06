@@ -34,4 +34,10 @@ describe('proxy matcher', () => {
   it('skips Next build assets', () => {
     expect(matches('/_next/static/chunks/main.js')).toBe(false);
   });
+
+  // Next serves only `/_next/static/...` itself; these render the 404 page.
+  it('covers lookalikes of the build asset prefix', () => {
+    expect(matches('/_next/static')).toBe(true);
+    expect(matches('/_next/staticfoo')).toBe(true);
+  });
 });
