@@ -49,6 +49,15 @@ jobs:
           # empty on non-schedule runs = default checkout
           ref: ${{ steps.ref.outputs.tag }}
 
+      # The weekly rebuild skips this: its npm deps already shipped in
+      # :latest, so failing it would only withhold the base-image fixes.
+      - name: npm audit (fail on high, production deps)
+        if: github.event_name != 'schedule'
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: npm audit (fail on critical, all deps)
+        run: npm audit --audit-level=critical
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4.4.1
 

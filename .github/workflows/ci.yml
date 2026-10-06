@@ -33,8 +33,13 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: npm audit (fail on high vulnerabilities)
-        run: npm audit --audit-level=high
+      # Dev deps never ship in the image, but they run during its build,
+      # so they still block on critical advisories (e.g. malware).
+      - name: npm audit (fail on high, production deps)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: npm audit (fail on critical, all deps)
+        run: npm audit --audit-level=critical
 
       - name: Lint
         run: npm run lint
