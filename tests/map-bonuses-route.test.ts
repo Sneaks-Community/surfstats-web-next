@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const getBonusRecordsFromCache = vi.fn();
+const searchBonusRecordsFromCache = vi.fn();
 
 vi.mock('server-only', () => ({}));
 vi.mock('../lib/map-records-cache', () => ({
   getBonusRecordsFromCache: (...args: unknown[]) => getBonusRecordsFromCache(...args),
-  searchBonusRecordsFromCache: vi.fn(),
+  searchBonusRecordsFromCache: (...args: unknown[]) => searchBonusRecordsFromCache(...args),
   getRecordCountsAndWRFromCache: () => Promise.resolve({ counts: { bonusesTotal: 250 }, wr_time: null }),
 }));
 vi.mock('../lib/registry-cache', () => ({
@@ -41,5 +42,14 @@ describe('bonus records route', () => {
     await call('bonus=1&page=3&pageSize=20');
 
     expect(getBonusRecordsFromCache).toHaveBeenCalledWith('surf_test', 1, 3, 20);
+  });
+
+  // The client counts the raw `ab'` as three characters; it must not get a 400.
+  it('answers a query that sanitizes too short with no results', async () => {
+    const res = await call(`bonus=1&q=${encodeURIComponent("ab'")}`);
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ records: [], total: 0 });
+    expect(searchBonusRecordsFromCache).not.toHaveBeenCalled();
   });
 });

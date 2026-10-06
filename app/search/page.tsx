@@ -3,28 +3,20 @@ import { Search as SearchIcon, Map as MapIcon, Users, ChevronRight } from 'lucid
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTierColor } from '@/lib/tierColors';
-import { mapImageUrl, getMapImagesUrl } from '@/lib/utils';
+import { mapImageUrl, getMapImagesUrl, MIN_SEARCH_LENGTH } from '@/lib/utils';
 import { validateSearchQuery, validatePlayerName } from '@/lib/validators';
-import { getAllMapMetadataFromCache } from '@/lib/map-cache';
+import { searchMaps } from '@/lib/map-cache';
 import { searchPlayersFromCache } from '@/lib/player-cache';
 import type { PlayerSearchResult } from '@/lib/player-cache';
 import logger from '@/lib/logger';
 import type { Metadata } from 'next';
-import { getErrorMessage } from '@/lib/errors';
+import { getErrorCode, getErrorMessage } from '@/lib/errors';
 
 export const metadata: Metadata = {
   title: 'Search',
   // Search results are thin/duplicate content — keep them out of the index.
   robots: { index: false },
 };
-
-interface MapResult {
-  mapname: string;
-  tier: number;
-}
-
-/** Shortest query that may reach the DB; matches `MIN_CHARS` in `/api/search`. */
-const MIN_SEARCH_CHARS = 3;
 
 export default async function SearchPage({
   searchParams,
@@ -36,30 +28,20 @@ export default async function SearchPage({
   const query = validateSearchQuery(q);
   
   let players: PlayerSearchResult[] = [];
-  let maps: MapResult[] = [];
+  let maps: Awaited<ReturnType<typeof searchMaps>> = [];
 
   // Each distinct query is a `LIKE '%q%'` scan cached under its own key, so the
   // floor bounds how cheaply those can be cycled.
-  if (query.length >= MIN_SEARCH_CHARS) {
+  if (query.length >= MIN_SEARCH_LENGTH) {
     try {
       // Search players using cached function
       players = await searchPlayersFromCache(query);
       
-      // Search maps using cached map metadata (Valkey cache)
-      const allMaps = await getAllMapMetadataFromCache();
-      const queryLower = query.toLowerCase();
-      maps = Array.from(allMaps.values())
-        .filter(map => map.mapname.toLowerCase().includes(queryLower))
-        .map(map => ({ mapname: map.mapname, tier: map.tier }))
-        .sort((a, b) => a.mapname.localeCompare(b.mapname))
-        .slice(0, 10);
+      maps = await searchMaps(query, 10);
       
       logger.debug(`[Search] Results for "${query}": ${players.length} players, ${maps.length} maps (cached)`);
     } catch (error: unknown) {
-      const err = error as { message?: string; code?: string };
-      const errorMessage = getErrorMessage(error);
-      logger.error(`[Search] Query failed for "${query}": ${errorMessage}`);
-      logger.error(`[Search] Error code: ${err.code || 'N/A'}`);
+      logger.error(`[Search] Query failed for "${query}": ${getErrorMessage(error)} (code: ${getErrorCode(error)})`);
     }
   }
 
@@ -83,13 +65,13 @@ export default async function SearchPage({
         </form>
       </div>
 
-      {query.length > 0 && query.length < MIN_SEARCH_CHARS && (
+      {query.length > 0 && query.length < MIN_SEARCH_LENGTH && (
         <div className="text-center text-text-muted py-8">
-          Please enter at least {MIN_SEARCH_CHARS} characters to search.
+          Please enter at least {MIN_SEARCH_LENGTH} characters to search.
         </div>
       )}
 
-      {query.length >= MIN_SEARCH_CHARS && (
+      {query.length >= MIN_SEARCH_LENGTH && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Players Results */}
           <div className="space-y-4">

@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { Search, User, Map } from 'lucide-react';
 import { useMapImagesUrl } from '@/lib/ClientConfigContext';
-import { mapImageUrl } from '@/lib/utils';
+import { mapImageUrl, MIN_SEARCH_LENGTH } from '@/lib/utils';
 import { clientError } from '@/lib/client-logger';
 import { getErrorMessage, isAbortError } from '@/lib/errors';
 import { fetchJson } from '@/lib/fetch-json';
@@ -30,7 +30,6 @@ interface SearchResponse {
   maps: MapResult[];
 }
 
-const MIN_CHARS = 3;
 const DEBOUNCE_MS = 300;
 
 export function SearchDropdown() {
@@ -53,7 +52,7 @@ export function SearchDropdown() {
 
   // Search function with AbortController to prevent stale race conditions
   const performSearch = useCallback(async (searchQuery: string) => {
-    if (searchQuery.length < MIN_CHARS) {
+    if (searchQuery.length < MIN_SEARCH_LENGTH) {
       setResults({ players: [], maps: [] });
       setIsOpen(false);
       return;
@@ -95,7 +94,7 @@ export function SearchDropdown() {
 
   // Too short closes at once, not after the debounce.
   useEffect(() => {
-    if (query.length >= MIN_CHARS) return;
+    if (query.length >= MIN_SEARCH_LENGTH) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Syncing results with query length
     setResults({ players: [], maps: [] });
     setError(null);
@@ -103,7 +102,7 @@ export function SearchDropdown() {
   }, [query]);
 
   useEffect(() => {
-    if (debouncedQuery.length < MIN_CHARS) return;
+    if (debouncedQuery.length < MIN_SEARCH_LENGTH) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the request is the external system this syncs with
     void performSearch(debouncedQuery);
     return () => {
@@ -148,7 +147,7 @@ export function SearchDropdown() {
         e.preventDefault();
         if (selectedIndex >= 0) {
           navigateToSelected();
-        } else if (query.length >= MIN_CHARS) {
+        } else if (query.length >= MIN_SEARCH_LENGTH) {
           // Submit form to search page using Next.js router
           router.push(`/search?q=${encodeURIComponent(query)}`);
         }
@@ -181,7 +180,7 @@ export function SearchDropdown() {
   };
 
   const handleInputFocus = () => {
-    if (query.length >= MIN_CHARS && totalResults > 0) {
+    if (query.length >= MIN_SEARCH_LENGTH && totalResults > 0) {
       setIsOpen(true);
     }
   };
@@ -189,7 +188,7 @@ export function SearchDropdown() {
   const optionId = (index: number) => `search-option-${index}`;
 
   const hasResults = results.players.length > 0 || results.maps.length > 0;
-  const showDropdown = isOpen && query.length >= MIN_CHARS && (hasResults || error !== null);
+  const showDropdown = isOpen && query.length >= MIN_SEARCH_LENGTH && (hasResults || error !== null);
 
   return (
     <div className="relative" ref={dropdownRef}>

@@ -5,7 +5,7 @@ import logger from '@/lib/logger';
 import { cachedFetch, type RefreshOptions } from './cached-fetch';
 import { mapKey } from './cache-keys';
 import { getErrorCode, getErrorMessage } from './errors';
-import { validateMapName } from './validators';
+import { validateMapName, type SearchQuery } from './validators';
 
 // Types for map metadata
 export interface MapMetadata {
@@ -226,4 +226,14 @@ export async function getTotalsFromCache({ force }: RefreshOptions = {}): Promis
       return { totalMaps: 0, totalBonuses: 0, totalStages: 0 };
     },
   });
+}
+
+/** Maps whose name contains `query`, alphabetical, at most `limit`. */
+export async function searchMaps(query: SearchQuery, limit: number): Promise<Array<Pick<MapMetadata, 'mapname' | 'tier'>>> {
+  const needle = query.toLowerCase();
+  return Array.from((await getAllMapMetadataFromCache()).values())
+    .filter((map) => map.mapname.toLowerCase().includes(needle))
+    .sort((a, b) => a.mapname.localeCompare(b.mapname))
+    .slice(0, limit)
+    .map((map) => ({ mapname: map.mapname, tier: map.tier }));
 }

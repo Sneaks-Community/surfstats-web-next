@@ -119,6 +119,12 @@ export const HEATMAP_MAX_SESSIONS = 10000;
 export type SortDirection = 'asc' | 'desc';
 
 /**
+ * Shortest search that reaches the DB. The server counts the sanitized query, so
+ * one that sanitizes shorter (`ab'`) gets empty results, not an error.
+ */
+export const MIN_SEARCH_LENGTH = 3;
+
+/**
  * Parse an integer from a URL search param (or any nullable string), guarding
  * against NaN and clamping to a range. Use for page/index params so malformed
  * input (`?page=abc`, `?page=-5`, huge values) falls back/clamps instead of

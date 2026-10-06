@@ -5,10 +5,7 @@ import { useDebounce } from './useDebounce';
 import { clientError } from '@/lib/client-logger';
 import { getErrorMessage, isAbortError } from '@/lib/errors';
 import { fetchJson } from '@/lib/fetch-json';
-import { ITEMS_PER_PAGE } from '@/lib/utils';
-
-/** Shorter than this is not a search: nothing is requested and results clear. */
-export const MIN_SEARCH_LENGTH = 3;
+import { ITEMS_PER_PAGE, MIN_SEARCH_LENGTH } from '@/lib/utils';
 
 /** Every record endpoint returns its rows under one of these two keys. */
 interface RecordSearchResponse<T> {

@@ -4,10 +4,10 @@ import Link from '@/components/Link';
 import Pagination from '@/components/Pagination';
 import { LoadingSpinner } from '@/components/LoadingSpinner';
 import SortableTh from '@/components/SortableTh';
-import { formatTime, formatDate, formatTimeDiff, type SortDirection } from '@/lib/utils';
+import { formatTime, formatDate, formatTimeDiff, MIN_SEARCH_LENGTH, type SortDirection } from '@/lib/utils';
 import { useDisplayTz } from '@/lib/ClientConfigContext';
 import { validatePlayerName } from '@/lib/validators';
-import { MIN_SEARCH_LENGTH, type LoadError } from '@/hooks/useRecordSearch';
+import type { LoadError } from '@/hooks/useRecordSearch';
 
 export type SortField = 'rank' | 'player' | 'time' | 'speed' | 'wrDiff' | 'date';
 

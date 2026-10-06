@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { validateSearchQuery } from '@/lib/validators';
 import { resolveMapnameParam, parsePageParams, apiError, SEARCH_CACHE_CONTROL, RECORDS_CACHE_CONTROL } from '@/lib/api-utils';
+import { MIN_SEARCH_LENGTH } from '@/lib/utils';
 import {
   getRecordCountsAndWRFromCache,
   getLeaderboardRecordsFromCache,
@@ -30,8 +31,8 @@ export async function GET(
   // Search mode: return all matching records (up to 100) sorted by rank
   if (rawQuery !== null) {
     const query = validateSearchQuery(rawQuery);
-    if (!query || query.length < 3) {
-      return NextResponse.json({ error: 'Search query must be at least 3 characters' }, { status: 400 });
+    if (query.length < MIN_SEARCH_LENGTH) {
+      return NextResponse.json({ records: [], total: 0 }, { headers: { 'Cache-Control': SEARCH_CACHE_CONTROL } });
     }
 
     try {
