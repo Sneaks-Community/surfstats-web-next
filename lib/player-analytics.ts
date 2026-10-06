@@ -83,7 +83,8 @@ export async function getPlayerTimeOnServerFromCache(
 
 // Activity Heatmap Data Interface
 interface PlayerConnectData extends RowDataPacket {
-  connect_time: string | Date;
+  /** Unix epoch seconds (an `int` column). */
+  connect_time: number;
 }
 
 interface HeatmapDataPoint {
@@ -174,23 +175,8 @@ async function getPlayerActivityHeatmapInternal(
     const aggregated = new Map<string, number>();
 
     for (const row of rows) {
-      // connect_time is stored as Unix timestamp (seconds) in the database
-      // MySQL returns it as a number, which needs to be multiplied by 1000 for JavaScript Date
-      let date: Date;
-      if (typeof row.connect_time === 'number') {
-        date = new Date(row.connect_time * 1000);
-      } else if (typeof row.connect_time === 'string') {
-        date = new Date(row.connect_time);
-      } else if (row.connect_time instanceof Date) {
-        date = row.connect_time;
-      } else {
-        continue;
-      }
-
-      // Skip invalid dates
-      if (isNaN(date.getTime())) {
-        continue;
-      }
+      const date = new Date(row.connect_time * 1000);
+      if (isNaN(date.getTime())) continue;
 
       const bucket = bucketParts(date, timeZone);
       if (!bucket) continue;

@@ -33,6 +33,8 @@ const analyticsPool = mysql.createPool({
   waitForConnections: true,
   connectionLimit: 5, // Smaller pool for secondary database
   queueLimit: 100,
+  // Same as the main pool: SUM(duration) is a DECIMAL.
+  decimalNumbers: true,
 });
 
 // Log pool connection events (debug mode only)

@@ -69,8 +69,7 @@ interface PlayerProfileContentProps {
   steamid: string;
 }
 
-// eslint-disable-next-line @typescript-eslint/require-await -- Server component pattern, data fetching done at route handler level
-export default async function PlayerProfileContent({
+export default function PlayerProfileContent({
   overview,
   totals,
   steamAvatars,

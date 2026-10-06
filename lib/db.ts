@@ -24,6 +24,9 @@ const pool = mysql.createPool({
   queueLimit,
   // Milliseconds before a timeout occurs during the initial connection to the MySQL server
   connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT_MS || '5000', 10) || 5000,
+  // DECIMAL runtimes and SUM()/AVG() results arrive as numbers, as the row types
+  // claim, rather than as strings that only arithmetic happened to coerce.
+  decimalNumbers: true,
 });
 
 // Validate env vars at module load time (only at runtime, not build)
