@@ -3,8 +3,6 @@ import logger from './logger';
 import { validateEnv } from './env';
 import { initializeDatabase } from './db';
 import { startAnalyticsHealthCheck } from './db-analytics';
-import { startServerBackgroundRefresh } from './server-background-refresh';
-import { startPlayersListBackgroundRefresh } from './players-list-background-refresh';
 import { startMapGraphPrecache } from './map-graph-precache';
 import { startCacheRefreshers } from './cache-background-refresh';
 
@@ -23,11 +21,8 @@ export async function startServer(): Promise<void> {
 
   const dbReady = await initializeDatabase();
 
-  startServerBackgroundRefresh();
-  startPlayersListBackgroundRefresh();
-  // Each of these runs once immediately, which is the cache warm that used to
-  // happen in initializeDatabase; started even if the probe failed, so a late DB
-  // heals on the next interval instead of waiting for a restart.
+  // Each refresher's first run is its cache warm. Started even if the probe failed,
+  // so a late DB heals on the next interval instead of waiting for a restart.
   startCacheRefreshers();
 
   // Seven aggregate queries per map across ~1,000 maps: skip the sweep if the probe

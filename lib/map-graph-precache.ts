@@ -61,23 +61,6 @@ async function precacheMapGraphs(mapname: string, startup: boolean): Promise<voi
 }
 
 /**
- * Process a batch of maps for precaching with concurrency limiting.
- * Returns a promise that resolves when the batch is complete.
- */
-async function processBatch(mapNames: string[], startup: boolean): Promise<void> {
-  // Split into concurrent groups
-  const groups: string[][] = [];
-  for (let i = 0; i < mapNames.length; i += MAX_CONCURRENT) {
-    groups.push(mapNames.slice(i, i + MAX_CONCURRENT));
-  }
-
-  // Process each group sequentially, maps within a group run in parallel
-  for (const group of groups) {
-    await Promise.all(group.map(name => precacheMapGraphs(name, startup)));
-  }
-}
-
-/**
  * Refresh every map's chart series once, in paced batches. One sweep per interval
  * replaces a ~1,000-timer per-map tree; the batch pacing already spreads the load.
  */
@@ -86,13 +69,11 @@ async function precacheAllMapGraphs(startup: boolean): Promise<void> {
   const mapNames = Array.from(metadata.keys());
   logger.info(`[MapGraphPrecache] Refreshing graphs for ${mapNames.length} maps`);
 
-  for (let i = 0; i < mapNames.length; i += BATCH_SIZE) {
-    await processBatch(mapNames.slice(i, i + BATCH_SIZE), startup);
-
-    // Delay between batches (except after the last one)
-    if (i + BATCH_SIZE < mapNames.length) {
+  for (let i = 0; i < mapNames.length; i += MAX_CONCURRENT) {
+    if (i > 0 && i % BATCH_SIZE === 0) {
       await new Promise(resolve => setTimeout(resolve, BATCH_DELAY_MS));
     }
+    await Promise.all(mapNames.slice(i, i + MAX_CONCURRENT).map(name => precacheMapGraphs(name, startup)));
   }
 
   logger.info(`[MapGraphPrecache] Precache complete for ${mapNames.length} maps`);

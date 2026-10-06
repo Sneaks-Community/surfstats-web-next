@@ -25,25 +25,57 @@ import {
   getPlayerMapEngagementFromCache,
 } from './player-analytics';
 import { listRecentProfiles } from './recent-profiles';
+import { fetchServersFromGame } from './server-status';
+import { cacheSet } from './valkey-cache';
+import { SERVER_CACHE_KEY, SERVER_CACHE_TTL } from './cache-keys';
+import { warmPlayersListCache } from './player-cache';
 
 /**
- * The caches that used to be warmed once at boot and then left to expire, plus the
- * recently-viewed profile set. Cadence is per domain because the cost of a pass is
+ * Every recurring cache refresh. Cadence is per domain because the cost of a pass is
  * (number of keys / interval): the volatile single-key caches are cheap enough to
  * run every minute, the 250-country slice is not.
  *
  * Every task refreshes in place (`force`), never `DEL`, so a pass can only ever
  * make a page faster, and a failed pass leaves the previous value being served.
  */
+const SERVERS_INTERVAL_MS = 30_000;
 const DASHBOARD_INTERVAL_MS = 60_000;
 const TOTALS_INTERVAL_MS = 300_000; // 5 minutes
 const STATIC_INTERVAL_MS = 1_800_000; // 30 minutes
 const COUNTRIES_INTERVAL_MS = 21_600_000; // 6 hours
 const PROFILES_INTERVAL_MS = 900_000; // 15 minutes
 
+// Rankings change slowly, so a few-minute interval keeps the browsed pages fresh.
+const PLAYERS_LIST_WARM_PAGES = Math.max(
+  1,
+  parseInt(process.env.PLAYERS_LIST_WARM_PAGES || '10', 10) || 10
+);
+const PLAYERS_LIST_INTERVAL_MS = Math.max(
+  60_000,
+  parseInt(process.env.PLAYERS_LIST_WARM_INTERVAL_MS || '', 10) || 300_000 // 5 minutes
+);
+
 const force = { force: true } as const;
 
 const refreshers = [
+  createBackgroundRefresh({
+    name: 'ServerRefresh',
+    intervalMs: SERVERS_INTERVAL_MS,
+    task: async () => {
+      const servers = await fetchServersFromGame();
+      await cacheSet(SERVER_CACHE_KEY, servers, SERVER_CACHE_TTL);
+      logger.debug(`[ServerRefresh] Cached ${servers.length} servers with TTL ${SERVER_CACHE_TTL}s`);
+    },
+  }),
+  createBackgroundRefresh({
+    name: 'PlayersListRefresh',
+    intervalMs: PLAYERS_LIST_INTERVAL_MS,
+    startupDetail: `${PLAYERS_LIST_WARM_PAGES} pages every ${PLAYERS_LIST_INTERVAL_MS}ms`,
+    task: async () => {
+      await warmPlayersListCache(PLAYERS_LIST_WARM_PAGES);
+      logger.debug(`[PlayersListRefresh] Warmed first ${PLAYERS_LIST_WARM_PAGES} players-list pages`);
+    },
+  }),
   createBackgroundRefresh({
     name: 'DashboardRefresh',
     intervalMs: DASHBOARD_INTERVAL_MS,
