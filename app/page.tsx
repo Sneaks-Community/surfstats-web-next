@@ -47,8 +47,8 @@ export default async function Home() {
 
   const topPlayerRows = topPlayersResult.players.slice(0, 10);
 
-  // Steam avatars for the top-10 list — already cached (7-day TTL) via the same
-  // path the /players table uses; degrade to no-avatar on any failure.
+  // Steam avatars for the top-10 list, cached via the same path the /players
+  // table uses; degrade to no-avatar on any failure.
   const avatars = await safe(
     'top player avatars',
     () => getSteamProfilesFromCache(topPlayerRows.map((p) => p.steamid)),

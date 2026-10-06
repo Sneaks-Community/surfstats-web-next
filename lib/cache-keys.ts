@@ -50,4 +50,4 @@ export function steamAvatarKey(steamId: string): string {
   return `surfstats:steam:avatar:${steamId}`;
 }
 
-export const STEAM_AVATAR_TTL = 604800; // 7 days
+export const STEAM_AVATAR_TTL = 86400; // 1 day

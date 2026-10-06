@@ -183,7 +183,7 @@ describe('getSteamProfilesFromCache', () => {
           value: { avatar: 'a', avatarmedium: 'm', avatarfull: 'f' },
         },
       ],
-      604800
+      86400
     );
   });
 

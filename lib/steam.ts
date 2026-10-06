@@ -38,8 +38,7 @@ export interface SteamAvatarSet {
 
 /** Steam's documented cap for `GetPlayerSummaries`; more IDs are silently dropped. */
 const STEAM_IDS_PER_REQUEST = 100;
-/** Steam omits deleted accounts; ask again daily, not on every render. */
-const STEAM_MISS_TTL = 86400;
+/** Cached for IDs Steam omits (deleted accounts), so they are not re-asked every render. */
 const NO_AVATAR: SteamAvatarSet = { avatar: '', avatarmedium: '', avatarfull: '' };
 
 /**
@@ -201,8 +200,7 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
         });
 
       // Pipelined, for the same reason the reads are.
-      await cacheSetMany(toCache, STEAM_AVATAR_TTL);
-      await cacheSetMany(misses, STEAM_MISS_TTL);
+      await cacheSetMany([...toCache, ...misses], STEAM_AVATAR_TTL);
     }
 
     const duration = Date.now() - startTime;
