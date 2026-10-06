@@ -68,11 +68,12 @@ describe('validateSearchQuery', () => {
 });
 
 describe('validatePlayerName', () => {
-  it('falls back to Unknown and truncates', () => {
+  it('trims, and falls back to Unknown for missing, blank or overlong names', () => {
     expect(validatePlayerName('bhop enjoyer')).toBe('bhop enjoyer');
     expect(validatePlayerName(null)).toBe('Unknown');
     expect(validatePlayerName(undefined)).toBe('Unknown');
     expect(validatePlayerName('')).toBe('Unknown');
+    expect(validatePlayerName('   ')).toBe('Unknown');
     expect(validatePlayerName('n'.repeat(65))).toBe('Unknown');
   });
 });

@@ -1,10 +1,4 @@
-/**
- * Input validation schemas and wrapper functions using Zod v4.
- * Replaces the custom sanitization logic from lib/sanitize.ts.
- *
- * All wrapper functions maintain backward-compatible signatures
- * (same parameter types and return types) to minimize migration surface area.
- */
+/** Input validation schemas (Zod v4) and the wrapper functions callers use. */
 
 import { z } from 'zod';
 
@@ -53,16 +47,8 @@ export const searchQuerySchema = z
     return sanitized;
   });
 
-/** Player name schema: safe for display (truncates to 64 chars) */
-export const playerNameSchema = z
-  .string()
-  .trim()
-  .max(64)
-  .or(z.literal(''))
-  .default('Unknown');
-
 // ---------------------------------------------------------------------------
-// Wrapper Functions (backward-compatible with lib/sanitize.ts signatures)
+// Wrapper Functions
 // ---------------------------------------------------------------------------
 
 /**
@@ -107,12 +93,10 @@ export function validateSearchQuery(query: string | undefined): SearchQuery {
 export const EMPTY_SEARCH = validateSearchQuery('');
 
 /**
- * Sanitize a player name for display.
- * @param name - The player name to sanitize
- * @returns Sanitized name safe for display
+ * A player name for display. React escapes it; this only trims, and stands in
+ * 'Unknown' for a missing, blank or over-64-character name.
  */
 export function validatePlayerName(name: string | null | undefined): string {
-  if (!name || typeof name !== 'string') return 'Unknown';
-  const result = playerNameSchema.safeParse(name);
-  return result.success ? result.data : 'Unknown';
+  const trimmed = typeof name === 'string' ? name.trim() : '';
+  return trimmed && trimmed.length <= 64 ? trimmed : 'Unknown';
 }

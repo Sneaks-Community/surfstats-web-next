@@ -10,7 +10,6 @@ import { LoadingSpinner } from '@/components/LoadingSpinner';
 import { formatTime, formatDate, sortRecords, matchesQuery, wrDiff, ITEMS_PER_PAGE, type SortDirection } from '@/lib/utils';
 import { useDisplayTz } from '@/lib/ClientConfigContext';
 import { useTabs } from '@/hooks/useTabs';
-import { validatePlayerName } from '@/lib/validators';
 import TierBadge from '@/components/TierBadge';
 import { ZoneGroupBadge, StageBadge } from '@/components/RecordBadges';
 import { clientError } from '@/lib/client-logger';
@@ -596,7 +595,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                     >
                       <div className="flex-1 min-w-0">
                         <MapLinkWithPreview mapname={record.mapname}>
-                          {validatePlayerName(record.mapname)}
+                          {record.mapname}
                         </MapLinkWithPreview>
                       </div>
                       <div className="sm:w-20 flex justify-end">
@@ -634,7 +633,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                   >
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.mapname}>
-                        {validatePlayerName(record.mapname)}
+                        {record.mapname}
                       </MapLinkWithPreview>
                       <ZoneGroupBadge zonegroup={record.zonegroup} />
                     </div>
@@ -662,7 +661,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                   >
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.map}>
-                        {validatePlayerName(record.map)}
+                        {record.map}
                       </MapLinkWithPreview>
                       <StageBadge stage={record.stage} />
                     </div>
@@ -691,7 +690,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                   >
                     <div className="flex-1 min-w-0">
                       <MapLinkWithPreview mapname={record.mapname}>
-                        {validatePlayerName(record.mapname)}
+                        {record.mapname}
                       </MapLinkWithPreview>
                     </div>
                     <div className="flex items-center gap-4 sm:gap-4">
@@ -726,7 +725,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                   >
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.mapname}>
-                        {validatePlayerName(record.mapname)}
+                        {record.mapname}
                       </MapLinkWithPreview>
                       <ZoneGroupBadge zonegroup={record.zonegroup} />
                     </div>
@@ -751,7 +750,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                   >
                     <div className="flex-1 min-w-0 flex items-center gap-2">
                       <MapLinkWithPreview mapname={record.map}>
-                        {validatePlayerName(record.map)}
+                        {record.map}
                       </MapLinkWithPreview>
                       <StageBadge stage={record.stage} />
                     </div>
