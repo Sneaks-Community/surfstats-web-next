@@ -159,6 +159,16 @@ export function getThemeConfig() {
   return cachedThemeConfig;
 }
 
+const SHADES = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950] as const;
+
+/** `--color-<name>` (shade 500) plus one variable per shade. */
+function scaleVars(name: string, palette: Record<string, string>): string {
+  return [
+    `  --color-${name}: ${palette[500]};`,
+    ...SHADES.map((shade) => `  --color-${name}-${shade}: ${palette[shade]};`),
+  ].join('\n');
+}
+
 /**
  * Generate CSS for theme colors
  */
@@ -177,31 +187,9 @@ export function generateThemeStyles(): string {
 /* Dark theme (default) */
 :root, .dark {
   color-scheme: dark;
-  --color-primary: ${primaryDark[500]};
-  --color-primary-50: ${primaryDark[50]};
-  --color-primary-100: ${primaryDark[100]};
-  --color-primary-200: ${primaryDark[200]};
-  --color-primary-300: ${primaryDark[300]};
-  --color-primary-400: ${primaryDark[400]};
-  --color-primary-500: ${primaryDark[500]};
-  --color-primary-600: ${primaryDark[600]};
-  --color-primary-700: ${primaryDark[700]};
-  --color-primary-800: ${primaryDark[800]};
-  --color-primary-900: ${primaryDark[900]};
-  --color-primary-950: ${primaryDark[950]};
+${scaleVars('primary', primaryDark)}
   
-  --color-secondary: ${secondaryDark[500]};
-  --color-secondary-50: ${secondaryDark[50]};
-  --color-secondary-100: ${secondaryDark[100]};
-  --color-secondary-200: ${secondaryDark[200]};
-  --color-secondary-300: ${secondaryDark[300]};
-  --color-secondary-400: ${secondaryDark[400]};
-  --color-secondary-500: ${secondaryDark[500]};
-  --color-secondary-600: ${secondaryDark[600]};
-  --color-secondary-700: ${secondaryDark[700]};
-  --color-secondary-800: ${secondaryDark[800]};
-  --color-secondary-900: ${secondaryDark[900]};
-  --color-secondary-950: ${secondaryDark[950]};
+${scaleVars('secondary', secondaryDark)}
   
   --color-background: ${bgDark[950]};
   --color-background-secondary: ${bgDark[900]};
@@ -223,31 +211,9 @@ export function generateThemeStyles(): string {
 /* Light theme */
 .light {
   color-scheme: light;
-  --color-primary: ${primaryLight[500]};
-  --color-primary-50: ${primaryLight[50]};
-  --color-primary-100: ${primaryLight[100]};
-  --color-primary-200: ${primaryLight[200]};
-  --color-primary-300: ${primaryLight[300]};
-  --color-primary-400: ${primaryLight[400]};
-  --color-primary-500: ${primaryLight[500]};
-  --color-primary-600: ${primaryLight[600]};
-  --color-primary-700: ${primaryLight[700]};
-  --color-primary-800: ${primaryLight[800]};
-  --color-primary-900: ${primaryLight[900]};
-  --color-primary-950: ${primaryLight[950]};
+${scaleVars('primary', primaryLight)}
   
-  --color-secondary: ${secondaryLight[500]};
-  --color-secondary-50: ${secondaryLight[50]};
-  --color-secondary-100: ${secondaryLight[100]};
-  --color-secondary-200: ${secondaryLight[200]};
-  --color-secondary-300: ${secondaryLight[300]};
-  --color-secondary-400: ${secondaryLight[400]};
-  --color-secondary-500: ${secondaryLight[500]};
-  --color-secondary-600: ${secondaryLight[600]};
-  --color-secondary-700: ${secondaryLight[700]};
-  --color-secondary-800: ${secondaryLight[800]};
-  --color-secondary-900: ${secondaryLight[900]};
-  --color-secondary-950: ${secondaryLight[950]};
+${scaleVars('secondary', secondaryLight)}
   
   --color-background: ${bgLight[50]};
   --color-background-secondary: ${bgLight[100]};
