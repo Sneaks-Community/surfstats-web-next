@@ -117,6 +117,46 @@ export interface TierDistributionRow {
 }
 
 /**
+ * Shared skeleton for every per-player cache: validate the SteamID, key it as
+ * `<key>:<steamid>`, and run {@link cachedFetch} under the lock. Resolves to
+ * `empty` on an invalid id or a failed fetch, which is never cached.
+ */
+function playerCachedFetch<T>({
+  steamid,
+  key,
+  label,
+  empty,
+  fetch,
+  expensive = false,
+  force,
+}: {
+  steamid: string;
+  key: string;
+  /** Names the data in log lines, e.g. "map times". */
+  label: string;
+  empty: T;
+  fetch: (validSteamId: string) => Promise<T>;
+  expensive?: boolean;
+  force?: boolean;
+}): Promise<T> {
+  const validSteamId = validateSteamId(steamid);
+  if (!validSteamId) {
+    logger.warn(`[PlayerProfileCache] Invalid SteamID for ${label}: ${steamid}`);
+    return Promise.resolve(empty);
+  }
+
+  return cachedFetch<T>(`${key}:${validSteamId}`, PLAYER_PROFILE_TTL, () => fetch(validSteamId), {
+    lock: true,
+    expensive,
+    force,
+    onError: (error) => {
+      logger.error(`[PlayerProfileCache] Failed to fetch ${label} for ${validSteamId}: ${getErrorMessage(error)}`);
+      return empty;
+    },
+  });
+}
+
+/**
  * Cheap player overview for the server-rendered Overview tab.
  *
  * Returns basic player info, the global rank, and per-section completion counts
@@ -131,18 +171,15 @@ export interface TierDistributionRow {
  * @returns Overview data, or null if the SteamID is invalid / player not found
  */
 export async function getPlayerOverviewFromCache(steamid: string, { force }: RefreshOptions = {}): Promise<PlayerOverview | null> {
-  const validSteamId = validateSteamId(steamid);
-  if (!validSteamId) {
-    logger.warn(`[PlayerProfileCache] Invalid SteamID for overview: ${steamid}`);
-    return null;
-  }
-
   // A null overview (player not found / query error) is never cached, so
   // subsequent requests keep retrying rather than pinning the absence.
-  const overview = await cachedFetch<PlayerOverview | null>(
-    `${PLAYER_OVERVIEW_KEY}:${validSteamId}`,
-    PLAYER_PROFILE_TTL,
-    async () => {
+  const overview = await playerCachedFetch<PlayerOverview | null>({
+    steamid,
+    key: PLAYER_OVERVIEW_KEY,
+    label: 'overview',
+    empty: null,
+    force,
+    fetch: async (validSteamId) => {
       const [playerRows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT
@@ -184,22 +221,14 @@ export async function getPlayerOverviewFromCache(steamid: string, { force }: Ref
 
       return { player, counts };
     },
-    {
-      lock: true,
-      force,
-      onError: (error) => {
-        logger.error(`[PlayerProfileCache] Failed to fetch overview for ${validSteamId}: ${getErrorMessage(error)}`);
-        return null;
-      },
-    }
-  );
+  });
 
   // Every profile view calls this, and nothing else does, so it is where the warm
   // set is fed. Recorded only for a player that exists: recording first let a
   // sweep of made-up numeric ids evict all 100 real profiles. Skipped on a forced
   // refresh: that is the warmer itself, and re-recording would keep the same 100
   // profiles in the set forever.
-  if (!force && overview) recordProfileView(validSteamId);
+  if (!force && overview) recordProfileView(overview.player.steamid);
   return overview;
 }
 
@@ -218,16 +247,13 @@ export async function getPlayerOverviewFromCache(steamid: string, { force }: Ref
  * @returns One point per completed map that has a WR time (empty on invalid id / error)
  */
 export async function getPlayerWrPerformanceFromCache(steamid: string, { force }: RefreshOptions = {}): Promise<PlayerWrPerformancePoint[]> {
-  const validSteamId = validateSteamId(steamid);
-  if (!validSteamId) {
-    logger.warn(`[PlayerProfileCache] Invalid SteamID for WR performance: ${steamid}`);
-    return [];
-  }
-
-  return cachedFetch<PlayerWrPerformancePoint[]>(
-    `${PLAYER_WR_PERF_KEY}:${validSteamId}`,
-    PLAYER_PROFILE_TTL,
-    async () => {
+  return playerCachedFetch<PlayerWrPerformancePoint[]>({
+    steamid,
+    key: PLAYER_WR_PERF_KEY,
+    label: 'WR performance',
+    empty: [],
+    force,
+    fetch: async (validSteamId) => {
       const [rows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT pt.mapname, pt.runtimepro, pt.date
@@ -258,15 +284,7 @@ export async function getPlayerWrPerformanceFromCache(steamid: string, { force }
 
       return points;
     },
-    {
-      lock: true,
-      force,
-      onError: (error) => {
-        logger.error(`[PlayerProfileCache] Failed to fetch WR performance for ${validSteamId}: ${getErrorMessage(error)}`);
-        return [];
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -280,16 +298,13 @@ export async function getPlayerWrPerformanceFromCache(steamid: string, { force }
  * @returns Full map-times list (empty on invalid id / error)
  */
 export async function getPlayerMapTimesFromCache(steamid: string): Promise<PlayerMapTime[]> {
-  const validSteamId = validateSteamId(steamid);
-  if (!validSteamId) {
-    logger.warn(`[PlayerProfileCache] Invalid SteamID for map times: ${steamid}`);
-    return [];
-  }
-
-  return cachedFetch<PlayerMapTime[]>(
-    `${PLAYER_MAP_TIMES_KEY}:${validSteamId}`,
-    PLAYER_PROFILE_TTL,
-    async () => {
+  return playerCachedFetch<PlayerMapTime[]>({
+    steamid,
+    key: PLAYER_MAP_TIMES_KEY,
+    label: 'map times',
+    empty: [],
+    expensive: true,
+    fetch: async (validSteamId) => {
       const allMapMetadata = await getAllMapMetadataFromCache();
 
       const [maps] = await withTimeout(
@@ -321,15 +336,7 @@ export async function getPlayerMapTimesFromCache(steamid: string): Promise<Playe
 
       return tiered as PlayerMapTime[];
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.error(`[PlayerProfileCache] Failed to fetch map times for ${validSteamId}: ${getErrorMessage(error)}`);
-        return [];
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -341,16 +348,13 @@ export async function getPlayerMapTimesFromCache(steamid: string): Promise<Playe
  * @returns Full bonus-times list (empty on invalid id / error)
  */
 export async function getPlayerBonusTimesFromCache(steamid: string): Promise<PlayerBonusTime[]> {
-  const validSteamId = validateSteamId(steamid);
-  if (!validSteamId) {
-    logger.warn(`[PlayerProfileCache] Invalid SteamID for bonus times: ${steamid}`);
-    return [];
-  }
-
-  return cachedFetch<PlayerBonusTime[]>(
-    `${PLAYER_BONUS_TIMES_KEY}:${validSteamId}`,
-    PLAYER_PROFILE_TTL,
-    async () => {
+  return playerCachedFetch<PlayerBonusTime[]>({
+    steamid,
+    key: PLAYER_BONUS_TIMES_KEY,
+    label: 'bonus times',
+    empty: [],
+    expensive: true,
+    fetch: async (validSteamId) => {
       const [bonuses] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT
@@ -370,15 +374,7 @@ export async function getPlayerBonusTimesFromCache(steamid: string): Promise<Pla
 
       return bonuses as PlayerBonusTime[];
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.error(`[PlayerProfileCache] Failed to fetch bonus times for ${validSteamId}: ${getErrorMessage(error)}`);
-        return [];
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -390,16 +386,13 @@ export async function getPlayerBonusTimesFromCache(steamid: string): Promise<Pla
  * @returns Full stage-times list (empty on invalid id / error)
  */
 export async function getPlayerStageTimesFromCache(steamid: string): Promise<PlayerStageTime[]> {
-  const validSteamId = validateSteamId(steamid);
-  if (!validSteamId) {
-    logger.warn(`[PlayerProfileCache] Invalid SteamID for stage times: ${steamid}`);
-    return [];
-  }
-
-  return cachedFetch<PlayerStageTime[]>(
-    `${PLAYER_STAGE_TIMES_KEY}:${validSteamId}`,
-    PLAYER_PROFILE_TTL,
-    async () => {
+  return playerCachedFetch<PlayerStageTime[]>({
+    steamid,
+    key: PLAYER_STAGE_TIMES_KEY,
+    label: 'stage times',
+    empty: [],
+    expensive: true,
+    fetch: async (validSteamId) => {
       const [stages] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT
@@ -419,15 +412,7 @@ export async function getPlayerStageTimesFromCache(steamid: string): Promise<Pla
 
       return stages as PlayerStageTime[];
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.error(`[PlayerProfileCache] Failed to fetch stage times for ${validSteamId}: ${getErrorMessage(error)}`);
-        return [];
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -440,16 +425,12 @@ export async function getPlayerStageTimesFromCache(steamid: string): Promise<Pla
  * @returns Incomplete-maps list (empty on invalid id / error)
  */
 export async function getIncompleteMapsFromCache(steamid: string): Promise<IncompleteMap[]> {
-  const validSteamId = validateSteamId(steamid);
-  if (!validSteamId) {
-    logger.warn(`[PlayerProfileCache] Invalid SteamID for incomplete maps: ${steamid}`);
-    return [];
-  }
-
-  return cachedFetch<IncompleteMap[]>(
-    `${PLAYER_INCOMPLETE_MAPS_KEY}:${validSteamId}`,
-    PLAYER_PROFILE_TTL,
-    async () => {
+  return playerCachedFetch<IncompleteMap[]>({
+    steamid,
+    key: PLAYER_INCOMPLETE_MAPS_KEY,
+    label: 'incomplete maps',
+    empty: [],
+    fetch: async (validSteamId) => {
       const [rows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT mapname
@@ -473,14 +454,7 @@ export async function getIncompleteMapsFromCache(steamid: string): Promise<Incom
           mapType: isStagedMap(m) ? 'staged' : 'linear',
         }));
     },
-    {
-      lock: true,
-      onError: (error) => {
-        logger.error(`[PlayerProfileCache] Failed to fetch incomplete maps for ${validSteamId}: ${getErrorMessage(error)}`);
-        return [];
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -492,16 +466,13 @@ export async function getIncompleteMapsFromCache(steamid: string): Promise<Incom
  * @returns Incomplete-bonuses list (empty on invalid id / error)
  */
 export async function getIncompleteBonusesFromCache(steamid: string): Promise<IncompleteBonus[]> {
-  const validSteamId = validateSteamId(steamid);
-  if (!validSteamId) {
-    logger.warn(`[PlayerProfileCache] Invalid SteamID for incomplete bonuses: ${steamid}`);
-    return [];
-  }
-
-  return cachedFetch<IncompleteBonus[]>(
-    `${PLAYER_INCOMPLETE_BONUSES_KEY}:${validSteamId}`,
-    PLAYER_PROFILE_TTL,
-    async () => {
+  return playerCachedFetch<IncompleteBonus[]>({
+    steamid,
+    key: PLAYER_INCOMPLETE_BONUSES_KEY,
+    label: 'incomplete bonuses',
+    empty: [],
+    expensive: true,
+    fetch: async (validSteamId) => {
       const [rows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT
@@ -531,15 +502,7 @@ export async function getIncompleteBonusesFromCache(steamid: string): Promise<In
           wr_time: r.wr_time,
         }));
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.error(`[PlayerProfileCache] Failed to fetch incomplete bonuses for ${validSteamId}: ${getErrorMessage(error)}`);
-        return [];
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -564,16 +527,13 @@ export async function getIncompleteBonusesFromCache(steamid: string): Promise<In
  * @returns Incomplete-stages list (empty on invalid id / error)
  */
 export async function getIncompleteStagesFromCache(steamid: string): Promise<IncompleteStage[]> {
-  const validSteamId = validateSteamId(steamid);
-  if (!validSteamId) {
-    logger.warn(`[PlayerProfileCache] Invalid SteamID for incomplete stages: ${steamid}`);
-    return [];
-  }
-
-  return cachedFetch<IncompleteStage[]>(
-    `${PLAYER_INCOMPLETE_STAGES_KEY}:${validSteamId}`,
-    PLAYER_PROFILE_TTL,
-    async () => {
+  return playerCachedFetch<IncompleteStage[]>({
+    steamid,
+    key: PLAYER_INCOMPLETE_STAGES_KEY,
+    label: 'incomplete stages',
+    empty: [],
+    expensive: true,
+    fetch: async (validSteamId) => {
       const [rows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT all_stages.map, all_stages.stage
@@ -604,15 +564,7 @@ export async function getIncompleteStagesFromCache(steamid: string): Promise<Inc
           stage: r.stage,
         }));
     },
-    {
-      lock: true,
-      expensive: true,
-      onError: (error) => {
-        logger.error(`[PlayerProfileCache] Failed to fetch incomplete stages for ${validSteamId}: ${getErrorMessage(error)}`);
-        return [];
-      },
-    }
-  );
+  });
 }
 
 /**
@@ -625,16 +577,14 @@ export async function getIncompleteStagesFromCache(steamid: string): Promise<Inc
  * @returns Per-tier rows (empty on invalid id / error)
  */
 export async function getLinearVsStagedPerTierFromCache(steamid: string, { force }: RefreshOptions = {}): Promise<TierDistributionRow[]> {
-  const validSteamId = validateSteamId(steamid);
-  if (!validSteamId) {
-    logger.warn(`[PlayerProfileCache] Invalid SteamID for tier distribution: ${steamid}`);
-    return [];
-  }
-
-  return cachedFetch<TierDistributionRow[]>(
-    `${PLAYER_TIER_DIST_KEY}:${validSteamId}`,
-    PLAYER_PROFILE_TTL,
-    async () => {
+  return playerCachedFetch<TierDistributionRow[]>({
+    steamid,
+    key: PLAYER_TIER_DIST_KEY,
+    label: 'tier distribution',
+    empty: [],
+    force,
+    expensive: true,
+    fetch: async (validSteamId) => {
       const [rows] = await withTimeout(
         pool.query<RowDataPacket[]>(`
           SELECT
@@ -661,15 +611,6 @@ export async function getLinearVsStagedPerTierFromCache(steamid: string, { force
         staged: Number(row.staged) || 0,
       }));
     },
-    {
-      lock: true,
-      force,
-      expensive: true,
-      onError: (error) => {
-        logger.error(`[PlayerProfileCache] Failed to fetch tier distribution for ${validSteamId}: ${getErrorMessage(error)}`);
-        return [];
-      },
-    }
-  );
+  });
 }
 
