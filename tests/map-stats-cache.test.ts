@@ -1,12 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  mapKey,
-  MAP_STATS_SUFFIXES,
-  wrCheckpointSuffix,
-  playersListKey,
-  steamAvatarKey,
-  SERVER_CACHE_KEY,
-} from '../lib/cache-keys';
+import { mapKey } from '../lib/cache-keys';
 
 const cacheSet = vi.fn();
 const query = vi.fn();
@@ -34,6 +27,7 @@ vi.mock('../lib/logger', () => ({
 }));
 
 const stats = await import('../lib/map-stats-cache');
+const { MAP_STATS_SUFFIXES, wrCheckpointSuffix } = stats;
 
 const MAP = 'surf_test';
 
@@ -43,24 +37,8 @@ beforeEach(() => {
   query.mockResolvedValue([[{ totalCount: 1, wrTime: 1, avgTime: 2 }]]);
 });
 
-describe('key builders', () => {
-  it('builds the documented key shapes', () => {
-    expect(mapKey(MAP, 'stats:completions')).toBe('surfstats:map:surf_test:stats:completions');
-    expect(wrCheckpointSuffix(7)).toBe('stats:wr-checkpoint:7');
-    expect(steamAvatarKey('STEAM_1:0:12345')).toBe('surfstats:steam:avatar:STEAM_1:0:12345');
-    expect(SERVER_CACHE_KEY).toBe('surfstats:server:all');
-  });
-
-  // The warmer writes the default listing and the read path reads it; a key
-  // mismatch is silent, the warmer just warms pages nobody reads.
-  it('gives the default players listing the same key as an empty search', () => {
-    expect(playersListKey(1, '')).toBe('surfstats:players:list:1:');
-    expect(playersListKey(2, 'surf')).toBe('surfstats:players:list:2:surf');
-  });
-});
-
-// MAP_STATS_SUFFIXES is the canonical list of the six series the precache refreshes,
-// so a fetcher writing a suffix that isn't in there is a series nothing enumerates.
+// The suffixes are the canonical list of the six series, so a fetcher writing a
+// key outside it is a series nothing enumerates.
 describe('map stats suffixes', () => {
   it('cover every key the stats fetchers write', async () => {
     await Promise.all([

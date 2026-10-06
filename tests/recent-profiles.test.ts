@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { RECENT_PROFILES_KEY, RECENT_PROFILES_MAX } from '../lib/cache-keys';
 
 const zAdd = vi.fn();
 const zRemRangeByRank = vi.fn();
@@ -25,7 +24,9 @@ vi.mock('../lib/logger', () => ({
   default: { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-const { recordProfileView, listRecentProfiles } = await import('../lib/recent-profiles');
+const { recordProfileView, listRecentProfiles, RECENT_PROFILES_KEY, RECENT_PROFILES_MAX } = await import(
+  '../lib/recent-profiles'
+);
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -13,7 +13,7 @@ export interface MapCachedFetchOptions<T> {
   mapname: string;
   /**
    * Key part appended after the `surfstats:map:<validMapname>:` prefix. Chart series
-   * use a suffix from `MAP_STATS_SUFFIXES` (`lib/cache-keys.ts`) rather than a literal.
+   * use a suffix from `MAP_STATS_SUFFIXES` (`lib/map-stats-cache.ts`) rather than a literal.
    */
   keySuffix: string;
   /** Cache TTL in seconds. */

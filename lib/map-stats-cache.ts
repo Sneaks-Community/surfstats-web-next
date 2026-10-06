@@ -7,12 +7,25 @@ import type { RowDataPacket } from 'mysql2';
 import { getMapMetadataFromCache } from './map-cache';
 import { isStagedMap } from './utils';
 import { validateMapName } from './validators';
-import { MAP_STATS_SUFFIXES, wrCheckpointSuffix } from './cache-keys';
 
 // TTL is the safety net, the 24h precache sweep is the freshness guarantee, so the
 // net has to be slacker: at 1x every map but the first in the sweep spent part of
 // each cycle expired, making its next visitor pay for six aggregates.
 const STATS_CACHE_TTL = 259200; // 72 hours = 3x the sweep interval
+
+/** Five of the six per-map chart series, one key each; the sixth is below. */
+export const MAP_STATS_SUFFIXES = {
+  completions: 'stats:completions',
+  timeOnMap: 'stats:time-on-map',
+  checkpoints: 'stats:checkpoints',
+  bonusTime: 'stats:bonus-time',
+  percentiles: 'stats:percentiles',
+} as const;
+
+/** WR checkpoint times are keyed per checkpoint count, so this one is a function. */
+export function wrCheckpointSuffix(maxCheckpoint: number): string {
+  return `stats:wr-checkpoint:${maxCheckpoint}`;
+}
 
 // Every fetcher here aggregates over ck_playertimes/ck_checkpoints/ck_bonus, so all
 // of them pass `expensive: true`; otherwise the precache floods the 20-connection

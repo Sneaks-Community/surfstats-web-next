@@ -7,8 +7,15 @@ import type { SearchQuery } from './validators';
 import { ITEMS_PER_PAGE } from './utils';
 import { cachedFetch } from './cached-fetch';
 import { cacheSet } from './valkey-cache';
-import { playersListKey, PLAYERS_LIST_TTL } from './cache-keys';
 import { getErrorCode, getErrorMessage } from './errors';
+
+// The read path and the background warmer must agree exactly.
+const PLAYERS_LIST_TTL = 3600; // 1 hour
+
+/** `search` is the sanitized term; the default (no-search) listing passes `''`. */
+function playersListKey(page: number, search: string): string {
+  return `surfstats:players:list:${page}:${search}`;
+}
 
 /**
  * Player rank data from database

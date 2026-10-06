@@ -1,8 +1,12 @@
 import 'server-only';
 import client from './valkey';
 import logger from './logger';
-import { RECENT_PROFILES_KEY, RECENT_PROFILES_MAX } from './cache-keys';
 import { getErrorMessage } from './errors';
+
+// A capped sorted set: written by the profile read path, read by the warmer, which
+// keeps exactly these profiles' keys fresh.
+export const RECENT_PROFILES_KEY = 'surfstats:player:recent';
+export const RECENT_PROFILES_MAX = 100;
 
 /**
  * Record a profile view in the capped recently-viewed set.

@@ -1,7 +1,6 @@
 import 'server-only';
 import logger from '@/lib/logger';
 import { cacheGetMany, cacheSetMany } from './valkey-cache';
-import { steamAvatarKey, STEAM_AVATAR_TTL } from './cache-keys';
 import { getErrorMessage } from './errors';
 
 /**
@@ -38,6 +37,11 @@ export interface SteamAvatarSet {
 
 /** Steam's documented cap for `GetPlayerSummaries`; more IDs are silently dropped. */
 const STEAM_IDS_PER_REQUEST = 100;
+const STEAM_AVATAR_TTL = 86400; // 1 day: players change avatars often
+
+function steamAvatarKey(steamId: string): string {
+  return `surfstats:steam:avatar:${steamId}`;
+}
 /** Cached for IDs Steam omits (deleted accounts), so they are not re-asked every render. */
 const NO_AVATAR: SteamAvatarSet = { avatar: '', avatarmedium: '', avatarfull: '' };
 
