@@ -1,6 +1,5 @@
 import Link from '@/components/Link';
 import { getCountryPlayers, getCountryPlayerCount } from '@/lib/country-cache';
-import { PLAYERS_PAGE_SIZE } from '@/lib/player-cache';
 import type { PlayerSortKey } from '@/lib/country-cache';
 import { getSteamProfilesFromCache } from '@/lib/steam';
 import { isValidCountryCode, getPrimaryCountryName } from '@/lib/countries';
@@ -10,7 +9,7 @@ import PlayerListTable from '@/components/PlayerListTable';
 import PlayersTableSkeleton from '@/components/PlayersTableSkeleton';
 import { SkeletonScreen } from '@/components/Skeleton';
 import { NavigationPendingProvider, PendingContent } from '@/components/NavigationPending';
-import { parseIntParam, type SortDirection } from '@/lib/utils';
+import { ITEMS_PER_PAGE, parseIntParam, type SortDirection } from '@/lib/utils';
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
 
@@ -49,7 +48,7 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
   // Clamp before the cache key / RANK() OFFSET, using this country's own count
   // so the ceiling matches `totalPages` from the same filter.
   const countryPlayerCount = await getCountryPlayerCount(countryCode);
-  const pageCeiling = Math.max(1, Math.ceil(countryPlayerCount / PLAYERS_PAGE_SIZE));
+  const pageCeiling = Math.max(1, Math.ceil(countryPlayerCount / ITEMS_PER_PAGE));
   const page = parseIntParam(pageParam, { max: pageCeiling });
 
   // Validate and parse sort parameters
@@ -64,7 +63,7 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
   const { players, total, totalPages, countryName } = await getCountryPlayers(
     countryCode,
     page,
-    PLAYERS_PAGE_SIZE,
+    ITEMS_PER_PAGE,
     validatedSort,
     validatedOrder
   );

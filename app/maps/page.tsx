@@ -7,7 +7,7 @@ import MapsGridSkeleton from '@/components/MapsGridSkeleton';
 import { SkeletonScreen } from '@/components/Skeleton';
 import { NavigationPendingProvider, PendingContent } from '@/components/NavigationPending';
 import { getTierColor } from '@/lib/tierColors';
-import { mapImageUrl, getMapImagesUrl, parseIntParam } from '@/lib/utils';
+import { mapImageUrl, getMapImagesUrl, parseIntParam, ITEMS_PER_PAGE } from '@/lib/utils';
 import Pagination from '@/components/Pagination';
 import { isStagedMap, type MapMetadata } from '@/lib/map-cache';
 import { getAllMapMetadataFromCache, getTierDistributionFromCache } from '@/lib/map-cache';
@@ -87,12 +87,11 @@ export default async function MapsPage({
 
   // Apply pagination. The filtered set is in memory, so clamp against the real
   // page count: an out-of-range `?page=` shows the last page, not an empty grid.
-  const limit = 20;
   const total = filteredMaps.length;
-  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
   const page = Math.min(requestedPage, totalPages);
-  const offset = (page - 1) * limit;
-  const paginatedMaps = filteredMaps.slice(offset, offset + limit);
+  const offset = (page - 1) * ITEMS_PER_PAGE;
+  const paginatedMaps = filteredMaps.slice(offset, offset + ITEMS_PER_PAGE);
 
   // Get filter options from cache
   const tierDistribution = await getTierDistributionFromCache();
@@ -123,7 +122,7 @@ export default async function MapsPage({
       {/* Pagination navigates through the provider, which shows the skeleton
           instantly. loading.tsx only covers the initial route load. */}
       <NavigationPendingProvider>
-        <PendingContent className="space-y-6" fallback={<SkeletonScreen label="Loading maps..."><MapsGridSkeleton count={paginatedMaps.length || limit} /></SkeletonScreen>}>
+        <PendingContent className="space-y-6" fallback={<SkeletonScreen label="Loading maps..."><MapsGridSkeleton count={paginatedMaps.length || ITEMS_PER_PAGE} /></SkeletonScreen>}>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {paginatedMaps.map((map) => {
               const tierColor = getTierColor(map.tier);

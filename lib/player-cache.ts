@@ -4,6 +4,7 @@ import type { RowDataPacket } from 'mysql2';
 import logger from '@/lib/logger';
 import { getPlayerCountFromCache } from '@/lib/registry-cache';
 import type { SearchQuery } from './validators';
+import { ITEMS_PER_PAGE } from './utils';
 import { cachedFetch } from './cached-fetch';
 import { cacheSet } from './valkey-cache';
 import { playersListKey, PLAYERS_LIST_TTL } from './cache-keys';
@@ -47,19 +48,14 @@ export interface PlayersResult {
   totalPages: number;
 }
 
-/** Rows per page in every player listing. Read path, warmer and clamping share it. */
-export const PLAYERS_PAGE_SIZE = 20;
-
 /**
  * Page-number ceiling from the cached player count. Page routes clamp `?page=`
  * against this before calling the cache functions, so an out-of-range value
  * can't mint a fresh key or a huge OFFSET.
- *
- * @param pageSize - Rows per page (defaults to {@link PLAYERS_PAGE_SIZE})
  */
 export async function getPlayerPageCeiling(): Promise<number> {
   const total = await getPlayerCountFromCache();
-  return Math.max(1, Math.ceil(total / PLAYERS_PAGE_SIZE));
+  return Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
 }
 
 /**
@@ -73,7 +69,7 @@ async function fetchPlayersInternal(
 ): Promise<PlayersResult> {
   logger.debug(`[PlayerCache] Fetching players list (page: ${page}, search: "${sanitizedSearch || 'none'}")`);
 
-  const limit = PLAYERS_PAGE_SIZE;
+  const limit = ITEMS_PER_PAGE;
   const offset = (page - 1) * limit;
 
   // Use window function for rank calculation (much more efficient than correlated subquery)
@@ -188,7 +184,7 @@ export async function getPlayersFromCache(
  * query. Called on an interval by the players-list background refresh.
  */
 export async function warmPlayersListCache(pageCount: number): Promise<void> {
-  const pageSize = PLAYERS_PAGE_SIZE;
+  const pageSize = ITEMS_PER_PAGE;
   const k = Math.max(1, pageCount) * pageSize;
 
   const [rows] = await pool.query<PlayerRank[]>(

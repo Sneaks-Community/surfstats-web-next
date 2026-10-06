@@ -8,7 +8,7 @@ import SortableTableHeader from '@/components/SortableTableHeader';
 import CountriesTableSkeleton from '@/components/CountriesTableSkeleton';
 import { SkeletonScreen } from '@/components/Skeleton';
 import { NavigationPendingProvider, PendingContent } from '@/components/NavigationPending';
-import { parseIntParam, type SortDirection } from '@/lib/utils';
+import { ITEMS_PER_PAGE, parseIntParam, type SortDirection } from '@/lib/utils';
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
@@ -17,7 +17,6 @@ export const metadata: Metadata = {
 };
 
 const BASE_URL = '/players/countries/list';
-const COUNTRIES_PER_PAGE = 20;
 
 export default async function CountriesListPage({
   searchParams,
@@ -46,10 +45,10 @@ export default async function CountriesListPage({
   ]);
 
   const sorted = sortCountries(ranking, validatedSort, validatedOrder);
-  const totalPages = Math.max(1, Math.ceil(sorted.length / COUNTRIES_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ITEMS_PER_PAGE));
   const page = parseIntParam(params.page, { max: totalPages });
-  const offset = (page - 1) * COUNTRIES_PER_PAGE;
-  const countries = sorted.slice(offset, offset + COUNTRIES_PER_PAGE);
+  const offset = (page - 1) * ITEMS_PER_PAGE;
+  const countries = sorted.slice(offset, offset + ITEMS_PER_PAGE);
 
   // Build query params for pagination
   const queryParams: Record<string, string> = {};
