@@ -38,6 +38,9 @@ export interface SteamAvatarSet {
 
 /** Steam's documented cap for `GetPlayerSummaries`; more IDs are silently dropped. */
 const STEAM_IDS_PER_REQUEST = 100;
+/** Steam omits deleted accounts; ask again daily, not on every render. */
+const STEAM_MISS_TTL = 86400;
+const NO_AVATAR: SteamAvatarSet = { avatar: '', avatarmedium: '', avatarfull: '' };
 
 /**
  * Strip the API key out of anything about to be logged.
@@ -54,20 +57,20 @@ function redactApiKey(message: string): string {
  * Fetch player data directly from Steam API
  * This is the core function that makes the actual Steam API call
  * @param steamId64s - Array of SteamID64 values to fetch
- * @returns Array of Steam player data or empty array on error
+ * @returns Steam player data, or null when Steam failed or no key is set
  */
-async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]> {
+async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[] | null> {
   const startTime = Date.now();
   const apiKey = process.env.STEAM_API_KEY;
 
   if (!apiKey) {
     logger.error('[Steam API] STEAM_API_KEY not configured');
-    return [];
+    return null;
   }
 
   if (steamId64s.length > STEAM_IDS_PER_REQUEST) {
     logger.error(`[Steam API] Refusing to request ${steamId64s.length} IDs in one call (max ${STEAM_IDS_PER_REQUEST}); caller must chunk`);
-    return [];
+    return null;
   }
 
   try {
@@ -85,7 +88,7 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
       } else {
         logger.error(`[Steam API] API request failed with status ${response.status} after ${duration}ms`);
       }
-      return [];
+      return null;
     }
 
     const data: SteamWrapperResponse = await response.json();
@@ -111,7 +114,7 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
       logger.error(`[Steam API] Error fetching data after ${duration}ms: ${errorMessage}`);
     }
     
-    return [];
+    return null;
   }
 }
 
@@ -171,7 +174,8 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
         chunks.push(uncachedSteamId64s.slice(i, i + STEAM_IDS_PER_REQUEST));
       }
 
-      const players = (await Promise.all(chunks.map(fetchSteamPlayerData))).flat();
+      const answers = await Promise.all(chunks.map(fetchSteamPlayerData));
+      const players = answers.flatMap((answer) => answer ?? []);
 
       const toCache: Array<{ key: string; value: SteamAvatarSet }> = [];
       for (const player of players) {
@@ -187,8 +191,18 @@ export async function getSteamProfilesFromCache(steamIds: string[]): Promise<Map
         }
       }
 
+      // Only answered chunks: a failed call proves nothing about its IDs.
+      const misses = chunks
+        .filter((_, i) => answers[i] !== null)
+        .flat()
+        .flatMap((id64) => {
+          const steamId = uncachedSteamId64Map.get(id64);
+          return steamId && !result.has(steamId) ? [{ key: steamAvatarKey(steamId), value: NO_AVATAR }] : [];
+        });
+
       // Pipelined, for the same reason the reads are.
       await cacheSetMany(toCache, STEAM_AVATAR_TTL);
+      await cacheSetMany(misses, STEAM_MISS_TTL);
     }
 
     const duration = Date.now() - startTime;

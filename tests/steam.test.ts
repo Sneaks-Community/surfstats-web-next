@@ -187,6 +187,33 @@ describe('getSteamProfilesFromCache', () => {
     );
   });
 
+  // Steam omits deleted accounts; without this every render asks again.
+  it('caches an empty avatar set for IDs Steam answered without', async () => {
+    process.env.STEAM_API_KEY = 'test-key';
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ response: { players: [] } }),
+    } as unknown as Response);
+
+    await getSteamProfilesFromCache(['STEAM_1:0:12345']);
+
+    expect(cacheSetMany).toHaveBeenCalledWith(
+      [{ key: 'surfstats:steam:avatar:STEAM_1:0:12345', value: { avatar: '', avatarmedium: '', avatarfull: '' } }],
+      86400
+    );
+  });
+
+  it('caches nothing when Steam fails or no key is set', async () => {
+    process.env.STEAM_API_KEY = 'test-key';
+    vi.mocked(fetch).mockResolvedValue({ ok: false, status: 503 } as unknown as Response);
+    await getSteamProfilesFromCache(['STEAM_1:0:12345']);
+
+    delete process.env.STEAM_API_KEY;
+    await getSteamProfilesFromCache(['STEAM_1:0:12345']);
+
+    for (const [entries] of cacheSetMany.mock.calls) expect(entries).toEqual([]);
+  });
+
   // The key is in the query string, so a Next data-cache entry would persist a
   // live credential in .next/cache.
   it('opts out of the Next data cache so the key never lands on disk', async () => {
