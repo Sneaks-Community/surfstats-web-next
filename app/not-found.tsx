@@ -1,11 +1,7 @@
 import Link from '@/components/Link';
 
-/**
- * Root 404 boundary. Rendered by `notFound()` from anywhere in the tree and by
- * Next for unmatched routes, with a real HTTP 404 status. The pages that used
- * to inline their own "not found" markup returned 200, which search engines
- * index as soft 404s.
- */
+/** Root 404 for `notFound()` anywhere and unmatched routes, with a real 404 status; inline "not
+ * found" markup would return 200, which search engines index as a soft 404. */
 export default function NotFound() {
   return (
     <div className="text-center py-20 bg-surface border border-border rounded-xl">

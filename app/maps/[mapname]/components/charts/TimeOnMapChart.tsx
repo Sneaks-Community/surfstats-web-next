@@ -30,7 +30,7 @@ ChartJS.register(
 
 interface TimeOnMapData {
   date: string;
-  totalDuration: number; // in seconds
+  totalDuration: number; // cumulative hours
 }
 
 interface TimeOnMapChartProps {
@@ -58,7 +58,7 @@ const formatHoursDetailed = (hours: number): string => {
 };
 
 const formatDate = (date: string): string => {
-  // Input: "2017-10-01" → Output: "10/2017"
+  // "2017-10-01" → "10/2017"
   const [year, month] = date.split('-');
   return `${month}/${year}`;
 };
@@ -127,8 +127,7 @@ export default function TimeOnMapChart({ data }: TimeOnMapChartProps) {
           minRotation: 0,
           autoSkip: true,
           maxTicksLimit: 12,
-          // Without a real gap autoSkip packs "MM/YYYY" labels edge to edge and
-          // they collide on narrow screens.
+          // Otherwise autoSkip packs "MM/YYYY" labels edge to edge; they collide on narrow screens.
           autoSkipPadding: 14,
         },
       },

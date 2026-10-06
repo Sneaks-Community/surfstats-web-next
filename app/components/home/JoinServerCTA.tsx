@@ -1,12 +1,8 @@
 import Link from '@/components/Link';
 import { Play } from 'lucide-react';
 
-/**
- * Prominent "Play Now" call to action. Links to the Servers page — the clearest
- * path into the game — where players can pick a server and one-click join.
- * Deliberately renders NO player counts here, so the front page entices without
- * implying the servers are empty.
- */
+/** Links to /servers, where players pick a server and join in one click. Deliberately shows no
+ * player counts, so the front page never implies the servers are empty. */
 export default function JoinServerCTA() {
   return (
     <Link

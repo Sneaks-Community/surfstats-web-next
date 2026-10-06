@@ -1,9 +1,7 @@
 @import "tailwindcss";
 
-/* Theme System - Define Tailwind utility classes that use CSS custom properties */
-/* The actual color values are injected by lib/theme-config.ts based on environment variables */
+/* Tailwind tokens over CSS vars whose values lib/theme-config.ts injects from env. */
 @theme {
-  /* Primary color shades */
   --color-primary: var(--color-primary);
   --color-primary-50: var(--color-primary-50);
   --color-primary-100: var(--color-primary-100);
@@ -17,7 +15,6 @@
   --color-primary-900: var(--color-primary-900);
   --color-primary-950: var(--color-primary-950);
   
-  /* Secondary color shades */
   --color-secondary: var(--color-secondary);
   --color-secondary-50: var(--color-secondary-50);
   --color-secondary-100: var(--color-secondary-100);
@@ -31,33 +28,26 @@
   --color-secondary-900: var(--color-secondary-900);
   --color-secondary-950: var(--color-secondary-950);
   
-  /* Background colors */
   --color-background: var(--color-background);
   --color-background-secondary: var(--color-background-secondary);
   --color-background-tertiary: var(--color-background-tertiary);
   
-  /* Surface/card colors */
   --color-surface: var(--color-surface);
   --color-surface-hover: var(--color-surface-hover);
   --color-surface-active: var(--color-surface-active);
   
-  /* Border colors */
   --color-border: var(--color-border);
   --color-border-hover: var(--color-border-hover);
   --color-border-focus: var(--color-border-focus);
   
-  /* Text colors */
   --color-text: var(--color-text);
   --color-text-muted: var(--color-text-muted);
   --color-text-placeholder: var(--color-text-placeholder);
   
-  /* Animation */
   --animate-barber-pole: barber-pole 4s linear infinite;
 }
 
-/* Step 1: Background Enhancements */
-
-/* 1.1 Radial Gradient Background - Creates depth with subtle gradient */
+/* Subtle radial gradient for depth. */
 .bg-gradient-radial {
   background: radial-gradient(
     ellipse at center,
@@ -66,7 +56,7 @@
   );
 }
 
-/* 1.2 Subtle Grid Pattern Overlay - Adds texture with low opacity */
+/* Low-opacity grid texture. */
 .grid-pattern {
   background-image:
     linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
@@ -74,7 +64,7 @@
   background-size: 40px 40px;
 }
 
-/* Light mode grid pattern - uses darker color for visibility on light backgrounds */
+/* Darker lines on light backgrounds, where the white ones vanish. */
 .light .grid-pattern {
   background-image:
     linear-gradient(var(--color-border) 1px, transparent 1px),
@@ -82,7 +72,7 @@
   background-size: 40px 40px;
 }
 
-/* 1.3 Accent Glow Effects - Subtle colored glows using primary theme color */
+/* Subtle blurred glow in the primary theme color. */
 .glow-effect {
   position: relative;
 }
@@ -100,7 +90,7 @@
   filter: blur(40px);
 }
 
-/* Light mode glow effect - reduced opacity for better visibility on light backgrounds */
+/* Lower opacity reads better on light backgrounds. */
 .light .glow-effect::before {
   opacity: 0.06;
 }
@@ -110,10 +100,8 @@
   100% { background-position: 40px 0; }
 }
 
-/* Delayed reveal for loading skeletons — stays invisible for a short window so
-   fast (cached) navigations swap in real content before the skeleton is ever
-   seen, then fades in for genuinely slow loads. The reduced-motion rule below
-   collapses the fade to an instant appearance while preserving the delay. */
+/* Loading skeletons stay invisible briefly so fast (cached) navigations never show them, then fade
+   in. The reduced-motion rule below makes the fade instant but keeps the delay. */
 @keyframes skeleton-reveal {
   to { opacity: 1; }
 }
@@ -122,7 +110,6 @@
   animation: skeleton-reveal 150ms ease-in 150ms forwards;
 }
 
-/* Respect prefers-reduced-motion for accessibility */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -133,9 +120,8 @@
   }
 }
 
-/* Horizontal activity ticker (Latest Activity on the home page).
-   The track holds two identical sequences; sliding it left by exactly half its
-   width (one sequence) and looping gives a seamless, JS-free marquee. */
+/* Home page activity ticker: the track holds two identical sequences, so sliding it left by half
+   its width (one sequence) on loop is a seamless, JS-free marquee. */
 @keyframes ticker-scroll {
   from { transform: translateX(0); }
   to { transform: translateX(-50%); }
@@ -144,13 +130,12 @@
   animation: ticker-scroll var(--ticker-duration, 60s) linear infinite;
   will-change: transform;
 }
-/* Pause while the reader is hovering, so they can follow / click an item. */
+/* Paused on hover so readers can follow or click an item. */
 .ticker-viewport:hover .ticker-track {
   animation-play-state: paused;
 }
-/* Reduced motion: stop the slide entirely (overriding the global rule, which
-   would otherwise fast-forward the animation to its end and hide the first
-   copy), drop the duplicate, and let the strip scroll manually instead. */
+/* Reduced motion: no slide (the global rule would jump it to the end, hiding the first copy);
+   drop the duplicate and scroll manually instead. */
 @media (prefers-reduced-motion: reduce) {
   .ticker-track {
     animation: none !important;

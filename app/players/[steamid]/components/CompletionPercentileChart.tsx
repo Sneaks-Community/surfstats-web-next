@@ -43,9 +43,6 @@ interface CompletionPercentileChartProps {
   data: CompletionPercentileData[];
 }
 
-/**
- * Determine aggregation granularity based on time range
- */
 type AggregationGranularity = 'day' | 'week' | 'month' | 'quarter';
 
 const getGranularity = (earliestDate: Date, latestDate: Date): AggregationGranularity => {
@@ -58,9 +55,6 @@ const getGranularity = (earliestDate: Date, latestDate: Date): AggregationGranul
   return 'quarter';
 };
 
-/**
- * Format date based on granularity
- */
 const formatDateLabel = (dateInput: string | Date, granularity: AggregationGranularity): string => {
   let date: Date;
   if (dateInput instanceof Date) {
@@ -86,18 +80,12 @@ const formatDateLabel = (dateInput: string | Date, granularity: AggregationGranu
 const ymd = (date: Date): string =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-/**
- * Get color based on WR percentage
- */
 const getPointColor = (wrPercentage: number): string => {
   if (wrPercentage >= 95) return 'rgba(34, 197, 94, 1)';   // green-500
   if (wrPercentage >= 85) return 'rgba(234, 179, 8, 1)';   // yellow-500
   return 'rgba(239, 68, 68, 1)';                            // red-500
 };
 
-/**
- * Get moving average window size based on granularity
- */
 const getMovingAvgWindowSize = (granularity: AggregationGranularity): number => {
   switch (granularity) {
     case 'day': return 7;
@@ -111,11 +99,9 @@ export default function CompletionPercentileChart({ data }: CompletionPercentile
   const chartTheme = useChartTheme();
   const safeData = useMemo(() => {
     if (!Array.isArray(data)) return [];
-    // Sort by date ascending (oldest first)
     return [...data].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   }, [data]);
 
-  // Determine granularity and aggregate data
   const { granularity, aggregatedData } = useMemo(() => {
     if (safeData.length === 0) {
       return { granularity: 'day' as AggregationGranularity, aggregatedData: [], earliestDate: null, latestDate: null };
@@ -125,7 +111,6 @@ export default function CompletionPercentileChart({ data }: CompletionPercentile
     const latest = new Date(safeData[safeData.length - 1].date);
     const gran = getGranularity(earliest, latest);
     
-    // Aggregate based on granularity
     const dataMap = new Map<string, { total: number; count: number }>();
     
     for (const d of safeData) {
@@ -165,19 +150,17 @@ export default function CompletionPercentileChart({ data }: CompletionPercentile
       dataMap.set(key, current);
     }
     
-    // Convert to array and sort by date
     const result: AggregatedDataPoint[] = [];
     for (const [key, { total, count }] of dataMap) {
       result.push({ date: key, avgWR: total / count, count });
     }
-    // Every key shape is zero-padded and chronological as a string; quarter keys
-    // like "2024-Q1" are not parseable dates and sorted by NaN here.
+    // Compare as strings: keys are zero-padded and chronological, and "2024-Q1" quarter keys
+    // aren't parseable Dates (comparing them as dates gives NaN).
     result.sort((a, b) => a.date.localeCompare(b.date));
     
     return { granularity: gran, aggregatedData: result, earliestDate: earliest, latestDate: latest };
   }, [safeData]);
 
-  // Calculate moving average
   const movingAvg = useMemo(() => {
     if (aggregatedData.length === 0) return [];
     const windowSize = getMovingAvgWindowSize(granularity);
@@ -302,7 +285,6 @@ export default function CompletionPercentileChart({ data }: CompletionPercentile
     },
   }), [yMin, chartTheme]);
 
-  // Calculate summary stats
   const summaryStats = useMemo(() => {
     if (aggregatedData.length === 0) return null;
     const avgWR = aggregatedData.reduce((sum, d) => sum + d.avgWR, 0) / aggregatedData.length;
@@ -310,7 +292,7 @@ export default function CompletionPercentileChart({ data }: CompletionPercentile
     const worstWR = Math.min(...aggregatedData.map(d => d.avgWR));
     const latestWR = aggregatedData[aggregatedData.length - 1]?.avgWR || 0;
     
-    // Calculate trend (compare first half avg to second half avg)
+    // Trend: first-half average vs second-half average.
     const midPoint = Math.floor(aggregatedData.length / 2);
     const firstHalf = aggregatedData.slice(0, midPoint);
     const secondHalf = aggregatedData.slice(midPoint);

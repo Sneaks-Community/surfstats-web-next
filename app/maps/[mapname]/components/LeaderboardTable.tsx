@@ -105,10 +105,8 @@ interface LeaderboardTableProps {
 }
 
 /**
- * The map, bonus and stage tabs are the same leaderboard: identical columns,
- * identical state ladder (too-short query, error, loading, rows, empty) and
- * identical pagination. They differ only in the rows they hand over and in the
- * wording of the loading and empty states.
+ * Shared by the map, bonus and stage tabs: same columns, pagination and state ladder (too-short
+ * query, error, loading, rows, empty). Tabs supply only the rows and the loading/empty wording.
  */
 export default function LeaderboardTable({
   rows,
@@ -142,8 +140,7 @@ export default function LeaderboardTable({
             {query.length > 0 && query.length < MIN_SEARCH_LENGTH ? (
               <MessageRow>Type at least {MIN_SEARCH_LENGTH} characters to search all players.</MessageRow>
             ) : error ? (
-              // A 403/429/503 reads as an error the user can retry rather than
-              // an empty leaderboard.
+              // A 403/429/503 shows as a retryable error, not an empty leaderboard.
               <tr>
                 <td colSpan={6} className="px-2 sm:px-4 py-12 text-center">
                   <p className="text-text-muted text-sm font-medium">Couldn&apos;t load records: {error.message}</p>

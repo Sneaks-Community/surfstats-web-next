@@ -26,19 +26,15 @@ export default async function CountriesListPage({
 }) {
   const params = await searchParams;
 
-  // Parse and validate sort/order parameters
   const sort = (typeof params.sort === 'string' ? params.sort : undefined) as CountrySortKey | undefined || 'points';
   const order = (typeof params.order === 'string' ? params.order : undefined) as SortDirection | undefined || 'desc';
 
-  // Validate sort column
   const validSortColumns: CountrySortKey[] = ['rank', 'country', 'points', 'players'];
   const validatedSort = validSortColumns.includes(sort) ? sort : 'points';
 
-  // Validate order
   const validatedOrder: SortDirection = order === 'asc' ? 'asc' : 'desc';
 
-  // Both reads are fixed cache keys, so an out-of-range `?page=` mints no key;
-  // it is clamped against the ranking itself.
+  // Both reads are fixed cache keys, so an out-of-range `?page=` mints none; clamp to the ranking.
   const [ranking, playerCount] = await Promise.all([
     getCountriesRankingFromCache(),
     getPlayerCountFromCache(),
@@ -50,7 +46,6 @@ export default async function CountriesListPage({
   const offset = (page - 1) * ITEMS_PER_PAGE;
   const countries = sorted.slice(offset, offset + ITEMS_PER_PAGE);
 
-  // Build query params for pagination
   const queryParams: Record<string, string> = {};
   if (validatedSort !== 'points') queryParams.sort = validatedSort;
   if (validatedOrder !== 'desc') queryParams.order = validatedOrder;
@@ -71,8 +66,8 @@ export default async function CountriesListPage({
         </p>
       </div>
 
-      {/* Sort/pagination navigate through the provider, which shows the
-          skeleton instantly. loading.tsx only covers the initial route load. */}
+      {/* The provider shows the skeleton instantly on sort/pagination; loading.tsx only covers
+          the initial route load. */}
       <NavigationPendingProvider>
         <PendingContent fallback={<SkeletonScreen label="Loading countries..."><CountriesTableSkeleton /></SkeletonScreen>}>
           <div className="bg-surface border border-border rounded-xl overflow-hidden">
@@ -154,7 +149,6 @@ export default async function CountriesListPage({
               </table>
             </div>
 
-            {/* Pagination */}
             {totalPages > 1 && (
               <div className="px-4 border-t border-border">
                 <Pagination

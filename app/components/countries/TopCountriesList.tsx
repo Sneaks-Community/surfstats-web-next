@@ -8,11 +8,7 @@ export interface TopCountryEntry {
   rank: number;
 }
 
-/**
- * Compact ranked country list shown beside the world map. Doubles as the
- * accessible table-view twin of the choropleth (values are readable without
- * hovering the map).
- */
+/** Ranked list beside the world map, doubling as its accessible table view (no hover needed). */
 export default function TopCountriesList({ countries }: { countries: TopCountryEntry[] }) {
   if (countries.length === 0) return null;
 

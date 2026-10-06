@@ -14,7 +14,7 @@ import { getErrorCode, getErrorMessage } from '@/lib/errors';
 
 export const metadata: Metadata = {
   title: 'Search',
-  // Search results are thin/duplicate content — keep them out of the index.
+  // Thin/duplicate content, so kept out of the index.
   robots: { index: false },
 };
 
@@ -24,7 +24,7 @@ export default async function SearchPage({
   searchParams: Promise<{ q?: string }>;
 }) {
   const { q } = await searchParams;
-  // Sanitize search query to prevent XSS and injection
+  // Sanitized against XSS and injection.
   const query = validateSearchQuery(q);
   
   let players: PlayerSearchResult[] = [];
@@ -34,7 +34,6 @@ export default async function SearchPage({
   // floor bounds how cheaply those can be cycled.
   if (query.length >= MIN_SEARCH_LENGTH) {
     try {
-      // Search players using cached function
       players = await searchPlayersFromCache(query);
       
       maps = await searchMaps(query, 10);
@@ -73,7 +72,6 @@ export default async function SearchPage({
 
       {query.length >= MIN_SEARCH_LENGTH && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Players Results */}
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-2">
               <h2 className="text-xl font-semibold text-text flex items-center gap-2">
@@ -122,7 +120,6 @@ export default async function SearchPage({
             )}
           </div>
 
-          {/* Maps Results */}
           <div className="space-y-4">
             <div className="flex items-center justify-between border-b border-border pb-2">
               <h2 className="text-xl font-semibold text-text flex items-center gap-2">

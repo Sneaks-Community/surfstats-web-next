@@ -22,7 +22,7 @@ export async function GET(
   const bonusGroupsList = await getBonusGroupsByMapFromCache(validMapname);
   const bonusExists = bonusGroupsList.includes(bonus);
 
-  // Search mode: return all matching records (up to 100) for this bonus zone
+  // Search mode: every match (up to 100) in this bonus.
   if (rawQuery !== null) {
     const query = validateSearchQuery(rawQuery);
     if (query.length < MIN_SEARCH_LENGTH) {
@@ -42,7 +42,6 @@ export async function GET(
     }
   }
 
-  // Pagination mode
   const { page, pageSize } = parsePageParams(searchParams);
 
   if (!bonusExists) {
@@ -55,10 +54,8 @@ export async function GET(
   }
 
   try {
-    // Clamp page like records/route.ts: bounds cache keys and OFFSET size. This
-    // count covers every zonegroup on the map rather than just this one, so it
-    // over-estimates and can never truncate a real page — and the records tab
-    // already warms the key, so no new query shape enters the system.
+    // Clamp like records/route.ts to bound cache keys and OFFSET. The count spans every bonus, so
+    // it can over-estimate but never truncate; the records tab warms its key (no new query shape).
     const { counts } = await getRecordCountsAndWRFromCache(validMapname);
     const totalPages = Math.max(1, Math.ceil(counts.bonusesTotal / pageSize));
     const data = await getBonusRecordsFromCache(validMapname, bonus, Math.min(page, totalPages), pageSize);

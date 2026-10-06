@@ -99,7 +99,7 @@ export default function ServerCard({
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Clipboard unavailable (e.g. insecure context); silently ignore
+      // Clipboard unavailable (e.g. insecure context).
     }
   };
 

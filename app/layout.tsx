@@ -1,6 +1,6 @@
 import type {Metadata} from 'next';
 import { headers } from 'next/headers';
-import './globals.css'; // Global styles
+import './globals.css';
 import { Navigation } from '@/components/navigation';
 import { ClientConfigProvider } from '@/lib/ClientConfigContext';
 import { ThemeProvider } from '@/lib/theme-context';
@@ -8,10 +8,9 @@ import { generateThemeStyles } from '@/lib/theme-config';
 import { getSiteUrl } from '@/lib/site-url';
 import { getMapImagesUrl, getDisplayTz, SITE_NAME } from '@/lib/utils';
 
-// Startup work lives in instrumentation.ts -> lib/startup.ts; a layout module is
-// not a startup hook (it can be evaluated more than once per process).
+// No startup work here (a layout can evaluate more than once per process); see instrumentation.ts.
 
-// Force dynamic rendering to read environment variables at runtime, not build time
+// Reads env vars at runtime, not build time.
 export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -47,8 +46,7 @@ export default async function RootLayout({children}: {children: React.ReactNode}
   const mapImagesUrl = getMapImagesUrl();
   const displayTz = getDisplayTz();
   const themeStyles = generateThemeStyles();
-  // Set by proxy.ts. Next nonces its own scripts from the CSP header, but not
-  // one written by hand, so the theme bootstrap below needs it explicitly.
+  // Set by proxy.ts. Next nonces only its own scripts, so the hand-written bootstrap needs it.
   const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (

@@ -29,8 +29,7 @@ interface MapRecordsTabsProps {
   numStages: number;
 }
 
-// Paginated (non-search) response shapes. The bonus endpoint returns `bonuses`
-// when paginating and `records` in search mode.
+// Paginated (non-search) shapes; bonus search returns `records` instead of `bonuses`.
 interface RecordsResponse {
   records?: MapRecord[];
   pagination?: { total: number };
@@ -50,8 +49,7 @@ const TABS: readonly TabType[] = ['map', 'bonus', 'stages'];
 const SORT_FIELDS: readonly SortField[] = ['rank', 'player', 'time', 'speed', 'wrDiff', 'date'];
 const SORT_DIRS: readonly SortDirection[] = ['asc', 'desc'];
 
-// URL params are cast, not parsed, so an unknown `?sort=` used to read as "not
-// rank" and arm the load-all fan-out from a crafted link.
+// Allowlist, so a crafted `?sort=` can't read as "not rank" and arm the load-all fan-out.
 function oneOf<T extends string>(allowed: readonly T[], raw: string | null, fallback: T): T {
   return allowed.includes(raw as T) ? (raw as T) : fallback;
 }
@@ -68,11 +66,7 @@ interface SortableRecord {
   wr_time: number | null;
 }
 
-/**
- * The three tabs sort by the same fields and differ only in what the time column
- * is called. Date sorts newest-first on all three: the stage tab used to be the
- * opposite, which was a slip rather than a decision (owner's call, 2026-08-13).
- */
+/** Shared by all three tabs (only the time field differs), so date sorts newest-first on each. */
 function compareRecords<T extends SortableRecord>(
   field: SortField,
   time: (record: T) => number
@@ -92,7 +86,7 @@ function compareRecords<T extends SortableRecord>(
       case 'wrDiff':
         return wrDiff(time(a), a.wr_time) - wrDiff(time(b), b.wr_time);
       case 'date':
-        // Newest first, so the ascending comparator is the reverse chronological one.
+        // Newest first: ascending is reverse-chronological.
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       default:
         return a.rank - b.rank;
@@ -142,7 +136,6 @@ export default function MapRecordsTabs({
   const searchParams = useSearchParams();
   const staged = isStagedMap({ stages: numStages });
 
-  // Get initial state from URL
   const initialTab = oneOf(TABS, searchParams.get('tab'), 'map');
   const initialPage = parseIntParam(searchParams.get('page'));
   const initialBonus = parseIntParam(searchParams.get('bonus'));
@@ -152,7 +145,6 @@ export default function MapRecordsTabs({
   const initialSortField = oneOf(SORT_FIELDS, searchParams.get('sort'), 'rank');
   const initialSortDir = oneOf(SORT_DIRS, searchParams.get('dir'), 'asc');
 
-  // State - Map tab uses client-side sorting, Stages tab uses server-side sorting
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [leaderboardPage, setLeaderboardPage] = useState(initialPage);
   const [selectedBonus, setSelectedBonus] = useState(initialBonus);
@@ -165,9 +157,9 @@ export default function MapRecordsTabs({
 
   // Starts empty; page 1 is fetched on mount (Times activation), not server-rendered.
   const [allLeaderboardRecords, setAllLeaderboardRecords] = useState<MapRecord[]>([]);
-  // Pages already merged into the above, so arbitrary page navigation can skip refetching.
+  // Pages already merged above, so non-sequential navigation skips refetching them.
   const loadedPagesRef = useRef<Set<number>>(new Set());
-  // Client-side cache of fetched bonus pages, keyed "${bonus}-${page}".
+  // Fetched bonus pages, keyed "${bonus}-${page}".
   const bonusCacheRef = useRef<Map<string, BonusRecord[]>>(new Map());
 
   const [allStageRecords, setAllStageRecords] = useState<StageRecord[]>([]);
@@ -183,13 +175,13 @@ export default function MapRecordsTabs({
   const allBonusLoadedRef = useRef<Set<number>>(new Set());
   const [isLoadingAllBonus, setIsLoadingAllBonus] = useState(false);
 
-  // Only one tab renders at a time, so a single slot covers the paginated loads
-  // of all three. Each search owns its own error (see `useRecordSearch`).
+  // One tab renders at a time, so one slot covers all three tabs' paginated loads.
+  // Each search owns its own error (see `useRecordSearch`).
   const [loadError, setLoadError] = useState<LoadError | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
-  // Server-side search, one per tab. The URL closes over the map name and the
-  // selected bonus/stage, so changing either re-runs that tab's search.
+  // One server-side search per tab; the URL closes over the map and selected bonus/stage,
+  // so changing either re-runs that tab's search.
   const mapSearch = useRecordSearch<MapRecord>({
     initialQuery: searchParams.get('q') ?? '',
     url: (q) => `/api/maps/${mapname}/records?q=${encodeURIComponent(q)}`,
@@ -209,7 +201,7 @@ export default function MapRecordsTabs({
     label: 'MapRecordsTabs stage',
   });
 
-  // Reset state when map changes - only depends on mapname to avoid pagination issues
+  // Reset on map change; mapname is the only dep, to avoid pagination issues.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- Reset on map change; the load effect refetches page 1
     setAllLeaderboardRecords([]);
@@ -226,8 +218,8 @@ export default function MapRecordsTabs({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapname]);
 
-  // Fetch the current rank page for the map tab if not loaded. On mount this is
-  // the deferred page-1 load. Non-rank sorts and search use their own paths.
+  // Map tab, rank sort: fetch the current page if not loaded (on mount, the deferred page 1).
+  // Non-rank sorts and search use their own paths.
   useEffect(() => {
     if (activeTab !== 'map' || sortField !== 'rank' || mapSearch.active) return;
     if (loadedPagesRef.current.has(leaderboardPage)) return;
@@ -260,10 +252,8 @@ export default function MapRecordsTabs({
     return () => controller.abort();
   }, [activeTab, sortField, mapSearch.active, leaderboardPage, mapname, retryToken]);
 
-  // Load stage records when the selected stage changes (sort is handled
-  // client-side). The API returns all 100 records sorted by rank. Cancellation
-  // rather than an in-flight guard: switching stages rapidly must never let an
-  // earlier response overwrite the current selection.
+  // Loads the stage's top 100 in rank order (sorting is client-side). Aborts rather than
+  // guarding in-flight, so a stale response from rapid stage switching never wins.
   useEffect(() => {
     if (activeTab !== 'stages' || !staged) return;
 
@@ -291,10 +281,8 @@ export default function MapRecordsTabs({
     return () => controller.abort();
   }, [activeTab, selectedStage, staged, mapname, retryToken]);
 
-  // Load bonus records when the selected bonus or page changes, with a
-  // client-side cache. Skip while a non-rank sort is active — that uses the
-  // load-all path below, which needs the full set rather than a single
-  // rank-window page. A failure is never cached, so retrying re-fetches.
+  // One bonus page, cached per bonus/page. Skipped under a non-rank sort, which needs the full
+  // set (load-all path below). Failures are never cached, so a retry re-fetches.
   useEffect(() => {
     if (activeTab !== 'bonus' || numBonuses === 0 || sortField !== 'rank') return;
 
@@ -318,7 +306,7 @@ export default function MapRecordsTabs({
         );
         const rows = data.bonuses ?? [];
         bonusCacheRef.current.set(cacheKey, rows);
-        // This is a single rank-window page — the full set is no longer loaded.
+        // A single rank-window page, so the full set is no longer loaded.
         allBonusLoadedRef.current.delete(selectedBonus);
         setAllBonusRecords(rows);
         setTotalBonusRecords(data.pagination?.total ?? 0);
@@ -335,8 +323,7 @@ export default function MapRecordsTabs({
     return () => controller.abort();
   }, [activeTab, selectedBonus, bonusPage, numBonuses, sortField, mapname, retryToken]);
 
-  // When a non-rank sort is active on the map tab, load the full
-  // leaderboard once so pagination pages through the globally-sorted order.
+  // Non-rank sort on the map tab: load the full leaderboard once so pages follow the global sort.
   useEffect(() => {
     if (activeTab !== 'map') return;
     if (sortField === 'rank') return;
@@ -372,7 +359,7 @@ export default function MapRecordsTabs({
     return () => controller.abort();
   }, [activeTab, sortField, mapSearch.active, mapname, totalRecords, retryToken]);
 
-  // same load-all path for the bonus tab (per-bonus).
+  // Same load-all path for the bonus tab, per bonus.
   useEffect(() => {
     if (activeTab !== 'bonus') return;
     if (sortField === 'rank') return;
@@ -412,7 +399,6 @@ export default function MapRecordsTabs({
     return () => controller.abort();
   }, [activeTab, sortField, bonusSearch.active, selectedBonus, mapname, retryToken]);
 
-  // Update URL when state changes
   useEffect(() => {
     const params = new URLSearchParams();
     params.set('tab', activeTab);
@@ -424,8 +410,7 @@ export default function MapRecordsTabs({
     if (mapSearch.query) params.set('q', mapSearch.query);
     if (bonusSearch.query) params.set('bq', bonusSearch.query);
     if (stageSearch.query) params.set('sq', stageSearch.query);
-    // Sort state is shared across tabs and always written as sort/dir so it
-    // round-trips through the URL initializer above (which only reads `dir`).
+    // Sort is shared across tabs and written as sort/dir, the names the initializer above reads.
     if (sortField !== 'rank') params.set('sort', sortField);
     if (sortDirection !== 'asc') params.set('dir', sortDirection);
 
@@ -438,18 +423,16 @@ export default function MapRecordsTabs({
 
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
-    // Reset sort to default when changing tabs
     setSortField('rank');
     setSortDirection('asc');
     // The error slot is shared across tabs; don't carry one tab's failure over.
     setLoadError(null);
   };
 
-  // Handle page change - with auto-loading for map tab
-  // Return type annotated because the retry closure below references this.
+  // Map tab fetches unloaded pages first. Explicit return type: the retry closure recurses.
   const handlePageChange = async (page: number): Promise<void> => {
     if (activeTab === 'map') {
-      // Full set already loaded (non-rank sort path) — just change the page.
+      // Full set already loaded (non-rank sort path).
       if (allLeaderboardLoadedRef.current) {
         setLeaderboardPage(page);
         return;
@@ -510,7 +493,7 @@ export default function MapRecordsTabs({
     setStagePage(1);
   };
 
-  // Handle sort for the map and bonus tabs (client-side sorting)
+  // Map and bonus tabs (client-side sort).
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -518,13 +501,11 @@ export default function MapRecordsTabs({
       setSortField(field);
       setSortDirection('asc');
     }
-    // Reset to the first page — under a non-rank sort the pages follow the
-    // sorted order, so a stale high page could fall outside the result set.
+    // Pages follow the sorted order under a non-rank sort; a stale high page could be out of range.
     setLeaderboardPage(1);
     setBonusPage(1);
   };
 
-  // Handle sort for stages tab (server-side sorting)
   const handleStageSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -535,7 +516,6 @@ export default function MapRecordsTabs({
     setStagePage(1);
   };
 
-  // Filter loaded records by the settled search text, then sort.
   const sortedRecords = useMemo(() => {
     const query = mapSearch.debouncedQuery;
     const filtered = query
@@ -552,8 +532,7 @@ export default function MapRecordsTabs({
     return sortRecords(filtered, sortDirection, compareRecords(sortField, (r) => r.runtime));
   }, [allBonusRecords, bonusSearch.debouncedQuery, sortField, sortDirection]);
 
-  // Stage records arrive sorted by rank (runtime ASC); sorting is client-side
-  // from there. `rank` sorts by runtime, since stage ranks are shared on a tie.
+  // Arrives in rank order; `rank` sorts by runtime instead, since tied stage times share a rank.
   const sortedStageRecords = useMemo(
     () =>
       sortRecords(
@@ -564,11 +543,8 @@ export default function MapRecordsTabs({
     [allStageRecords, sortField, sortDirection]
   );
 
-  // Pagination.
-  // Search mode (≥3 chars): the hook paginates the server results — every match is reachable.
-  // Rank sort: rank-window filtering handles non-sequential lazy page loading.
-  // Non-rank sort: the full set is loaded (see load-all effects), so slice the
-  //   globally-sorted array — pages follow the sorted order, not the rank window.
+  // Search (≥3 chars) pages the server results; rank sort filters by rank window (pages load
+  // lazily, out of order); non-rank sort slices the fully loaded set (load-all effects).
   const rankWindow = <T extends { rank: number }>(rows: T[], page: number): T[] =>
     rows.filter((r) => r.rank >= (page - 1) * ITEMS_PER_PAGE + 1 && r.rank <= page * ITEMS_PER_PAGE);
   const pageSlice = <T,>(rows: T[], page: number): T[] =>
@@ -647,7 +623,6 @@ export default function MapRecordsTabs({
           )}
         </div>
 
-        {/* Bonus sub-tabs */}
         {activeTab === 'bonus' && numBonuses > 0 && (
           <div className="flex gap-2 mt-4 flex-wrap">
             {Array.from({ length: numBonuses }, (_, i) => i + 1).map((bonusNum) => (
@@ -669,7 +644,6 @@ export default function MapRecordsTabs({
           </div>
         )}
 
-        {/* Stage sub-tabs */}
         {activeTab === 'stages' && staged && (
           <div className="flex gap-2 mt-4 flex-wrap items-center">
             <span className="text-xs text-text-muted font-medium px-2">Top 100 times:</span>

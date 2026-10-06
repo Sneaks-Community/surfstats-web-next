@@ -13,8 +13,7 @@ export interface TopPlayerEntry {
   avatar: string | null;
 }
 
-// Medal tones for the podium (gold / silver / bronze are a universal convention,
-// not theme colors); everyone else gets a muted chip.
+// Podium medal tones are a universal convention, hence not theme tokens.
 function rankChipClass(rank: number): string {
   if (rank === 1) return 'bg-amber-400/15 text-amber-400';
   if (rank === 2) return 'bg-zinc-300/15 text-zinc-300';
@@ -22,10 +21,7 @@ function rankChipClass(rank: number): string {
   return 'bg-surface-hover text-text-muted';
 }
 
-/**
- * Top-ranked players "hall of fame" preview. Aspirational, competitive — it
- * gives newcomers something to climb toward.
- */
+/** Top-ranked players preview, giving newcomers something to climb toward. */
 export default function TopPlayersPreview({ players }: { players: TopPlayerEntry[] }) {
   if (players.length === 0) return null;
 

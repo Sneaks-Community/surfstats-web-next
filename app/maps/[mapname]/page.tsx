@@ -48,9 +48,8 @@ export async function generateMetadata({ params }: { params: Promise<{ mapname: 
 }
 
 /**
- * Seven cached aggregates, all below the fold. Behind a Suspense boundary so the
- * header and the leaderboard stream first instead of waiting on them; on a cold
- * key that wait is seconds, not milliseconds.
+ * Seven cached aggregates, all below the fold, so Suspense lets the header and leaderboard
+ * stream first instead of waiting on them (seconds on a cold key).
  */
 async function ChartGrid({ mapname }: { mapname: string }) {
   return <MapChartGrid data={await getMapChartDataFromCache(mapname)} />;
@@ -72,7 +71,6 @@ export default async function MapProfilePage({
   const { mapname } = await params;
   const decodedMapname = decodeURIComponent(mapname);
   
-  // Validate and sanitize map name input
   const validMapname = validateMapName(decodedMapname);
   if (!validMapname) {
     notFound();
@@ -93,7 +91,6 @@ export default async function MapProfilePage({
 
   return (
     <div className="space-y-4">
-      {/* Map Header */}
       <div className="bg-surface border border-border rounded-xl overflow-hidden relative">
         <div className="absolute inset-0 z-0 opacity-60">
           <MapImage

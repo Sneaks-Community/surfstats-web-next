@@ -30,7 +30,7 @@ ChartJS.register(
 
 interface CheckpointTimeData {
   checkpoint: number;
-  avgTime: number; // in seconds
+  avgTime: number; // seconds
   sampleSize: number;
 }
 
@@ -46,7 +46,7 @@ interface CheckpointTimesChartProps {
     avgTime: number | null;
     wrTime: number | null;
   };
-  isStageMap?: boolean; // true if map has stages (zonetype 3), false for linear maps (zonetype 4)
+  isStageMap?: boolean; // true: stages (zonetype 3); false: linear checkpoints (zonetype 4)
 }
 
 export default function CheckpointTimesChart({ data, wrData, finishTime, isStageMap = false }: CheckpointTimesChartProps) {
@@ -67,25 +67,21 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
       return `CP${d.checkpoint}`;
     });
 
-    // Add "Finish" label at the end
     labels.push('Finish');
 
     const avgTimes: Array<number | null> = safeData.map(d => d.avgTime);
 
-    // Add average finish time if available
     if (safeFinishTime.avgTime !== null) {
       avgTimes.push(safeFinishTime.avgTime);
     } else {
       avgTimes.push(null);
     }
 
-    // Create a map of checkpoint -> WR time for easy lookup
     const wrTimeMap = new Map(safeWRData.map(cp => [cp.checkpoint, cp.time]));
 
-    // Get WR times aligned with average data checkpoints (only include if WR has that checkpoint)
+    // Aligned to the average's checkpoints; null where the WR run lacks that checkpoint.
     const wrTimes = safeData.map(d => wrTimeMap.get(d.checkpoint) ?? null);
 
-    // Add WR finish time if available
     if (safeFinishTime.wrTime !== null) {
       wrTimes.push(safeFinishTime.wrTime);
     } else {
@@ -150,11 +146,10 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
         callbacks: {
           title: (tooltipItems) => {
             const label = tooltipItems[0].label;
-            // Handle "Finish" label
             if (label === 'Finish') {
               return 'Finish';
             }
-            // Extract number from either 'CP1' or 'S1' format
+            // 'CP1' or 'S1' becomes 'CP 1' or 'S 1'.
             const match = label.match(/(CP|S)(\d+)/);
             if (match) {
               const type = match[1];
@@ -169,10 +164,8 @@ export default function CheckpointTimesChart({ data, wrData, finishTime, isStage
             const label = context.label;
             
             if (datasetIndex === 0) {
-              // Average Time dataset
               return `Avg: ${formatTime(value)}`;
             } else if (datasetIndex === 1 && wrData && wrData.length > 0) {
-              // WR Time dataset
               if (label === 'Finish') {
                 return `WR: ${formatTime(value)}`;
               }

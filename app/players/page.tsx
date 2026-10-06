@@ -28,7 +28,6 @@ export default async function PlayersPage({
   // Fetch players first to get steam IDs
   const { players, total, totalPages } = await getPlayersFromCache(page, q);
 
-  // Extract steam IDs and fetch avatars
   const steamIds = players.map(p => p.steamid);
   const avatarsWithData = await getSteamProfilesFromCache(steamIds);
 
@@ -55,10 +54,8 @@ export default async function PlayersPage({
         </form>
       </div>
 
-      {/* Pagination navigates through the provider, which shows the skeleton
-          the instant a page is clicked. `loading.tsx` only fires on the initial
-          route load; search-param navigations reuse the segment and would
-          otherwise sit frozen until the (uncached) query returns. */}
+      {/* Shows the skeleton on pagination clicks: `loading.tsx` covers only the first load;
+          search-param navigations reuse the segment, frozen until the uncached query returns. */}
       <NavigationPendingProvider>
         <PendingContent className="space-y-4" fallback={<SkeletonScreen label="Loading players..."><PlayersTableSkeleton /></SkeletonScreen>}>
           <PlayerListTable

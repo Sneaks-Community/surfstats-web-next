@@ -18,7 +18,6 @@ interface CountryPageProps {
   searchParams: Promise<{ page?: string; sort?: string; order?: string }>;
 }
 
-// Generate metadata for the page
 export async function generateMetadata({ params }: CountryPageProps): Promise<Metadata> {
   const { countrycode } = await params;
   const countryName = getPrimaryCountryName(countrycode);
@@ -39,27 +38,23 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
   const { countrycode } = await params;
   const { page: pageParam, sort, order } = await searchParams;
 
-  // Validate country code
   if (!isValidCountryCode(countrycode)) {
     notFound();
   }
 
   const countryCode = countrycode.toUpperCase();
-  // Clamp before the cache key / RANK() OFFSET, using this country's own count
-  // so the ceiling matches `totalPages` from the same filter.
+  // Clamp before the cache key / RANK() OFFSET, against this country's own count so the
+  // ceiling matches `totalPages` (same filter).
   const countryPlayerCount = await getCountryPlayerCount(countryCode);
   const pageCeiling = Math.max(1, Math.ceil(countryPlayerCount / ITEMS_PER_PAGE));
   const page = parseIntParam(pageParam, { max: pageCeiling });
 
-  // Validate and parse sort parameters
-  // Default sort is by points descending (top players first)
   const validSortColumns: PlayerSortKey[] = ['rank', 'player', 'points', 'maps', 'lastseen'];
   const validatedSort: PlayerSortKey = validSortColumns.includes(sort as PlayerSortKey)
     ? (sort as PlayerSortKey)
     : 'points';
   const validatedOrder: SortDirection = order === 'asc' ? 'asc' : 'desc';
 
-  // Fetch players for this country with sorting
   const { players, total, totalPages, countryName } = await getCountryPlayers(
     countryCode,
     page,
@@ -68,21 +63,18 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
     validatedOrder
   );
 
-  // If no players found, still show the page but with empty state
+  // A country with no players still renders, with an empty state.
   const displayName = getPrimaryCountryName(countryCode) || countryName;
 
-  // Extract steam IDs and fetch avatars
   const steamIds = players.map(p => p.steamid);
   const avatarsWithData = await getSteamProfilesFromCache(steamIds);
 
-  // Build query params for pagination
   const queryParams: Record<string, string> = {};
   if (validatedSort !== 'points') queryParams.sort = validatedSort;
   if (validatedOrder !== 'desc') queryParams.order = validatedOrder;
 
   return (
     <div className="space-y-4">
-      {/* Header with country info */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Link
@@ -108,8 +100,8 @@ export default async function CountryPlayersPage({ params, searchParams }: Count
         </div>
       </div>
 
-      {/* Sort/pagination navigate through the provider, which shows the
-          skeleton instantly. loading.tsx only covers the initial route load. */}
+      {/* The provider shows the skeleton instantly on sort/pagination; loading.tsx only covers
+          the initial route load. */}
       <NavigationPendingProvider>
         <PendingContent className="space-y-4" fallback={<SkeletonScreen label="Loading country players..."><PlayersTableSkeleton /></SkeletonScreen>}>
           <PlayerListTable

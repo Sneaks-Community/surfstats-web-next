@@ -22,9 +22,7 @@ import {
 import type { MapEngagementPoint } from '@/lib/player-analytics';
 
 interface PlayerProfileContentProps {
-  // Cheap overview: identity + global rank + completion counts, sourced from
-  // getPlayerOverviewFromCache. Drives the profile header, stat cards, and
-  // progress bars (no dependence on the expensive full lists).
+  // Cheap getPlayerOverviewFromCache data (no full lists): header, stat cards, progress bars.
   overview: {
     player: {
       steamid: string;
@@ -80,13 +78,10 @@ export default function PlayerProfileContent({
   mapEngagement,
   steamid,
 }: PlayerProfileContentProps) {
-  // Identity + stats come from the cheap overview query, not the expensive
-  // full lists. `counts` replaces the old `maps.length`/`bonuses.length`/etc.
   const player = overview.player;
   const counts = overview.counts;
 
-  // Profile header (identity + stat cards + progress bars). Always visible,
-  // above the Overview | Times tabs, so the player stays on screen on both tabs.
+  // Above the Overview | Times tabs, so the player stays on screen on both.
   const profileHeader = (
     <div className="bg-surface border border-border rounded-xl overflow-hidden">
       <div className="h-20 bg-gradient-to-r from-primary-900 to-background-secondary"></div>
@@ -177,7 +172,6 @@ export default function PlayerProfileContent({
             </div>
           </div>
           
-          {/* Stats Grid */}
           <div className="grid grid-cols-2 md:grid-cols-[1fr_1fr_1fr_1fr_2fr] gap-2">
             <div className="bg-surface border border-border rounded-xl p-3 flex flex-col items-center justify-center">
               <Trophy className="w-8 h-8 text-yellow-500 mb-2" />
@@ -197,7 +191,7 @@ export default function PlayerProfileContent({
             {playtimeData && playtimeData.totalSeconds > 0 ? (
               <PlayerTimeDisplay totalSeconds={playtimeData.totalSeconds} />
             ) : null}
-            {/* Progress Bars - Stacked vertically in a single container to the right of Time Played */}
+            {/* Progress bars, stacked in one container right of Time Played */}
             <div className="bg-surface border border-border rounded-xl p-3 col-span-2 md:col-start-5 md:row-start-1 flex flex-col justify-center space-y-3">
               <ProgressBar label="Map" current={counts.maps} total={totals.totalMaps} color="blue" />
               <ProgressBar label="Bonus" current={counts.bonuses} total={totals.totalBonuses} color="purple" />
@@ -212,7 +206,6 @@ export default function PlayerProfileContent({
   const overviewSection = (
     <div className="space-y-3">
     <div className="grid grid-cols-1 lg:grid-cols-4 gap-3">
-      {/* Tier Distribution Radar */}
       <div className="lg:col-span-1 h-[280px] min-h-[280px]">
         {linearVsStagedPerTier.length > 0 ? (
           <TierDistributionChart data={linearVsStagedPerTier} />
@@ -220,7 +213,6 @@ export default function PlayerProfileContent({
           <ChartEmptyState title="Tier Distribution" message="No data available" />
         )}
       </div>
-      {/* Completion Percentile + Activity Heatmap */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:col-span-3">
         <div className="h-[280px] lg:h-auto">
           {wrPerformanceData.length > 0 ? (
@@ -238,9 +230,7 @@ export default function PlayerProfileContent({
         </div>
       </div>
     </div>
-    {/* Second row: additional analytics charts */}
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-      {/* Completion Breakdown Doughnut */}
       <div className="h-[280px]">
         {counts.maps + counts.bonuses + counts.stages > 0 ? (
           <CompletionBreakdownChart counts={counts} />
@@ -248,7 +238,6 @@ export default function PlayerProfileContent({
           <ChartEmptyState title="Completion Breakdown" message="No completions" />
         )}
       </div>
-      {/* Career Timeline Stacked Bar */}
       <div className="h-[280px]">
         {wrPerformanceData.length > 0 ? (
           <CareerTimelineChart data={wrPerformanceData} />
@@ -256,7 +245,6 @@ export default function PlayerProfileContent({
           <ChartEmptyState title="Career Timeline" message="No completions" />
         )}
       </div>
-      {/* Map Engagement Bubble */}
       <div className="h-[280px]">
         {mapEngagement && mapEngagement.length > 0 ? (
           <MapEngagementChart data={mapEngagement} />
@@ -268,8 +256,7 @@ export default function PlayerProfileContent({
     </div>
   );
 
-  // Records Section — gated behind the top-level Times tab. Fetches its full
-  // lists on activation (no fetch on the initial render / for crawlers).
+  // Fetches its full lists only once the Times tab opens: never on initial render or for crawlers.
   const timesSection = <PlayerRecordsTabs steamid={steamid} counts={counts} />;
 
   return (

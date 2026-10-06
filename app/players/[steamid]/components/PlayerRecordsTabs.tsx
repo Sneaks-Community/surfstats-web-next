@@ -27,14 +27,11 @@ import type {
 
 interface PlayerRecordsTabsProps {
   steamid: string;
-  // Cheap authoritative completion totals from the overview query. Used for the
-  // finished-status badges so Bonuses/Stages show correct counts before their
-  // (lazily-fetched) section lists have loaded.
+  // Authoritative overview totals, so finished badges are right on tabs whose lists haven't loaded.
   counts: PlayerCompletionCounts;
 }
 
-// Each player-times route returns the full per-section list + the not-yet-done
-// list. Held in state once fetched (state doubles as the client-side cache).
+// One player-times route's payload (finished + not-yet-done lists); state doubles as the cache.
 interface MapsSection {
   records: PlayerMapTime[];
   incomplete: IncompleteMap[];
@@ -67,10 +64,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
   const [error, setError] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
 
-  // Derived arrays default to empty until their section loads, so all the
-  // client-side filter/sort/pagination below is unchanged from when these
-  // arrived as props. Memoized so the empty-fallback keeps a stable reference
-  // (otherwise the downstream useMemos would recompute every render).
+  // Empty until loaded; memoized so the [] fallback is stable for the downstream useMemos.
   const maps = useMemo(() => mapsData?.records ?? [], [mapsData]);
   const incompleteMaps = useMemo(() => mapsData?.incomplete ?? [], [mapsData]);
   const bonuses = useMemo(() => bonusesData?.records ?? [], [bonusesData]);
@@ -86,12 +80,8 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
   const [sortField, setSortField] = useState<SortField>('map');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
-  // Fetch the active section's full list on activation. Nothing fetches on the
-  // initial page render: this component only mounts once the user opens the
-  // top-level Times tab (PageTabs conditionally mounts it), so a crawler
-  // that renders only the default Overview never triggers these queries.
-  // A loaded section stays in state, which doubles as the client cache,
-  // re-selecting a tab never refetches.
+  // Fetch on tab activation. PageTabs mounts this only once Times opens, so crawlers that render
+  // just Overview never run these queries. A loaded section stays in state; no refetch.
   useEffect(() => {
     const alreadyLoaded =
       (activeTab === 'maps' && mapsData !== null) ||
@@ -119,8 +109,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
         else setStagesData(section as StagesSection);
       } catch (err: unknown) {
         if (!isAbortError(err)) {
-          // Leave the section null so it isn't treated as loaded — the retry
-          // below (and re-selecting the tab) fetches again.
+          // Section stays null (not loaded), so retry or re-selecting the tab fetches again.
           clientError(`[PlayerRecordsTabs] Failed to load ${activeTab}: ${getErrorMessage(err)}`);
           setError(getErrorMessage(err));
         }
@@ -137,42 +126,33 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, steamid, retryToken]);
 
-  // Handle tab change
   const handleTabChange = (tab: TabType) => {
     setActiveTab(tab);
-    // Reset sort to default when changing tabs
     setSortField('map');
     setSortDirection('asc');
     // The error slot is shared across tabs; don't carry one tab's failure over.
     setError(null);
   };
 
-  // Handle status filter change
   const handleStatusChange = (status: StatusFilter) => {
     setStatusFilter(status);
-    // Reset to page 1 when changing status
     setPages((prev) => ({ ...prev, [activeTab]: 1 }));
   };
 
-  // Handle page change
   const handlePageChange = (page: number) => {
     setPages((prev) => ({ ...prev, [activeTab]: page }));
   };
 
-  // Handle search change
   const handleSearchChange = (value: string) => {
     setSearchQueries((prev) => ({ ...prev, [activeTab]: value }));
-    // Reset to page 1 when search changes
     setPages((prev) => ({ ...prev, [activeTab]: 1 }));
   };
 
-  // Clear search
   const clearSearch = () => {
     setSearchQueries((prev) => ({ ...prev, [activeTab]: '' }));
     setPages((prev) => ({ ...prev, [activeTab]: 1 }));
   };
 
-  // Handle sort
   const handleSort = (field: SortField) => {
     if (sortField === field) {
       setSortDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
@@ -180,7 +160,6 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
       setSortField(field);
       setSortDirection('asc');
     }
-    // Reset to page 1 when sort changes
     setPages((prev) => ({ ...prev, [activeTab]: 1 }));
   };
 
@@ -196,7 +175,6 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
   );
 
 
-  // Filter and sort records
   const filteredMaps = useMemo(() => {
     const query = searchQueries.maps;
     const filtered = query
@@ -267,7 +245,6 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
     });
   }, [stages, searchQueries.stages, sortField, sortDirection]);
 
-  // Filter and sort incomplete records based on search
   const filteredIncompleteMaps = useMemo(() => {
     const query = searchQueries.maps;
     const filtered = query
@@ -319,7 +296,6 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
     );
   }, [incompleteStages, searchQueries.stages, sortDirection]);
 
-  // Get current page data based on status filter
   const getCurrentData = () => {
     if (statusFilter === 'finished') {
       switch (activeTab) {
@@ -382,9 +358,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
     return 'text-red-400';
   };
 
-  // Prefer the fetched list length once a section has loaded; otherwise fall
-  // back to the authoritative overview counts so badges are correct before the
-  // (lazily-fetched) Bonuses/Stages lists arrive.
+  // Loaded list length, else the authoritative overview count, so badges are right before load.
   const finishedCount = (tabId: TabType): number => {
     switch (tabId) {
       case 'maps': return mapsData ? maps.length : counts.maps;
@@ -393,8 +367,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
     }
   };
 
-  // Null until the section loads: only the active tab fetches, and there is no
-  // overview equivalent to fall back on, so an unloaded tab has no count yet.
+  // Null until the tab's section loads (only the active tab fetches); there's no overview count.
   const incompleteCount = (tabId: TabType): number | null => {
     switch (tabId) {
       case 'maps': return mapsData ? incompleteMaps.length : null;
@@ -426,9 +399,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
 
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden">
-      {/* Tab Bar */}
       <div className="flex flex-col sm:flex-row border-b border-border">
-        {/* Main Tabs */}
         <div className="flex border-b sm:border-b-0 border-border overflow-x-auto min-w-0 sm:min-w-0 flex-1" {...tablistProps}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -457,7 +428,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
           })}
         </div>
         
-        {/* Status Filter Sub-Tabs */}
+        {/* Status filter sub-tabs */}
         <div className="flex border-b sm:border-b-0 border-border sm:ml-auto">
           {statusFilters.map((filter) => {
             const Icon = filter.icon;
@@ -486,7 +457,6 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
         </div>
       </div>
 
-      {/* Search Bar */}
       <div className="p-2 border-b border-border">
         <RecordSearchInput
           variant="full"
@@ -497,7 +467,6 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
         />
       </div>
 
-      {/* Records List */}
       <div {...panelProps(activeTab)} className="min-h-[400px]">
         {isActiveLoading ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20">
@@ -518,9 +487,9 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
           </div>
         ) : paginatedRecords.length > 0 ? (
           <>
-            {/* Desktop Sortable Headers - only for finished records */}
             {statusFilter === 'finished' && (
               <>
+                {/* Desktop sortable headers */}
                 <div className="hidden sm:flex px-6 py-2 bg-surface-hover/50 border-b border-border items-center gap-4 text-sm font-medium text-text-muted">
                   {sortButton('map', 'Map', 'flex-1 min-w-0')}
                   {activeTab === 'maps'
@@ -534,7 +503,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                   {sortButton('date', 'Date', 'w-24 justify-end text-right')}
                 </div>
 
-                {/* Mobile Compact Header - only for finished records */}
+                {/* Mobile compact header */}
                 <div className="sm:hidden px-3 py-2 bg-surface-hover/50 border-b border-border flex items-center justify-between text-xs font-medium text-text-muted">
                   {sortButton('map', 'Map')}
                   <div className="flex items-center gap-2">
@@ -548,10 +517,9 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
               </>
             )}
 
-            {/* Header for incomplete records */}
             {statusFilter === 'incomplete' && (
               <>
-                {/* Desktop Sortable Headers */}
+                {/* Desktop sortable headers */}
                 <div className="hidden sm:flex px-6 py-2 bg-surface-hover/50 border-b border-border items-center gap-4 text-sm font-medium text-text-muted">
                   {sortButton('map', 'Map', 'flex-1 min-w-0')}
                   {activeTab === 'maps' ? (
@@ -565,7 +533,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                   )}
                 </div>
 
-                {/* Mobile Compact Header */}
+                {/* Mobile compact header */}
                 <div className="sm:hidden px-3 py-2 bg-surface-hover/50 border-b border-border flex items-center justify-between text-xs font-medium text-text-muted">
                   {sortButton('map', 'Map')}
                   {activeTab === 'maps' && (
@@ -580,7 +548,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
             )}
 
             <div className="divide-y divide-border">
-              {/* FINISHED RECORDS */}
+              {/* Finished records */}
               {statusFilter === 'finished' && activeTab === 'maps' &&
                 (paginatedRecords as PlayerMapTime[]).map((record, i) => {
                   const wrTimeDiff = record.wr_time ? record.runtimepro - record.wr_time : null;
@@ -681,7 +649,7 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
                   </div>
                 ))}
 
-              {/* INCOMPLETE RECORDS */}
+              {/* Incomplete records */}
               {statusFilter === 'incomplete' && activeTab === 'maps' &&
                 (paginatedRecords as IncompleteMap[]).map((record, i) => (
                   <div
@@ -780,7 +748,6 @@ export default function PlayerRecordsTabs({ steamid, counts }: PlayerRecordsTabs
         )}
       </div>
 
-      {/* Pagination */}
       {currentData.totalPages > 1 && (
         <div className="px-3 sm:px-6 py-4 border-t border-border">
           <Pagination

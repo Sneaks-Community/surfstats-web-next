@@ -57,7 +57,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
   const safeBonusData: BonusTimeSeriesData = useMemo(() => bonusData, [bonusData]);
 
   const formatDate = (dateStr: string): string => {
-    // MySQL returns dates as 'YYYY-MM-01', parse manually to avoid timezone issues
+    // MySQL returns 'YYYY-MM-01'; parsed by hand to avoid timezone issues.
     const parts = dateStr.split('-');
     if (parts.length !== 3) return dateStr;
     const year = parseInt(parts[0], 10);
@@ -69,11 +69,10 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
   const labels = useMemo(() => safeData.map(d => d.date), [safeData]);
   const counts = useMemo(() => safeData.map(d => d.count), [safeData]);
 
-  // Calculate max count for Y-axis upper bound (considering both total and bonuses)
+  // Y-axis upper bound, across the map and every bonus series.
   const maxCount = useMemo(() => {
     const allCounts = [...counts];
     
-    // Add bonus counts to find the true maximum
     Object.values(safeBonusData).forEach((bonusSeries: Array<{ date: string; count: number }>) => {
       bonusSeries.forEach((d) => allCounts.push(d.count));
     });
@@ -82,7 +81,6 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
     return Math.max(...allCounts);
   }, [counts, safeBonusData]);
 
-  // Generate datasets for total completions and each bonus
   const chartData = useMemo(() => {
     const datasets: Array<{
       label: string;
@@ -95,7 +93,6 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
       pointHoverRadius: number;
     }> = [];
 
-    // Total completions line (blue, solid)
     datasets.push({
       label: 'Map',
       data: counts,
@@ -107,14 +104,13 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
       pointHoverRadius: 4,
     });
 
-    // Bonus lines (one per bonus)
     const bonusNumbers = Object.keys(safeBonusData)
       .map(Number)
       .sort((a, b) => a - b);
     
     bonusNumbers.forEach((bonus, index) => {
       const bonusSeries = safeBonusData[bonus] ?? [];
-      // Create an array aligned with labels, using null for missing dates
+      // Aligned to labels; null where this bonus has no entry for the date.
       const alignedData = labels.map(date => {
         const entry = bonusSeries.find(d => d.date === date);
         return entry ? entry.count : null;
@@ -139,7 +135,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
   }, [labels, counts, safeBonusData]);
 
   const options: ChartOptions<'line'> = useMemo(() => {
-    // Calculate the upper bound for Y-axis (next power of 10 above maxCount)
+    // Y-axis max: the next power of 10 at or above maxCount.
     const yAxisMax = maxCount > 1 ? Math.pow(10, Math.ceil(Math.log10(maxCount))) : 1;
 
     return {
@@ -183,8 +179,7 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
       scales: {
         x: {
           grid: {
-            // Grid line at each January. Every-12th-index would only line up
-            // with year boundaries when the series happens to start in January.
+            // Grid line at each January; every 12th index aligns only if the series starts in Jan.
             color: (ctx) => {
               // Chart.js types don't expose the tick index.
               const ctxAny = ctx as { tick?: { index?: number } };
@@ -208,7 +203,6 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
               const date = chartData.labels[index];
               if (!date) return '';
               
-              // Parse the date to determine appropriate formatting based on data density
               const parts = date.split('-');
               if (parts.length !== 3) return date;
               const year = parseInt(parts[0], 10);
@@ -217,7 +211,6 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
               if (labels.length > 24) {
                 return isJanuary(date) ? year.toString() : '';
               }
-              // Otherwise show month/year
               return formatDate(date);
             },
           },
@@ -234,13 +227,12 @@ export default function CompletionsOverTimeChart({ data, bonusData }: Completion
             font: {
               size: 12,
             },
-            // Only show major ticks (powers of 10) to reduce overlap
+            // Major ticks only (powers of 10), to reduce overlap.
             source: 'auto',
             autoSkip: true,
             maxTicksLimit: 6,
             callback: (value) => {
               const rounded = Math.round(value as number);
-              // Show the maxCount value (upper bound) and major powers of 10
               if (rounded === maxCount ||
                   rounded === 1 || rounded === 10 || rounded === 100 ||
                   rounded === 1000 || rounded === 10000 || rounded === 100000) {

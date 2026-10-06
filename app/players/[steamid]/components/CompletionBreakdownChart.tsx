@@ -21,9 +21,8 @@ interface CompletionBreakdownChartProps {
   };
 }
 
-// Categorical palette validated for CVD safety (dataviz skill: blue / green /
-// magenta, ΔE well above the colorblind floor in both light and dark). Identity
-// is reinforced by the legend + center total, so it never rests on color alone.
+// CVD-safe blue/green/magenta (dataviz-validated ΔE, light and dark); the legend and center
+// total mean identity never rests on color alone.
 const SEGMENTS = [
   { label: 'Maps', color: '#3987e5' },
   { label: 'Bonuses', color: '#008300' },
@@ -39,9 +38,7 @@ export default function CompletionBreakdownChart({ counts }: CompletionBreakdown
 
   const total = values.reduce((sum, v) => sum + v, 0);
 
-  // The center total is an HTML overlay stacked above the canvas, so it would
-  // show through the (canvas-drawn) tooltip. Fade it out while a segment is
-  // hovered so the tooltip stays legible.
+  // The HTML center total sits above the canvas-drawn tooltip, so it fades out while hovering.
   const [hovering, setHovering] = useState(false);
 
   const chartData = useMemo(
@@ -102,8 +99,7 @@ export default function CompletionBreakdownChart({ counts }: CompletionBreakdown
       <h3 className="text-sm font-semibold text-text mb-2">Completion Breakdown</h3>
       <div className="flex-1 min-h-[200px] relative">
         <Doughnut data={chartData} options={options} />
-        {/* Center total overlays the doughnut hole; fades out on hover so it
-            never bleeds through the tooltip. */}
+        {/* Center total, over the doughnut hole */}
         <div
           className={`absolute inset-0 flex flex-col items-center justify-center pointer-events-none -translate-y-[10%] transition-opacity duration-150 ${
             hovering ? 'opacity-0' : 'opacity-100'

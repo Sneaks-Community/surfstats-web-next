@@ -16,16 +16,8 @@ import { SITE_NAME } from '@/lib/utils';
 // Highest tier the Tier Distribution radar will render.
 const MAX_ALLOWED_TIER = getEnv().MAX_TIER;
 
-/**
- * Zero-fill the player's per-tier completions across the full tier range
- * `1..maxTier`, so the radar chart shows every tier the server supports (with
- * un-completed tiers at zero) and never silently drops a tier. `maxTier` comes
- * from the server's actual map pool, so a server with tiers up to 6 renders
- * 1-6 and a server with tiers up to 10 renders 1-10 — no blank trailing axes.
- *
- * When the player has no completions at all, returns an empty array so the
- * chart renders its "No completions" empty state instead of an all-zero radar.
- */
+/** Zero-fills tiers 1..maxTier (the pool's ceiling) so the radar drops no tier and has no blank
+ * trailing axes. [] for no completions: the chart's empty state beats an all-zero radar. */
 function padTierDistribution(rows: TierDistributionRow[], maxTier: number): TierDistributionRow[] {
   if (rows.length === 0) return [];
 
@@ -85,8 +77,7 @@ export default async function PlayerProfilePage({
   const { steamid } = await params;
   const decodedSteamId: string = decodeURIComponent(steamid);
   
-  // No `?? decodedSteamId` fallback: substituting the raw value made this guard
-  // unreachable for everything but the empty string.
+  // No fallback to the raw param: the guard would then only reject ''.
   const validSteamId = validateSteamId(decodedSteamId);
   if (!validSteamId) {
     notFound();
@@ -109,13 +100,8 @@ export default async function PlayerProfilePage({
     getPlayerMapEngagementFromCache(validSteamId),
   ]);
 
-  // The tier ceiling is a property of the server's map pool, not the player.
-  // Derive it from the server-wide tier distribution (falling back to the
-  // player's own completed tiers) so the chart shows exactly the tiers this
-  // server supports. Ignore any tier above MAX_ALLOWED_TIER (default 10, the
-  // ckSurf tier ceiling; override via the MAX_TIER env var): higher values are
-  // placeholder/junk data (e.g. a tier-69 stub map) that would otherwise blow
-  // the radar up to dozens of empty axes.
+  // Ceiling from the server's map pool, falling back to the player's tiers. Above MAX_TIER (default
+  // 10, ckSurf's max) is junk, e.g. a tier-69 stub map that would add dozens of empty radar axes.
   const candidateTiers = [
     ...tierDistribution.keys(),
     ...linearVsStagedRaw.map(r => r.tier),

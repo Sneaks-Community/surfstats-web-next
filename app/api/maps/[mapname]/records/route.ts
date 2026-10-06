@@ -18,9 +18,8 @@ export async function GET(
   const validMapname = resolveMapnameParam(mapname);
   if (validMapname instanceof NextResponse) return validMapname;
 
-  // Cache-only existence check: the map page warms this key for every real map
-  // and a miss writes nothing, since cachedFetch never caches null. The stage and
-  // bonus siblings get this from their registry lookup.
+  // Existence check on a key the map page warms for every real map; a miss writes nothing
+  // (cachedFetch never caches null). The stage and bonus routes get this from the registry.
   if (!(await getMapMetadataFromCache(validMapname))) {
     return NextResponse.json({ error: 'Map not found' }, { status: 404 });
   }
@@ -28,7 +27,7 @@ export async function GET(
   const searchParams = request.nextUrl.searchParams;
   const rawQuery = searchParams.get('q');
 
-  // Search mode: return all matching records (up to 100) sorted by rank
+  // Search mode: every match (up to 100), by rank.
   if (rawQuery !== null) {
     const query = validateSearchQuery(rawQuery);
     if (query.length < MIN_SEARCH_LENGTH) {
@@ -45,7 +44,6 @@ export async function GET(
     }
   }
 
-  // Pagination mode
   const { page, pageSize } = parsePageParams(searchParams);
 
   try {

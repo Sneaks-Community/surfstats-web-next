@@ -2,11 +2,8 @@
 
 import Link from '@/components/Link';
 
-/**
- * Root error boundary. Reached when a render throws, most often `DbBusyError`
- * from the expensive-query cap under load: better an honest retry than an empty
- * result set the reader takes for a real answer.
- */
+/** Root error boundary, mostly for `DbBusyError` from the expensive-query cap under load: an honest
+ * retry beats an empty result the reader would take for a real answer. */
 export default function Error({ reset }: { error: Error; reset: () => void }) {
   return (
     <div className="text-center py-20 bg-surface border border-border rounded-xl">

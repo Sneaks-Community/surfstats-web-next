@@ -21,11 +21,9 @@ import TopPlayersPreview, { type TopPlayerEntry } from '@/app/components/home/To
 import FeaturedMaps, { type FeaturedMapEntry } from '@/app/components/home/FeaturedMaps';
 import ActivityTicker from '@/app/components/home/ActivityTicker';
 
-// Force dynamic rendering to prevent static generation
 export const dynamic = 'force-dynamic';
 
-// Small wrapper: run a cached fetch, log + degrade to a fallback on failure so a
-// single dead sub-source never blanks the whole page.
+// Logs and returns `fallback` on failure, so one dead source never blanks the whole page.
 async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {
   try {
     return await fn();
@@ -47,8 +45,7 @@ export default async function Home() {
 
   const topPlayerRows = topPlayersResult.players.slice(0, 10);
 
-  // Steam avatars for the top-10 list, cached via the same path the /players
-  // table uses; degrade to no-avatar on any failure.
+  // Same cached avatar path as the /players table.
   const avatars = await safe(
     'top player avatars',
     () => getSteamProfilesFromCache(topPlayerRows.map((p) => p.steamid)),
@@ -74,7 +71,6 @@ export default async function Home() {
 
   return (
     <div className="space-y-5">
-      {/* Hero header */}
       <section className="pt-1 pb-2 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <div className="min-w-0">
           <h1 className="text-3xl font-bold tracking-tight text-text mb-1">
@@ -88,8 +84,7 @@ export default async function Home() {
         <JoinServerCTA />
       </section>
 
-      {/* KPI stat row + Latest Activity, grouped so the ticker reads as an
-          extension of the stats block rather than its own full-height section. */}
+      {/* Grouped with the stats so the ticker reads as part of that block, not its own section. */}
       {stats && (
         <section className="space-y-2">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
@@ -101,8 +96,6 @@ export default async function Home() {
             <StatTile icon={Layers} value={stats.stageCompletions} label="Stage Completions" accent="secondary" />
           </div>
 
-          {/* Latest Activity — a single combined marquee (records + completions)
-              tucked directly under the stats with just a small label. */}
           {recentRecords.length > 0 || latestCompletions.length > 0 ? (
             <div className="bg-surface border border-border rounded-xl overflow-hidden">
               <div className="flex items-center gap-1.5 px-4 pt-2 text-xs font-medium uppercase tracking-wider text-text-muted">
@@ -119,7 +112,6 @@ export default async function Home() {
         </section>
       )}
 
-      {/* Top players + featured maps */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {topPlayers.length > 0 && (
           <section className="bg-surface border border-border rounded-xl overflow-hidden">

@@ -28,16 +28,14 @@ interface WorldReachChartProps {
   data: WorldReachDatum[];
 }
 
-// Read a themed CSS custom property at runtime so the map's colors follow the
-// env-configured theme and the light/dark toggle. Falls back to a sensible hex
-// during SSR / before hydration.
+// Read at runtime so colors follow the env theme and light/dark toggle; `fallback` during SSR.
 function cssVar(name: string, fallback: string): string {
   if (typeof window === 'undefined') return fallback;
   const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return v || fallback;
 }
 
-// The world topology ships as a TopoJSON Topology; convert once to GeoJSON.
+// Ships as TopoJSON; converted to GeoJSON once.
 const worldFeatures: Feature[] = (
   topojson.feature(
     worldData as unknown as Parameters<typeof topojson.feature>[0],
@@ -46,12 +44,8 @@ const worldFeatures: Feature[] = (
   ) as FeatureCollection
 ).features;
 
-/**
- * World choropleth shaded by players-per-country — a single-hue SEQUENTIAL
- * ramp (light = few, dark = many) drawn from the theme's primary ramp, with an
- * HTML scale legend below. The Top-Countries list rendered beside it is the
- * accessible table-view twin.
- */
+/** Players-per-country choropleth on a single-hue sequential ramp from the theme primary, with an
+ * HTML legend. TopCountriesList beside it is its accessible table view. */
 export default function WorldReachChart({ data }: WorldReachChartProps) {
   // Recompute themed colors whenever the <html> class (theme) changes.
   const [themeVersion, setThemeVersion] = useState(0);
@@ -82,8 +76,7 @@ export default function WorldReachChart({ data }: WorldReachChartProps) {
     return { values, meta };
   }, [byNumeric]);
 
-  // Quantile thresholds over the non-zero counts → even color spread despite the
-  // heavy skew of a few dominant countries.
+  // Quantiles of the non-zero counts, so a few dominant countries don't flatten the color spread.
   const thresholds = useMemo(() => {
     const nz = values.filter((v) => v > 0).sort((a, b) => a - b);
     if (nz.length === 0) return [] as number[];
@@ -100,11 +93,8 @@ export default function WorldReachChart({ data }: WorldReachChartProps) {
     };
   }, [thresholds]);
 
-  // Colors adapt to the active theme (recomputed when the <html> class flips).
-  // The ramp direction follows the surface so the busiest countries always
-  // stand out: on light, more players = darker green; on dark, more = brighter
-  // green. Five sequential steps, fewest → most; fallbacks are the default
-  // emerald theme.
+  // Five steps, fewest to most, flipped per mode so the busiest countries stand out: darker on
+  // light, brighter on dark. Fallbacks are the default emerald theme.
   const { ramp, emptyColor, borderColor } = useMemo(() => {
     const isLight =
       typeof document !== 'undefined' &&
@@ -128,11 +118,9 @@ export default function WorldReachChart({ data }: WorldReachChartProps) {
 
     return {
       ramp: stops.map(([name, fallback]) => cssVar(name, fallback)),
-      // "No players": a neutral gray kept distinct from the surface in each mode.
-      // (surface-hover is near-white in light mode — it read as white-on-white.)
+      // Gray distinct from the surface in both modes (surface-hover is near-white on light).
       emptyColor: isLight ? '#d4d4d8' : '#3f3f46',
-      // Country outlines: a mid gray strong enough to delineate every country —
-      // including empty ones — on either surface.
+      // Mid gray that outlines every country, empty ones included, on either surface.
       borderColor: isLight ? '#9ca3af' : '#52525b',
     };
     // themeVersion is only a recompute trigger, not an input.
@@ -207,13 +195,11 @@ export default function WorldReachChart({ data }: WorldReachChartProps) {
 
   return (
     <div className="flex flex-col">
-      {/* Explicit, bounded height. A responsive + maintainAspectRatio:false
-          canvas inside a flex-1 / h-full parent that has no fixed height feeds
-          back on itself and grows without bound, so pin the height here. */}
+      {/* Fixed height: a responsive, maintainAspectRatio:false canvas in an unsized flex-1/h-full
+          parent feeds back on itself and grows without bound. */}
       <div className="relative w-full h-[300px] sm:h-[420px]">
         <Chart type="choropleth" data={chartData} options={options} />
       </div>
-      {/* Sequential scale legend (fewer → more), plus the "no players" tone. */}
       {hasBuckets && (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-text-muted">
           <div className="flex items-center gap-2">

@@ -14,22 +14,20 @@ export const metadata: Metadata = {
 };
 
 export default async function CountriesPage() {
-  // The whole ranking, so every country can be shaded, plus the headline's player
-  // count. The Top-Countries list beside the map is the accessible twin.
+  // The whole ranking, so every country can be shaded, plus the headline's player count.
   const [ranking, playerCount] = await Promise.all([
     getCountriesRankingFromCache(),
     getPlayerCountFromCache(),
   ]);
   const byPlayers = sortCountries(ranking, 'players', 'desc');
 
-  // World map: players per country, matched to map features by ISO numeric code.
+  // Matched to map features by ISO numeric code.
   const worldData: WorldReachDatum[] = byPlayers
     .map((c) => {
       const numeric = getNumericCodeFromAlpha2(c.country_code);
       if (!numeric) return null;
       return {
-        // country-cache uses the ISO code as the identifier, so resolve a
-        // human-readable name for the map tooltip (falls back to the code).
+        // `c.country` is the ISO code, so resolve a readable name for the tooltip.
         numeric,
         name: getPrimaryCountryName(c.country_code) ?? c.country,
         players: c.player_count,
@@ -37,7 +35,7 @@ export default async function CountriesPage() {
     })
     .filter((d): d is WorldReachDatum => d !== null);
 
-  // Top countries by player count (positional rank within this list).
+  // Rank is the position in this player-count list, not the ranking's points rank.
   const topCountries: TopCountryEntry[] = byPlayers.slice(0, 10).map((c, i) => ({
     code: c.country_code,
     name: c.country,
@@ -54,7 +52,6 @@ export default async function CountriesPage() {
         </p>
       </div>
 
-      {/* Global Reach — world choropleth + top countries */}
       {worldData.length > 0 ? (
         <section className="bg-surface border border-border rounded-xl overflow-hidden">
           <PanelHeader

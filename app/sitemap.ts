@@ -4,18 +4,11 @@ import { getSiteUrl } from '@/lib/site-url';
 import { getErrorMessage } from '@/lib/errors';
 import logger from '@/lib/logger';
 
-/**
- * Sitemap of the site's static pages plus every map page (map list comes from
- * the already-cached map metadata, so this stays cheap).
- *
- * Individual player profiles are intentionally NOT enumerated: they're
- * crawlable via `/players`, but listing every one would require a full-table
- * scan and a very large sitemap — deliberately out of scope here.
- */
-// Built per request: baking it at build time would freeze the map list to
-// whatever the cache held (usually nothing) during the build.
+// Per request: at build time the map list would freeze to the build's cache (usually empty).
 export const dynamic = 'force-dynamic';
 
+/** Static pages plus every map page (cached metadata, so cheap). Player profiles are omitted on
+ * purpose: crawlable via `/players`, but listing all needs a full-table scan and a huge sitemap. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = await getSiteUrl();
   const now = new Date();

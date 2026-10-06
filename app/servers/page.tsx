@@ -7,7 +7,7 @@ import type { Metadata } from 'next';
 import { getErrorMessage } from '@/lib/errors';
 import { getMapImagesUrl, isSurfMap } from '@/lib/utils';
 
-// Force dynamic rendering to ensure fresh data on each request
+// Fresh data on every request.
 export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {

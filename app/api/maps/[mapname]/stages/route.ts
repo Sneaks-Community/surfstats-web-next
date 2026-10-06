@@ -18,12 +18,11 @@ export async function GET(
   const stage = parseIntParam(searchParams.get('stage'), { fallback: 1, min: 1 });
   const rawQuery = searchParams.get('q');
 
-  // Only stages with records exist in the registry; reject others up front so
-  // invalid values can't trigger the heavy DENSE_RANK query.
+  // The registry lists only stages with records; reject others before the heavy DENSE_RANK query.
   const stagesList = await getStagesByMapFromCache(validMapname);
   const stageExists = stagesList.includes(stage);
 
-  // Search mode: return all matching records (up to 100) with true global ranks
+  // Search mode: every match (up to 100), with true global ranks.
   if (rawQuery !== null) {
     const query = validateSearchQuery(rawQuery);
     if (query.length < MIN_SEARCH_LENGTH) {

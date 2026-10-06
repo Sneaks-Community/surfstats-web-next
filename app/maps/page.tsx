@@ -31,13 +31,13 @@ export default async function MapsPage({
   }>;
 }) {
   const params = await searchParams;
-  // Helper to handle string | string[] from searchParams (returns first value)
+  // First value of a possibly repeated search param.
   const getParam = (value: string | string[] | undefined, defaultValue = ''): string => {
     if (Array.isArray(value)) return value[0] || defaultValue;
     return value || defaultValue;
   };
 
-  // Helper to get all values from string | string[] (for multi-select like tiers)
+  // Every value of a possibly repeated param, for multi-selects like tiers.
   const getParamArray = (value: string | string[] | undefined): string[] => {
     if (Array.isArray(value)) return value;
     if (value) return [value];
@@ -47,32 +47,25 @@ export default async function MapsPage({
   const q = validateSearchQuery(getParam(params.q));
   const requestedPage = parseIntParam(getParam(params.page, '1'));
   const type = getParam(params.type, 'all');
-  // Handle tiers from URL - can be comma-separated or multiple params
+  // Tiers arrive comma-separated, as repeated params, or both.
   const tiersParams = getParamArray(params.tiers);
   const tiers = tiersParams.flatMap(t => t.split(',').map(tier => parseInt(tier.trim(), 10)).filter(tier => !isNaN(tier)));
   const mapper = getParam(params.mapper);
   const bonuses = getParam(params.bonuses, 'all');
 
-  // Fetch all map metadata from Valkey cache
   const allMetadata = await getAllMapMetadataFromCache();
 
-  // Apply filters to cached data
   const filteredMaps: MapMetadata[] = [];
   for (const metadata of allMetadata.values()) {
-    // Apply search filter
     if (q && !metadata.mapname.toLowerCase().includes(q.toLowerCase())) continue;
 
-    // Apply type filter (linear vs staged)
     if (type === 'linear' && isStagedMap(metadata)) continue;
     if (type === 'staged' && !isStagedMap(metadata)) continue;
 
-    // Apply tier filter
     if (tiers.length > 0 && !tiers.includes(metadata.tier)) continue;
 
-    // Apply mapper filter
     if (mapper && !metadata.mapper.toLowerCase().includes(mapper.toLowerCase())) continue;
 
-    // Apply bonuses filter
     if (bonuses !== 'all') {
       if (bonuses === '0' && metadata.bonuses !== 0) continue;
       if (bonuses === '4+' && metadata.bonuses < 4) continue;
@@ -82,18 +75,16 @@ export default async function MapsPage({
     filteredMaps.push(metadata);
   }
 
-  // Sort by mapname
   filteredMaps.sort((a, b) => a.mapname.localeCompare(b.mapname));
 
-  // Apply pagination. The filtered set is in memory, so clamp against the real
-  // page count: an out-of-range `?page=` shows the last page, not an empty grid.
+  // The filtered set is in memory, so clamp to the real page count: an out-of-range `?page=`
+  // shows the last page, not an empty grid.
   const total = filteredMaps.length;
   const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
   const page = Math.min(requestedPage, totalPages);
   const offset = (page - 1) * ITEMS_PER_PAGE;
   const paginatedMaps = filteredMaps.slice(offset, offset + ITEMS_PER_PAGE);
 
-  // Get filter options from cache
   const tierDistribution = await getTierDistributionFromCache();
   const filterOptions = {
     tiers: Array.from(tierDistribution.entries())
@@ -113,7 +104,6 @@ export default async function MapsPage({
           </div>
         </div>
 
-        {/* Filter Panel */}
         <Suspense fallback={<div className="bg-surface border border-border rounded-xl p-4 h-32 animate-pulse" />}>
           <MapFilters tierOptions={filterOptions.tiers} />
         </Suspense>
@@ -183,7 +173,6 @@ export default async function MapsPage({
             </div>
           )}
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <Pagination
               currentPage={page}

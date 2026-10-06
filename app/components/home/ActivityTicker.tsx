@@ -36,11 +36,7 @@ interface TickerItem {
   bonus: number | null;
 }
 
-/**
- * Interleave the two feeds (record, completion, record, …). Both arrive
- * newest-first, so alternating preserves recency without parsing dates and
- * gives an evenly-mixed strip.
- */
+/** Alternate the feeds; both arrive newest-first, so this keeps recency without parsing dates. */
 function interleave(records: TickerRecord[], completions: TickerCompletion[]): TickerItem[] {
   const items: TickerItem[] = [];
   const max = Math.max(records.length, completions.length);
@@ -99,16 +95,9 @@ function Chip({ item, mapImagesUrl }: { item: TickerItem; mapImagesUrl: string }
   );
 }
 
-/**
- * Latest Activity ticker — a single continuous horizontal marquee that merges
- * the "Latest Records" and "Latest Completions" feeds into one compact strip,
- * replacing the two tall columns that made the front page long.
- *
- * Pure CSS (no client JS): the track holds two identical sequences and slides
- * left by exactly one sequence-width on loop for a seamless scroll (see
- * `.ticker-*` rules in globals.css). It pauses on hover, and collapses to a
- * manually-scrollable strip under `prefers-reduced-motion`.
- */
+/** Marquee merging latest records and completions into one compact strip. Pure CSS (`.ticker-*`
+ * in globals.css): two identical sequences slide left one sequence-width per loop, seamlessly;
+ * pauses on hover, becomes a manual scroll under `prefers-reduced-motion`. */
 export default function ActivityTicker({ records, completions, mapImagesUrl }: ActivityTickerProps) {
   const items = interleave(records, completions);
   if (items.length === 0) return null;
@@ -137,7 +126,7 @@ export default function ActivityTicker({ records, completions, mapImagesUrl }: A
         {seq(false)}
         {seq(true)}
       </div>
-      {/* Edge fades so chips ease in/out rather than clipping hard at the borders. */}
+      {/* Edge fades, so chips don't clip hard at the borders. */}
       <div className="pointer-events-none absolute inset-y-0 left-0 w-12 bg-gradient-to-r from-surface to-transparent" />
       <div className="pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-surface to-transparent" />
     </div>

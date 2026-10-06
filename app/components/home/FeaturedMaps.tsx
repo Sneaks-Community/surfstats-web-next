@@ -10,11 +10,7 @@ export interface FeaturedMapEntry {
   completions: number;
 }
 
-/**
- * Visual showcase of maps to play (most-completed, i.e. community favourites).
- * Thumbnail grid with tier badges + completion counts — shows off content and
- * gives newcomers an obvious place to start.
- */
+/** Thumbnail grid of the most-completed maps, giving newcomers an obvious place to start. */
 export default function FeaturedMaps({
   maps,
   mapImagesUrl,
@@ -40,9 +36,8 @@ export default function FeaturedMaps({
               className="object-cover transition-transform duration-300 group-hover:scale-105"
               referrerPolicy="no-referrer"
             />
-            {/* Solid dark chip (with backdrop-blur) instead of the translucent
-                TierBadge so the tier stays legible over bright map skies — same
-                treatment the /maps grid uses. */}
+            {/* Solid dark chip, not the translucent TierBadge, so the tier stays legible over
+                bright skies (same as the /maps grid). */}
             <div className="absolute top-2 left-2">
               <span
                 className={`flex items-center gap-1 rounded-md bg-black/60 backdrop-blur-sm px-2 py-1 text-xs font-bold uppercase tracking-wider ring-1 ring-white/10 ${getTierColor(m.tier).text}`}

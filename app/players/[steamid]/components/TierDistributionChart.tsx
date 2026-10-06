@@ -37,24 +37,19 @@ interface TierDistributionChartProps {
 
 export default function TierDistributionChart({ data }: TierDistributionChartProps) {
   const chartTheme = useChartTheme();
-  // Ensure data is an array and handle edge cases
   const safeData = useMemo(() => Array.isArray(data) ? data : [], [data]);
 
-  // Transform data for the radar chart
   const chartData = useMemo(() => {
-    // Derive the tier axes from the data, which the server pads to its full tier
-    // range (up to 6, 10, etc. depending on the server's map pool). This keeps
-    // the radar and the L/S summary in agreement and avoids both dropped high
-    // tiers and blank trailing axes.
+    // Tier axes come from the data (server-padded to the pool's full tier range), so the radar
+    // agrees with the L/S summary, with no dropped high tiers or blank trailing axes.
     const tiers = Array.from(new Set(safeData.map(d => d.tier))).sort((a, b) => a - b);
 
-    // Build Map for O(1) lookups - computed directly within outer useMemo
+    // O(1) per-tier lookups rather than a find() per tier.
     const dataMap = new Map<number, { linear: number; staged: number }>();
     for (const d of safeData) {
       dataMap.set(d.tier, { linear: d.linear, staged: d.staged });
     }
 
-    // O(1) lookups instead of O(n) find() calls
     const linearPerTier = tiers.map(tier => dataMap.get(tier)?.linear ?? 0);
     const stagedPerTier = tiers.map(tier => dataMap.get(tier)?.staged ?? 0);
 
@@ -133,16 +128,14 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
           display: false, // Hide value labels (50, 100, 200, etc.)
         },
         suggestedMin: 0,
-        // Auto-scale the radial axis based on data
         max: Math.max(
           ...safeData.map(d => d.linear),
           ...safeData.map(d => d.staged)
-        ) * 1.1, // Add 10% padding for visual clarity
+        ) * 1.1, // 10% padding
       },
     },
   }), [safeData, chartTheme]);
 
-  // Summary stats for the info panel
   const summaryInfo = useMemo(() => {
     if (safeData.length === 0) return null;
     const totalLinear = safeData.reduce((sum, d) => sum + d.linear, 0);
@@ -153,7 +146,6 @@ export default function TierDistributionChart({ data }: TierDistributionChartPro
     return { totalLinear, totalStaged, bestTier: bestTier.tier };
   }, [safeData]);
 
-  // If no data, show empty state
   if (chartData.labels.length === 0) {
     return <ChartEmptyState title="Tier Distribution" message="No completions" />;
   }
