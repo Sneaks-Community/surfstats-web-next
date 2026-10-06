@@ -87,16 +87,6 @@ export async function getAllRegistryDataFromCache({ force }: RefreshOptions = {}
   return cachedFetch(REGISTRY_DATA_KEY, REGISTRY_CACHE_TTL, fetchRegistryData, { lock: true, force });
 }
 
-export async function getAllBonusGroupsFromCache(): Promise<BonusGroup[]> {
-  const data = await getAllRegistryDataFromCache();
-  return data.bonuses;
-}
-
-export async function getAllStagesFromCache(): Promise<StageGroup[]> {
-  const data = await getAllRegistryDataFromCache();
-  return data.stages;
-}
-
 export async function getPlayerCountFromCache(): Promise<number> {
   const data = await getAllRegistryDataFromCache();
   return data.playerCount;
