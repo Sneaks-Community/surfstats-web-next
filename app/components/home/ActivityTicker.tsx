@@ -57,7 +57,8 @@ function Chip({ item, mapImagesUrl }: { item: TickerItem; mapImagesUrl: string }
         unoptimized
         width={40}
         height={40}
-        className="rounded-md shrink-0"
+        // Sized by class too: Tailwind's base `img { height: auto }` overrides the height attribute.
+        className="h-10 w-10 rounded-md shrink-0 object-cover"
         referrerPolicy="no-referrer"
       />
       <div className="flex flex-col gap-0.5 min-w-0">

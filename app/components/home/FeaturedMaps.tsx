@@ -33,6 +33,8 @@ export default function FeaturedMaps({
               alt={`${m.mapname} thumbnail`}
               unoptimized
               fill
+              // Above the fold on desktop, where any of these equal-size thumbnails can be the LCP.
+              loading="eager"
               className="object-cover transition-transform duration-300 group-hover:scale-105"
               referrerPolicy="no-referrer"
             />
