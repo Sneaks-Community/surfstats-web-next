@@ -7,10 +7,8 @@ interface Global {
   __surfstatsShutdown?: unknown;
 }
 
-/**
- * Fresh module + global registry per test: the registry lives on globalThis, so
- * `vi.resetModules()` alone would carry the previous `shuttingDown` flag over.
- */
+/** Fresh module and registry per test: the registry is on globalThis, so `vi.resetModules()`
+ * alone would carry over the previous `shuttingDown` flag. */
 async function freshShutdown() {
   delete (globalThis as Global).__surfstatsShutdown;
   process.removeAllListeners('SIGTERM');
@@ -45,7 +43,7 @@ describe('shutdown', () => {
     expect(exit).toHaveBeenCalledWith(0);
   });
 
-  // It always exited 0, so a pool that refused to drain looked like a clean stop.
+  // Exiting 0 regardless would make a pool that refused to drain look like a clean stop.
   it('exits non-zero when a handler fails, after running the others', async () => {
     const { onShutdown } = await freshShutdown();
     const ok = vi.fn();
@@ -60,8 +58,7 @@ describe('shutdown', () => {
     expect(logger.error.mock.calls[0][0]).toContain('"broken" failed');
   });
 
-  // Proxy and server bundles each register "valkey-client" for their own live
-  // client, so both handlers have to run.
+  // Proxy and server bundles each register "valkey-client" for their own client; both must run.
   it('runs both handlers when two module instances register the same name', async () => {
     const { onShutdown } = await freshShutdown();
     const proxyInstance = vi.fn();
@@ -88,8 +85,8 @@ describe('shutdown', () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
-  // Next's listener is installed before instrumentation.ts runs and its cleanup
-  // ends in process.exit(143), so without the takeover nothing below ever ran.
+  // Next's listener is installed before instrumentation.ts runs and its cleanup ends in
+  // process.exit(143), so without the takeover no registered handler would run.
   it('lets an inherited listener drain first, and survives its exit', async () => {
     delete (globalThis as Global).__surfstatsShutdown;
     process.removeAllListeners('SIGTERM');

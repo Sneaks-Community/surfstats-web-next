@@ -28,7 +28,7 @@ describe('wrapPoolQuery', () => {
     expect(logger.debug.mock.calls[0][0]).toContain('SELECT 1');
   });
 
-  // A re-evaluated module used to wrap the previous wrapper, double-logging.
+  // A re-evaluated module would otherwise wrap the previous wrapper and log twice.
   it('wraps a pool only once, however many times it is called', async () => {
     const pool = fakePool();
     wrapPoolQuery(pool, { prefix: 'DB' });
@@ -40,7 +40,7 @@ describe('wrapPoolQuery', () => {
     expect(logger.debug.mock.calls.filter((call) => String(call[0]).includes('SELECT 1'))).toHaveLength(1);
   });
 
-  // `execute` was left unwrapped, silently losing slow-query logging.
+  // An unwrapped `execute` silently loses slow-query logging.
   it('logs `execute` as well as `query`', async () => {
     const pool = fakePool();
     wrapPoolQuery(pool, { prefix: 'DB' });
@@ -61,8 +61,8 @@ describe('wrapPoolQuery', () => {
     expect(logger.error.mock.calls[0][0]).toContain('PROTOCOL_CONNECTION_LOST');
   });
 
-  // mysql2 rejects with a plain, code-less Error here, which read as an
-  // anonymous "Database error (UNKNOWN)" and hid pool exhaustion.
+  // mysql2 rejects with a plain, code-less Error here, which would log as an anonymous
+  // "Database error (UNKNOWN)" and hide pool exhaustion.
   it('names a full connection queue as a pool failure, not a query error', async () => {
     const pool = fakePool();
     (pool.query as unknown as ReturnType<typeof vi.fn>).mockRejectedValue(

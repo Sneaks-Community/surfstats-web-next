@@ -1,7 +1,5 @@
-/**
- * Next calls `register()` once per server instance, before it accepts requests:
- * the app's only startup hook. Deliberately not awaited, see `lib/startup.ts`.
- */
+/** Next calls this once per server instance, before it accepts requests: the app's only startup
+ * hook. `startServer()` is deliberately not awaited (see lib/startup.ts). */
 export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
 

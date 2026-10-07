@@ -34,21 +34,19 @@ export default function MapLinkWithPreview({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const mapImagesUrl = useMapImagesUrl();
 
-  // Calculate thumbnail position to stay within viewport
+  // Flip the thumbnail left/above when it would overflow the viewport.
   const updateThumbnailPosition = useCallback((x: number, y: number) => {
     const thumbnailWidth = 160;
     const thumbnailHeight = 120;
     const offset = 15;
     const padding = 10;
 
-    // Determine horizontal position
     if (x + offset + thumbnailWidth + padding > window.innerWidth) {
       setThumbnailPosition('left');
     } else {
       setThumbnailPosition('right');
     }
 
-    // Determine vertical position
     if (y + offset + thumbnailHeight + padding > window.innerHeight) {
       setThumbnailVerticalPosition('above');
     } else {
@@ -59,13 +57,11 @@ export default function MapLinkWithPreview({
   }, []);
 
   const handleMouseEnter = useCallback((e: React.MouseEvent) => {
-    // Start tracking position
     updateThumbnailPosition(e.clientX, e.clientY);
     
-    // Set a 200ms delay before showing the thumbnail
     timeoutRef.current = setTimeout(() => {
       setIsVisible(true);
-      // Trigger fade-in after a small delay to ensure the element is rendered
+      // Next frame, so it renders at opacity 0 first and the fade transition runs.
       requestAnimationFrame(() => {
         setIsFadingIn(true);
       });
@@ -79,14 +75,13 @@ export default function MapLinkWithPreview({
   }, [isVisible, updateThumbnailPosition]);
 
   const handleMouseLeave = useCallback(() => {
-    // Clear the timeout if mouse leaves before delay completes
+    // Cancel the show delay if it hasn't fired yet.
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
     
-    // Same ref as the show delay, so the unmount cleanup below clears
-    // whichever of the two is pending.
+    // The hide delay shares the ref, so the unmount cleanup clears whichever timer is pending.
     setIsFadingIn(false);
     timeoutRef.current = setTimeout(() => {
       setIsVisible(false);
@@ -94,7 +89,6 @@ export default function MapLinkWithPreview({
     }, 150);
   }, []);
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     return () => {
       if (timeoutRef.current) {
@@ -103,7 +97,6 @@ export default function MapLinkWithPreview({
     };
   }, []);
 
-  // Calculate actual position for the thumbnail
   const thumbnailStyle: React.CSSProperties = {
     position: 'fixed',
     pointerEvents: 'none',

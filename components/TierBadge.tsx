@@ -4,15 +4,10 @@ import { Mountain } from 'lucide-react';
 interface TierBadgeProps {
   tier: number;
   className?: string;
-  variant?: 'compact' | 'full'; // 'compact' = T<number>, 'full' = Tier <number>
+  variant?: 'compact' | 'full'; // compact: T1, full: Tier 1
 }
 
-/**
- * Badge displaying the tier with color coding
- * @param tier - The tier number to display
- * @param className - Additional CSS classes
- * @param variant - Display format: 'compact' (T1) or 'full' (Tier 1)
- */
+/** Color-coded tier badge. */
 export default function TierBadge({ tier, className = '', variant = 'compact' }: TierBadgeProps) {
   const colors = getTierColor(tier);
   

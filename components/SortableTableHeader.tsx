@@ -2,10 +2,7 @@ import SortLink, { type SortLinkProps } from '@/components/SortLink';
 
 type SortableTableHeaderProps = SortLinkProps;
 
-/**
- * A sortable `<th>` for real `<table>` layouts (e.g. the countries ranking
- * list). Delegates the clickable control to the shared `SortLink`.
- */
+/** Sortable `<th>` for real `<table>` layouts (e.g. the countries list), wrapping `SortLink`. */
 export default function SortableTableHeader({
   className = '',
   ...sortLinkProps

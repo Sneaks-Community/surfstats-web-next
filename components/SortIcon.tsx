@@ -13,12 +13,8 @@ interface SortIconProps {
   inactiveClassName?: string;
 }
 
-/**
- * Sort-direction indicator for sortable table/list headers. Shows a neutral
- * up/down arrow for inactive columns and a directional arrow for the active one.
- * Shared by the map and player record tables and the URL-nav header cell; the
- * class props let each caller theme the arrows (e.g. hover-reveal vs. always-on).
- */
+/** Sort arrow: neutral when inactive, directional on the active column. Used by the map and player
+ * record tables and `SortLink`; class props let callers theme it (hover-reveal, always-on). */
 export default function SortIcon({
   field,
   sortField,

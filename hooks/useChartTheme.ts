@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-// Used during SSR and if a property is missing; matches the dark palette the
-// charts were written against.
+// SSR and missing-property fallback; matches the dark palette.
 const FALLBACK = {
   text: '#f8fafc',
   textMuted: '#94a3b8',
@@ -38,11 +37,8 @@ export const chartTooltip = (theme: ChartTheme) => ({
   bodyFont: { size: 12 },
 });
 
-/**
- * Chart.js draws to canvas, so it can't use CSS classes: colors have to be
- * resolved to strings. Reads them from the theme's custom properties and
- * recomputes when the light/dark class on <html> flips.
- */
+/** Theme colors as strings, since Chart.js draws to canvas and can't use CSS classes. Read from the
+ * theme's CSS custom properties; recomputed when the light/dark class on <html> flips. */
 export function useChartTheme(): ChartTheme {
   const [themeVersion, setThemeVersion] = useState(0);
 

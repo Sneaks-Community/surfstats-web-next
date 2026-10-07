@@ -1,41 +1,21 @@
-/**
- * Pagination hook for calculating page numbers to display
- * 
- * Implements sliding window pagination with ellipsis for large page counts.
- * Delta controls how many pages to show on each side of the current page.
- * 
- * @example
- * ```tsx
- * const { pageNumbers, hasNextPage, hasPrevPage } = usePagination({
- *   currentPage: 5,
- *   totalPages: 100,
- *   delta: 2,
- * });
- * ```
- */
-
 import { useMemo } from 'react';
 
 interface UsePaginationOptions {
   currentPage: number;
   totalPages: number;
-  delta?: number; // Number of pages to show on each side of current page (default: 2)
+  delta?: number; // pages shown either side of the current one
 }
 
 interface UsePaginationResult {
-  pageNumbers: Array<number | string>; // Array of page numbers with '...' for gaps
+  pageNumbers: Array<number | string>; // '...' marks a gap
   hasNextPage: boolean;
   hasPrevPage: boolean;
   canGoToFirst: boolean;
   canGoToLast: boolean;
 }
 
-/**
- * Hook to calculate pagination state
- * 
- * Returns an array of page numbers to display, with ellipsis placeholders
- * for gaps when there are many pages. Also provides navigation state flags.
- */
+/** Sliding-window page list: every page up to 7, else first, last and `delta` either side of the
+ * current page, with `'...'` for gaps; plus the navigation flags. */
 export function usePagination({
   currentPage,
   totalPages,
@@ -55,19 +35,16 @@ export function usePagination({
     }
 
     if (totalPages <= 7) {
-      // Show all pages if 7 or fewer
       for (let i = 1; i <= totalPages; i++) {
         pageNumbers.push(i);
       }
     } else {
-      // Always show first page
       pageNumbers.push(1);
 
       if (currentPage > delta + 2) {
         pageNumbers.push('...');
       }
 
-      // Calculate range around current page
       const start = Math.max(2, currentPage - delta);
       const end = Math.min(totalPages - 1, currentPage + delta);
 
@@ -79,7 +56,6 @@ export function usePagination({
         pageNumbers.push('...');
       }
 
-      // Always show last page
       pageNumbers.push(totalPages);
     }
 

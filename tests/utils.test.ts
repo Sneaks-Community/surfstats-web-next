@@ -16,8 +16,7 @@ import {
   DEFAULT_DISPLAY_TZ,
 } from '../lib/utils';
 
-// Every page route clamps `?page=` through this; a NaN must never reach an
-// OFFSET calculation.
+// Every page route clamps `?page=` through this; a NaN must never reach an OFFSET.
 describe('parseIntParam', () => {
   it('falls back on missing or non-numeric input', () => {
     expect(parseIntParam(undefined)).toBe(1);
@@ -58,8 +57,7 @@ describe('formatPlaytime', () => {
   });
 });
 
-// The zone is an explicit argument, so a server render and the client's
-// re-render cannot disagree by silently falling back to different defaults.
+// The zone is explicit, so server and client renders can't silently default to different zones.
 describe('formatDate', () => {
   it('formats in the given zone and survives bad input', () => {
     // month and day are both 'numeric', so neither is zero-padded
@@ -146,7 +144,7 @@ describe('sortRecords and matchesQuery', () => {
   });
 });
 
-// Shared by both record tables, three of those call sites as sort comparators.
+// Shared by both record tables; each uses wrDiff as a sort comparator.
 describe('wrDiff and formatTimeDiff', () => {
   it('sorts records with no WR last, whichever direction', () => {
     const rows = [

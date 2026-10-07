@@ -16,12 +16,8 @@ interface SortableThProps<F extends string> {
   className?: string;
 }
 
-/**
- * Keyboard-accessible sortable table header cell. The sort trigger is a real
- * `<button>`, so it is reachable and activatable via keyboard (fixes the
- * mouse-only `<th onClick>` pattern). Generic over the sort-field union so each
- * table keeps its own strongly-typed field names.
- */
+/** Sortable `<th>` whose trigger is a real `<button>`, so keyboard users can reach and activate it
+ * (unlike `<th onClick>`). Generic over the field union so each table keeps typed field names. */
 export default function SortableTh<F extends string>({
   label,
   field,

@@ -47,10 +47,9 @@ export function SearchDropdown() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const mapImagesUrl = useMapImagesUrl();
 
-  // Calculate total results for keyboard navigation
   const totalResults = results.players.length + results.maps.length;
 
-  // Search function with AbortController to prevent stale race conditions
+  // Aborts the previous request so a stale response can't overwrite a newer one.
   const performSearch = useCallback(async (searchQuery: string) => {
     if (searchQuery.length < MIN_SEARCH_LENGTH) {
       setResults({ players: [], maps: [] });
@@ -58,12 +57,10 @@ export function SearchDropdown() {
       return;
     }
 
-    // Cancel any pending request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
 
-    // Create new AbortController for this request
     abortControllerRef.current = new AbortController();
 
     setIsLoading(true);
@@ -76,7 +73,7 @@ export function SearchDropdown() {
       setIsOpen(true);
       setSelectedIndex(-1);
     } catch (error) {
-      // Ignore abort errors - they're expected when a new search cancels this one
+      // Expected when a newer search cancels this one.
       if (isAbortError(error)) {
         return;
       }
@@ -111,7 +108,6 @@ export function SearchDropdown() {
     };
   }, [debouncedQuery, performSearch]);
 
-  // Click outside to close
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
@@ -128,7 +124,6 @@ export function SearchDropdown() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (!isOpen) return;
 
@@ -148,7 +143,7 @@ export function SearchDropdown() {
         if (selectedIndex >= 0) {
           navigateToSelected();
         } else if (query.length >= MIN_SEARCH_LENGTH) {
-          // Submit form to search page using Next.js router
+          // Same as the form submit, but client-side.
           router.push(`/search?q=${encodeURIComponent(query)}`);
         }
         break;
@@ -161,7 +156,6 @@ export function SearchDropdown() {
     }
   };
 
-  // Navigate to selected item using Next.js router
   const navigateToSelected = () => {
     if (selectedIndex < 0) return;
 
@@ -221,7 +215,6 @@ export function SearchDropdown() {
         )}
       </form>
 
-      {/* Dropdown results */}
       {showDropdown && (
         <div
           id="search-dropdown"
@@ -240,7 +233,6 @@ export function SearchDropdown() {
             </div>
           )}
 
-          {/* Players section */}
           {results.players.length > 0 && (
             <div>
               <div className="px-3 py-1 text-xs font-medium text-text-muted uppercase tracking-wider flex items-center gap-1">
@@ -284,7 +276,6 @@ export function SearchDropdown() {
             </div>
           )}
 
-          {/* Maps section */}
           {results.maps.length > 0 && (
             <div className={results.players.length > 0 ? 'border-t border-border' : ''}>
               <div className="px-3 py-1 text-xs font-medium text-text-muted uppercase tracking-wider flex items-center gap-1">

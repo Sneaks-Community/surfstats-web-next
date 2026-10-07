@@ -31,10 +31,8 @@ interface PlayerListTableProps {
   rankLabel?: string;
 }
 
-// Shared column widths so the header and every row align. `player` takes the
-// slack (flex-1) so the numeric columns pack tightly on the right instead of
-// spreading across the full width. Widths shrink below `sm`, where Last Seen
-// drops out of the grid and moves under the player name instead.
+// Header columns; Row repeats these widths by hand, so keep them in sync. `player` takes the
+// slack so the numbers pack right; below `sm` widths shrink and Last Seen moves under the name.
 const COLUMNS = [
   { key: 'rank', label: 'Rank', short: '#', width: 'w-11 sm:w-20', right: false, defaultOrder: 'asc' as const },
   { key: 'player', label: 'Player', short: 'Player', width: 'flex-1 min-w-0', right: false, defaultOrder: 'asc' as const },
@@ -120,12 +118,8 @@ function Row({ player, avatar }: { player: PlayerListEntry; avatar?: { avatarmed
   );
 }
 
-/**
- * A compact, two-column player leaderboard. The page's 20 players are split
- * 10/10 into side-by-side columns on wide screens (using the horizontal space
- * and halving the height) and collapse to a single continuous list below `xl`.
- * Numeric columns are right-aligned with fixed widths so they group tightly.
- */
+/** Player leaderboard: from `xl` the page splits in half into side-by-side columns (halving the
+ * height); below it they stack as one continuous list. */
 export default function PlayerListTable({
   players,
   avatars,
@@ -148,7 +142,6 @@ export default function PlayerListTable({
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden">
       <div className="grid grid-cols-1 xl:grid-cols-2">
-        {/* Left column: ranks 1–10 (or first half). */}
         <div className="xl:border-r border-border">
           <Header sort={sort} rankLabel={rankLabel} />
           <div className="divide-y divide-border">
@@ -158,9 +151,7 @@ export default function PlayerListTable({
           </div>
         </div>
 
-        {/* Right column: ranks 11–20 (or second half). The header only shows
-            when the columns are side-by-side; stacked on mobile it reads as one
-            continuous list under the left column's header. */}
+        {/* Right half: its header shows only side by side; stacked, it continues the left list. */}
         {right.length > 0 && (
           <div className="border-t border-border xl:border-t-0">
             <div className="hidden xl:block">

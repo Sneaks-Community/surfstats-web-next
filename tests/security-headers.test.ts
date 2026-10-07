@@ -32,8 +32,7 @@ describe('contentSecurityPolicy', () => {
     expect(directive(contentSecurityPolicy('abc123'), 'connect-src')).toBe("'self'");
   });
 
-  // Styles are the deliberate exception: React writes style attributes, which a
-  // nonce cannot cover.
+  // Styles are the deliberate exception: React writes style attributes, which a nonce can't cover.
   it('still allows inline styles', () => {
     expect(directive(contentSecurityPolicy('abc123'), 'style-src')).toContain("'unsafe-inline'");
   });

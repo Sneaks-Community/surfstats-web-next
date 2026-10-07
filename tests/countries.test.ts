@@ -15,8 +15,7 @@ describe('getCountryCodeFromName', () => {
     expect(getCountryCodeFromName('  Germany  ')).toBe('DE');
   });
 
-  // GeoIP stores the article form; missing this dropped the largest country
-  // from every country view.
+  // GeoIP stores the article form; unstripped, the largest country drops out of all country views.
   it('strips a leading "The"', () => {
     expect(getCountryCodeFromName('The United States')).toBe('US');
     expect(getCountryCodeFromName('The Russian Federation')).toBe('RU');
@@ -56,8 +55,7 @@ describe('code lookups', () => {
     expect(isValidCountryCode('ZZ')).toBe(false);
   });
 
-  // Drives the OR'd WHERE clause on the country pages, so a missing variation
-  // silently loses players.
+  // Drives the OR'd WHERE clause on the country pages; a missing variation silently loses players.
   it('returns every spelling a country page must match', () => {
     const names = getCountryNamesFromCode('GB');
 

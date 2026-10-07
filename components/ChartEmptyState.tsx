@@ -1,17 +1,12 @@
 interface ChartEmptyStateProps {
-  /** Chart heading, shown so the card matches its populated counterpart. */
+  /** Chart heading, matching the populated card. */
   title: string;
-  /** Muted placeholder message (e.g. "No completions"). */
+  /** Placeholder text, e.g. "No completions". */
   message: string;
 }
 
-/**
- * Full-height placeholder card shown when a chart has no data.
- *
- * Mirrors the populated chart card chrome (surface + border + title) so the
- * surrounding grid keeps a stable height, with a centered muted message in
- * place of the chart.
- */
+/** Full-height card for a chart with no data: the populated card's chrome (surface, border, title)
+ * keeps the grid height stable, with a centered muted message in place of the chart. */
 export default function ChartEmptyState({ title, message }: ChartEmptyStateProps) {
   return (
     <div className="bg-surface border border-border rounded-xl p-4 h-full flex flex-col">

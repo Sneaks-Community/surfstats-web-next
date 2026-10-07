@@ -39,9 +39,8 @@ describe('waitForCacheReady', () => {
     expect(connectedOnImport).toBe(true);
   });
 
-  // The initial-connect promise is bounded by a wall-clock race and is one-shot,
-  // so on its own it reports "down" for a handshake that is merely still in
-  // flight — which turned one slow boot into a flood of hard failures.
+  // The initial-connect race is wall-clock and one-shot, so on its own it reports "down" for a
+  // handshake still in flight, turning one slow boot into a flood of hard failures.
   it('waits out a handshake still in flight instead of failing closed', async () => {
     const pending = waitForCacheReady();
 

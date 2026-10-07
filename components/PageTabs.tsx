@@ -11,15 +11,9 @@ interface PageTabsProps {
 
 type TopTab = 'overview' | 'times';
 
-/**
- * Overview | Times tabs, shared by the map and player pages.
- *
- * Crawler-safety hard rule: the active tab hard-defaults to Overview and is
- * deliberately NOT initialized from the URL, so a link carrying a tab param can
- * never auto-open (and auto-fetch) the expensive Times section under a crawler's
- * renderer. Times is conditionally mounted until its first activation, then
- * stays mounted and CSS-toggled so switching back and forth doesn't refetch.
- */
+/** Overview | Times tabs for the map and player pages. Crawler-safety hard rule: always starts on
+ * Overview, never from the URL, so no link makes a crawler auto-open (and fetch) the costly Times.
+ * Times mounts on first activation, then stays mounted, CSS-toggled; switching never refetches. */
 export default function PageTabs({ overview, times }: PageTabsProps) {
   const [activeTab, setActiveTab] = useState<TopTab>('overview');
   const { tablistProps, tabProps, panelProps } = useTabs(activeTab);

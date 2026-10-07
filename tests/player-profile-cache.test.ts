@@ -44,17 +44,16 @@ describe('getPlayerOverviewFromCache', () => {
     expect(recordProfileView).toHaveBeenCalledWith(STEAM_ID);
   });
 
-  // The warmer refreshes through this same function. Re-recording would give all
-  // 100 entries a fresh score every pass, so the set could never rotate and a
-  // profile nobody views any more would be warmed forever.
+  // The warmer refreshes through this function; re-recording would rescore all 100 entries each
+  // pass, so the set never rotates and a profile nobody views is warmed forever.
   it('does not record the view when the warmer forces a refresh', async () => {
     await getPlayerOverviewFromCache(STEAM_ID, { force: true });
 
     expect(recordProfileView).not.toHaveBeenCalled();
   });
 
-  // A 0-point player is absent from every ranked listing, so SQL returns a NULL
-  // rank; `Number(null) || 1` would have reported them as rank 1.
+  // A 0-point player is absent from every ranked listing, so SQL returns a NULL rank, which
+  // `Number(null) || 1` would report as rank 1.
   it('keeps a null rank null', async () => {
     query.mockResolvedValue([[{ steamid: STEAM_ID, name: 'a', country: 'US', points: 0, lastseen: '', rank: null, maps: 0, bonuses: 0, stages: 0 }]]);
 
@@ -73,8 +72,7 @@ describe('getPlayerOverviewFromCache', () => {
 });
 
 describe('getPlayerMapTimesFromCache', () => {
-  // Metadata excludes untiered maps and tiers outside 1-10; a miss used to be
-  // rendered as a fabricated tier 1 instead of being dropped.
+  // Metadata excludes untiered maps and tiers outside 1-10; a miss is dropped, not faked as tier 1.
   it('drops maps that are absent from the metadata blob', async () => {
     mapMetadata = new Map([['surf_kitsune', { mapname: 'surf_kitsune', tier: 3, wr_time: 42 }]]);
     query.mockResolvedValue([[
@@ -90,8 +88,8 @@ describe('getPlayerMapTimesFromCache', () => {
 });
 
 describe('getIncompleteMapsFromCache', () => {
-  // The universe is the metadata blob — what /maps lists — so a tiered map that
-  // nobody has ever finished is absent from both instead of only from /maps.
+  // The universe is the metadata blob (what /maps lists), so a tiered map nobody has finished is
+  // absent from both, not only from /maps.
   it('subtracts the player times from the metadata universe', async () => {
     mapMetadata = new Map([
       ['surf_kitsune', { mapname: 'surf_kitsune', tier: 3, wr_time: 42 }],

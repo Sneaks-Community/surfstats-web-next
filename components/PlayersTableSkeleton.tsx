@@ -1,16 +1,9 @@
 import { Skeleton } from '@/components/Skeleton';
 
-/**
- * Skeleton placeholder for the two-column player list. Shared between the
- * route-level `loading.tsx` (initial navigation) and the in-page
- * `<Suspense>` fallback that covers search-param changes (pagination / search),
- * which do not re-trigger `loading.tsx`. Mirrors `PlayerListTable`: two columns
- * of 10 rows on wide screens, collapsing to one continuous list below `xl`.
- */
 function SkeletonColumn({ side }: { side: 'left' | 'right' }) {
   return (
     <div className={side === 'left' ? 'xl:border-r border-border' : 'border-t border-border xl:border-t-0'}>
-      {/* Header (hidden on mobile for the right column, matching the real list). */}
+      {/* Header row; the right column's is hidden below xl, like the real list. */}
       <div className={`${side === 'right' ? 'hidden xl:flex' : 'flex'} items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 bg-surface/50 border-b border-border`}>
         <Skeleton className="h-3 w-4 sm:w-10 rounded" />
         <Skeleton className="h-3 flex-1 max-w-[8rem] rounded" />
@@ -34,6 +27,8 @@ function SkeletonColumn({ side }: { side: 'left' | 'right' }) {
   );
 }
 
+/** `PlayerListTable` placeholder (two columns of 10 rows, one list below `xl`) for the route
+ * `loading.tsx` and the `PendingContent` fallback (search-param changes skip `loading.tsx`). */
 export default function PlayersTableSkeleton() {
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden">

@@ -1,7 +1,4 @@
-/**
- * Spinning loading indicator. Renders just the spinner element — callers supply
- * any surrounding layout/label.
- */
+/** Bare spinner element; callers supply any surrounding layout or label. */
 export function LoadingSpinner({
   size = 'md',
   className = '',

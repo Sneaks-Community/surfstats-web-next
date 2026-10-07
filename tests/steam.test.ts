@@ -111,8 +111,7 @@ describe('getSteamProfilesFromCache', () => {
     expect(cacheGetMany).toHaveBeenCalledWith(ids.map((id) => `surfstats:steam:avatar:${id}`));
   });
 
-  // Results are matched back by position, so a partial hit must not
-  // shift avatars onto the wrong players.
+  // Results match back by position; a partial hit must not shift avatars onto the wrong players.
   it('maps a partial cache hit back to the right SteamIDs', async () => {
     const second = { avatar: 'b', avatarmedium: 'b', avatarfull: 'b' };
     cacheGetMany.mockResolvedValue([null, second, null]);
@@ -214,8 +213,7 @@ describe('getSteamProfilesFromCache', () => {
     for (const [entries] of cacheSetMany.mock.calls) expect(entries).toEqual([]);
   });
 
-  // The key is in the query string, so a Next data-cache entry would persist a
-  // live credential in .next/cache.
+  // The key is in the query string, so a Next data-cache entry would persist it in .next/cache.
   it('opts out of the Next data cache so the key never lands on disk', async () => {
     process.env.STEAM_API_KEY = 'test-key';
     vi.mocked(fetch).mockResolvedValue({
@@ -231,8 +229,7 @@ describe('getSteamProfilesFromCache', () => {
   });
 });
 
-// The key travels in the query string, and some fetch failures put the
-// request URL in the error message.
+// The key is in the query string, and some fetch errors put the request URL in their message.
 describe('Steam API key redaction', () => {
   beforeEach(() => {
     vi.clearAllMocks();

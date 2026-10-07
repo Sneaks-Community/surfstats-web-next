@@ -4,16 +4,13 @@ import Link from '@/components/Link';
 interface PanelHeaderProps {
   icon: LucideIcon;
   title: string;
-  /** Icon color class; defaults to the theme primary. */
+  /** Icon color class. */
   iconClassName?: string;
-  /** Optional trailing link (e.g. "View all"). */
+  /** Trailing link, e.g. "View all". */
   action?: { href: string; label: string };
 }
 
-/**
- * The titled header bar shared across dashboard panels
- * (icon + heading, optional trailing action link).
- */
+/** Header bar for dashboard panels: icon, heading and optional trailing link. */
 export default function PanelHeader({
   icon: Icon,
   title,

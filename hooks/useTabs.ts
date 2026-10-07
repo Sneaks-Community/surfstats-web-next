@@ -4,14 +4,8 @@ import { useId, type KeyboardEvent } from 'react';
 
 const MOVE_KEYS = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
 
-/**
- * ARIA plumbing for a tab bar, with manual activation: arrows and Home/End move
- * focus, and the button's own click/Enter/Space still does the selecting, so
- * arrowing past a tab never triggers its fetch.
- *
- * @param activeTab - The currently selected tab id
- * @returns Prop spreads for the tablist container, each tab, and the panel
- */
+/** ARIA prop spreads for a tab bar (tablist, tabs, panel), manual activation: arrows and Home/End
+ * move focus, the button's click/Enter/Space selects, so arrowing past a tab never fetches it. */
 export function useTabs<T extends string>(activeTab: T) {
   const prefix = useId();
   const tabId = (id: T) => `${prefix}-tab-${id}`;

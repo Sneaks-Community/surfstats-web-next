@@ -9,33 +9,30 @@ interface CountryBadgeProps {
   className?: string;
 }
 
+/** ISO code from a 2-letter code or a country name (ISO dataset, aliases too); null if unmapped. */
 function getCountryCode(input: string | null | undefined): string | null {
   if (!input) return null;
   
   const trimmed = input.trim();
   if (trimmed.length === 0) return null;
   
-  // If it's already a 2-letter code, return it uppercase
   if (trimmed.length === 2) {
     return trimmed.toUpperCase();
   }
 
-  // Resolve the name via the ISO dataset (handles aliases/variations)
   const code = getCountryCodeFromName(trimmed);
   return code === UNKNOWN_COUNTRY_CODE ? null : code;
 }
 
+/** Full country name for the code, else `originalName`, else the code. */
 function getCountryDisplayName(isoCode: string, originalName?: string): string {
-  // Try to get the full country name from the code
   const fullName = getPrimaryCountryName(isoCode);
   if (fullName) {
     return fullName;
   }
-  // Fall back to original name if provided
   if (originalName) {
     return originalName;
   }
-  // Last resort: use the ISO code
   return isoCode;
 }
 
@@ -44,10 +41,8 @@ export default function CountryBadge({
   showName = true,
   className = ''
 }: CountryBadgeProps) {
-  // Convert country name to ISO code if needed
   const isoCode = getCountryCode(countryCode);
   
-  // Handle null, undefined, or empty country codes
   if (!isoCode) {
     return (
       <span className={`inline-flex items-center gap-2 text-text-placeholder ${className}`} title={countryCode || 'Unknown'}>
@@ -56,7 +51,6 @@ export default function CountryBadge({
     );
   }
 
-  // Check if the flag exists
   if (!hasFlag(isoCode)) {
     const displayName = getCountryDisplayName(isoCode, countryCode || undefined);
     return (
@@ -66,7 +60,6 @@ export default function CountryBadge({
     );
   }
 
-  // Get the flag component dynamically
   const FlagsRecord = Flags as Record<string, React.FC<React.SVGProps<SVGSVGElement>>> | undefined;
   const FlagComponent = FlagsRecord?.[isoCode];
 

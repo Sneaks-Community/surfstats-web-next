@@ -1,17 +1,14 @@
 interface ChartSkeletonProps {
-  /** Fixed pixel height. Omit to fill the parent (`h-full`). */
+  /** Fixed height in px; omit to fill the parent. */
   height?: number;
-  /** Width of the title placeholder bar in px. */
+  /** Title bar width in px. */
   titleWidth?: number;
-  /** Minimum height of the chart-body placeholder in px. */
+  /** Min chart-body height in px. */
   minBodyHeight?: number;
 }
 
-/**
- * Animated placeholder shown while a lazy-loaded chart bundle is fetched.
- * Shared by the player-profile charts (flexible height, 200px min body) and the
- * map chart grid (fixed 250px height); parametrize to match each call site.
- */
+/** Animated chart-card placeholder for lazy chart bundles and route loading. Props fit each caller:
+ * a fixed height in the map chart grid, a min body height for the player and country charts. */
 export default function ChartSkeleton({
   height,
   titleWidth = 128,

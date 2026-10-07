@@ -17,9 +17,9 @@ const WINDOW_SECONDS = env.RATE_LIMIT_WINDOW_SECONDS;
 const MAX_REQUESTS = env.RATE_LIMIT_MAX;
 // More generous than the API's: one page view fans out into several API calls.
 const PAGE_MAX_REQUESTS = env.RATE_LIMIT_PAGE_MAX;
-// RSC requests get their own, larger budget: every viewport `<Link>` prefetches (dozens per page).
-// Next strips flight headers before the proxy, so client navigations (`sec-fetch-dest: empty`)
-// count here too, and so would a forged header.
+// RSC requests (`sec-fetch-dest: empty`) get their own, larger budget. Link prefetch is off
+// (components/Link.tsx), so these are mostly client navigations; Next strips flight headers before
+// the proxy, so a prefetch can't be told apart, and a forged header would count here too.
 const PREFETCH_MAX_REQUESTS = env.RATE_LIMIT_PREFETCH_MAX;
 // Optional penalty: seconds an IP stays blocked from the moment it blows a budget, replacing
 // (not extending) the window reset. 0 (default) disables it.

@@ -14,13 +14,11 @@ interface MapFiltersProps {
   tierOptions: TierOption[];
 }
 
-// Helper to parse tiers from URL
 const parseTiers = (tiersParam: string | null): number[] => {
   if (!tiersParam) return [];
   return tiersParam.split(',').map(t => parseInt(t)).filter(t => !isNaN(t));
 };
 
-// Inner component that receives parsed initial values
 function MapFiltersForm({
   tierOptions,
   initialQ,
@@ -48,7 +46,7 @@ function MapFiltersForm({
   const [bonuses, setBonuses] = useState(initialBonuses);
   const [selectedTiers, setSelectedTiers] = useState<number[]>(initialTiers);
 
-  // Apply filters when debounced values change (live search)
+  // Live search: push the URL when the debounced filters change.
   useEffect(() => {
     const params = new URLSearchParams();
     if (debouncedSearch) params.set('q', debouncedSearch);
@@ -88,7 +86,7 @@ function MapFiltersForm({
     setSelectedTiers([]);
   };
 
-  // Count filters that are in the collapsible section (not default values)
+  // Non-default filters in the collapsible section, for the badge.
   const advancedFiltersCount = useMemo(
     () => {
       let count = 0;
@@ -101,7 +99,6 @@ function MapFiltersForm({
     [mapper, type, bonuses, selectedTiers]
   );
 
-  // Check if any filters are active (for showing clear button)
   const hasFilters = useMemo(
     () => search || mapper || type !== 'all' || bonuses !== 'all' || selectedTiers.length > 0,
     [search, mapper, type, bonuses, selectedTiers]
@@ -109,7 +106,7 @@ function MapFiltersForm({
 
   return (
     <div className="bg-surface border border-border rounded-xl p-4 space-y-4">
-      {/* Always Visible Row: Search + More Filters Toggle */}
+      {/* Always-visible row: search + More Filters toggle */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -144,14 +141,12 @@ function MapFiltersForm({
         </button>
       </div>
 
-      {/* Collapsible Advanced Filters. `inert` while collapsed: max-h-0 only
-          clips the panel, it leaves the controls focusable and typeable. */}
       <div
         id="advanced-filters"
+        // max-h-0 only clips the panel; without inert its controls stay focusable and typeable
         inert={!isExpanded}
         className={`space-y-4 overflow-hidden transition-all duration-200 ${isExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}
       >
-        {/* Row: Mapper + Type + Bonuses */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -188,7 +183,6 @@ function MapFiltersForm({
           </select>
         </div>
         
-        {/* Tier Checkboxes */}
         <div className="flex flex-wrap items-center gap-2">
           {tierOptions.filter(tier => tier.tier >= 1 && tier.tier <= 10).map((tier) => (
             <button
@@ -207,7 +201,6 @@ function MapFiltersForm({
           ))}
         </div>
         
-        {/* Clear Filters Button */}
         {hasFilters && (
           <div className="flex gap-3">
             <button
@@ -226,11 +219,10 @@ function MapFiltersForm({
   );
 }
 
-// Wrapper component that reads URL params and syncs them to local state
+// Seeds the form from the URL on mount only; useState ignores later initial values.
 export default function MapFilters({ tierOptions }: MapFiltersProps) {
   const searchParams = useSearchParams();
   
-  // Parse URL params once per render
   const urlParams = useMemo(() => ({
     q: searchParams.get('q') || '',
     mapper: searchParams.get('mapper') || '',

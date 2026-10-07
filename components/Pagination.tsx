@@ -35,29 +35,22 @@ export default function Pagination({
     totalPages,
   });
 
-  // Detect navigation mode
   const navigationMode: NavigationMode = useMemo(() => {
     if (onPageChange) return 'client';
     if (baseUrl) return 'server';
     return 'none';
   }, [onPageChange, baseUrl]);
 
-  // Build URL for server-side navigation
   const buildUrl = useCallback((page: number) => {
     const params = new URLSearchParams();
-    
-    // Add all existing query params except page
     Object.entries(queryParams).forEach(([key, value]) => {
       if (value) params.set(key, value);
     });
-    
-    // Add page param
     params.set('page', page.toString());
     
     return `${baseUrl}?${params.toString()}`;
   }, [baseUrl, queryParams]);
 
-  // Handle client-side page change
   const handlePageChange = useCallback((page: number) => {
     if (onPageChange) {
       onPageChange(page);
@@ -68,9 +61,8 @@ export default function Pagination({
   const searchParams = useSearchParams();
   const nav = useNavigationPending();
 
-  // Intercept plain left-clicks on server-mode links so navigation runs through
-  // the transition-backed provider (instant pending state / skeleton). Modified
-  // clicks (new tab, etc.) and the no-provider case fall through to the <Link>.
+  // Plain left-clicks on server-mode links go through the provider so the skeleton shows at once;
+  // modified clicks (new tab) and the no-provider case fall through to the <Link>.
   const handleNavClick = useCallback(
     (e: React.MouseEvent, href: string) => {
       if (!nav) return;
@@ -81,7 +73,6 @@ export default function Pagination({
     [nav]
   );
 
-  // Handle jump to page
   const handleJumpSubmit = useCallback((e: React.SyntheticEvent) => {
     e.preventDefault();
     const page = parseInt(jumpPage, 10);
@@ -89,13 +80,11 @@ export default function Pagination({
       if (navigationMode === 'client' && onPageChange) {
         handlePageChange(page);
       } else {
-        // Use Next.js router instead of window.location.href for client-side navigation
         const searchStr = searchParams.toString() || '';
         const params = new URLSearchParams(searchStr);
         params.set('page', page.toString());
         const url = `?${params.toString()}`;
-        // Route through the transition-backed provider when available so the
-        // pending skeleton shows immediately; otherwise plain router push.
+        // Client-side, no full reload; via the provider when present so the skeleton shows at once.
         if (nav) {
           nav.navigate(url);
         } else {
@@ -106,7 +95,6 @@ export default function Pagination({
     }
   }, [jumpPage, totalPages, navigationMode, onPageChange, handlePageChange, router, searchParams, nav]);
 
-  // Render page number button/link
   const renderPageNumber = (page: number) => {
     const commonClasses = `min-w-[2.5rem] h-9 px-2 rounded-md border text-sm font-medium transition-colors flex items-center justify-center ${
       currentPage === page
@@ -140,7 +128,6 @@ export default function Pagination({
     );
   };
 
-  // Render navigation button
   const renderNavButton = (
     onClick: () => void,
     disabled: boolean,
@@ -184,7 +171,7 @@ export default function Pagination({
     );
   };
 
-  // Validation for development mode, after commit so render stays pure.
+  // Dev-only misuse check, in an effect so render stays pure.
   useEffect(() => {
     if (process.env.NODE_ENV === 'development' && navigationMode === 'none') {
       clientError(
@@ -195,7 +182,6 @@ export default function Pagination({
 
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4">
-      {/* Page info */}
       <div className="text-sm text-text-muted">
         Page <span className="font-medium text-text">{currentPage}</span> of{' '}
         <span className="font-medium text-text">{totalPages.toLocaleString()}</span>
@@ -203,7 +189,6 @@ export default function Pagination({
 
       {/* Pagination controls */}
       <div className="flex items-center gap-2 flex-wrap justify-center">
-        {/* First page */}
         {renderNavButton(
           () => handlePageChange(1),
           !canGoToFirst,
@@ -212,7 +197,6 @@ export default function Pagination({
           navigationMode === 'server' ? buildUrl(1) : undefined
         )}
 
-        {/* Previous page */}
         {renderNavButton(
           () => handlePageChange(currentPage - 1),
           !hasPrevPage,
@@ -221,7 +205,6 @@ export default function Pagination({
           navigationMode === 'server' && hasPrevPage ? buildUrl(currentPage - 1) : undefined
         )}
 
-        {/* Page numbers */}
         <div className="flex items-center gap-1">
           {pageNumbers.map((page, idx) =>
             typeof page === 'number' ? renderPageNumber(page) : (
@@ -230,7 +213,6 @@ export default function Pagination({
           )}
         </div>
 
-        {/* Next page */}
         {renderNavButton(
           () => handlePageChange(currentPage + 1),
           !hasNextPage,
@@ -239,7 +221,6 @@ export default function Pagination({
           navigationMode === 'server' && hasNextPage ? buildUrl(currentPage + 1) : undefined
         )}
 
-        {/* Last page */}
         {renderNavButton(
           () => handlePageChange(totalPages),
           !canGoToLast,
@@ -248,7 +229,6 @@ export default function Pagination({
           navigationMode === 'server' ? buildUrl(totalPages) : undefined
         )}
 
-        {/* Jump to page (server mode only) */}
         {navigationMode === 'server' && (
           <form onSubmit={handleJumpSubmit} className="flex items-center gap-2 ml-2">
             <span className="text-sm text-text-muted hidden sm:inline">Go to</span>

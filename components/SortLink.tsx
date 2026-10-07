@@ -12,15 +12,12 @@ export interface SortLinkProps {
   baseUrl: string;
   queryParams?: Record<string, string>;
   defaultOrder?: 'asc' | 'desc';
-  /** Extra classes for the link (e.g. justify-end for right-aligned columns). */
+  /** Extra link classes, e.g. justify-end for right-aligned columns. */
   className?: string;
 }
 
-/**
- * The clickable sort control shared by the table-header (`SortableTableHeader`,
- * which wraps this in a `<th>`) and the div-based player list header. Owns the
- * next-order toggle, URL building, and the instant pending-skeleton navigation.
- */
+/** Sort control shared by `SortableTableHeader` (in a `<th>`) and the div-based player list header:
+ * next-order toggle, URL building, and instant pending-skeleton navigation. */
 export default function SortLink({
   column,
   label,
@@ -34,7 +31,6 @@ export default function SortLink({
   const isActive = currentSort === column;
   const nav = useNavigationPending();
 
-  // If currently active, toggle the order; otherwise use this column's default.
   const nextOrder = isActive
     ? currentOrder === 'asc' ? 'desc' : 'asc'
     : defaultOrder;
@@ -42,7 +38,6 @@ export default function SortLink({
   const buildUrl = () => {
     const params = new URLSearchParams();
 
-    // Carry existing params except sort/order (which we set below).
     Object.entries(queryParams).forEach(([key, value]) => {
       if (value && key !== 'sort' && key !== 'order') {
         params.set(key, value);
@@ -62,9 +57,8 @@ export default function SortLink({
 
   const href = buildUrl();
 
-  // Route plain left-clicks through the transition-backed provider so the
-  // pending skeleton shows immediately; modified clicks and the no-provider
-  // case fall through to the <Link>.
+  // Plain left-clicks go through the provider so the skeleton shows at once; modified clicks
+  // (new tab) and the no-provider case fall through to the <Link>.
   const handleClick = (e: React.MouseEvent) => {
     if (!nav) return;
     if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;

@@ -27,8 +27,7 @@ const RANKING = [
 
 const codes = (rows: CountryRank[]) => rows.map((r) => r.country_code);
 
-// These four sorts are pure functions of the one cached array, not four cache
-// keys each re-running the full `GROUP BY country` aggregation.
+// Pure sorts of the one cached array, not four cache keys each re-running `GROUP BY country`.
 describe('sortCountries', () => {
   it('sorts by points, players, country and rank', () => {
     expect(codes(sortCountries(RANKING, 'points', 'desc'))).toEqual(['US', 'DE', 'FR', 'AU']);
@@ -52,8 +51,7 @@ describe('sortCountries', () => {
     expect(codes(sortCountries(rows, 'country', 'asc'))).toEqual(['SK', 'SE']);
   });
 
-  // The array is the shared cached payload; mutating it would corrupt every
-  // later reader of the same key within the process.
+  // Callers joining one in-flight fetch share this array; mutating it would reorder theirs too.
   it('does not mutate the cached array', () => {
     const before = codes(RANKING);
     sortCountries(RANKING, 'players', 'asc');
@@ -61,8 +59,7 @@ describe('sortCountries', () => {
     expect(codes(RANKING)).toEqual(before);
   });
 
-  // Ranks are assigned by points before caching, so a tie keeps its shared rank
-  // rather than being renumbered per sort.
+  // Ranks are assigned by points before caching, so a tie keeps its shared rank under any sort.
   it('keeps the points-derived rank when sorting by something else', () => {
     expect(sortCountries(RANKING, 'players', 'desc').map((r) => r.rank)).toEqual([2, 4, 1, 2]);
   });

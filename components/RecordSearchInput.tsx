@@ -9,19 +9,13 @@ interface RecordSearchInputProps {
   placeholder: string;
   /** Accessible label; defaults to the placeholder. */
   ariaLabel?: string;
-  /**
-   * Visual style:
-   * - `compact`: inline, capped-width filter (map records tabs)
-   * - `full`: full-width search bar (player records tabs)
-   */
+  /** `compact`: inline, capped-width filter (map record tabs);
+   * `full`: full-width search bar (player record tabs). */
   variant?: 'compact' | 'full';
 }
 
-/**
- * Search input with a leading magnifier and a trailing clear button, shared by
- * the map and player record tables. Two visual variants preserve each table's
- * original appearance.
- */
+/** Search input with a magnifier and clear button, shared by the map and player record tables;
+ * the two variants keep each table's own look. */
 export default function RecordSearchInput({
   value,
   onChange,

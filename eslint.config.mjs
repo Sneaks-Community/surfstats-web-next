@@ -4,9 +4,8 @@ import next from "eslint-config-next";
 import tseslint from "typescript-eslint";
 
 export default defineConfig(
-  // Exclude build artifacts, node_modules, generated files, and JS config files.
-  // Note: eslint-config-next sets the TypeScript parser globally, which causes
-  // type-aware rules to fail on non-TypeScript files like .mjs configs.
+  // Build output, generated files and configs: eslint-config-next sets the TS parser globally,
+  // so type-aware rules fail on untyped files like .mjs configs.
   {
     ignores: [
       ".next/**/*",
@@ -19,27 +18,23 @@ export default defineConfig(
     ],
   },
 
-  // 1. Base JavaScript recommended rules
   js.configs.recommended,
 
-  // 2. Next.js configuration with React, React Hooks, and Next.js rules
+  // Next.js, React and React Hooks rules
   ...next,
 
-  // 3. TypeScript ESLint strict type-checked + stylistic configurations
-  //    These provide ~120+ rules for maximum type safety and code style consistency
   ...tseslint.configs.strictTypeChecked,
   ...tseslint.configs.stylistic,
 
-  // Pin the React version instead of eslint-config-next's "detect". Detection
-  // in eslint-plugin-react 7.37.5 calls the removed context.getFilename() API,
-  // which throws under ESLint 10.
+  // Pinned instead of "detect": eslint-plugin-react 7.37.5's detection calls the removed
+  // context.getFilename(), which throws under ESLint 10.
   {
     settings: {
       react: { version: "19.2" },
     },
   },
 
-  // Configure TypeScript parser globally for type-aware rules
+  // Type information for the type-aware rules
   {
     files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
@@ -50,7 +45,6 @@ export default defineConfig(
     },
   },
 
-  // Custom rule overrides and project-specific tuning
   {
     files: ["**/*.ts", "**/*.tsx"],
     rules: {
@@ -91,9 +85,8 @@ export default defineConfig(
       "@typescript-eslint/no-unsafe-argument": "off",
       "@typescript-eslint/no-unsafe-return": "off",
 
-      // Hand-rolled interactive markup is the norm here, so the structural
-      // a11y rules are errors: they catch a div with onClick, a role missing
-      // its required props, and interactive elements nested inside a button.
+      // Errors, since hand-rolled interactive markup is the norm here: they catch a div with onClick,
+      // a role missing its required props, and interactive elements nested inside a button.
       "jsx-a11y/alt-text": "error",
       "jsx-a11y/aria-props": "error",
       "jsx-a11y/aria-role": "error",
@@ -115,10 +108,7 @@ export default defineConfig(
 
       "no-console": ["warn", { allow: ["warn", "error", "debug"] }],
 
-      // Warn on lexical declarations in case blocks (let/const in switch)
       "no-case-declarations": "warn",
-
-      // Warn on unnecessary escapes
       "no-useless-escape": "warn",
     },
   },

@@ -1,19 +1,13 @@
 import type { CSSProperties, ReactNode } from 'react';
 
-/**
- * A single pulsing placeholder block. Pass sizing/rounding via `className`
- * (e.g. `h-4 w-32 rounded`). Kept rounding-free by default so callers can use
- * any `rounded-*` utility without Tailwind border-radius conflicts.
- */
+/** Pulsing placeholder block, sized and rounded via `className` (e.g. `h-4 w-32 rounded`). No
+ * default rounding, so a caller's `rounded-*` never conflicts with one. */
 export function Skeleton({ className = '', style }: { className?: string; style?: CSSProperties }) {
   return <div className={`bg-surface-hover animate-pulse ${className}`} style={style} />;
 }
 
-/**
- * Accessible wrapper for a route `loading.tsx` skeleton. Carries the
- * `role="status"` / `aria-live` / `aria-busy` boilerplate and a screen-reader
- * label so every loading screen announces itself consistently.
- */
+/** Wrapper for a route `loading.tsx` skeleton: `role="status"`, `aria-live`, `aria-busy` and an
+ * sr-only label, so every loading screen announces itself the same way. */
 export function SkeletonScreen({
   label,
   className = '',
@@ -36,10 +30,8 @@ export function SkeletonScreen({
   );
 }
 
-/**
- * Title + subtitle block opening most routes. Widths are Tailwind classes, not
- * px, so the bars scale with the root font size like the headings they mirror.
- */
+/** Title + subtitle bars opening most routes. Widths are Tailwind classes, not px, so the bars
+ * scale with the root font size like the headings they mirror. */
 export function PageHeaderSkeleton({
   titleWidth = 'w-40',
   subtitleWidth = 'w-64',

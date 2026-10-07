@@ -22,8 +22,7 @@ beforeEach(() => {
   waitForCacheReady.mockResolvedValue(true);
   cacheGetWithTtl.mockResolvedValue(miss);
   cacheSet.mockResolvedValue(undefined);
-  // shouldRefreshEarly is probabilistic; pin the draw so the near-expiry tests
-  // aren't a 90/10 coin flip.
+  // shouldRefreshEarly is random; pin the draw so near-expiry tests aren't a 90/10 coin flip.
   vi.spyOn(Math, 'random').mockReturnValue(0);
 });
 
@@ -44,8 +43,7 @@ describe('cachedFetch', () => {
     expect(cacheSet).not.toHaveBeenCalled();
   });
 
-  // The whole point of onError: a transient DB failure must not pin an empty
-  // result for the full TTL.
+  // onError's purpose: a transient DB failure must not pin an empty result for the full TTL.
   it('never writes the onError fallback to the cache', async () => {
     const fallback = { players: [], total: 0 };
 
@@ -60,8 +58,7 @@ describe('cachedFetch', () => {
     expect(cacheSet).not.toHaveBeenCalled();
   });
 
-  // Shedding is backpressure, not an answer: the empty fallback would render as
-  // a real "no results" page.
+  // Shedding is backpressure, not an answer: the fallback would render as a real "no results" page.
   it('rethrows DbBusyError past onError', async () => {
     const onError = vi.fn(() => ({ players: [], total: 0 }));
 
@@ -85,11 +82,8 @@ describe('cachedFetch', () => {
     expect(cacheSet).not.toHaveBeenCalled();
   });
 
-  // The readiness gate is awaited, and onError must not swallow it: serving a
-  // fallback would hide a cache outage behind empty pages.
-  // A sweep reads thousands of keys at once. Fanning out a background refresh
-  // per near-expiry key put a whole sweep on the expensive-query semaphore and
-  // flooded the log with "Database busy".
+  // A sweep reads thousands of keys: one background refresh per near-expiry key would put the
+  // whole sweep on the expensive-query semaphore at once and flood the log with "Database busy".
   it('renews a near-expiry key inline for a refresher, not in the background', async () => {
     // 1% of the TTL left: inside the early-refresh window.
     cacheGetWithTtl.mockResolvedValue({ value: { n: 1 }, ttlMs: 600 });
@@ -110,6 +104,7 @@ describe('cachedFetch', () => {
     expect(await cachedFetch('k', 60, loader, { lock: true })).toEqual({ n: 1 });
   });
 
+  // The readiness gate is awaited; an onError fallback would hide the outage behind empty pages.
   it('throws CacheUnavailableError past onError when the cache is down', async () => {
     waitForCacheReady.mockResolvedValue(false);
     const loader = vi.fn();
@@ -120,8 +115,7 @@ describe('cachedFetch', () => {
     expect(loader).not.toHaveBeenCalled();
   });
 
-  // A background refresher must not DEL first: forcing skips the read and overwrites,
-  // so there is no window where the key is missing and a visitor pays for the query.
+  // Refreshers force instead of DEL first, so the key is never missing for a visitor to pay for.
   it('runs the loader and overwrites on a forced reload, hit or not', async () => {
     cacheGetWithTtl.mockResolvedValue({ value: { n: 1 }, ttlMs: 60_000 });
     const loader = vi.fn().mockResolvedValue({ n: 2 });
@@ -159,7 +153,6 @@ describe('cachedFetch', () => {
     expect(cacheSet).toHaveBeenCalledTimes(1);
   });
 
-  // The miss path must hand back the same shape the hit path does.
   it('normalizes the fetched value to its cached shape', async () => {
     const date = new Date('2026-02-24T19:15:18.000Z');
 

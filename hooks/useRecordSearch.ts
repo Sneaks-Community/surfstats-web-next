@@ -21,15 +21,11 @@ export interface LoadError {
 
 interface RecordSearchOptions<T> {
   initialQuery: string;
-  /**
-   * Endpoint for a given query. Called during render, so the resulting string is
-   * what the request effect depends on: whatever else the URL closes over (map
-   * name, selected bonus or stage) re-runs the search by changing it.
-   */
+  /** Endpoint for a query. Called during render, so its string is the request effect's dependency:
+   * changing what it closes over (map name, selected bonus or stage) re-runs the search. */
   url: (query: string) => string;
-  /** Response key holding the rows. */
   rowsKey: keyof RecordSearchResponse<T>;
-  /** Prefix for the client-side log line on failure. */
+  /** Prefix for the failure log line. */
   label: string;
 }
 
@@ -50,12 +46,8 @@ export interface RecordSearch<T> {
   clear: () => void;
 }
 
-/**
- * Server-side player search for one record tab: query state, a 400 ms debounce,
- * the request (cancelled when the query or the URL changes), and pagination over
- * the results. The three map tabs and any future one differ only in the URL and
- * the response key.
- */
+/** Server-side player search for one record tab: query state, 400 ms debounce, the request (aborted
+ * when the query or URL changes) and result pagination. Tabs differ only in `url` and `rowsKey`. */
 export function useRecordSearch<T>({
   initialQuery,
   url,
@@ -72,8 +64,8 @@ export function useRecordSearch<T>({
   const debouncedQuery = useDebounce(query, 400);
   const requestUrl = debouncedQuery.length >= MIN_SEARCH_LENGTH ? url(debouncedQuery) : null;
 
-  // Derived, not stored: typing "abcd" and deleting back to the loaded "abc"
-  // leaves the request URL unchanged, so an eagerly-set flag never cleared.
+  // Derived, not stored: typing "abcd" and deleting back to the loaded "abc" leaves the request
+  // URL unchanged, so an eagerly set flag would never clear.
   const isSearching =
     query.length >= MIN_SEARCH_LENGTH && (query !== debouncedQuery || requestUrl !== settledUrl);
 
@@ -93,8 +85,7 @@ export function useRecordSearch<T>({
         setSettledUrl(requestUrl);
       })
       .catch((err: unknown) => {
-        // An abort means a newer request is already in flight; leave the
-        // spinner to that one.
+        // An abort means a newer request is in flight; leave the spinner to it.
         if (!isAbortError(err)) {
           clientError(`[${label}] Search failed: ${getErrorMessage(err)}`);
           setResults([]);

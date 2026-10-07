@@ -15,8 +15,7 @@ afterEach(() => {
   delete process.env.SERVERS_JSON;
 });
 
-// These values reach GameDig.query() as a host and port, so a malformed entry
-// must never get through.
+// Entries reach GameDig.query() as host and port, so a malformed one must never get through.
 describe('getServerConfigs', () => {
   it('parses a valid list and coerces a string port', async () => {
     expect(await configs('[{"name":"EU","ip":"1.2.3.4","port":27015}]')).toEqual([
@@ -118,7 +117,7 @@ describe('getEnv', () => {
     process.env = ORIGINAL_ENV;
   });
 
-  // The defaults every module used to repeat as its own `parseInt(...) || n`.
+  // Defaults live here, not in a per-module `parseInt(...) || n`.
   it('fills in the defaults and parses what is set', async () => {
     const env = await read({ RATE_LIMIT_MAX: '50', ALLOWED_ORIGINS: 'https://a.example, https://b.example' });
 

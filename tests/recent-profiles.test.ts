@@ -33,9 +33,8 @@ beforeEach(() => {
 });
 
 describe('recordProfileView', () => {
-  // The trim is what bounds the warm set. Off by one and the set grows without
-  // limit (or drops the profile just recorded), which only shows up as a warm pass
-  // that gets slower every interval.
+  // The trim bounds the warm set; a wrong range grows it without limit (or drops the profile just
+  // recorded), which shows only as a warm pass that slows every interval.
   it('adds the profile and trims to the newest N in one transaction', () => {
     recordProfileView('STEAM_1:0:1');
 

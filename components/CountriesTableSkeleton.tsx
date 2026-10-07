@@ -1,10 +1,7 @@
 import { Skeleton } from '@/components/Skeleton';
 
-/**
- * Skeleton placeholder for the countries ranking table. Shared between the
- * route `loading.tsx` and the in-page `<Suspense>` fallback that covers
- * sort/pagination search-param changes. Row count matches the page size (20).
- */
+/** Countries table placeholder for the route `loading.tsx` and the `PendingContent` fallback on
+ * sort/pagination changes; 20 rows to match `ITEMS_PER_PAGE`. */
 export default function CountriesTableSkeleton() {
   return (
     <div className="bg-surface border border-border rounded-xl overflow-hidden">

@@ -28,12 +28,10 @@ export function Navigation({ siteName }: { siteName: string }) {
   const [dropdownDismissed, setDropdownDismissed] = useState(false);
   const pathname = usePathname();
 
-  // Check if a path is active (exact match)
   const isActive = (href: string) => {
     return pathname === href;
   };
 
-  // Check if we're on any page under this parent route (for dropdown parent highlighting)
   const isParentActive = (href: string) => {
     if (href === '/') return pathname === '/';
     return pathname === href || pathname.startsWith(href + '/');
@@ -69,7 +67,7 @@ export function Navigation({ siteName }: { siteName: string }) {
                         <ChevronDown className="h-4 w-4" />
                       </Link>
                       
-                      {/* Dropdown panel: hidden by visibility, so its links leave the tab order until shown */}
+                      {/* Panel uses visibility so its links leave the tab order until shown */}
                       <div
                         className={`invisible absolute left-0 mt-0 w-48 rounded-md shadow-lg bg-surface border border-border ring-1 ring-black ring-opacity-5 ${
                           dropdownDismissed ? '' : 'group-hover:visible group-focus-within:visible'
@@ -95,7 +93,6 @@ export function Navigation({ siteName }: { siteName: string }) {
                       </div>
                     </div>
                   ) : (
-                    // Regular link for items without children
                     <Link
                       key={link.href}
                       href={link.href}
@@ -114,13 +111,11 @@ export function Navigation({ siteName }: { siteName: string }) {
             </div>
           </div>
 
-          {/* Desktop search and theme toggle */}
           <div className="hidden lg:flex items-center gap-4">
             <SearchDropdown />
             <ThemeToggle />
           </div>
 
-          {/* Mobile menu button */}
           <div className="lg:hidden flex items-center gap-2">
             <ThemeToggle />
             <button
@@ -139,16 +134,14 @@ export function Navigation({ siteName }: { siteName: string }) {
         </div>
       </div>
 
-      {/* Mobile menu. Capped to the space under the bar and scrollable: the nav
-          is sticky, so anything past the viewport would be unreachable. */}
+      {/* Mobile menu, capped under the bar and scrollable: the nav is sticky, so content past
+          the viewport would be unreachable. */}
       {mobileMenuOpen && (
         <div className="lg:hidden border-t border-border bg-background-secondary max-h-[calc(100dvh-4rem)] overflow-y-auto overscroll-contain">
           <div className="px-4 py-4 space-y-4">
-            {/* Mobile nav links */}
             <div className="flex flex-col space-y-2">
               {navLinks.map((link) => (
                 link.children ? (
-                  // Mobile dropdown for items with children
                   <div key={link.href} className="space-y-1">
                     <button
                       onClick={() => setMobilePlayersExpanded(!mobilePlayersExpanded)}
@@ -177,7 +170,6 @@ export function Navigation({ siteName }: { siteName: string }) {
                     )}
                   </div>
                 ) : (
-                  // Regular link for items without children
                   <Link
                     key={link.href}
                     href={link.href}
@@ -193,7 +185,6 @@ export function Navigation({ siteName }: { siteName: string }) {
                 )
               ))}
             </div>
-            {/* Mobile search */}
             <form action="/search" method="GET" className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Search className="h-4 w-4 text-text-placeholder" />

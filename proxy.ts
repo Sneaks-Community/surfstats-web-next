@@ -6,22 +6,18 @@ import { waitForCacheReady } from '@/lib/valkey';
 import { cacheUnavailableHtml, tooManyRequestsHtml } from '@/lib/cache-unavailable-page';
 import { STATIC_SECURITY_HEADERS, contentSecurityPolicy } from '@/lib/security-headers';
 
-// `next.config.ts`'s headers() only runs for routes the app renders, so every
-// short-circuit below has to carry the security headers itself. None of them
-// contains a script, hence no nonce.
+// next.config.ts headers() only reach rendered routes, so each short-circuit below carries the
+// security headers itself. None contains a script, hence no nonce.
 const shortCircuitHeaders: Record<string, string> = {
   ...STATIC_SECURITY_HEADERS,
   'Content-Security-Policy': contentSecurityPolicy(),
 };
 
-// Runs on the Node.js runtime so it can reuse the node-redis Valkey client
-// (unavailable on Edge).
+// Runs on the Node.js runtime so it can reuse the node-redis Valkey client (unavailable on Edge).
 export const config = {
   matcher: [
-    // Everything except Next's build assets; the slash matters, as `/_next/static`
-    // alone renders a page. No dot-excluding pattern: a dotted path (`/players/1.1`)
-    // is a page or route like any other and must not skip the gates below.
-    // `/public` holds no files, so nothing else is served statically.
+    // All but Next's build assets (the slash matters: bare `/_next/static` renders a page). No
+    // dot-exclusion: dotted paths (`/players/1.1`) are pages and must hit the gates; `/public` is empty.
     '/((?!_next/static/).*)',
   ],
 };
@@ -37,16 +33,14 @@ export async function proxy(request: NextRequest) {
   }
   const isApi = decoded.startsWith('/api/');
 
-  // Exempt before every gate, primarily the origin guard: the healthcheck's wget
-  // sends no Origin or Sec-Fetch-*, so that guard would 403 it. The route touches
-  // nothing, and metering it would cost a Valkey round-trip to serve a constant.
-  // Exact match, never a prefix.
+  // Exempt before every gate: the healthcheck's wget sends no Origin/Sec-Fetch-*, so the origin guard
+  // would 403 it, and metering a route that touches nothing costs a Valkey round-trip. Exact match only.
   if (pathname === '/api/health') {
     return NextResponse.next();
   }
 
-  // Cache is a required layer for every route: without it we serve a graceful
-  // "temporarily unavailable" rather than run uncached DB queries on every hit.
+  // The cache is required: without it, serve "temporarily unavailable" rather than run uncached
+  // DB queries on every hit.
   if (!(await waitForCacheReady())) {
     if (isApi) {
       return NextResponse.json(
@@ -71,18 +65,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403, headers: shortCircuitHeaders });
   }
 
-  // Pages too, not just the API: they run the same user-parameterized heavy
-  // queries. Separate budget per scope — the router's RSC requests (a prefetch
-  // for every viewport `<Link>`, ~38 on the home page alone) must not spend the
-  // same allowance as real navigations.
-  //
-  // Do NOT test `next-router-prefetch`/`rsc` here: Next strips every flight
-  // header before middleware runs, so those checks are always false and the
-  // whole prefetch fan-out lands on the page budget (see FLIGHT_HEADERS in
-  // `next/dist/server/web/adapter.js`, "Ensure users only see page requests").
-  // `Sec-Fetch-Dest` survives, and browsers send `document` only for a real
-  // navigation. Missing header (older browsers, crawlers, curl) counts as a
-  // navigation, the stricter budget.
+  // Pages are metered too (same user-parameterized heavy queries), on a budget separate from the
+  // router's RSC requests (client-side navigations; Link prefetch is off, see components/Link.tsx).
+  // Don't test `next-router-prefetch`/`rsc`: Next strips flight headers before this runs, so they're
+  // always false (FLIGHT_HEADERS in next/dist/server/web/adapter.js). `Sec-Fetch-Dest: document`
+  // survives and marks a real navigation; a missing header (old browsers, crawlers, curl) counts as
+  // one, the stricter budget.
   const isNavigation = (request.headers.get('sec-fetch-dest') ?? 'document') === 'document';
   const result = await checkRateLimit(request, isApi ? 'api' : isNavigation ? 'page' : 'prefetch');
 
@@ -101,9 +89,8 @@ export async function proxy(request: NextRequest) {
       );
     }
 
-    // Only a real navigation gets the HTML page. An RSC request (prefetch or
-    // client-side navigation) cannot parse HTML as flight data, so the router
-    // throws and retries; a bodyless 429 makes it drop the prefetch quietly.
+    // HTML only for real navigations: the router can't parse HTML as flight data, so it throws and
+    // retries, while a bodyless 429 makes it drop the prefetch quietly.
     if (!isNavigation) {
       return new NextResponse(null, { status: 429, headers: rateLimitHeaders });
     }
@@ -118,9 +105,8 @@ export async function proxy(request: NextRequest) {
     });
   }
 
-  // A fresh nonce per request, forwarded on the request so Next can stamp it
-  // onto the scripts it emits (and so `app/layout.tsx` can read it back for the
-  // theme bootstrap), and set on the response so the browser enforces it.
+  // Fresh nonce per request: on the request so Next stamps its scripts (and app/layout.tsx reads it
+  // for the theme bootstrap), on the response so the browser enforces it.
   const nonce = Buffer.from(crypto.randomUUID()).toString('base64');
   const csp = contentSecurityPolicy(nonce);
   const requestHeaders = new Headers(request.headers);

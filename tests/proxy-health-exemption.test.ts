@@ -35,8 +35,7 @@ describe('proxy /api/health exemption', () => {
     expect(waitForCacheReady).not.toHaveBeenCalled();
   });
 
-  // The origin guard is the gate that actually bit: wget sends no Origin, so
-  // without the exemption the container would be permanently unhealthy.
+  // wget sends no Origin, so without the exemption the origin guard keeps the container unhealthy.
   it('would be rejected by the origin guard without it', async () => {
     const { proxy } = await import('../proxy');
     waitForCacheReady.mockResolvedValue(true);

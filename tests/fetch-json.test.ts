@@ -47,8 +47,7 @@ describe('fetchJson', () => {
     await expect(fetchJson('/api/x')).rejects.toThrow('Request failed (500)');
   });
 
-  // The tabs rely on aborts staying distinguishable so a cancelled request
-  // isn't rendered as a failure.
+  // The tabs need aborts kept distinguishable, so a cancelled request isn't rendered as a failure.
   it('propagates abort errors unchanged', async () => {
     const abort = new DOMException('The operation was aborted.', 'AbortError');
     vi.mocked(fetch).mockRejectedValue(abort);

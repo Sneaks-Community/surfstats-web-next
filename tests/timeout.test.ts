@@ -51,8 +51,7 @@ describe('applyStatementTimeout', () => {
     expect(executed).toEqual(['SET SESSION max_execution_time=8000']);
   });
 
-  // The vendor flag is a driver internal; if it ever disappears the fallback
-  // must still cap the statement rather than silently leave it uncapped.
+  // The vendor flag is a driver internal; if it disappears the fallback must still set the cap.
   it('falls back to the other spelling when the first is rejected', async () => {
     const { pool, executed, connect } = fakePool({ isMariaDB: true, rejectFirst: true });
 
