@@ -21,7 +21,7 @@
     "country-flag-icons": "^1.6.20",
     "gamedig": "^5.3.3",
     "i18n-iso-countries": "^7.14.0",
-    "lucide-react": "^1.52.0",
+    "lucide-react": "^1.53.0",
     "mysql2": "^3.24.5",
     "next": "^16.4.0",
     "pino": "^10.4.0",
