@@ -1,7 +1,3 @@
-> [!CAUTION]
-> THIS PROJECT IS UNDER EARLY PHASE ACTIVE DEVELOPMENT
-> Expect bugs, improper documentation, and no support.
-
 # SurfStats - CS:GO Surf Statistics Web Interface
 
 A modern, fast, and responsive web interface for displaying player statistics, map records, and live server status for CS:GO surf servers running the ckSurf timer plugin.
