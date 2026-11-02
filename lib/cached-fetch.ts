@@ -63,7 +63,7 @@ function triggerBackgroundRefresh<T>(
     .acquire(key, async () => {
       const fetched = await (expensive ? withExpensiveQueryLimit(fetchFn) : fetchFn());
       const value = normalizeToCachedShape(fetched);
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+
       if (value !== null && value !== undefined) {
         await cacheSet(key, value, ttl);
       }
@@ -123,7 +123,7 @@ export async function cachedFetch<T>(
     const value = normalizeToCachedShape(fetched);
 
     // T may be nullable (profiles resolve to null); the generic doesn't carry that.
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+
     if (value !== null && value !== undefined) {
       await cacheSet(key, value, ttl);
     }
