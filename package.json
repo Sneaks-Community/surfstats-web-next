@@ -25,7 +25,7 @@
     "mysql2": "^3.24.6",
     "next": "^16.4.6",
     "pino": "^10.4.0",
-    "rate-limiter-flexible": "^11.4.0",
+    "rate-limiter-flexible": "^11.4.1",
     "react": "^19.3.1",
     "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.3.1",
