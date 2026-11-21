@@ -2,6 +2,8 @@
 
 A modern, fast, and responsive web interface for displaying player statistics, map records, and live server status for CS:GO surf servers running the ckSurf timer plugin.
 
+![Dashboard](docs/images/surf-dashboard-split.webp)
+
 ## Features
 
 * **Dashboard:** Real-time statistics including total players, map completions, bonus completions, stage completions, total points, and recent records display.
