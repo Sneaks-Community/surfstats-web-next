@@ -1,6 +1,6 @@
 import { Suspense } from 'react';
 import { getSteamProfileUrl } from '@/lib/steam';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { Skeleton } from '@/components/Skeleton';
 import { Map as MapIcon, Users, Layers, Target, Download, Trophy, Medal, Award, Timer, Clock } from 'lucide-react';
 import MapImage from '@/components/MapImage';
@@ -12,7 +12,7 @@ import MapRecordsTabs from './components/MapRecordsTabs';
 import PageTabs from '@/components/PageTabs';
 import TierBadge from '@/components/TierBadge';
 import MapChartGrid from './components/charts/MapChartGrid';
-import { getMapMetadataFromCache } from '@/lib/map-cache';
+import { findMapNameIgnoringCase, getMapMetadataFromCache } from '@/lib/map-cache';
 import { getMapChartDataFromCache, getPercentileTimesFromCache } from '@/lib/map-stats-cache';
 
 export async function generateMetadata({ params }: { params: Promise<{ mapname: string }> }) {
@@ -64,6 +64,8 @@ const ChartGridSkeleton = () => (
   </div>
 );
 
+/** No `loading.tsx` on this route or above it: its fallback would stream the page into a hidden
+ * div that non-JS crawlers may skip, and fix the status at 200 before notFound() can run. */
 export default async function MapProfilePage({
   params,
 }: {
@@ -82,6 +84,9 @@ export default async function MapProfilePage({
   logger.debug(`[Map Page] Map data for ${validMapname}: stages=${map?.stages}, checkpoints=${map?.checkpoints}`);
 
   if (!map) {
+    // 308 to the stored spelling, so /maps/SURF_BEGINNER lands on (and consolidates into) surf_beginner.
+    const canonical = await findMapNameIgnoringCase(validMapname);
+    if (canonical) permanentRedirect(`/maps/${canonical}`);
     notFound();
   }
 

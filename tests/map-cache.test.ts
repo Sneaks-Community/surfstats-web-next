@@ -17,7 +17,7 @@ vi.mock('../lib/logger', () => ({
   default: { warn: vi.fn(), debug: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
-const { getMapMetadataFromCache } = await import('../lib/map-cache');
+const { getMapMetadataFromCache, findMapNameIgnoringCase } = await import('../lib/map-cache');
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -38,5 +38,18 @@ describe('getMapMetadataFromCache', () => {
     expect(await getMapMetadataFromCache('../etc/passwd')).toBeNull();
     expect(cacheSet).not.toHaveBeenCalled();
     expect(query).not.toHaveBeenCalled();
+  });
+});
+
+describe('findMapNameIgnoringCase', () => {
+  it('returns the stored spelling, including mixed case, for a case-only mismatch', async () => {
+    query.mockResolvedValue([[{ mapname: 'surf_beginner' }, { mapname: 'surf_kitsune2_GO' }]]);
+
+    expect(await findMapNameIgnoringCase('SURF_BEGINNER')).toBe('surf_beginner');
+    expect(await findMapNameIgnoringCase('surf_KITSUNE2_go')).toBe('surf_kitsune2_GO');
+  });
+
+  it('returns null for a name no map matches', async () => {
+    expect(await findMapNameIgnoringCase('surf_nope')).toBeNull();
   });
 });

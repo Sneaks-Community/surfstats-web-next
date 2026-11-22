@@ -170,6 +170,16 @@ export async function getMapMetadataFromCache(mapname: string): Promise<MapMetad
   );
 }
 
+/** The stored spelling of a map whose name differs only in case, or null. Scans the cached
+ * all-maps blob, so an unknown name never reaches the DB. */
+export async function findMapNameIgnoringCase(mapname: string): Promise<string | null> {
+  const lower = mapname.toLowerCase();
+  for (const name of (await getAllMapMetadataFromCache()).keys()) {
+    if (name.toLowerCase() === lower) return name;
+  }
+  return null;
+}
+
 export async function getTierDistributionFromCache({ force }: RefreshOptions = {}): Promise<Map<number, number>> {
   const stored = await cachedFetch(
     `${MAP_METADATA_KEY}:tier_distribution`,
