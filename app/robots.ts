@@ -7,7 +7,8 @@ export default async function robots(): Promise<MetadataRoute.Robots> {
   return {
     rules: {
       userAgent: '*',
-      allow: '/',
+      // Longest match wins, so this beats `/*?`; filters precede `page`, so filtered views stay blocked.
+      allow: ['/', '/maps?page='],
       disallow: ['/api/', '/*?'],
     },
     sitemap: `${base}/sitemap.xml`,
