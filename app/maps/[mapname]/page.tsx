@@ -2,17 +2,18 @@ import { Suspense } from 'react';
 import { getSteamProfileUrl } from '@/lib/steam';
 import { notFound } from 'next/navigation';
 import { Skeleton } from '@/components/Skeleton';
-import { Map as MapIcon, Users, Layers, Target, Download } from 'lucide-react';
+import { Map as MapIcon, Users, Layers, Target, Download, Trophy, Medal, Award, Timer, Clock } from 'lucide-react';
 import MapImage from '@/components/MapImage';
+import StatTile from '@/components/StatTile';
 import { validateMapName, validatePlayerName } from '@/lib/validators';
-import { mapImageUrl, getMapImagesUrl, isStagedMap, SITE_NAME } from '@/lib/utils';
+import { mapImageUrl, getMapImagesUrl, isStagedMap, formatTime, SITE_NAME } from '@/lib/utils';
 import logger from '@/lib/logger';
 import MapRecordsTabs from './components/MapRecordsTabs';
 import PageTabs from '@/components/PageTabs';
 import TierBadge from '@/components/TierBadge';
 import MapChartGrid from './components/charts/MapChartGrid';
 import { getMapMetadataFromCache } from '@/lib/map-cache';
-import { getMapChartDataFromCache } from '@/lib/map-stats-cache';
+import { getMapChartDataFromCache, getPercentileTimesFromCache } from '@/lib/map-stats-cache';
 
 export async function generateMetadata({ params }: { params: Promise<{ mapname: string }> }) {
   const { mapname } = await params;
@@ -86,6 +87,16 @@ export default async function MapProfilePage({
 
   // Cheap cached count; avoids the expensive records query on page render.
   const total = map.completions;
+
+  // After notFound(), so a bogus name never queries; MapGraphPrecache keeps it warm for every map.
+  // Awaited here, not in the chart grid's Suspense, so the tiles arrive with the header.
+  const percentiles = await getPercentileTimesFromCache(validMapname);
+  const timeTiles = [
+    { label: 'Top 1%', time: percentiles?.p1Time, icon: Medal },
+    { label: 'Top 10%', time: percentiles?.p10Time, icon: Award },
+    { label: 'Median', time: percentiles?.medianTime, icon: Timer },
+    { label: 'Average', time: percentiles?.avgTime, icon: Clock },
+  ];
 
   const mapImagesUrl = getMapImagesUrl();
 
@@ -180,6 +191,23 @@ export default async function MapProfilePage({
           </div>
         </div>
       </div>
+
+      {map.wr_time != null && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+          <StatTile
+            icon={Trophy}
+            value={formatTime(map.wr_time)}
+            label="World Record"
+            detail={map.wr_holder ? `by ${validatePlayerName(map.wr_holder)}` : undefined}
+            href={map.wr_holder_steamid ? `/players/${map.wr_holder_steamid}` : undefined}
+          />
+          {timeTiles.map(({ label, time, icon }, i) =>
+            time != null && (
+              <StatTile key={label} icon={icon} value={formatTime(time)} label={label} accent={i % 2 === 0 ? 'secondary' : 'primary'} />
+            )
+          )}
+        </div>
+      )}
 
       <PageTabs
         overview={
