@@ -51,16 +51,20 @@ function Chip({ item, mapImagesUrl }: { item: TickerItem; mapImagesUrl: string }
   const isRecord = item.kind === 'record';
   return (
     <div className="flex items-center gap-2.5 shrink-0 border-l border-border pl-4 pr-5 py-3">
-      <MapImage
-        src={mapImageUrl(mapImagesUrl, item.map)}
-        alt={`${item.map} thumbnail`}
-        unoptimized
-        width={40}
-        height={40}
-        // Sized by class too: Tailwind's base `img { height: auto }` overrides the height attribute.
-        className="h-10 w-10 rounded-md shrink-0 object-cover"
-        referrerPolicy="no-referrer"
-      />
+      {/* Duplicates the name link, so it stays out of the tab order and a11y tree. The padding makes a
+          44px touch target, and the negative margin keeps the layout unchanged. */}
+      <Link href={`/maps/${item.map}`} tabIndex={-1} aria-hidden className="shrink-0 -m-0.5 p-0.5">
+        <MapImage
+          src={mapImageUrl(mapImagesUrl, item.map)}
+          alt={`${item.map} thumbnail`}
+          unoptimized
+          width={40}
+          height={40}
+          // Sized by class too: Tailwind's base `img { height: auto }` overrides the height attribute.
+          className="h-10 w-10 rounded-md shrink-0 object-cover"
+          referrerPolicy="no-referrer"
+        />
+      </Link>
       <div className="flex flex-col gap-0.5 min-w-0">
         <div className="flex items-center gap-1.5">
           {isRecord ? (

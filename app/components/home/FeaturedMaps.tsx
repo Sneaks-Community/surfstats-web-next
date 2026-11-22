@@ -1,4 +1,5 @@
 import { Mountain } from 'lucide-react';
+import Link from '@/components/Link';
 import MapImage from '@/components/MapImage';
 import MapLinkWithPreview from '@/components/MapLinkWithPreview';
 import { getTierColor } from '@/lib/tierColors';
@@ -27,7 +28,13 @@ export default function FeaturedMaps({
           key={m.mapname}
           className="group flex flex-col rounded-lg overflow-hidden border border-border bg-surface-hover/30 hover:border-border-hover transition-colors"
         >
-          <div className="relative flex-1 min-h-24 overflow-hidden">
+          {/* Duplicates the name link, so it stays out of the tab order and a11y tree. */}
+          <Link
+            href={`/maps/${m.mapname}`}
+            tabIndex={-1}
+            aria-hidden
+            className="relative flex-1 min-h-24 overflow-hidden"
+          >
             <MapImage
               src={mapImageUrl(mapImagesUrl, m.mapname)}
               alt={`${m.mapname} thumbnail`}
@@ -48,7 +55,7 @@ export default function FeaturedMaps({
                 T{m.tier}
               </span>
             </div>
-          </div>
+          </Link>
           <div className="p-2.5">
             <MapLinkWithPreview mapname={m.mapname}>{m.mapname}</MapLinkWithPreview>
             <div className="text-xs text-text-muted mt-1 tabular-nums">
