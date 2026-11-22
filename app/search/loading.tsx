@@ -3,7 +3,7 @@ import { PanelSkeleton, Skeleton, SkeletonScreen } from '@/components/Skeleton';
 export default function Loading() {
   return (
     <SkeletonScreen label="Loading search results..." className="space-y-8 max-w-4xl mx-auto">
-      {/* Search header: centred and oversized, so not PageHeaderSkeleton */}
+      {/* Search header: centred and oversized */}
       <div className="text-center space-y-4 py-8">
         <Skeleton className="h-10 w-40 rounded-md mx-auto" />
         <Skeleton className="h-14 w-full max-w-2xl rounded-xl mx-auto" />

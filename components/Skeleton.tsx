@@ -30,27 +30,6 @@ export function SkeletonScreen({
   );
 }
 
-/** Title + subtitle bars opening most routes. Widths are Tailwind classes, not px, so the bars
- * scale with the root font size like the headings they mirror. */
-export function PageHeaderSkeleton({
-  titleWidth = 'w-40',
-  subtitleWidth = 'w-64',
-  eyebrow = false,
-}: {
-  titleWidth?: string;
-  subtitleWidth?: string;
-  /** Small bar above the title, e.g. a back link. */
-  eyebrow?: boolean;
-}) {
-  return (
-    <div className="space-y-2">
-      {eyebrow && <Skeleton className="h-4 w-28 rounded" />}
-      <Skeleton className={`h-8 ${titleWidth} max-w-full rounded-md`} />
-      <Skeleton className={`h-4 ${subtitleWidth} max-w-full rounded`} />
-    </div>
-  );
-}
-
 /** Card chrome for a skeleton panel, mirroring the real surface + PanelHeader pair. */
 export function PanelSkeleton({
   headerWidth,
