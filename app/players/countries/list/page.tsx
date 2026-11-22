@@ -15,6 +15,7 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'All Countries - Players',
   description: 'Full country rankings based on total player points',
+  alternates: { canonical: '/players/countries/list' },
 };
 
 const BASE_URL = '/players/countries/list';

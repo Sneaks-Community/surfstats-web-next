@@ -14,9 +14,15 @@ import { getAllMapMetadataFromCache, getTierDistributionFromCache } from '@/lib/
 import { validateSearchQuery } from '@/lib/validators';
 import type { Metadata } from 'next';
 
-export const metadata: Metadata = {
-  title: 'Maps',
-};
+// Filtered views are robots-blocked, so only the page number reaches a crawler's canonical.
+export async function generateMetadata({ searchParams }: { searchParams: Promise<{ page?: string | string[] }> }): Promise<Metadata> {
+  const { page } = await searchParams;
+  const n = parseIntParam(Array.isArray(page) ? page[0] : page);
+  return {
+    title: 'Maps',
+    alternates: { canonical: n > 1 ? `/maps?page=${n}` : '/maps' },
+  };
+}
 
 export default async function MapsPage({
   searchParams,

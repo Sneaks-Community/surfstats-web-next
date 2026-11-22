@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 
 export const metadata: Metadata = {
   title: 'Servers',
+  alternates: { canonical: '/servers' },
 };
 
 async function getSurfTier(map: string | undefined): Promise<number | null> {

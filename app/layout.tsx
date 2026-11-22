@@ -32,7 +32,6 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: SITE_NAME,
       title,
       description,
-      url: siteUrl,
     },
     twitter: {
       card: 'summary',

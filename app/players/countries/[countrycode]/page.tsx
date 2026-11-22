@@ -31,6 +31,7 @@ export async function generateMetadata({ params }: CountryPageProps): Promise<Me
   return {
     title: `${countryName} - Players - Countries`,
     description: `Players from ${countryName} ranked by points`,
+    alternates: { canonical: `/players/countries/${countrycode.toUpperCase()}` },
   };
 }
 

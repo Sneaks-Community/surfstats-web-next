@@ -20,8 +20,13 @@ import JoinServerCTA from '@/app/components/home/JoinServerCTA';
 import TopPlayersPreview, { type TopPlayerEntry } from '@/app/components/home/TopPlayersPreview';
 import FeaturedMaps, { type FeaturedMapEntry } from '@/app/components/home/FeaturedMaps';
 import ActivityTicker from '@/app/components/home/ActivityTicker';
+import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
+
+export const metadata: Metadata = {
+  alternates: { canonical: '/' },
+};
 
 // Logs and returns `fallback` on failure, so one dead source never blanks the whole page.
 async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<T> {

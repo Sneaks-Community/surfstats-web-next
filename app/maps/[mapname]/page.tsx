@@ -31,21 +31,32 @@ export async function generateMetadata({ params }: { params: Promise<{ mapname: 
     return { title: 'Map Not Found' };
   }
 
-  const description =
-    `Leaderboards, world records, and completion stats for the CS:GO surf map ${map.mapname} (Tier ${map.tier})` +
-    (map.wr_holder ? `. Current world record held by ${map.wr_holder}.` : '.');
-  const imagesBaseUrl = getMapImagesUrl();
+  const staged = isStagedMap(map);
+  const extras = [staged && 'stage', map.bonuses > 0 && 'bonus'].filter(Boolean).join(' and ');
+  const description = [
+    map.wr_time != null &&
+      `${map.mapname} world record: ${formatTime(map.wr_time)}${map.wr_holder ? ` by ${validatePlayerName(map.wr_holder)}` : ''}.`,
+    `Tier ${map.tier} ${staged ? `staged CS:GO surf map (${map.stages} stages)` : 'linear CS:GO surf map'} by ${validatePlayerName(map.mapper)}, ${map.completions.toLocaleString()} completions.`,
+    `Full leaderboard${extras && ` with ${extras} times`}.`,
+  ].filter(Boolean).join(' ');
+  const title = `${map.mapname} World Record & Leaderboard (Tier ${map.tier})`;
+  const socialTitle = `${title} - ${SITE_NAME}`;
+  const path = `/maps/${map.mapname}`;
+  const image = mapImageUrl(getMapImagesUrl(), map.mapname);
 
   return {
-    title: map.mapname,
+    title,
     description,
+    alternates: { canonical: path },
     openGraph: {
       type: 'website',
       siteName: SITE_NAME,
-      title: `${map.mapname} - ${SITE_NAME}`,
+      title: socialTitle,
       description,
-      images: [{ url: mapImageUrl(imagesBaseUrl, map.mapname) }],
+      url: path,
+      images: [{ url: image }],
     },
+    twitter: { card: 'summary_large_image', title: socialTitle, description, images: [image] },
   };
 }
 

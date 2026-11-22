@@ -12,6 +12,7 @@ import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
   title: 'Players',
+  alternates: { canonical: '/players' },
 };
 
 export default async function PlayersPage({

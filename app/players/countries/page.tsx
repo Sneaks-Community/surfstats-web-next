@@ -11,6 +11,7 @@ import type { Metadata } from 'next';
 export const metadata: Metadata = {
   title: 'Countries - Players',
   description: "Global reach of the surf community — players ranked by country",
+  alternates: { canonical: '/players/countries' },
 };
 
 export default async function CountriesPage() {
