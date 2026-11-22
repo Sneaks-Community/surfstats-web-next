@@ -7,31 +7,17 @@ import logger from '@/lib/logger';
 // Per request: at build time the map list would freeze to the build's cache (usually empty).
 export const dynamic = 'force-dynamic';
 
-/** Static pages plus every map page (cached metadata, so cheap). Player profiles are omitted on
- * purpose: crawlable via `/players`, but listing all needs a full-table scan and a huge sitemap. */
+/** Static pages plus every map page (cached metadata, so cheap). Player profiles are left out: they're
+ * not a search target, and listing them all needs a full-table scan. No lastmod: there's no real one. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const base = await getSiteUrl();
-  const now = new Date();
-
-  const staticRoutes: MetadataRoute.Sitemap = [
-    { url: `${base}/`, lastModified: now, changeFrequency: 'daily', priority: 1 },
-    { url: `${base}/maps`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
-    { url: `${base}/players`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
-    { url: `${base}/servers`, lastModified: now, changeFrequency: 'hourly', priority: 0.7 },
-    { url: `${base}/players/countries`, lastModified: now, changeFrequency: 'weekly', priority: 0.5 },
-    { url: `${base}/players/countries/list`, lastModified: now, changeFrequency: 'weekly', priority: 0.4 },
-    { url: `${base}/search`, lastModified: now, changeFrequency: 'monthly', priority: 0.3 },
-  ];
+  const staticRoutes: MetadataRoute.Sitemap = ['/', '/maps', '/players', '/servers', '/players/countries', '/players/countries/list']
+    .map((path) => ({ url: `${base}${path}` }));
 
   let mapRoutes: MetadataRoute.Sitemap = [];
   try {
     const metadata = await getAllMapMetadataFromCache();
-    mapRoutes = Array.from(metadata.keys()).map((mapname) => ({
-      url: `${base}/maps/${encodeURIComponent(mapname)}`,
-      lastModified: now,
-      changeFrequency: 'daily',
-      priority: 0.8,
-    }));
+    mapRoutes = Array.from(metadata.keys()).map((mapname) => ({ url: `${base}/maps/${encodeURIComponent(mapname)}` }));
   } catch (error: unknown) {
     // Don't fail the whole sitemap if the map list is briefly unavailable.
     logger.error(`[sitemap] Failed to list map pages: ${getErrorMessage(error)}`);
