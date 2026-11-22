@@ -82,6 +82,11 @@ export const HEATMAP_MAX_SESSIONS = 10000;
 export type SortDirection = 'asc' | 'desc';
 
 export const SITE_NAME = process.env.NEXT_PUBLIC_SITE_NAME || 'SurfStats';
+/** Homepage `<title>` and H1. */
+export const SITE_TITLE = process.env.NEXT_PUBLIC_SITE_TITLE || 'SurfStats - CS:GO Surf Community';
+export const SITE_DESCRIPTION =
+  process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
+  'Statistics, leaderboards, and server information for our CS:GO surf community.';
 
 /** Whether a map is staged rather than linear; client-safe so the map page's tabs match the server.
  * `stages` is `COUNT(*) + 1` over stage zones (linear 0, staged >= 2, never 1); route every check

@@ -102,6 +102,12 @@ describe('validateEnv', () => {
       validate({ VALKEY_URL: 'rediss://cache:6379', VALKEY_TLS: 'true', VALKEY_CONNECT_TIMEOUT: '2000' })
     ).resolves.toBeUndefined();
   });
+
+  // The structured data derives the organization's `@id` from it.
+  it('rejects an ORG_URL that is not a URL', async () => {
+    await expect(validate({ ORG_URL: 'example.com' })).rejects.toThrow(/ORG_URL must be a valid URL/);
+    await expect(validate({ ORG_URL: 'https://example.com/' })).resolves.toBeUndefined();
+  });
 });
 
 describe('getEnv', () => {

@@ -121,11 +121,13 @@ Rate limiting uses [`rate-limiter-flexible`](https://github.com/animir/node-rate
 
 | Env var | Required | Default | Description |
 | --- | --- | --- | --- |
-| `NEXT_PUBLIC_SITE_TITLE` | No | `SurfStats - CS:GO Surf Community` | Browser tab / metadata title. |
-| `NEXT_PUBLIC_SITE_NAME` | No | `SurfStats` | Site name in headings and metadata. |
+| `NEXT_PUBLIC_SITE_TITLE` | No | `SurfStats - CS:GO Surf Community` | Home page browser tab / metadata title and heading. |
+| `NEXT_PUBLIC_SITE_NAME` | No | `SurfStats` | Site name in the nav bar, page-title suffix and metadata, and in the home page's `WebSite` structured data, which Google can show as the site name. |
 | `NEXT_PUBLIC_SITE_DESCRIPTION` | No | built-in blurb | Meta description and home page subtitle. |
 | `NEXT_PUBLIC_MAIN_SITE_URL` | No | `https://yourdomain.invalid` | Footer link to your community's main site. |
 | `NEXT_PUBLIC_MAIN_SITE_NAME` | No | `Main Site` | Text for that link. |
+| `ORG_NAME` | No | | Organization that runs the site, named as `publisher` in the home page's `WebSite` structured data. Left out unless an organization URL is also set. |
+| `ORG_URL` | No | `NEXT_PUBLIC_MAIN_SITE_URL` | That organization's own website, where its full structured data (logo, profiles) lives; its `@id` is this URL plus `#organization`. |
 | `NEXT_PUBLIC_FOOTER_LINK_URL` | No | | One extra footer link (e.g. Discord); hidden when unset. |
 | `NEXT_PUBLIC_FOOTER_LINK_TEXT` | No | `Link` | Text for that link. |
 | `NEXT_PUBLIC_MAP_DOWNLOAD_URL_PREFIX` | No | | Prefix wrapping a map name into a download URL; leave blank to hide the download icon. |

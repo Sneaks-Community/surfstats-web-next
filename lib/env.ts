@@ -92,6 +92,9 @@ const optionalSchema = z.object({
     .enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal', 'silent'])
     .optional(),
   MAP_IMAGES_URL: z.url('MAP_IMAGES_URL must be a valid URL').optional(),
+  // The organization publishing this site, referenced from its WebSite structured data (lib/structured-data.ts).
+  ORG_NAME: z.string().trim().min(1).optional(),
+  ORG_URL: z.url('ORG_URL must be a valid URL').optional(),
   // IANA zone for rendered dates and heatmap day/hour buckets (default UTC). Rejected at boot if
   // unknown to the runtime, since Intl would throw on render.
   DISPLAY_TZ: z

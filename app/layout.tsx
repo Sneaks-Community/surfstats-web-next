@@ -6,7 +6,7 @@ import { ClientConfigProvider } from '@/lib/ClientConfigContext';
 import { ThemeProvider } from '@/lib/theme-context';
 import { generateThemeStyles } from '@/lib/theme-config';
 import { getSiteUrl } from '@/lib/site-url';
-import { getMapImagesUrl, getDisplayTz, SITE_NAME } from '@/lib/utils';
+import { getMapImagesUrl, getDisplayTz, SITE_DESCRIPTION, SITE_NAME, SITE_TITLE } from '@/lib/utils';
 
 // No startup work here (a layout can evaluate more than once per process); see instrumentation.ts.
 
@@ -15,10 +15,8 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata(): Promise<Metadata> {
   const siteUrl = await getSiteUrl();
-  const title = process.env.NEXT_PUBLIC_SITE_TITLE || 'SurfStats - CS:GO Surf Community';
-  const description =
-    process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
-    'Statistics, leaderboards, and server information for our CS:GO surf community.';
+  const title = SITE_TITLE;
+  const description = SITE_DESCRIPTION;
 
   return {
     metadataBase: new URL(siteUrl),

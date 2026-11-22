@@ -6,7 +6,9 @@ import {
   Flag,
   Layers,
 } from 'lucide-react';
-import { getMapImagesUrl, SITE_NAME } from '@/lib/utils';
+import { getMapImagesUrl, SITE_DESCRIPTION, SITE_TITLE } from '@/lib/utils';
+import { getSiteUrl } from '@/lib/site-url';
+import { serializeJsonLd, websiteJsonLd } from '@/lib/structured-data';
 import { getStatsFromCache, getLatestCompletionsFromCache } from '@/lib/dashboard-cache';
 import { getPlayersFromCache } from '@/lib/player-cache';
 import { EMPTY_SEARCH } from '@/lib/validators';
@@ -73,18 +75,17 @@ export default async function Home() {
     .map((m) => ({ mapname: m.mapname, tier: m.tier, completions: m.completions }));
 
   const recentRecords = stats?.recentRecords ?? [];
+  const jsonLd = serializeJsonLd(websiteJsonLd(await getSiteUrl()));
 
   return (
     <div className="space-y-5">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: jsonLd }} />
       <section className="pt-1 pb-2 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
         <div className="min-w-0">
           <h1 className="text-3xl font-bold tracking-tight text-text mb-1">
-            Welcome to {SITE_NAME}
+            {SITE_TITLE}
           </h1>
-          <p className="text-text-muted text-base max-w-2xl">
-            {process.env.NEXT_PUBLIC_SITE_DESCRIPTION ||
-              'Statistics, leaderboards, and server information for our CS:GO surf community.'}
-          </p>
+          <p className="text-text-muted text-base max-w-2xl">{SITE_DESCRIPTION}</p>
         </div>
         <JoinServerCTA />
       </section>
