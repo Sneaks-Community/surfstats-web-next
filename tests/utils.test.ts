@@ -14,6 +14,7 @@ import {
   isValidTimeZone,
   getDisplayTz,
   DEFAULT_DISPLAY_TZ,
+  relatedMaps,
 } from '../lib/utils';
 
 // Every page route clamps `?page=` through this; a NaN must never reach an OFFSET.
@@ -161,5 +162,51 @@ describe('wrDiff and formatTimeDiff', () => {
     expect(formatTimeDiff(70, 60)).toBe('+0:10.000');
     expect(formatTimeDiff(60, 60)).toBe('-');
     expect(formatTimeDiff(70, null)).toBe('-');
+  });
+});
+
+describe('relatedMaps', () => {
+  const mk = (mapname: string, tier: number, extra: Partial<{ stages: number; checkpoints: number; bonuses: number; wr_time: number | null; mappersteam: string | null }> = {}) =>
+    ({ mapname, tier, stages: 0, checkpoints: 0, bonuses: 0, wr_time: 60, mappersteam: null, ...extra });
+  const names = (list: Array<{ mapname: string }>) => list.map((m) => m.mapname);
+
+  // Alphabetical order disagrees with similarity order on purpose.
+  const maps = [
+    mk('surf_a', 3, { stages: 8, mappersteam: 'STEAM_1:0:1' }),
+    mk('surf_b', 3, { checkpoints: 2 }),
+    mk('surf_c', 3, { stages: 2, bonuses: 1, mappersteam: 'STEAM_1:0:1' }),
+    mk('surf_d', 3, { stages: 2, bonuses: 1, wr_time: 30 }),
+    mk('surf_e', 3, { stages: 2 }),
+    mk('surf_f', 3, { checkpoints: 9, mappersteam: 'STEAM_1:0:1' }),
+    mk('surf_g', 2, { checkpoints: 2 }),
+    mk('surf_h', 4, { checkpoints: 2 }),
+    mk('surf_i', 3, { stages: 5, mappersteam: 'STEAM_1:0:1' }),
+    mk('surf_j', 1),
+    mk('surf_k', 6, { mappersteam: 'STEAM_1:0:2' }),
+  ];
+  // Expected order: j g | b f | e d c i a | h | k
+
+  it('orders by tier, type, stage or checkpoint count, bonuses, then WR time', () => {
+    expect(names(relatedMaps(maps, maps[4]).similar)).toEqual(['g', 'b', 'f', 'd', 'c', 'i'].map((n) => `surf_${n}`));
+  });
+
+  it('shifts the window at the ends instead of wrapping', () => {
+    expect(names(relatedMaps(maps, maps[9]).similar)).toEqual(['g', 'b', 'f', 'e', 'd', 'c'].map((n) => `surf_${n}`));
+    expect(names(relatedMaps(maps, maps[10]).similar)).toEqual(['e', 'd', 'c', 'i', 'a', 'h'].map((n) => `surf_${n}`));
+  });
+
+  it('links every map from at least one other map', () => {
+    const linked = new Set(maps.flatMap((m) => names(relatedMaps(maps, m).similar)));
+    expect(maps.filter((m) => !linked.has(m.mapname))).toEqual([]);
+  });
+
+  it('groups by mapper Steam ID in similarity order, and skips maps without one', () => {
+    expect(names(relatedMaps(maps, maps[0]).sameMapper)).toEqual(['surf_f', 'surf_c', 'surf_i']);
+    expect(relatedMaps(maps, maps[1]).sameMapper).toEqual([]);
+  });
+
+  it('returns nothing when the map has no other map to list', () => {
+    expect(relatedMaps([maps[10]], maps[10])).toEqual({ similar: [], sameMapper: [] });
+    expect(relatedMaps(maps, maps[10]).sameMapper).toEqual([]);
   });
 });

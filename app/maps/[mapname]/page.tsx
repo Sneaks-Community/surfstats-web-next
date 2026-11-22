@@ -2,17 +2,18 @@ import { Suspense } from 'react';
 import { getSteamProfileUrl } from '@/lib/steam';
 import { notFound, permanentRedirect } from 'next/navigation';
 import { Skeleton } from '@/components/Skeleton';
-import { Map as MapIcon, Users, Layers, Target, Download, Trophy, Medal, Award, Timer, Clock } from 'lucide-react';
+import { Map as MapIcon, Users, Layers, Target, Download, Trophy, Medal, Award, Timer, Clock, ChevronRight, ChevronDown, User, type LucideIcon } from 'lucide-react';
+import Link from '@/components/Link';
 import MapImage from '@/components/MapImage';
 import StatTile from '@/components/StatTile';
 import { validateMapName, validatePlayerName } from '@/lib/validators';
-import { mapImageUrl, getMapImagesUrl, isStagedMap, formatTime, SITE_NAME } from '@/lib/utils';
+import { mapImageUrl, getMapImagesUrl, isStagedMap, formatTime, relatedMaps, SITE_NAME } from '@/lib/utils';
 import logger from '@/lib/logger';
 import MapRecordsTabs from './components/MapRecordsTabs';
 import PageTabs from '@/components/PageTabs';
 import TierBadge from '@/components/TierBadge';
 import MapChartGrid from './components/charts/MapChartGrid';
-import { findMapNameIgnoringCase, getMapMetadataFromCache } from '@/lib/map-cache';
+import { findMapNameIgnoringCase, getAllMapMetadataFromCache, getMapMetadataFromCache, type MapMetadata } from '@/lib/map-cache';
 import { getMapChartDataFromCache, getPercentileTimesFromCache } from '@/lib/map-stats-cache';
 
 export async function generateMetadata({ params }: { params: Promise<{ mapname: string }> }) {
@@ -56,6 +57,39 @@ async function ChartGrid({ mapname }: { mapname: string }) {
   return <MapChartGrid data={await getMapChartDataFromCache(mapname)} />;
 }
 
+function RelatedMapList({ title, icon: Icon, maps }: {
+  title: string;
+  icon: LucideIcon;
+  maps: MapMetadata[];
+}) {
+  if (maps.length === 0) return null;
+  // Native <details>: collapsed, but the links stay in the server HTML for crawlers.
+  return (
+    <details className="group/related">
+      <summary className="flex items-center gap-2 min-h-11 border-b border-border pb-2 cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <Icon className="h-5 w-5 text-primary" />
+        <h2 className="text-lg font-semibold text-text">{title}</h2>
+        <ChevronDown className="ml-auto h-5 w-5 text-text-muted transition-transform group-open/related:rotate-180" />
+      </summary>
+      <div className="mt-3 bg-surface border border-border rounded-xl overflow-hidden divide-y divide-border">
+        {maps.map((m) => (
+          <Link
+            key={m.mapname}
+            href={`/maps/${m.mapname}`}
+            className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-surface-hover/50 transition-colors group"
+          >
+            <span className="font-medium text-text group-hover:text-primary transition-colors truncate">{m.mapname}</span>
+            <span className="flex items-center gap-3 shrink-0 text-xs text-text-muted">
+              Tier {m.tier}
+              <ChevronRight className="h-4 w-4 text-text-placeholder group-hover:text-text-muted transition-colors" />
+            </span>
+          </Link>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 const ChartGridSkeleton = () => (
   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
     {Array.from({ length: 4 }).map((_, i) => (
@@ -95,7 +129,11 @@ export default async function MapProfilePage({
 
   // After notFound(), so a bogus name never queries; MapGraphPrecache keeps it warm for every map.
   // Awaited here, not in the chart grid's Suspense, so the tiles arrive with the header.
-  const percentiles = await getPercentileTimesFromCache(validMapname);
+  const [percentiles, allMaps] = await Promise.all([
+    getPercentileTimesFromCache(validMapname),
+    getAllMapMetadataFromCache(),
+  ]);
+  const { similar, sameMapper } = relatedMaps([...allMaps.values()], map);
   const timeTiles = [
     { label: 'Top 1%', time: percentiles?.p1Time, icon: Medal },
     { label: 'Top 10%', time: percentiles?.p10Time, icon: Award },
@@ -229,6 +267,13 @@ export default async function MapProfilePage({
           />
         }
       />
+
+      {(similar.length > 0 || sameMapper.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+          <RelatedMapList title="Similar Maps" icon={MapIcon} maps={similar} />
+          <RelatedMapList title="More by This Mapper" icon={User} maps={sameMapper} />
+        </div>
+      )}
     </div>
   );
 }

@@ -90,6 +90,42 @@ export function isStagedMap(metadata: { stages: number }): boolean {
   return metadata.stages > 1;
 }
 
+interface RelatedMapFields {
+  mapname: string;
+  tier: number;
+  stages: number;
+  checkpoints: number;
+  bonuses: number;
+  wr_time: number | null;
+  mappersteam: string | null;
+}
+
+/** Tier, then linear before staged, stage (or checkpoint) count, bonuses, WR time. */
+function bySimilarity(a: RelatedMapFields, b: RelatedMapFields): number {
+  const staged = isStagedMap(a);
+  return a.tier - b.tier
+    || Number(staged) - Number(isStagedMap(b))
+    || (staged ? a.stages - b.stages : a.checkpoints - b.checkpoints)
+    || a.bonuses - b.bonuses
+    || (a.wr_time ?? Infinity) - (b.wr_time ?? Infinity) // NaN when both null: falls through
+    || a.mapname.localeCompare(b.mapname);
+}
+
+/** The 6 maps nearest `map` in the similarity order, overall and by its mapper (grouped by Steam ID:
+ * placeholder mappers have none). The window shifts at the ends, so every map is listed by its neighbours. */
+export function relatedMaps<T extends RelatedMapFields>(all: readonly T[], map: RelatedMapFields): { similar: T[]; sameMapper: T[] } {
+  const sorted = [...all].sort(bySimilarity);
+  const around = (group: T[]): T[] => {
+    const i = group.findIndex((m) => m.mapname === map.mapname);
+    const start = Math.min(Math.max(i - 3, 0), Math.max(group.length - 7, 0));
+    return group.slice(start, start + 7).filter((m) => m.mapname !== map.mapname).slice(0, 6);
+  };
+  return {
+    similar: around(sorted),
+    sameMapper: map.mappersteam ? around(sorted.filter((m) => m.mappersteam === map.mappersteam)) : [],
+  };
+}
+
 /** Shortest search that reaches the DB. It counts the sanitized query, so `ab'` gets empty results,
  * not an error. */
 export const MIN_SEARCH_LENGTH = 3;
