@@ -171,11 +171,13 @@ export default async function MapProfilePage({
         
         <div className="relative z-10 p-4 sm:p-6 flex flex-col md:flex-row gap-3 items-center md:items-end">
           <div className="relative h-48 w-full md:w-72 rounded-xl overflow-hidden border-4 border-border bg-surface-hover flex-shrink-0 shadow-2xl">
+            {/* Preloaded: the hero, and the blurred background shares its URL, so one early fetch serves both. */}
             <MapImage
               src={mapImageUrl(mapImagesUrl, map.mapname)}
               alt={map.mapname}
               unoptimized
               fill
+              preload
               className="object-cover"
               referrerPolicy="no-referrer"
             />
