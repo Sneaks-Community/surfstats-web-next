@@ -34,12 +34,26 @@ export interface SteamAvatarSet {
 /** Steam's documented cap for `GetPlayerSummaries`; more IDs are silently dropped. */
 const STEAM_IDS_PER_REQUEST = 100;
 const STEAM_AVATAR_TTL = 86400; // 1 day: players change avatars often
+/** Pages wait on this call with no skeleton in front, so a hung Steam API must not hang them. */
+const STEAM_FETCH_TIMEOUT_MS = 3000;
 
 function steamAvatarKey(steamId: string): string {
   return `surfstats:steam:avatar:${steamId}`;
 }
 /** Cached for IDs Steam omits (deleted accounts), so they are not re-asked every render. */
 const NO_AVATAR: SteamAvatarSet = { avatar: '', avatarmedium: '', avatarfull: '' };
+
+/** After a failure, Steam is asked once per this window (the rest get default avatars) until it answers. */
+const STEAM_RETRY_COOLDOWN_MS = 60_000;
+let outage: { since: number; retryAt: number } | null = null;
+
+/** Starts or extends an outage; only its first failure is logged, so a long one costs one warning. */
+function steamFailed(reason: string): null {
+  const now = Date.now();
+  if (!outage) logger.warn(`[Steam API] ${reason}; serving default avatars, retrying every ${STEAM_RETRY_COOLDOWN_MS / 1000}s`);
+  outage = { since: outage?.since ?? now, retryAt: now + STEAM_RETRY_COOLDOWN_MS };
+  return null;
+}
 
 /** Strips the API key before logging: some fetch failures put the request URL, key included,
  * in the error message, which would log a live credential. */
@@ -62,47 +76,51 @@ async function fetchSteamPlayerData(steamId64s: string[]): Promise<SteamPlayer[]
     return null;
   }
 
+  if (outage) {
+    if (startTime < outage.retryAt) return null;
+    outage.retryAt = startTime + STEAM_RETRY_COOLDOWN_MS; // claimed, so concurrent renders skip this window
+  }
+
   try {
     const response = await fetch(
       `https://api.steampowered.com/ISteamUser/GetPlayerSummaries/v2/?key=${apiKey}&steamids=${steamId64s.join(',')}`,
-      { cache: 'no-store' }
+      { cache: 'no-store', signal: AbortSignal.timeout(STEAM_FETCH_TIMEOUT_MS) }
     );
 
     if (!response.ok) {
       const duration = Date.now() - startTime;
       if (response.status === 403) {
-        logger.error(`[Steam API] API key invalid or forbidden (${response.status}) - check STEAM_API_KEY`);
+        return steamFailed(`API key invalid or forbidden (${response.status}) - check STEAM_API_KEY`);
       } else if (response.status === 429) {
-        logger.error(`[Steam API] Rate limited by Steam API (${response.status}) - too many requests`);
-      } else {
-        logger.error(`[Steam API] API request failed with status ${response.status} after ${duration}ms`);
+        return steamFailed(`Rate limited by Steam API (${response.status}) - too many requests`);
       }
-      return null;
+      return steamFailed(`API request failed with status ${response.status} after ${duration}ms`);
     }
 
     const data: SteamWrapperResponse = await response.json();
     const duration = Date.now() - startTime;
     
     const players = data.response?.players || [];
-    
+
+    if (outage) {
+      logger.info(`[Steam API] Back after ${((Date.now() - outage.since) / 60_000).toFixed(1)} min`);
+      outage = null;
+    }
     logger.debug(`[Steam API] Successfully fetched ${players.length} players in ${duration}ms`);
     
     return players;
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
-    const err = error as { code?: string; message?: string };
+    const err = error as { code?: string; name?: string; message?: string };
     const errorCode = err.code || 'UNKNOWN';
     const errorMessage = redactApiKey(getErrorMessage(error));
 
     if (err.code === 'ENOTFOUND' || err.code === 'ECONNREFUSED') {
-      logger.error(`[Steam API] Network error - unable to reach Steam API servers (${errorCode})`);
-    } else if (err.code === 'ETIMEDOUT') {
-      logger.error(`[Steam API] Request timed out after ${duration}ms`);
-    } else {
-      logger.error(`[Steam API] Error fetching data after ${duration}ms: ${errorMessage}`);
+      return steamFailed(`Network error - unable to reach Steam API servers (${errorCode})`);
+    } else if (err.code === 'ETIMEDOUT' || err.name === 'TimeoutError') {
+      return steamFailed(`Request timed out after ${duration}ms`);
     }
-    
-    return null;
+    return steamFailed(`Error fetching data after ${duration}ms: ${errorMessage}`);
   }
 }
 

@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as Steam from '../lib/steam';
 
 const cacheGetMany = vi.fn();
 const cacheSetMany = vi.fn();
@@ -23,12 +24,17 @@ const fetchUrl = (index: number): string => {
   return arg instanceof URL ? arg.href : arg.url;
 };
 
-const {
-  convertSteamId2ToSteamId3Numeric,
-  convertSteamIdTo64,
-  getSteamProfileUrl,
-  getSteamProfilesFromCache,
-} = await import('../lib/steam');
+const { convertSteamId2ToSteamId3Numeric, convertSteamIdTo64, getSteamProfileUrl } = await import('../lib/steam');
+
+// The outage state is module-level, so each case needs a fresh module.
+let getSteamProfilesFromCache: typeof Steam.getSteamProfilesFromCache;
+beforeEach(async () => {
+  vi.resetModules();
+  ({ getSteamProfilesFromCache } = await import('../lib/steam'));
+});
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('convertSteamIdTo64', () => {
   it('converts SteamID2 using the known base offset', () => {
@@ -227,6 +233,49 @@ describe('getSteamProfilesFromCache', () => {
     expect(init.cache).toBe('no-store');
     expect(init.next).toBeUndefined();
   });
+  // Pages render inline, so a hung Steam call must end in default avatars, not a hung page.
+  it('bounds the Steam call with a timeout and caches nothing when it fires', async () => {
+    process.env.STEAM_API_KEY = 'test-key';
+    vi.mocked(fetch).mockRejectedValue(new DOMException('The operation was aborted due to timeout', 'TimeoutError'));
+
+    const result = await getSteamProfilesFromCache(['STEAM_1:0:12345']);
+
+    const init = vi.mocked(fetch).mock.calls[0][1] as RequestInit;
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(result.size).toBe(0);
+    expect(cacheSetMany).toHaveBeenCalledWith([], 86400);
+    expect(vi.mocked(logger.warn).mock.calls.map((c) => String(c[0])).join('\n')).toContain('timed out');
+  });
+
+  // Valve's weekly maintenance can last an hour: one warning and one wait per minute, not one per view.
+  it('logs an outage once, retries Steam once a minute, and logs the recovery', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    process.env.STEAM_API_KEY = 'test-key';
+    const ids = ['STEAM_1:0:12345'];
+    const later = (ms: number) => vi.setSystemTime(Date.now() + ms);
+    vi.mocked(fetch).mockResolvedValue({ ok: false, status: 503 } as unknown as Response);
+
+    await getSteamProfilesFromCache(ids);
+    later(30_000);
+    await getSteamProfilesFromCache(ids); // inside the cooldown: skipped
+    later(31_000);
+    await Promise.all([getSteamProfilesFromCache(ids), getSteamProfilesFromCache(ids)]); // one retry between them
+
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(logger.warn).toHaveBeenCalledTimes(1);
+
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ response: { players: [] } }),
+    } as unknown as Response);
+    later(60_000);
+    await getSteamProfilesFromCache(ids);
+    await getSteamProfilesFromCache(ids);
+
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(logger.info).toHaveBeenCalledTimes(1);
+    expect(logger.info).toHaveBeenCalledWith('[Steam API] Back after 2.0 min');
+  });
 });
 
 // The key is in the query string, and some fetch errors put the request URL in their message.
@@ -250,7 +299,7 @@ describe('Steam API key redaction', () => {
 
     await getSteamProfilesFromCache(['STEAM_1:0:12345']);
 
-    const logged = vi.mocked(logger.error).mock.calls.map((c) => String(c[0])).join('\n');
+    const logged = [logger.error, logger.warn, logger.info].flatMap((fn) => vi.mocked(fn).mock.calls.map((c) => String(c[0]))).join('\n');
     expect(logged).not.toContain('super-secret-key');
     expect(logged).toContain('key=***');
   });
